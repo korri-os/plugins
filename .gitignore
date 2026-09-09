@@ -1,0 +1,6 @@
+/result
+/result-*
+/publisher
+/.worktrees/
+__pycache__/
+*.py[cod]
