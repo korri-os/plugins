@@ -2,21 +2,20 @@
 
 Tailscale installs independently through the [generic plugin host](https://github.com/korri-os/korri/blob/main/services/korrid/plugin-host/README.md). The system image contains no Tailscale package or named service registration. Install, enable, update, disable, and remove use the administrator CLI without a NixOS update.
 
-`packages.<system>.korri-tailscale` contains the runtime-interpreted `plugin.ts` declaration and links to the unchanged `pkgs.tailscale` binaries from the locked core input's nixpkgs. The small declaration package is also built in CI. The publisher converts its complete closure to content-addressed form for a verified HTTPS archive. Devices never build it locally. Both CLI and daemon come from that same selected package.
+`packages.<system>.korri-tailscale` contains the runtime-interpreted `plugin.ts` declaration and links to the unchanged `pkgs.tailscale` binaries from the locked core input's nixpkgs. The small declaration package is also built in CI. Nix exports and signs its complete closure for a standard binary cache hosted on GitHub Releases. Devices never build it locally. Both CLI and daemon come from that same selected package.
 
 ## Installation
 
-First install core's generic `nixosModules.korri-plugin-host` support in the base system. The module does not name Tailscale. After the curator publishes a real catalog, use its explicit URL and plugin release label. No official destination is configured by this change.
+First install core's generic `nixosModules.korri-plugin-host` support in the base system. The module does not name Tailscale. After publication, use the cache metadata release URL and the exact store path from the build artifact. Configure the cache public key through the approved host configuration first. No destination or key is installed by this change.
 
 ```sh
-sudo korri-plugin repository add "$CATALOG_URL"
-sudo korri-plugin repository inspect "$CATALOG_URL" @korri:tailscale "$RELEASE"
+sudo korri-plugin inspect "$CACHE_URL" "$PACKAGE"
 ```
 
 Read the reported declaration, effective systemd policy, and permission warning. Then supply the report's exact approval value:
 
 ```sh
-sudo korri-plugin repository install "$CATALOG_URL" @korri:tailscale "$RELEASE" "$APPROVAL"
+sudo korri-plugin install "$CACHE_URL" "$PACKAGE" "$APPROVAL"
 sudo korri-plugin enable @korri:tailscale
 ```
 
@@ -38,8 +37,8 @@ Run these on a development or CI machine, never on a download-only device:
 
 ```sh
 nix build .#checks.x86_64-linux.korri-plugin-host .#checks.x86_64-linux.korri-runtime-plugin-host --no-link
-nix run .#korri-publisher-check
+nix build .#checks.x86_64-linux.korri-github-cache --no-link
 nix build .#checks.x86_64-linux.korri-tailscale-package --no-link
 ```
 
-The [curator-triggered publication workflow](../../PUBLICATION.md) builds this actual plugin and checks the host on standard x86_64 and ARM64 Linux runners. Its Rust producer supplies archive names and catalog records. A plugin release label is independent of the upstream Tailscale binary version. Preparation is not live publication: destination, tag, draft approval, immutable-release settings and separate catalog deployment still need curator action. No device deployment or real tailnet enrollment is part of these checks.
+The [curator-triggered publication workflow](../../PUBLICATION.md) builds selected packages on standard x86_64 and ARM64 Linux runners. A batch can contain several plugins. Nix generates the cache metadata; no catalog is maintained in this publication path. Core's separate catalog commands remain unchanged. Publishing, device deployment and real tailnet enrollment require their own approval.

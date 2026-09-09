@@ -1,49 +1,43 @@
-name: Prepare plugin repository release
+name: Publish Nix cache
 
 on:
   workflow_dispatch:
     inputs:
-      destination:
-        description: "Explicit GitHub OWNER/REPOSITORY for archive URLs (draft writes only to this repository)"
+      packages:
+        description: "Package output names separated by spaces; one or more per batch"
         required: true
+        default: korri-tailscale
         type: string
       tag:
-        description: "New release tag; must already point at this main commit before draft creation"
+        description: "Batch tag, not a plugin version; must name this main commit before publication"
         required: true
         type: string
-      release_label:
-        description: "New plugin release label, independent of upstream Tailscale version"
+      cache_tag:
+        description: "Existing public mutable release for Nix metadata"
         required: true
+        default: cache
         type: string
-      create_draft:
-        description: "Approve creating a draft and uploading verified archives (never publishes)"
+      publish:
+        description: "Publish verified NAR assets and append signed cache metadata"
         default: false
         type: boolean
 
 permissions:
   contents: read
 
+# All batches share cache metadata. Never cancel an in-flight publication.
 concurrency:
-  group: plugin-repository-${{ inputs.destination }}-${{ inputs.tag }}
+  group: plugin-binary-cache
   cancel-in-progress: false
 
 env:
-  PLUGIN_DESTINATION: ${{ inputs.destination }}
-  PLUGIN_TAG: ${{ inputs.tag }}
-  PLUGIN_RELEASE: ${{ inputs.release_label }}
+  NAR_TAG: ${{ inputs.tag }}
+  CACHE_TAG: ${{ inputs.cache_tag }}
+  PACKAGES: ${{ inputs.packages }}
 
 jobs:
-  guard:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - run: python3 nix/publication.py guard
-
   build:
-    needs: guard
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +48,7 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    environment: plugin-release
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -61,32 +56,52 @@ jobs:
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check only plugin, host, and download policy outputs
+      - name: Validate the destination and test the publisher
         env:
           SYSTEM: ${{ matrix.system }}
-        run: >-
-          nix build --no-link
-          ".#checks.$SYSTEM.korri-plugin-host"
-          ".#checks.$SYSTEM.korri-tailscale-package"
-          ".#checks.$SYSTEM.korri-device-cache"
-          ".#checks.$SYSTEM.korri-input-module"
-          ".#checks.$SYSTEM.korri-bundle-module"
-          ".#checks.$SYSTEM.korri-publication-workflow"
-      - name: Actual publisher tests in the writable build-machine store
-        run: nix run .#korri-publisher-check
-      - name: Prepare complete Tailscale archive and its Rust catalog record
+        run: |
+          nix run .#korri-cache -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
+          test_output=$(nix build --no-link --print-out-paths ".#checks.$SYSTEM.korri-github-cache")
+          nix build --no-link ".#checks.$SYSTEM.korri-device-cache"
+          python3 nix/github-cache-export-test.py "$test_output"
+          nix build --out-link cache-tool .#korri-cache
+      - name: Build the selected packages without a signing key
         env:
           SYSTEM: ${{ matrix.system }}
-        run: python3 nix/publication.py build "$SYSTEM" "$RUNNER_TEMP/plugin"
+        run: |
+          read -ra selected_outputs <<< "$PACKAGES"
+          ./cache-tool/bin/korri-cache build --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
+      - name: Sign and prepare the Nix cache without content-address conversion
+        env:
+          SIGNING_KEY: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
+          PUBLISH: ${{ inputs.publish }}
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/cache-key"
+          trap 'rm -f "$key"' EXIT
+          if [ -n "$SIGNING_KEY" ]; then
+            printf '%s\n' "$SIGNING_KEY" > "$key"
+          elif [ "$PUBLISH" = true ]; then
+            echo 'NIX_CACHE_SIGNING_KEY is required before publication' >&2
+            exit 1
+          else
+            nix-store --generate-binary-cache-key ci-test-only "$key" "$RUNNER_TEMP/cache-public-key"
+          fi
+          unset SIGNING_KEY
+          mapfile -t paths < "$RUNNER_TEMP/paths.txt"
+          ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
+          ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/"
+          cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: plugin-${{ matrix.system }}
-          path: ${{ runner.temp }}/plugin/
+          name: cache-${{ matrix.system }}
+          path: ${{ runner.temp }}/prepared/
           if-no-files-found: error
           retention-days: 7
 
   lifecycle:
-    needs: guard
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -96,45 +111,14 @@ jobs:
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cold-host HTTPS and lifecycle acceptance
+      - name: Existing cold-host lifecycle acceptance
         run: nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host
 
-  assemble:
+  publish:
     needs: [build, lifecycle]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson' && inputs.publish
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          pattern: plugin-*
-          path: artifacts
-      - name: Merge with the Rust reader contract and verify both assets
-        run: python3 nix/publication.py assemble artifacts prepared
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: plugin-release-assets
-          path: prepared/assets/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Small catalog is separate; not deployed by this workflow
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: plugin-catalog
-          path: prepared/catalog.json
-          if-no-files-found: error
-          retention-days: 7
-
-  draft:
-    needs: assemble
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson' && inputs.create_draft
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: plugin-release
     permissions:
       contents: write
@@ -145,17 +129,13 @@ jobs:
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: plugin-release-assets
-          path: prepared/assets
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: plugin-catalog
-          path: prepared
-      - name: Build the trusted validator before exposing a write token
-        run: nix build --out-link publisher .#korri-plugin-host
-      - name: Create draft, upload all assets without overwrite, and verify downloads
+          pattern: cache-*
+          path: artifacts
+      - name: Prepare the tool before exposing a write token
+        run: |
+          nix build --out-link cache-tool .#korri-cache
+          ./cache-tool/bin/korri-cache combine prepared artifacts/cache-x86_64-linux artifacts/cache-aarch64-linux
+      - name: Publish the batch then append cache metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KORRI_PUBLICATION_PUBLISHER: ./publisher/bin/korri-publish
-          PLUGIN_CREATE_DRAFT: ${{ inputs.create_draft }}
-        run: python3 nix/publication.py draft prepared
+        run: ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG" --revision "$GITHUB_SHA"

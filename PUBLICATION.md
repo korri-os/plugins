@@ -1,147 +1,149 @@
-# Plugin release preparation
+# Signed Nix cache publication
 
-`.github/workflows/plugin-repository.yml` prepares `@korri:tailscale` on standard
-`ubuntu-24.04` and `ubuntu-24.04-arm` runners. It has not been run or published as
-part of this change. No official catalog URL is configured by the workflow.
+The publisher uses Nix's file-cache format. It does not convert store paths to
+content-addressed paths, pack closure tarballs, or produce Korri catalog records.
+Nix owns signatures and verifies downloaded contents.
 
-## Curator controls
+## Hosting setup
 
-Only curator `simonwjackson` may manually dispatch from `main` or rerun a job.
-The owner is the `korri-os` organization; organization ownership or membership
-alone grants no permission through these guards. There are no PR, push, or tag
-triggers. Both YAML job guards and `nix/publication.py` enforce the exact curator.
-Actions are pinned to commit hashes. Package, core host, module, publisher,
-publication workflow and x86_64 VM checks run with `contents: read`. Core owns
-Rust formatting, lint and source validation; this repository consumes its pin.
-A missing architecture or failed check blocks assembly and draft creation.
-Core binaries without `plugin.ts` are not catalog entries. Kernels, images,
-Android builds, and general core binary caching are outside this workflow.
+Use two distinct release tags:
 
-Supply an explicit GitHub `OWNER/REPOSITORY`, release tag, and new plugin release
-label. The label does not come from Tailscale's upstream binary version. With
-`create_draft` false, the workflow only produces seven-day Actions artifacts:
+| Release | Contents | Change policy |
+|---|---|---|
+| Build batch | Compressed NAR files for any selected packages and both architectures. | Upload while draft, then publish. Release immutability can lock these files. |
+| Cache metadata | `nix-cache-info` and signed `.narinfo` files. | Public and mutable. The publisher only adds files; it never replaces or deletes one. |
 
-| Artifact | Content and use |
-|---|---|
-| `plugin-x86_64-linux`, `plugin-aarch64-linux` | Complete file-cache tar and its producer-emitted `record.json`. These are intermediate build artifacts, not a live repository. |
-| `plugin-release-assets` | Both verified tar files, intended for GitHub Releases. Each must be strictly smaller than 2 GiB. |
-| `plugin-catalog` | Only `catalog.json`, intended for a separately approved HTTPS catalog host. Never large archives or a Nix substituter. |
+The cache URL is `https://github.com/OWNER/REPO/releases/download/CACHE_TAG/`.
+NAR URLs name their batch release. Tags identify storage locations, not plugin
+versions. Updating two plugins together needs one batch tag, not two plugin tags.
 
-The Rust publisher owns the archive filename: `package::unit_name(id)`, explicit
-release label, and Nix system. `archive-name` loads the actual package declaration.
-The build uses that name in both the intended archive URL and the upload.
-`catalog` merges producer records with the same `Catalog` serialization and
-reader validation, including duplicate and size limits. `verify-release` checks
-the complete expected platform set, release, URLs, regular files, sizes and
-hashes before external writes. No YAML or jq constructs catalog records.
-The existing archive producer verifies the complete content-addressed Nix cache
-before packing. Devices retain their own independent checks.
+Create the metadata release before enabling immutability for future releases.
+If that release is immutable, publication refuses it. Do not disable protection
+on an existing release or move a tag to bypass the check.
 
-## Draft writes are separate from publication
+No setup step below has been performed by this code change.
 
-`create_draft: true` explicitly approves only draft creation and archive upload.
-The separate write job uses the `plugin-release` environment. Before its first
-use, the curator must review that environment's approval and branch protections.
-These settings have not been inspected or changed here. The job's event, actor,
-rerun-actor, branch and explicit-approval guards do not depend on the environment
-being configured correctly.
+## Signing key
 
-Draft writes are limited to the current repository because its `GITHUB_TOKEN`
-does not authorize another repository. Preparation may target another explicit
-repository, but uploading there needs a separately reviewed operational path.
-No cross-repository secret or account permission is introduced.
-
-The destination tag must already exist and resolve to this run's exact source
-commit. The workflow neither creates nor moves tags. Before creation it lists
-**all pages** of releases and rejects any draft or published release with that
-tag. Failed reads, including authentication and network errors, stop preparation.
-`gh release create --draft` does not enforce this uniqueness by itself.
-
-The documented REST create-release request sends `draft: true` and captures the
-new release ID and upload URL. Every later read and upload uses that exact ID;
-downloads use the exact IDs returned for uploaded assets, never another lookup
-by tag. Response IDs and URLs must match the requested repository and the fixed
-`api.github.com` / `uploads.github.com` HTTPS origins before use. Assets are
-POSTed without replacement or deletion. Preparation checks tag uniqueness and
-draft state before and after each upload, compares the stored asset IDs, and
-downloads the stored bytes for hash verification. It rechecks asset identity and
-draft state after verification. A failed upload leaves a partial draft for curator
-inspection; retries reject it rather than silently repairing or overwriting it.
-The write step uses a validator built before the write token is exposed.
-
-**Do not publish or edit the draft, change its tag, or start another release for
-that tag while preparation runs.** GitHub supplies no transaction across list,
-create, upload and verification requests. Workflow concurrency serializes these
-workflow runs, not other administrators or API clients. An administrator can change
-state between a check and a write; later detection cannot undo that write. Exact
-IDs prevent retargeting an upload to another release, but cannot freeze the draft
-or make tag uniqueness atomic. The final check is a point-in-time observation,
-not proof that another administrator cannot publish immediately afterward. Repeated
-paginated checks add API requests; a rate limit can leave preparation incomplete.
-
-## Immutability and the final operator gate
-
-GitHub's documentation, read on 2026-09-08, identifies the real control:
-repository **Settings → Releases → Enable release immutability**. Organization
-policy may also enforce it. This applies only to future releases. The documented
-create-release request does not provide an `immutable` input; a response field
-is not a request setting. We do not send an undocumented field or infer account
-settings from public documentation.
-
-Sources:
-- [Preventing changes to your releases](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/establish-provenance-and-integrity/prevent-release-changes).
-- [Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
-- [Create a release](https://docs.github.com/en/rest/releases/releases#create-a-release).
-- [List releases](https://docs.github.com/en/rest/releases/releases#list-releases) and [get a release by ID](https://docs.github.com/en/rest/releases/releases#get-a-release).
-- [Upload a release asset](https://docs.github.com/en/rest/releases/assets#upload-a-release-asset), [list assets](https://docs.github.com/en/rest/releases/assets#list-release-assets), and [download by asset ID](https://docs.github.com/en/rest/releases/assets#get-a-release-asset).
-- [`gh api`](https://cli.github.com/manual/gh_api).
-- [Standard GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
-
-Actual repository settings and free runner entitlement have not been verified.
-Use standard runners only; do not enable larger runners or paid services to
-resolve a limit. This workflow intentionally has **no publish operation**.
-The curator must separately approve and perform the remaining steps:
-
-1. Confirm repository visibility/free runner availability, tag identity,
-   environment approval rules, and release immutability before publication.
-2. Inspect the complete draft and both downloaded archives. Publish the draft
-   only after the immutability control is enabled. Confirm its **Immutable**
-   indicator and verify the public downloads. If the control is unavailable,
-   leave the draft unpublished; do not claim immutable delivery.
-3. Choose the real HTTPS catalog destination. Deploy the small validated
-   `catalog.json` only after every referenced Release asset is public. Keep
-   archives in Releases, not Git history or Pages. A later catalog update must
-   retain any still-offered records deliberately; this workflow produces one
-   explicitly selected plugin release, not a cumulative repository history.
-4. Configure that real URL through core's `officialCatalogUrl` after curator approval,
-   then perform actual GitHub download and device acceptance separately.
-
-The cost is full closure conversion/downloads per architecture and repeated
-build work on uncached runners. Standard free runner disk, time or quota limits
-may still stop preparation. Actions artifact retention is not release hosting.
-General core packages now have no Korri-hosted substitute service; Releases is
-not a drop-in Nix cache. Device misses must fail without local or remote builds.
-
-## Local checks
-
-Run on a build machine with a writable Nix store:
+Generate a persistent key with the standard Nix command on a trusted machine:
 
 ```sh
-nix run .#korri-publisher-check
-nix build .#checks.x86_64-linux.korri-publication-workflow --no-link
+umask 077
+nix-store --generate-binary-cache-key korri-plugins-1 cache.secret cache.public
 ```
 
-The opt-in app passes this repository's actual `korri-tailscale` store path to
-`korri.apps.<system>.korri-publisher-check.program`. Pinned core supplies locked
-Nix, Rust, immutable test source and temporary writable build targets. It runs
-the actual ignored publisher tests explicitly;
-missing configuration fails. CA conversion is not run inside a pure derivation.
-The ordinary Rust/HTTPS and publication CLI tests remain sandboxed in the
-core's `korri-plugin-host` package check. The lifecycle VM imports core's
-parameterized test with this repository's actual Tailscale package, core's host
-module and host package. The workflow check parses YAML, runs offline
-guard tests, controlled-process REST orchestration tests, and actionlint. The
-process tests exercise pagination, read failures, concurrent tag ambiguity,
-exact-ID uploads and downloads, draft-state changes, invalid response URLs,
-byte verification, and failed-draft retry refusal. They use local files and
-configured CLI processes; they make no network requests or GitHub writes.
+Store the private key as the `NIX_CACHE_SIGNING_KEY` Actions secret. Keep it out
+of Git, the Nix store and workflow artifacts. Configure the public key as an
+additional trusted key on each device through its approved host configuration.
+Keep `require-sigs = true`. Never use a signature bypass to make an install work.
+
+A signature authorizes Nix store contents. It is not permission to start a
+privileged plugin. Core's administrator approval remains a separate step.
+
+## Workflow
+
+Only `simonwjackson` can dispatch or rerun `main`. Review the `plugin-release`
+environment before the first run. Jobs use standard x86_64 and ARM runners.
+
+Inputs to `.github/workflows/plugin-repository.yml`:
+
+- `packages` selects one or more flake package output names, separated by spaces.
+  The tool rejects expressions, flags and paths. It does not hardcode a plugin ID.
+- `tag` identifies the build batch. Before publication, this tag must already
+  resolve to the workflow's exact source commit. The publisher never creates or
+  moves a tag.
+- `cache_tag` identifies the existing public mutable metadata release.
+- `publish` defaults to false. True explicitly permits NAR release creation,
+  publication and metadata uploads after both builds and the lifecycle gate pass.
+
+Builds run before the signing key is exposed. Signed exports use `nix copy` with
+zero build jobs and no remote builders. The secret is removed before artifacts
+upload. When publication is false and no signing secret exists, the build uses a
+temporary test key. Such outputs are not production artifacts.
+
+Each architecture artifact contains prepared cache files and the exact output
+paths emitted by Nix in `paths-SYSTEM.txt`. These are generated build outputs,
+not manually maintained metadata. Actions artifacts expire after seven days;
+published cache assets do not use Actions retention.
+
+The workflow combines both architectures, then uploads NARs to the batch draft.
+It checks GitHub's reported SHA256 and size for each uploaded asset. It publishes
+that exact release ID before adding any metadata that refers to it. Existing
+release settings determine whether publication makes it immutable.
+
+## Commands on a build machine
+
+Build the package outputs you want. Pass their exact store paths to the export
+command. Do not pass flake references to export.
+
+```sh
+nix run .#korri-cache -- build --system aarch64-linux --paths-file paths.txt korri-tailscale
+nix run .#korri-cache -- export file-cache --key-file cache.secret /nix/store/EXACT_OUTPUT
+nix run .#korri-cache -- prepare file-cache prepared --nar-base-url https://github.com/OWNER/REPO/releases/download/BATCH_TAG/
+```
+
+`EXACT_OUTPUT`, repository, tag and key path above are operator inputs, not real
+published values. `export` can take several store paths. Nix exports and signs
+their full dependency closure. `prepare` changes only each narinfo's `URL:` line;
+that field is outside Nix's signed fingerprint. All signatures remain unchanged.
+
+After approval, `publish` performs the GitHub writes:
+
+```sh
+nix run .#korri-cache -- publish prepared --repo OWNER/REPO --tag BATCH_TAG --cache-tag CACHE_TAG --revision EXACT_COMMIT
+```
+
+The lower-level `upload --part nars` and `upload --part metadata` commands allow
+separate operator stages. Metadata upload refuses draft NAR releases.
+
+## Device installation
+
+Use the exact store path from the build artifact and the metadata release URL:
+
+```sh
+sudo korri-plugin inspect CACHE_URL EXACT_STORE_PATH
+sudo korri-plugin install CACHE_URL EXACT_STORE_PATH APPROVAL_FROM_INSPECTION
+```
+
+Read the approval report before installing. Enable the plugin separately. This
+uses the existing raw-cache CLI, not `repository install`. The cache protocol
+cannot list plugins. Browsing and source-pinned catalog operations are unchanged;
+they still need their existing catalog contract. No new discovery file is
+introduced here.
+
+## Retries and failures
+
+All workflow batches share one concurrency group. Uploads never use `--clobber`
+or delete assets. A retry skips assets whose reported SHA256 and size match.
+A different file under an existing name stops publication before that upload set
+writes anything. Partial uploads remain available for an identical retry.
+
+Different batches often contain the same dependencies. If their narinfos differ
+only in the NAR URL, retain the first published metadata and URL. Every other
+field, including signatures, must match. Key changes require a separate migration;
+this publisher does not replace existing signatures.
+
+Failure can leave a partial draft, a published NAR release, or some added cache
+metadata. It cannot make a cache-wide update atomic. Nix sees missing paths as
+cache misses, and devices must refuse builds. A retry repairs missing assets;
+it does not remove valid assets from another batch. An administrator can still
+change releases outside the workflow. Do not edit them during publication.
+
+## Capacity and verification limits
+
+[GitHub's release limits](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
+are 1,000 assets per release and less than 2 GiB per asset. The metadata release
+holds one narinfo per store path plus `nix-cache-info`. It will eventually fill.
+No automatic rotation or deletion is implemented. Publication refuses the limit;
+it does not remove old software to make room.
+
+Metadata points to immutable NAR locations, but signing is the trust mechanism.
+Deletion or account loss can still cause an outage. There is no storage bill in
+this public-Release design; there is no uptime or unlimited-capacity guarantee.
+
+Local checks cover Nix signature and byte verification, TLS redirects, multiple
+packages, merging architecture outputs, shared dependencies, partial-upload
+retry, wrong-commit refusal and conflicting assets. GitHub operations use a
+file-backed test process. Live release downloads and physical ARM installation
+remain separate acceptance gates. No claim of live verification follows from
+these tests.
