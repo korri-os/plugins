@@ -34,6 +34,180 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 class SignedCache(unittest.TestCase):
+    def check_upstreams(self, root, site, base, cert, secret, public, fixture, env):
+        env = dict(env, NIX_SSL_CERT_FILE=str(cert))
+        env["NIX_CONFIG"] += (
+            "trusted-public-keys = " + public.read_text().strip() + "\n"
+        )
+
+        def build(text, dependencies=()):
+            return run(
+                "nix",
+                "build",
+                "--file",
+                str(fixture),
+                "--argstr",
+                "shell",
+                shutil.which("bash"),
+                "--argstr",
+                "text",
+                text,
+                "--no-link",
+                "--print-out-paths",
+                "--max-jobs",
+                "1",
+                "--impure",
+                "--arg",
+                "dependencies",
+                "[ "
+                + " ".join(
+                    '(builtins.storePath "' + path + '")' for path in dependencies
+                )
+                + " ]",
+                env=env,
+            ).stdout.strip()
+
+        source = root / "dependency"
+        source.write_text("upstream dependency")
+        # Existing content-addressed inputs still require an actual trusted
+        # signature. No content-address conversion is performed by prepare.
+        dependency = run(
+            "nix", "store", "add-file", str(source), env=env
+        ).stdout.strip()
+        missing_text = f"genuinely missing dependency {dependency}"
+        missing = build(missing_text, [dependency])
+        wrappers = [
+            build(f"plugin {i}: {dependency} {missing}", [dependency, missing])
+            for i in range(2)
+        ]
+        closure = root / "closure"
+        upstream = site / "upstream"
+        for cache, paths in ((closure, wrappers), (upstream, [dependency])):
+            run(
+                "nix",
+                "copy",
+                "--to",
+                cache.as_uri() + "?secret-key=" + str(secret),
+                *paths,
+                env=env,
+            )
+        dep_note = next(upstream.glob("*.narinfo"))
+        dep_text = dep_note.read_text()
+        self.assertIn("CA: ", dep_text)
+        dep_nar = next(s[5:] for s in dep_text.splitlines() if s.startswith("URL: "))
+        self.assertEqual(len(list(closure.glob("*.narinfo"))), 4)
+        counter = 0
+
+        def prepare(*urls, succeeds=True, environment=env):
+            nonlocal counter
+            counter += 1
+            output = site / f"filtered-{counter}"
+            result = run(
+                sys.executable,
+                str(SCRIPT),
+                "prepare",
+                str(closure),
+                str(output),
+                "--nar-base-url",
+                base + f"/filtered-{counter}/nars/",
+                *[arg for url in urls for arg in ("--upstream-cache", url)],
+                env=environment,
+                succeeds=succeeds,
+            )
+            if not succeeds:
+                self.assertFalse(output.exists(), result.stderr)
+            return output, result
+
+        # Only a verified 404 is absence. A second cache can supply a dependency.
+        filtered, _ = prepare(base + "/absent", base + "/upstream")
+        expected = {
+            Path(p).name.split("-", 1)[0] + ".narinfo" for p in [*wrappers, missing]
+        }
+        self.assertEqual(
+            {p.name for p in (filtered / "metadata").glob("*.narinfo")}, expected
+        )
+        self.assertFalse((filtered / "nars" / Path(dep_nar).name).exists())
+        self.assertEqual(len(list((filtered / "nars").iterdir())), 3)
+        complete, _ = prepare()
+        self.assertEqual(len(list((complete / "metadata").glob("*.narinfo"))), 4)
+
+        # Two package wrappers reuse an upstream dependency from an empty store.
+        for name in ("store", "state", "log", "cache"):
+            shutil.rmtree(root / name, ignore_errors=True)
+        env["NIX_CONFIG"] += (
+            f"substituters = {base}/{filtered.name}/metadata {base}/upstream\n"
+            "substitute = true\n"
+        )
+        for i, wrapper in enumerate(wrappers):
+            run("nix-store", "--realise", wrapper, env=env)
+            self.assertEqual(
+                Path(wrapper).read_text(), f"plugin {i}: {dependency} {missing}"
+            )
+        self.assertEqual(Path(dependency).read_text(), "upstream dependency")
+        self.assertEqual(Path(missing).read_text(), missing_text)
+        run(
+            "nix",
+            "copy",
+            "--to",
+            upstream.as_uri() + "?secret-key=" + str(secret),
+            missing,
+            env=env,
+        )
+        wrappers_only, _ = prepare(base + "/upstream")
+        self.assertEqual(
+            {p.name for p in (wrappers_only / "metadata").glob("*.narinfo")},
+            {Path(p).name.split("-", 1)[0] + ".narinfo" for p in wrappers},
+        )
+        self.assertEqual(len(list((wrappers_only / "nars").iterdir())), 2)
+
+        # Every configured upstream is checked, even after another has the path.
+        for code in (401, 403, 429, 500, 503):
+            _, result = prepare(
+                base + "/upstream", base + f"/status/{code}", succeeds=False
+            )
+            self.assertIn(str(code), result.stderr)
+        prepare(base + "/disconnect", succeeds=False)
+        prepare(base + "/downgrade", succeeds=False)
+        untrusted = dict(env, NIX_CONFIG=env["NIX_CONFIG"] + "trusted-public-keys =\n")
+        _, result = prepare(base + "/upstream", succeeds=False, environment=untrusted)
+        self.assertIn("untrusted", result.stderr)
+        wrong_tls = dict(env, NIX_SSL_CERT_FILE="/dev/null")
+        prepare(base + "/upstream", succeeds=False, environment=wrong_tls)
+        for before, after in (
+            ("NarSize: ", "NarSize: 9"),
+            ("NarHash: sha256:", "NarHash: sha256:0"),
+            ("References: ", "References: " + Path(missing).name + " "),
+            ("StorePath: ", "StorePath: /wrong"),
+            ("Sig: test-cache-1:", "Sig: unknown-key:"),
+            ("URL: ", "URL: http://insecure.example/"),
+            ("CA: ", "CA: malformed:"),
+        ):
+            dep_note.write_text(dep_text.replace(before, after))
+            prepare(base + "/upstream", succeeds=False)
+        signature = next(s for s in dep_text.splitlines() if s.startswith("Sig: "))
+        signature_prefix, signature_bytes = signature.rsplit(":", 1)
+        corrupt_signature = (
+            signature_prefix
+            + ":"
+            + ("A" if signature_bytes[0] != "A" else "B")
+            + signature_bytes[1:]
+        )
+        dep_note.write_text(dep_text.replace(signature, corrupt_signature))
+        _, result = prepare(base + "/upstream", succeeds=False)
+        self.assertIn("untrusted", result.stderr)
+        for text in (
+            "not narinfo\n",
+            dep_text + "NarSize: 1\n",
+            dep_text.replace("Sig: ", "Unknown: "),
+            "x" * (64 * 1024 + 1),
+        ):
+            dep_note.write_text(text)
+            prepare(base + "/upstream", succeeds=False)
+        dep_note.write_text(dep_text)
+        # No dependency payloads need to be downloaded by prepare itself.
+        (upstream / dep_nar).unlink()
+        prepare(base + "/upstream")
+
     def check_uploads(self, root, exported, env):
         fixture = root / "github"
         fixture.mkdir()
@@ -269,10 +443,10 @@ class SignedCache(unittest.TestCase):
                 env=env,
             )
             fixture = root / "fixture.nix"
-            fixture.write_text("""{ shell, text }: builtins.derivation {
+            fixture.write_text("""{ shell, text, dependencies ? [] }: builtins.derivation {
   name = "cache-test"; system = builtins.currentSystem;
   builder = shell; args = [ "-c" "printf '%s' \\\"$text\\\" > \\\"$out\\\"" ];
-  inherit text; preferLocalBuild = true; allowSubstitutes = true;
+  inherit text dependencies; preferLocalBuild = true; allowSubstitutes = true;
 }""")
             paths = []
             for text in ("first plugin", "second plugin"):
@@ -337,6 +511,14 @@ class SignedCache(unittest.TestCase):
                             "Location", "/nars/" + self.path.rsplit("/", 1)[-1]
                         )
                         self.end_headers()
+                    elif self.path.startswith("/status/"):
+                        self.send_error(int(self.path.split("/")[2]))
+                    elif self.path.startswith("/disconnect/"):
+                        self.close_connection = True
+                    elif self.path.startswith("/downgrade/"):
+                        self.send_response(302)
+                        self.send_header("Location", "http://127.0.0.1/absent")
+                        self.end_headers()
                     else:
                         super().do_GET()
 
@@ -400,6 +582,9 @@ class SignedCache(unittest.TestCase):
                         [s for s in original.splitlines() if s.startswith("Sig:")],
                     )
                 self.check_uploads(root, exported, env)
+                self.check_upstreams(
+                    root, site, base, cert, secret, public, fixture, env
+                )
                 for name in ("store", "state", "log", "cache"):
                     shutil.rmtree(root / name, ignore_errors=True)
                 env["NIX_SSL_CERT_FILE"] = str(cert)
@@ -477,6 +662,26 @@ class CliInputs(unittest.TestCase):
                 "/tmp/absent",
                 "/tmp/unused",
                 "--nar-base-url",
+                value,
+                succeeds=False,
+            )
+            self.assertIn("HTTPS URL", result.stderr)
+
+    def test_prepare_refuses_insecure_upstreams(self):
+        for value in (
+            "http://example.com",
+            "https://user:secret@example.com",
+            "https://example.com?token=secret",
+        ):
+            result = run(
+                sys.executable,
+                str(SCRIPT),
+                "prepare",
+                "/tmp/absent",
+                "/tmp/unused",
+                "--nar-base-url",
+                "https://example.com/nars",
+                "--upstream-cache",
                 value,
                 succeeds=False,
             )

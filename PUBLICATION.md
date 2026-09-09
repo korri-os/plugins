@@ -61,6 +61,11 @@ zero build jobs and no remote builders. The secret is removed before artifacts
 upload. When publication is false and no signing secret exists, the build uses a
 temporary test key. Such outputs are not production artifacts.
 
+The workflow prepares against `https://cache.nixos.org` by default. It uploads
+only paths not already verified there, normally custom plugin wrappers and their
+Nix metadata. It retains any dependencies genuinely absent upstream. This saves
+hosted assets, not CI disk: the local signed export still contains the full closure.
+
 Each architecture artifact contains prepared cache files and the exact output
 paths emitted by Nix in `paths-SYSTEM.txt`. These are generated build outputs,
 not manually maintained metadata. Actions artifacts expire after seven days;
@@ -79,13 +84,28 @@ command. Do not pass flake references to export.
 ```sh
 nix run .#korri-cache -- build --system aarch64-linux --paths-file paths.txt korri-tailscale
 nix run .#korri-cache -- export file-cache --key-file cache.secret /nix/store/EXACT_OUTPUT
-nix run .#korri-cache -- prepare file-cache prepared --nar-base-url https://github.com/OWNER/REPO/releases/download/BATCH_TAG/
+nix run .#korri-cache -- prepare file-cache prepared --nar-base-url https://github.com/OWNER/REPO/releases/download/BATCH_TAG/ --upstream-cache https://cache.nixos.org
 ```
 
 `EXACT_OUTPUT`, repository, tag and key path above are operator inputs, not real
 published values. `export` can take several store paths. Nix exports and signs
-their full dependency closure. `prepare` changes only each narinfo's `URL:` line;
-that field is outside Nix's signed fingerprint. All signatures remain unchanged.
+their full dependency closure. Repeat `prepare --upstream-cache HTTPS_URL` to
+check more than one upstream. Each matching path must have the same store path,
+NAR hash, NAR size and references as the local signed export. Nix verifies the
+fetched metadata's signatures against the build machine's configured
+`trusted-public-keys`. No trust is granted by naming an upstream URL. Configure
+extra upstream keys through Nix's normal configuration, not through this tool.
+
+Only a valid HTTPS 404 means absent. Authentication, TLS, network, server,
+malformed metadata, conflicting identity and signature failures stop preparation
+without leaving a prepared output. Every configured upstream is checked, even
+if another supplies the path. Preparation checks metadata, not upstream payload
+availability; Nix checks payload contents during installation.
+
+For verified upstream paths, `prepare` omits both the narinfo and its compressed
+NAR. For retained paths it changes only each narinfo's `URL:` line; that field is
+outside Nix's signed fingerprint. All retained signatures remain unchanged.
+Without `--upstream-cache`, the explicit command keeps the complete closure.
 
 After approval, `publish` performs the GitHub writes:
 
@@ -98,7 +118,15 @@ separate operator stages. Metadata upload refuses draft NAR releases.
 
 ## Device installation
 
-Use the exact store path from the build artifact and the metadata release URL:
+**Partial caches require an updated core raw-cache installer that combines the
+plugin cache with configured trusted upstream caches.** A core installer that
+expects the plugin cache to contain the entire closure cannot use this workflow's
+output. Update and verify core before publication or device use. This publisher
+change does not update the core flake pin or device configuration.
+
+Devices must configure the same upstream caches and their trusted public keys,
+with signatures required and builds disabled. Use the exact store path from the
+build artifact and the metadata release URL:
 
 ```sh
 sudo korri-plugin inspect CACHE_URL EXACT_STORE_PATH
@@ -106,7 +134,7 @@ sudo korri-plugin install CACHE_URL EXACT_STORE_PATH APPROVAL_FROM_INSPECTION
 ```
 
 Read the approval report before installing. Enable the plugin separately. This
-uses the existing raw-cache CLI, not `repository install`. The cache protocol
+uses the raw-cache CLI with the updated core importer, not `repository install`. The cache protocol
 cannot list plugins. Browsing and source-pinned catalog operations are unchanged;
 they still need their existing catalog contract. No new discovery file is
 introduced here.
@@ -143,7 +171,10 @@ this public-Release design; there is no uptime or unlimited-capacity guarantee.
 
 Local checks cover Nix signature and byte verification, TLS redirects, multiple
 packages, merging architecture outputs, shared dependencies, partial-upload
-retry, wrong-commit refusal and conflicting assets. GitHub operations use a
+retry, wrong-commit refusal and conflicting assets. Local HTTPS upstream tests
+also cover omitted NARs and metadata, dependency reuse in an empty store, genuine
+404s, authentication/server/TLS/network failures, untrusted and damaged signatures,
+and mismatched metadata. GitHub operations use a
 file-backed test process. Live release downloads and physical ARM installation
 remain separate acceptance gates. No claim of live verification follows from
 these tests.

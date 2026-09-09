@@ -9,13 +9,18 @@ splitting a cache between a NAR release and the shared metadata release.
 import argparse
 import hashlib
 import json
+import os
+from http.client import HTTPException
 from pathlib import Path
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
-from urllib.parse import quote, urlsplit
+from urllib.error import HTTPError
+from urllib.parse import quote, urljoin, urlsplit
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, build_opener
 
 
 def run(*args):
@@ -53,7 +58,7 @@ def https_base(value):
         or any(c.isspace() for c in value)
     ):
         raise ValueError(
-            "NAR base must be an HTTPS URL without credentials, query or fragment"
+            "cache location must be an HTTPS URL without credentials, query or fragment"
         )
     return value.rstrip("/") + "/"
 
@@ -84,8 +89,133 @@ def verify_nar(path, fields):
         raise ValueError("GitHub Release assets must be smaller than 2 GiB")
 
 
-def prepare(cache, output, base):
+class HTTPSRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, newurl):
+        https_base(newurl)
+        return super().redirect_request(
+            request, response, code, message, headers, newurl
+        )
+
+
+def signed_identity(fields):
+    # These are precisely the fields in Nix's signed fingerprint. References
+    # are a set; compression and transport URLs are deliberately not signed.
+    nar_hash = run(
+        "nix",
+        "hash",
+        "convert",
+        "--hash-algo",
+        "sha256",
+        "--to",
+        "base16",
+        fields["NarHash"],
+    )
+    size = int(fields["NarSize"])
+    if size <= 0:
+        raise ValueError("invalid upstream NAR size")
+    references = fields["References"].split()
+    if len(references) != len(set(references)):
+        raise ValueError("duplicate Nix references")
+    return fields["StorePath"], nar_hash, size, sorted(references)
+
+
+def upstream_paths(cache, records, upstreams, temporary):
+    if not upstreams:
+        return set()
+    context = ssl.create_default_context(cafile=os.environ.get("NIX_SSL_CERT_FILE"))
+    opener = build_opener(HTTPSHandler(context=context), HTTPSRedirectHandler())
+    omitted = set()
+    local = {path.name: metadata(path)[1] for path in records}
+    for index, base in enumerate(upstreams):
+        downloaded = Path(temporary) / f"downloaded-{index}"
+        verified = Path(temporary) / f"verified-{index}"
+        for directory in (downloaded, verified):
+            directory.mkdir()
+            shutil.copyfile(
+                regular(cache / "nix-cache-info"), directory / "nix-cache-info"
+            )
+        paths = []
+        for name, fields in local.items():
+            try:
+                with opener.open(base + name, timeout=30) as response:
+                    if response.status != 200:
+                        raise ValueError(f"unexpected upstream HTTP {response.status}")
+                    data = response.read(64 * 1024 + 1)
+                    if len(data) > 64 * 1024:
+                        raise ValueError("upstream narinfo exceeds 64 KiB")
+                    length = response.headers.get("Content-Length")
+                    if length is not None and int(length) != len(data):
+                        raise ValueError("incomplete upstream narinfo")
+            except HTTPError as error:
+                if error.code == 404:
+                    continue
+                raise
+            note = downloaded / name
+            note.write_bytes(data)
+            text, remote = metadata(note)
+            https_base(urljoin(base, remote["URL"]))
+            if not remote["URL"] or int(remote["FileSize"]) <= 0:
+                raise ValueError("invalid upstream NAR transport metadata")
+            run(
+                "nix",
+                "hash",
+                "convert",
+                "--hash-algo",
+                "sha256",
+                "--to",
+                "base16",
+                remote["FileHash"],
+            )
+            if remote["Compression"] not in (
+                "none",
+                "xz",
+                "bzip2",
+                "gzip",
+                "zstd",
+                "br",
+            ):
+                raise ValueError("invalid upstream NAR compression")
+            if signed_identity(remote) != signed_identity(fields):
+                raise ValueError(f"upstream NAR identity differs: {base}{name}")
+            # Verify exactly the fetched signatures, without a second network
+            # lookup or signatures from other substituters. Remove only CA in
+            # this temporary verification copy: content addressing must never
+            # satisfy the explicit trusted-signature requirement on its own.
+            (verified / name).write_text(
+                "\n".join(
+                    line for line in text.splitlines() if not line.startswith("CA: ")
+                )
+                + "\n"
+            )
+            paths.append(fields["StorePath"])
+        if paths:
+            # Let Nix parse the unmodified metadata too, including any CA field.
+            # Use distinct cache URLs so its metadata cache cannot reuse CA when
+            # checking signatures against the verification copy below.
+            run("nix", "path-info", "--store", downloaded.resolve().as_uri(), *paths)
+            run(
+                "nix",
+                "store",
+                "verify",
+                "--store",
+                verified.resolve().as_uri(),
+                "--no-contents",
+                "--sigs-needed",
+                "1",
+                "--option",
+                "substituters",
+                "",
+                *paths,
+            )
+            omitted.update(
+                Path(path).name.split("-", 1)[0] + ".narinfo" for path in paths
+            )
+    return omitted
+
+
+def prepare(cache, output, base, upstreams):
     base = https_base(base)
+    upstreams = [https_base(url) for url in upstreams]
     if output.exists():
         raise ValueError("output already exists; do not overwrite a prepared cache")
     records = sorted(cache.glob("*.narinfo"))
@@ -93,6 +223,7 @@ def prepare(cache, output, base):
         raise ValueError("file cache contains no narinfos")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=output.parent) as temporary:
+        omitted = upstream_paths(cache, records, upstreams, temporary)
         staged = Path(temporary) / "prepared"
         nars, notes = staged / "nars", staged / "metadata"
         nars.mkdir(parents=True)
@@ -110,6 +241,8 @@ def prepare(cache, output, base):
             if source.parent.is_symlink():
                 raise ValueError("NAR directory cannot be a symlink")
             verify_nar(regular(source), fields)
+            if path.name in omitted:
+                continue
             target = nars / source.name
             if target.exists() and digest(target) != digest(source):
                 raise ValueError("conflicting NAR filename")
@@ -475,6 +608,13 @@ def main():
     prepare_parser.add_argument("cache", type=Path)
     prepare_parser.add_argument("output", type=Path)
     prepare_parser.add_argument("--nar-base-url", required=True)
+    prepare_parser.add_argument(
+        "--upstream-cache",
+        action="append",
+        default=[],
+        metavar="HTTPS_URL",
+        help="omit paths verified in this trusted upstream cache (repeatable)",
+    )
     combine_parser = commands.add_parser("combine")
     combine_parser.add_argument("output", type=Path)
     combine_parser.add_argument("inputs", type=Path, nargs="+")
@@ -498,7 +638,7 @@ def main():
     elif args.command == "export":
         export(args.cache, args.key_file, args.paths)
     elif args.command == "prepare":
-        prepare(args.cache, args.output, args.nar_base_url)
+        prepare(args.cache, args.output, args.nar_base_url, args.upstream_cache)
     elif args.command == "combine":
         combine(args.output, args.inputs)
     elif args.command == "publish":
@@ -514,6 +654,7 @@ if __name__ == "__main__":
         ValueError,
         KeyError,
         OSError,
+        HTTPException,
         subprocess.CalledProcessError,
         subprocess.TimeoutExpired,
     ) as error:
