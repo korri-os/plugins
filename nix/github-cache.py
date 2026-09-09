@@ -113,7 +113,9 @@ def signed_identity(fields):
     size = int(fields["NarSize"])
     if size <= 0:
         raise ValueError("invalid upstream NAR size")
-    references = fields["References"].split()
+    # Nix permits omission when an output has no references. cache.nixos.org
+    # uses that representation for dependency-free outputs.
+    references = fields.get("References", "").split()
     if len(references) != len(set(references)):
         raise ValueError("duplicate Nix references")
     return fields["StorePath"], nar_hash, size, sorted(references)

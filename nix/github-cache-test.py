@@ -180,6 +180,13 @@ class SignedCache(unittest.TestCase):
         )
         self.assertEqual(len(list((wrappers_only / "nars").iterdir())), 2)
 
+        # cache.nixos.org omits References for dependency-free outputs (for
+        # example xgcc-14.3.0-libgcc). Nix treats omission as the empty set.
+        self.assertIn("References: \n", dep_text)
+        dep_note.write_text(dep_text.replace("References: \n", ""))
+        prepare(base + "/upstream")
+        dep_note.write_text(dep_text)
+
         # Every configured upstream is checked, even after another has the path.
         for code in (401, 403, 429, 500, 503):
             for endpoint in ("status", "path-status"):
