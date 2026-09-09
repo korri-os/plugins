@@ -118,8 +118,14 @@ class SignedCache(unittest.TestCase):
                 self.assertFalse(output.exists(), result.stderr)
             return output, result
 
-        # Only a verified 404 is absence. A second cache can supply a dependency.
-        filtered, _ = prepare(base + "/absent", base + "/upstream")
+        # A missing cache must not turn every dependency into a genuine miss.
+        _, result = prepare(base + "/upstream", base + "/absent", succeeds=False)
+        self.assertIn("404", result.stderr)
+        empty = site / "empty"
+        empty.mkdir()
+        shutil.copyfile(upstream / "nix-cache-info", empty / "nix-cache-info")
+        # A healthy empty cache can miss paths supplied by a second cache.
+        filtered, _ = prepare(base + "/empty", base + "/upstream")
         expected = {
             Path(p).name.split("-", 1)[0] + ".narinfo" for p in [*wrappers, missing]
         }
@@ -130,6 +136,20 @@ class SignedCache(unittest.TestCase):
         self.assertEqual(len(list((filtered / "nars").iterdir())), 3)
         complete, _ = prepare()
         self.assertEqual(len(list((complete / "metadata").glob("*.narinfo"))), 4)
+        empty_only, _ = prepare(base + "/empty")
+        self.assertEqual(len(list((empty_only / "metadata").glob("*.narinfo"))), 4)
+        info = empty / "nix-cache-info"
+        valid_info = info.read_text()
+        for text in (
+            "",
+            "<html>not a cache</html>\n",
+            "StoreDir: /wrong\n",
+            valid_info + "Priority: invalid\n",
+            "x" * (64 * 1024 + 1),
+        ):
+            info.write_text(text)
+            prepare(base + "/empty", succeeds=False)
+        info.write_text(valid_info)
 
         # Two package wrappers reuse an upstream dependency from an empty store.
         for name in ("store", "state", "log", "cache"):
@@ -162,10 +182,11 @@ class SignedCache(unittest.TestCase):
 
         # Every configured upstream is checked, even after another has the path.
         for code in (401, 403, 429, 500, 503):
-            _, result = prepare(
-                base + "/upstream", base + f"/status/{code}", succeeds=False
-            )
-            self.assertIn(str(code), result.stderr)
+            for endpoint in ("status", "path-status"):
+                _, result = prepare(
+                    base + "/upstream", base + f"/{endpoint}/{code}", succeeds=False
+                )
+                self.assertIn(str(code), result.stderr)
         prepare(base + "/disconnect", succeeds=False)
         prepare(base + "/downgrade", succeeds=False)
         untrusted = dict(env, NIX_CONFIG=env["NIX_CONFIG"] + "trusted-public-keys =\n")
@@ -511,6 +532,12 @@ class SignedCache(unittest.TestCase):
                             "Location", "/nars/" + self.path.rsplit("/", 1)[-1]
                         )
                         self.end_headers()
+                    elif self.path.startswith("/path-status/"):
+                        if self.path.endswith("/nix-cache-info"):
+                            self.path = "/upstream/nix-cache-info"
+                            super().do_GET()
+                        else:
+                            self.send_error(int(self.path.split("/")[2]))
                     elif self.path.startswith("/status/"):
                         self.send_error(int(self.path.split("/")[2]))
                     elif self.path.startswith("/disconnect/"):

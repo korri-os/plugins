@@ -119,7 +119,20 @@ def signed_identity(fields):
     return fields["StorePath"], nar_hash, size, sorted(references)
 
 
-def upstream_paths(cache, records, upstreams, temporary):
+def upstream_metadata(opener, url):
+    with opener.open(url, timeout=30) as response:
+        if response.status != 200:
+            raise ValueError(f"unexpected upstream HTTP {response.status}")
+        data = response.read(64 * 1024 + 1)
+        if len(data) > 64 * 1024:
+            raise ValueError("upstream metadata exceeds 64 KiB")
+        length = response.headers.get("Content-Length")
+        if length is not None and int(length) != len(data):
+            raise ValueError("incomplete upstream metadata")
+        return data
+
+
+def upstream_paths(records, upstreams, temporary):
     if not upstreams:
         return set()
     context = ssl.create_default_context(cafile=os.environ.get("NIX_SSL_CERT_FILE"))
@@ -129,23 +142,22 @@ def upstream_paths(cache, records, upstreams, temporary):
     for index, base in enumerate(upstreams):
         downloaded = Path(temporary) / f"downloaded-{index}"
         verified = Path(temporary) / f"verified-{index}"
+        # Fetch once over the same bounded HTTPS transport as the narinfos.
+        # A 404 here means the cache is missing, not that a path is absent.
+        info = upstream_metadata(opener, base + "nix-cache-info")
+        # Nix defaults a missing StoreDir; require it to reject empty/HTML pages.
+        if not any(line.startswith("StoreDir:") for line in info.decode().splitlines()):
+            raise ValueError(f"upstream nix-cache-info has no StoreDir: {base}")
         for directory in (downloaded, verified):
             directory.mkdir()
-            shutil.copyfile(
-                regular(cache / "nix-cache-info"), directory / "nix-cache-info"
-            )
+            (directory / "nix-cache-info").write_bytes(info)
+        # Parse the fetched cache info with Nix, using a fresh local URL to avoid
+        # stale cached health results or a second network lookup.
+        run("nix", "store", "info", "--store", downloaded.resolve().as_uri())
         paths = []
         for name, fields in local.items():
             try:
-                with opener.open(base + name, timeout=30) as response:
-                    if response.status != 200:
-                        raise ValueError(f"unexpected upstream HTTP {response.status}")
-                    data = response.read(64 * 1024 + 1)
-                    if len(data) > 64 * 1024:
-                        raise ValueError("upstream narinfo exceeds 64 KiB")
-                    length = response.headers.get("Content-Length")
-                    if length is not None and int(length) != len(data):
-                        raise ValueError("incomplete upstream narinfo")
+                data = upstream_metadata(opener, base + name)
             except HTTPError as error:
                 if error.code == 404:
                     continue
@@ -223,7 +235,7 @@ def prepare(cache, output, base, upstreams):
         raise ValueError("file cache contains no narinfos")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=output.parent) as temporary:
-        omitted = upstream_paths(cache, records, upstreams, temporary)
+        omitted = upstream_paths(records, upstreams, temporary)
         staged = Path(temporary) / "prepared"
         nars, notes = staged / "nars", staged / "metadata"
         nars.mkdir(parents=True)

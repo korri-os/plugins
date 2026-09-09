@@ -96,11 +96,14 @@ fetched metadata's signatures against the build machine's configured
 `trusted-public-keys`. No trust is granted by naming an upstream URL. Configure
 extra upstream keys through Nix's normal configuration, not through this tool.
 
-Only a valid HTTPS 404 means absent. Authentication, TLS, network, server,
-malformed metadata, conflicting identity and signature failures stop preparation
-without leaving a prepared output. Every configured upstream is checked, even
-if another supplies the path. Preparation checks metadata, not upstream payload
-availability; Nix checks payload contents during installation.
+Preparation first fetches each upstream's `nix-cache-info` over HTTPS and has Nix
+parse it. Missing, invalid or unavailable cache info stops preparation. Only a
+narinfo HTTPS 404 from a cache that passed this check means a path is absent.
+Authentication, TLS, network, server, malformed metadata, conflicting identity
+and signature failures stop preparation without leaving a prepared output.
+Every configured upstream is checked, even if another supplies the path.
+Preparation checks metadata, not upstream payload availability; Nix checks
+payload contents during installation.
 
 For verified upstream paths, `prepare` omits both the narinfo and its compressed
 NAR. For retained paths it changes only each narinfo's `URL:` line; that field is
@@ -172,8 +175,9 @@ this public-Release design; there is no uptime or unlimited-capacity guarantee.
 Local checks cover Nix signature and byte verification, TLS redirects, multiple
 packages, merging architecture outputs, shared dependencies, partial-upload
 retry, wrong-commit refusal and conflicting assets. Local HTTPS upstream tests
-also cover omitted NARs and metadata, dependency reuse in an empty store, genuine
-404s, authentication/server/TLS/network failures, untrusted and damaged signatures,
+also cover omitted NARs and metadata, dependency reuse in an empty store, healthy
+empty caches, missing or invalid cache info, genuine narinfo 404s,
+authentication/server/TLS/network failures, untrusted and damaged signatures,
 and mismatched metadata. GitHub operations use a
 file-backed test process. Live release downloads and physical ARM installation
 remain separate acceptance gates. No claim of live verification follows from
