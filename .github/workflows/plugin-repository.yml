@@ -6,7 +6,7 @@ on:
       packages:
         description: "Package output names separated by spaces; one or more per batch"
         required: true
-        default: korri-tailscale
+        default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba
         type: string
       tag:
         description: "Batch tag, not a plugin version; must name this main commit before publication"
@@ -62,7 +62,7 @@ jobs:
         run: |
           nix run .#korri-cache -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
           test_output=$(nix build --no-link --print-out-paths ".#checks.$SYSTEM.korri-github-cache")
-          nix build --no-link ".#checks.$SYSTEM.korri-device-cache"
+          nix build --no-link ".#checks.$SYSTEM.korri-device-cache" ".#checks.$SYSTEM.korri-tailscale-package"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool .#korri-cache
       - name: Build the selected packages without a signing key
@@ -93,6 +93,7 @@ jobs:
           ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
           ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org
           cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cache-${{ matrix.system }}

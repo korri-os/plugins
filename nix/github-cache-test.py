@@ -294,6 +294,21 @@ class SignedCache(unittest.TestCase):
             env=env,
         )
 
+        # The workflow records /nix/store outputs. This test's isolated Nix
+        # store uses a temporary prefix; retain its real hashes and names.
+        paths = [
+            "/nix/store/" + Path(line.removeprefix("StorePath: ")).name
+            for record in sorted(exported.glob("*.narinfo"))
+            for line in record.read_text().splitlines()
+            if line.startswith("StorePath: ")
+        ]
+
+        def record_batch(folder):
+            (folder / "revision.txt").write_text("1" * 40 + "\n")
+            (folder / "paths-x86_64-linux.txt").write_text("\n".join(paths) + "\n")
+
+        record_batch(prepared)
+
         def upload(part, folder=prepared, tag="build-1", succeeds=True):
             return run(
                 sys.executable,
@@ -345,6 +360,26 @@ class SignedCache(unittest.TestCase):
         )
         self.assertIn("checked source", refused.stderr)
         self.assertEqual(before, fixture_state.read_bytes())
+        (prepared / "revision.txt").write_text("2" * 40 + "\n")
+        refused = run(
+            sys.executable,
+            str(SCRIPT),
+            "publish",
+            str(prepared),
+            "--repo",
+            "owner/plugins",
+            "--tag",
+            "build-1",
+            "--cache-tag",
+            "cache",
+            "--revision",
+            "2" * 40,
+            env=env,
+            succeeds=False,
+        )
+        self.assertIn("NAR tag must point", refused.stderr)
+        self.assertEqual(before, fixture_state.read_bytes())
+        record_batch(prepared)
         run(
             sys.executable,
             str(SCRIPT),
@@ -362,6 +397,19 @@ class SignedCache(unittest.TestCase):
         )
         state = json.loads(fixture_state.read_text())
         self.assertFalse(state["releases"][0]["draft"])
+        batch_assets = {a["name"]: a for a in state["assets"] if a["release"] == 1}
+        for name in ("revision.txt", "paths-x86_64-linux.txt"):
+            self.assertEqual(
+                (fixture / str(batch_assets[name]["id"])).read_bytes(),
+                (prepared / name).read_bytes(),
+            )
+        self.assertFalse(
+            any(
+                a["release"] == 2
+                and (a["name"].startswith("paths-") or a["name"] == "revision.txt")
+                for a in state["assets"]
+            )
+        )
         before = fixture_state.read_bytes()
         upload("metadata")
         self.assertEqual(before, fixture_state.read_bytes())
@@ -394,6 +442,7 @@ class SignedCache(unittest.TestCase):
             base + "build-3/",
             env=env,
         )
+        record_batch(third)
         run(
             sys.executable,
             str(SCRIPT),
@@ -413,6 +462,14 @@ class SignedCache(unittest.TestCase):
         new_release = next(r for r in state["releases"] if r["tag_name"] == "build-3")
         self.assertFalse(new_release["draft"])
         self.assertTrue(new_release["immutable"])
+        # Identical retries include the listing, even after immutability locks it.
+        before = fixture_state.read_bytes()
+        upload("nars", third, "build-3")
+        self.assertEqual(before, fixture_state.read_bytes())
+        (third / "paths-x86_64-linux.txt").write_text(paths[0] + "\n")
+        refused = upload("nars", third, "build-3", succeeds=False)
+        self.assertEqual(before, fixture_state.read_bytes())
+        record_batch(third)
         # A conflicting remote file stops before writing anything else.
         state = json.loads(fixture_state.read_text())
         first = next(
@@ -720,6 +777,80 @@ class CliInputs(unittest.TestCase):
                 succeeds=False,
             )
             self.assertIn("HTTPS URL", result.stderr)
+
+    def test_batch_artifacts_combine_and_refuse_conflicts(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            inputs = [root / "x86", root / "arm"]
+            path = "/nix/store/" + "0" * 32 + "-plugin\n"
+            for folder, system in zip(inputs, ("x86_64-linux", "aarch64-linux")):
+                (folder / "nars").mkdir(parents=True)
+                (folder / "metadata").mkdir()
+                (folder / "revision.txt").write_text("1" * 40 + "\n")
+                (folder / f"paths-{system}.txt").write_text(path)
+
+            output = root / "combined"
+            command = [
+                sys.executable,
+                str(SCRIPT),
+                "combine",
+                str(output),
+                *map(str, inputs),
+            ]
+            run(*command)
+            self.assertEqual((output / "revision.txt").read_text(), "1" * 40 + "\n")
+            self.assertEqual((output / "paths-x86_64-linux.txt").read_text(), path)
+            self.assertEqual((output / "paths-aarch64-linux.txt").read_text(), path)
+            shutil.rmtree(output)
+            (inputs[1] / "revision.txt").write_text("2" * 40 + "\n")
+            self.assertIn(
+                "conflicting prepared file: revision.txt",
+                run(*command, succeeds=False).stderr,
+            )
+            self.assertFalse(output.exists())
+            (inputs[1] / "revision.txt").write_text("1" * 40 + "\n")
+            (inputs[1] / "paths-x86_64-linux.txt").write_text(
+                path.replace("-plugin", "-different")
+            )
+            self.assertIn(
+                "conflicting prepared file: paths-x86_64-linux.txt",
+                run(*command, succeeds=False).stderr,
+            )
+            self.assertFalse(output.exists())
+            (inputs[1] / "paths-x86_64-linux.txt").unlink()
+            listing = inputs[1] / "paths-aarch64-linux.txt"
+            for invalid in ("", "./result\n", path + "--impure\n", path.rstrip()):
+                listing.write_text(invalid)
+                self.assertIn(
+                    "expected exact Nix output paths",
+                    run(*command, succeeds=False).stderr,
+                )
+                self.assertFalse(output.exists())
+            listing.unlink()
+            listing.symlink_to(inputs[0] / "paths-x86_64-linux.txt")
+            self.assertIn(
+                "expected a regular file", run(*command, succeeds=False).stderr
+            )
+            self.assertFalse(output.exists())
+
+    def test_publish_requires_commit_and_package_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            refused = run(
+                sys.executable,
+                str(SCRIPT),
+                "publish",
+                temp,
+                "--repo",
+                "owner/plugins",
+                "--tag",
+                "build-1",
+                "--cache-tag",
+                "cache",
+                "--revision",
+                "1" * 40,
+                succeeds=False,
+            )
+            self.assertIn("batch requires package paths", refused.stderr)
 
     def test_build_refuses_expression_inputs(self):
         result = run(

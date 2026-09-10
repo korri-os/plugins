@@ -476,6 +476,38 @@ def validate_destination(repo, tag, cache_tag):
         raise ValueError("use distinct bounded NAR and cache tags")
 
 
+def batch_files(prepared, required=False):
+    """Keep the workflow's Nix output paths with their exact source revision.
+
+    These text artifacts locate builds; they grant no namespace or Nix trust.
+    """
+    listings = sorted(prepared.glob("paths-*.txt"))
+    revision = prepared / "revision.txt"
+    if not listings and not revision.exists() and not required:
+        return []
+    if not listings or not re.fullmatch(
+        r"[a-f0-9]{40}\n", regular(revision).read_text()
+    ):
+        raise ValueError("batch requires package paths and an exact source revision")
+    for path in listings:
+        if path.name not in ("paths-x86_64-linux.txt", "paths-aarch64-linux.txt"):
+            raise ValueError(f"unsupported package paths artifact: {path.name}")
+        text = regular(path).read_text()
+        paths = text.splitlines()
+        if (
+            not paths
+            or not text.endswith("\n")
+            or any(
+                not re.fullmatch(
+                    r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]+", p
+                )
+                for p in paths
+            )
+        ):
+            raise ValueError(f"expected exact Nix output paths: {path.name}")
+    return [revision, *listings]
+
+
 def upload(prepared, repo, tag, cache_tag, part):
     validate_destination(repo, tag, cache_tag)
     base = f"https://github.com/{repo}/releases/download/{tag}/"
@@ -493,8 +525,9 @@ def upload(prepared, repo, tag, cache_tag, part):
         nar = prepared / "nars" / name
         verify_nar(regular(nar), fields)
         nars[name] = nar
+    payloads = [*sorted(nars.values()), *batch_files(prepared)]
     if part == "nars":
-        upload_files(repo, tag, sorted(nars.values()))
+        upload_files(repo, tag, payloads)
     else:
         payload_release = release(repo, tag)
         if payload_release["draft"]:
@@ -503,8 +536,8 @@ def upload(prepared, repo, tag, cache_tag, part):
             )
         remote = assets(repo, payload_release["id"])
         if any(
-            name not in remote or not matches(remote[name], path)
-            for name, path in nars.items()
+            path.name not in remote or not matches(remote[path.name], path)
+            for path in payloads
         ):
             raise ValueError("public NAR assets do not match the prepared bytes")
         index_release = release(repo, cache_tag)
@@ -533,6 +566,12 @@ def combine(output, inputs):
                     if target.exists() and digest(target) != digest(path):
                         raise ValueError(f"conflicting prepared file: {path.name}")
                     shutil.copyfile(path, target)
+        for source in inputs:
+            for path in batch_files(source):
+                target = staged / path.name
+                if target.exists() and digest(target) != digest(path):
+                    raise ValueError(f"conflicting prepared file: {path.name}")
+                shutil.copyfile(path, target)
         staged.rename(output)
 
 
@@ -540,6 +579,9 @@ def publish(prepared, repo, tag, cache_tag, revision):
     validate_destination(repo, tag, cache_tag)
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise ValueError("supply the exact checked source commit")
+    batch_files(prepared, required=True)
+    if (prepared / "revision.txt").read_text().strip() != revision:
+        raise ValueError("prepared batch differs from the checked source commit")
     commit = api(f"repos/{repo}/commits/{quote('refs/tags/' + tag, safe='')}")
     if commit["sha"] != revision:
         raise ValueError("NAR tag must point at the checked source commit")
@@ -561,7 +603,7 @@ def publish(prepared, repo, tag, cache_tag, revision):
             "--title",
             tag,
             "--notes",
-            f"Prebuilt Nix cache payloads from {revision}. Package paths are in the workflow artifacts.",
+            f"Prebuilt Nix cache payloads from {revision}. Exact package paths are in this release's paths-SYSTEM.txt assets; revision.txt records the source commit.",
         )
     payload = release(repo, tag)
     upload(prepared, repo, tag, cache_tag, "nars")

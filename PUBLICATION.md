@@ -10,7 +10,7 @@ Use two distinct release tags:
 
 | Release | Contents | Change policy |
 |---|---|---|
-| Build batch | Compressed NAR files for any selected packages and both architectures. | Upload while draft, then publish. Release immutability can lock these files. |
+| Build batch | Compressed NAR files, generated `paths-SYSTEM.txt` lists and `revision.txt`. | Upload while draft, then publish. Release immutability can lock these files. |
 | Cache metadata | `nix-cache-info` and signed `.narinfo` files. | Public and mutable. The publisher only adds files; it never replaces or deletes one. |
 
 The cache URL is `https://github.com/OWNER/REPO/releases/download/CACHE_TAG/`.
@@ -37,8 +37,17 @@ of Git, the Nix store and workflow artifacts. Configure the public key as an
 additional trusted key on each device through its approved host configuration.
 Keep `require-sigs = true`. Never use a signature bypass to make an install work.
 
-A signature authorizes Nix store contents. It is not permission to start a
-privileged plugin. Core's administrator approval remains a separate step.
+Core's builder writes `publisher.namespace` into the generated manifest before
+this exporter signs the Nix closure. The namespace is fixed by trusted build
+composition, not by `plugin.ts` or by reading a signature name. Core's game
+outputs already contain it; this repository exports them unchanged so mGBA's
+exact RetroArch requirement remains valid. Never rewrite a manifest after build.
+
+The device must bind `@korri` to the full public key and the exact cache URL in
+`services.korri.pluginHost.publishers` (or core's root-owned publisher file on
+non-NixOS). The new host checks the actual NAR signature with that bound key.
+A matching signature label or another globally trusted signer is insufficient.
+Administrator approval to start the plugin remains a separate step.
 
 ## Workflow
 
@@ -49,6 +58,8 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 
 - `packages` selects one or more flake package output names, separated by spaces.
   The tool rejects expressions, flags and paths. It does not hardcode a plugin ID.
+  Defaults: `korri-tailscale korri-plugin-retroarch korri-plugin-mgba`. The latter
+  two are unmodified outputs from the locked core flake.
 - `tag` identifies the build batch. Before publication, this tag must already
   resolve to the workflow's exact source commit. The publisher never creates or
   moves a tag.
@@ -66,12 +77,17 @@ only paths not already verified there, normally custom plugin wrappers and their
 Nix metadata. It retains any dependencies genuinely absent upstream. This saves
 hosted assets, not CI disk: the local signed export still contains the full closure.
 
-Each architecture artifact contains prepared cache files and the exact output
-paths emitted by Nix in `paths-SYSTEM.txt`. These are generated build outputs,
-not manually maintained metadata. Actions artifacts expire after seven days;
-published cache assets do not use Actions retention.
+Each architecture artifact contains prepared cache files, the exact output
+paths emitted by `nix build --print-out-paths` in `paths-SYSTEM.txt`, and the
+workflow's full `GITHUB_SHA` in `revision.txt`. These are generated build outputs,
+not manually maintained metadata. Combine preserves both architecture lists and
+refuses conflicting revisions or same-named files. `publish` requires these
+files and checks their revision against both its argument and the batch tag.
+Actions artifacts expire after seven days; the same text files are uploaded
+with the NARs **before the batch is published**, so published lookup evidence
+does not expire with Actions. They never enter the mutable cache release.
 
-The workflow combines both architectures, then uploads NARs to the batch draft.
+The workflow combines both architectures, then uploads NARs and path listings to the batch draft.
 It checks GitHub's reported SHA256 and size for each uploaded asset. It publishes
 that exact release ID before adding any metadata that refers to it. Existing
 release settings determine whether publication makes it immutable.
@@ -110,7 +126,12 @@ NAR. For retained paths it changes only each narinfo's `URL:` line; that field i
 outside Nix's signed fingerprint. All retained signatures remain unchanged.
 Without `--upstream-cache`, the explicit command keeps the complete closure.
 
-After approval, `publish` performs the GitHub writes:
+For manual batches, retain each architecture's `build --paths-file` output as
+`prepared/paths-SYSTEM.txt` and write the exact checked source commit plus a
+newline to `prepared/revision.txt`. Do not create these from guessed paths.
+For example, copy `paths.txt` from the build above to
+`prepared/paths-aarch64-linux.txt`. These files describe the build, not the
+signing identity. After approval, `publish` performs the GitHub writes:
 
 ```sh
 nix run .#korri-cache -- publish prepared --repo OWNER/REPO --tag BATCH_TAG --cache-tag CACHE_TAG --revision EXACT_COMMIT
@@ -121,15 +142,19 @@ separate operator stages. Metadata upload refuses draft NAR releases.
 
 ## Device installation
 
-**Partial caches require an updated core raw-cache installer that combines the
-plugin cache with configured trusted upstream caches.** A core installer that
-expects the plugin cache to contain the entire closure cannot use this workflow's
-output. Update and verify core before publication or device use. This publisher
-change does not update the core flake pin or device configuration.
+**Publication is blocked until core main provides the new plugin builder and
+host, and this repository pins that main commit.** The current lock still names
+`a17c5c35e74066251184a3fd8d1e4e386559002a`. Development evaluation may override
+core locally with `--no-write-lock-file`; production must not. The old host
+cannot inspect the new named-export source and manifest contract.
+
+Partial caches also require core's multi-cache importer. Devices combine the
+plugin cache with configured trusted upstream caches. This repository does not
+change device configuration.
 
 Devices must configure the same upstream caches and their trusted public keys,
 with signatures required and builds disabled. Use the exact store path from the
-build artifact and the metadata release URL:
+immutable batch's architecture-specific path list and the metadata release URL:
 
 ```sh
 sudo korri-plugin inspect CACHE_URL EXACT_STORE_PATH
@@ -141,6 +166,28 @@ uses the raw-cache CLI with the updated core importer, not `repository install`.
 cannot list plugins. Browsing and source-pinned catalog operations are unchanged;
 they still need their existing catalog contract. No new discovery file is
 introduced here.
+
+## Exact commit lookup evidence
+
+For the brief's `build-<rev12>` convention, the full commit identifies the batch
+tag by its first 12 characters. Publication requires that tag to resolve to the
+full checked commit. Existing custom batch tags remain supported; supply their
+exact names rather than assuming they follow this convention. No `latest`,
+stable pointer, or tag-moving operation is introduced.
+
+| Batch asset | Producer | Contents |
+|---|---|---|
+| `revision.txt` | Workflow checkout (`GITHUB_SHA`) | One full 40-character commit and a newline |
+| `paths-x86_64-linux.txt` | `korri-cache build` / Nix stdout | One selected output store path per line |
+| `paths-aarch64-linux.txt` | `korri-cache build` / Nix stdout | One selected output store path per line |
+
+These lists do not map plugin IDs to paths, and they are not signed catalogs.
+They are durable lookup evidence from the existing publication path. The new
+host must still verify and inspect a selected store output to determine its
+identity, permissions and bound publisher. Downloading a list grants no trust.
+The brief's `install CACHE ID --release <commit>` consumer is not implemented
+by this repository. Core must implement that lookup separately; this change does
+not invent another catalog schema or claim the CLI already exists.
 
 ## Retries and failures
 
