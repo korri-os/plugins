@@ -6,7 +6,7 @@ on:
       packages:
         description: "Package output names separated by spaces; one or more per batch"
         required: true
-        default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba
+        default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh
         type: string
       tag:
         description: "Batch tag, not a plugin version; must name this main commit before publication"
@@ -62,7 +62,7 @@ jobs:
         run: |
           nix run .#korri-cache -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
           test_output=$(nix build --no-link --print-out-paths ".#checks.$SYSTEM.korri-github-cache")
-          nix build --no-link ".#checks.$SYSTEM.korri-device-cache" ".#checks.$SYSTEM.korri-tailscale-package"
+          nix build --no-link ".#checks.$SYSTEM.korri-device-cache" ".#checks.$SYSTEM.korri-tailscale-package" ".#checks.$SYSTEM.korri-ssh-upstream" ".#checks.$SYSTEM.korri-ssh-host-support"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool .#korri-cache
       - name: Build the selected packages without a signing key

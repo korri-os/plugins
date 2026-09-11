@@ -29,7 +29,7 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   {
     packages = {
       korri-tailscale = tailscalePackage;
-      inherit (korri.packages.${system}) korri-plugin-retroarch korri-plugin-mgba;
+      inherit (korri.packages.${system}) korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh;
       korri-plugin-host = hostPackage;
       korri-cache = cacheTool;
     };
@@ -46,9 +46,16 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         tailscale = tailscalePackage;
       };
       korri-plugin-host = hostPackage;
-      inherit (korri.checks.${system}) korri-device-cache korri-input-module korri-bundle-module;
+      inherit (korri.checks.${system})
+        korri-device-cache
+        korri-input-module
+        korri-bundle-module
+        korri-ssh-upstream
+        korri-ssh-host-support
+        ;
       korri-runtime-plugin-host = import "${korri}/services/korrid/plugin-host/vm-test.nix" {
         inherit pkgs hostPackage tailscalePackage;
+        sshPackage = korri.packages.${system}.korri-plugin-ssh;
         hostModule = korri.nixosModules.korri-plugin-host;
       };
     };

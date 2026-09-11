@@ -58,8 +58,8 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 
 - `packages` selects one or more flake package output names, separated by spaces.
   The tool rejects expressions, flags and paths. It does not hardcode a plugin ID.
-  Defaults: `korri-tailscale korri-plugin-retroarch korri-plugin-mgba`. The latter
-  two are unmodified outputs from the locked core flake.
+  Defaults: `korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh`.
+  The game and SSH packages are unmodified outputs from the locked core flake.
 - `tag` identifies the build batch. Before publication, this tag must already
   resolve to the workflow's exact source commit. The publisher never creates or
   moves a tag.
@@ -142,11 +142,14 @@ separate operator stages. Metadata upload refuses draft NAR releases.
 
 ## Device installation
 
-**Publication is blocked until core main provides the new plugin builder and
-host, and this repository pins that main commit.** The current lock still names
-`a17c5c35e74066251184a3fd8d1e4e386559002a`. Development evaluation may override
-core locally with `--no-write-lock-file`; production must not. The old host
-cannot inspect the new named-export source and manifest contract.
+**The core lock gate is resolved; publication and device acceptance are still
+pending.** The lock pins reachable core main commit
+`f352e9f5e565c0ca0fdfb78025c4814fee50f072`, with the native builder, compatible
+host and optional SSH output. Production uses this GitHub lock, not a local
+path override. Each device still needs one compatible host update and explicit
+publisher trust configuration. The old host cannot inspect the named-export
+source and manifest contract. After that update, approved SSH enable/disable
+commands need no system generation switch.
 
 Partial caches also require core's multi-cache importer. Devices combine the
 plugin cache with configured trusted upstream caches. This repository does not
@@ -185,9 +188,20 @@ These lists do not map plugin IDs to paths, and they are not signed catalogs.
 They are durable lookup evidence from the existing publication path. The new
 host must still verify and inspect a selected store output to determine its
 identity, permissions and bound publisher. Downloading a list grants no trust.
-The brief's `install CACHE ID --release <commit>` consumer is not implemented
-by this repository. Core must implement that lookup separately; this change does
-not invent another catalog schema or claim the CLI already exists.
+The locked core implements `install CACHE ID --release COMMIT` as an
+inspection-only lookup for `build-<rev12>` batches. It verifies `revision.txt`,
+reads the host architecture's path list, and imports and inspects every
+candidate with the bound publisher key. It rejects ambiguous plugin IDs.
+Despite the command name, it does not install or enable anything: review its
+report, then use the exact-path approval command above. Custom batch tags still
+use the exact-path route. No new catalog schema is introduced.
+
+The consumer refuses duplicate paths and lists larger than 64 KiB. The
+publisher's list validation does not impose those two limits, and arbitrary
+package selections can include non-plugin outputs that inspection refuses.
+Keep commit-lookup batches to distinct plugin outputs; the workflow's default
+four-plugin selection satisfies that contract. Raw-cache exact-path installation
+remains available independently.
 
 ## Retries and failures
 
