@@ -39,9 +39,9 @@ Keep `require-sigs = true`. Never use a signature bypass to make an install work
 
 Core's builder writes `publisher.namespace` into the generated manifest before
 this exporter signs the Nix closure. The namespace is fixed by trusted build
-composition, not by `plugin.ts` or by reading a signature name. Core's game
-outputs already contain it; this repository exports them unchanged so mGBA's
-exact RetroArch requirement remains valid. Never rewrite a manifest after build.
+composition, not by `plugin.ts` or by reading a signature name. This repository
+builds each game package through that builder. Never rewrite a manifest after
+build.
 
 The device must bind `@korri` to the full public key and the exact cache URL in
 `services.korri.pluginHost.publishers` (or core's root-owned publisher file on
@@ -59,7 +59,8 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 - `packages` selects one or more flake package output names, separated by spaces.
   The tool rejects expressions, flags and paths. It does not hardcode a plugin ID.
   Defaults: `korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh`.
-  The game and SSH packages are unmodified outputs from the locked core flake.
+  RetroArch and game packages are built from this repository. SSH remains an
+  unmodified output from the locked core flake.
 - `tag` identifies the build batch. Before publication, this tag must already
   resolve to the workflow's exact source commit. The publisher never creates or
   moves a tag.
@@ -142,14 +143,15 @@ separate operator stages. Metadata upload refuses draft NAR releases.
 
 ## Device installation
 
-**The core lock gate is resolved; publication and device acceptance are still
-pending.** The lock pins reachable core main commit
-`f352e9f5e565c0ca0fdfb78025c4814fee50f072`, with the native builder, compatible
-host and optional SSH output. Production uses this GitHub lock, not a local
-path override. Each device still needs one compatible host update and explicit
-publisher trust configuration. The old host cannot inspect the named-export
-source and manifest contract. After that update, approved SSH enable/disable
-commands need no system generation switch.
+**The core lock gate is resolved; publication and device acceptance remain
+pending.** The lock pins reachable core commit
+`b4f1496e7c661f3b1aa58392eef9f9361a5349d7`, with the exported package set,
+compatible host, external game-runtime VM seam, and optional SSH output.
+Production uses this GitHub lock, not a local path override. Each device still
+needs one compatible host update and explicit publisher trust configuration.
+The old host cannot inspect the named-export source and manifest contract.
+After that update, approved SSH enable/disable commands need no system
+generation switch.
 
 Partial caches also require core's multi-cache importer. Devices combine the
 plugin cache with configured trusted upstream caches. This repository does not

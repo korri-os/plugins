@@ -62,13 +62,26 @@ jobs:
         run: |
           nix run .#korri-cache -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
           test_output=$(nix build --no-link --print-out-paths ".#checks.$SYSTEM.korri-github-cache")
-          nix build --no-link ".#checks.$SYSTEM.korri-device-cache" ".#checks.$SYSTEM.korri-tailscale-package" ".#checks.$SYSTEM.korri-ssh-upstream" ".#checks.$SYSTEM.korri-ssh-host-support"
+          nix run .#korri-retroarch-check
+          nix build --no-link \
+            ".#checks.$SYSTEM.korri-device-cache" \
+            ".#checks.$SYSTEM.korri-tailscale-package" \
+            ".#checks.$SYSTEM.korri-retroarch-package" \
+            ".#checks.$SYSTEM.korri-retroarch-settings" \
+            ".#checks.$SYSTEM.korri-libretro-example" \
+            ".#checks.$SYSTEM.korri-libretro-frontend-override" \
+            ".#checks.$SYSTEM.korri-libretro-typecheck" \
+            ".#checks.$SYSTEM.korri-ssh-upstream" \
+            ".#checks.$SYSTEM.korri-ssh-host-support"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool .#korri-cache
       - name: Build the selected packages without a signing key
         env:
           SYSTEM: ${{ matrix.system }}
         run: |
+          nix eval --json ".#packages.$SYSTEM" \
+            --apply 'packages: builtins.attrNames packages' \
+            >/dev/null
           read -ra selected_outputs <<< "$PACKAGES"
           ./cache-tool/bin/korri-cache build --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
       - name: Sign and prepare the Nix cache without content-address conversion

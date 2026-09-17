@@ -3,40 +3,39 @@
 This repository publishes prebuilt Linux plugins through a signed Nix cache on
 GitHub Releases. Devices download exact store outputs. They never compile them.
 
-The checked-in lock pins core main commit
-`f352e9f5e565c0ca0fdfb78025c4814fee50f072`, including the native plugin builder,
-compatible host and optional SSH package. Devices need one compatible host
-update before inspecting these packages. Publication and physical-device
-acceptance remain pending; this cutover changes neither devices nor releases.
+The checked-in core lock pins commit
+`b4f1496e7c661f3b1aa58392eef9f9361a5349d7`. It supplies the native plugin
+builder, exact Nixpkgs package set, compatible host, and optional SSH package.
+Devices need a compatible host update before inspecting these packages.
+Publication and physical-device acceptance remain pending. This source move
+changes neither devices nor releases.
 
 ## Packages
 
 | Flake output (`packages.<system>`) | Plugin | Source |
 |---|---|---|
-| `korri-tailscale` | `@korri:tailscale` | This repository's `plugins/tailscale/` |
-| `korri-plugin-retroarch` | `@korri:retroarch` | Locked core output, unchanged |
-| `korri-plugin-mgba` | `@korri:mgba` | Locked core output, unchanged |
+| `korri-tailscale` | `@korri:tailscale` | `plugins/tailscale/` |
+| `korri-plugin-retroarch` | `@korri:retroarch` | `plugins/retroarch/` |
+| `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
 | `korri-plugin-ssh` | `@korri:ssh` | Locked core output, unchanged |
 
-Supported systems are `x86_64-linux` and `aarch64-linux`. Core supplies Nixpkgs,
-toolchains and `lib.<system>.mkPlugin`. mGBA's `requires` pins the same exact
-RetroArch output exported here. Install and approve RetroArch before mGBA;
-downloading the dependency closure does not approve its plugins.
+Supported systems are `x86_64-linux` and `aarch64-linux`. Core supplies the
+exact package set and `lib.<system>.mkPlugin`. The catalogue currently emits 90
+core packages. Each core package carries its selected RetroArch frontend and
+core library in one closure. Nix deduplicates identical store paths.
 
 ## Authoring
 
-Each plugin has two source files:
-
-- `plugin.nix` declares `packages`, named `files`, native NixOS `services`, exact
-  plugin `requires`, and optional `ports` using NixOS firewall list names.
-- `plugin.ts` declares identity and Korri contributions through named exports.
-  It cannot declare a namespace or systemd configuration.
+A hand-written plugin uses `plugin.nix` for native artifacts and `plugin.ts`
+for identity and Korri contributions. The libretro catalogue generates one
+ordinary plugin source and package per core. Generated plugins use the same
+builder and admission rules as hand-written plugins.
 
 `nix/default.nix` calls core's builder with `publisher.namespace = "@korri"`.
 The builder renders service units with the same pinned Nixpkgs, checks named
-files exist, and creates `manifest.json`. The immutable output contains that
-manifest and `plugin.ts`; the Nix closure contains its packages and native units.
-There is no `package.nix` compatibility route.
+files, and creates `manifest.json`. The immutable output contains the closed
+TypeScript source root and manifest. The Nix closure contains its packages and
+native units. There is no `package.nix` compatibility route.
 
 Publisher composition supplies the namespace **before** Nix signs the output.
 The exporter does not rewrite manifests or remap store paths. This preserves
@@ -106,18 +105,23 @@ provided by this package. No owner or host private key is published.
 
 [PUBLICATION.md](PUBLICATION.md) covers signed exports, verified upstream
 omission, append-only metadata, immutable batch path listings and retries.
-RetroArch, mGBA and SSH are published directly from core; their source is not copied
-into this repository. The workflow retains its combined cold-host lifecycle
-gate with SSH. Core records that VM gate as passed on 2026-09-10; this publisher
-cutover did not rerun a VM or test physical hardware. The separate Effect
-runtime is not a dependency.
+This repository now owns RetroArch and the generated libretro core packages.
+SSH remains a locked core output. The combined x86_64 cold-host lifecycle gate
+passed on 2026-09-17 with the external mGBA package. Physical-hardware
+acceptance remains pending.
 
 Run focused checks on a build machine:
 
 ```sh
 python3 nix/github-cache-test.py # requires Nix, Python, OpenSSL and Bash
 nix build --no-link .#checks.x86_64-linux.korri-github-cache
+nix run .#korri-retroarch-check
 nix build --no-link .#checks.x86_64-linux.korri-tailscale-package
+nix build --no-link .#checks.x86_64-linux.korri-retroarch-package
+nix build --no-link .#checks.x86_64-linux.korri-retroarch-settings
+nix build --no-link .#checks.x86_64-linux.korri-libretro-example
+nix build --no-link .#checks.x86_64-linux.korri-libretro-frontend-override
+nix build --no-link .#checks.x86_64-linux.korri-libretro-typecheck
 nix build --no-link .#checks.x86_64-linux.korri-ssh-upstream .#checks.x86_64-linux.korri-ssh-host-support
 ```
 
@@ -132,11 +136,13 @@ override:
 ```sh
 for system in x86_64-linux aarch64-linux; do
   nix eval --no-write-lock-file --json ".#packages.$system" \
-    --apply 'p: builtins.mapAttrs (_: v: v.outPath) p'
+    --apply 'packages: builtins.attrNames packages'
 done
 ```
 
-For future updates, select a reachable core main commit and review its GitHub
-revision and hash in `flake.lock`. Recheck both architectures and mGBA's exact
-RetroArch requirement before publication. Never commit a local source path or
-add a second Nixpkgs input.
+This checks the catalogue shape without discarding nixpkgs platform metadata.
+Building a selected core still fails when nixpkgs does not support that target.
+For future updates, select a reachable reviewed core commit and verify its
+GitHub revision and hash in `flake.lock`. Recheck both architectures and
+mGBA's exact RetroArch frontend path before publication. Never commit a local
+source path or add a second Nixpkgs input.
