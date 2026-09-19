@@ -10,17 +10,16 @@
 # needs it.
 { pkgs }:
 let
-  # nixpkgs marks both of these `badPlatforms = [ "aarch64-linux" ]`. PPSSPP is
-  # the only first-party PSP libretro core, and ParaLLEl N64 is the parallel N64
-  # core; both are wanted on the SM8550 target, so the platform block is lifted
-  # for this catalogue only. Every other core keeps nixpkgs' platform metadata.
+  # nixpkgs marks PPSSPP `badPlatforms = [ "aarch64-linux" ]`. It is the only
+  # first-party PSP libretro core and it is wanted on the SM8550 target, so the
+  # platform block is lifted for this catalogue only. Every other core keeps
+  # nixpkgs' platform metadata.
+  #
+  # ParaLLEl N64's block is deliberately NOT lifted. Verified on a build host on
+  # 2026-09-19: the aarch64 link fails with `relocation truncated to fit:
+  # R_AARCH64_CONDBR19 against symbol 'invalidate_block'`, so this core cannot
+  # ship for the target. Mupen64Plus remains the N64 runner there.
   ppsspp = pkgs.libretro.ppsspp.overrideAttrs (old: {
-    meta = old.meta // {
-      badPlatforms = [ ];
-    };
-  });
-
-  parallel-n64 = pkgs.libretro.parallel-n64.overrideAttrs (old: {
     meta = old.meta // {
       badPlatforms = [ ];
     };
@@ -1441,8 +1440,8 @@ in
   parallel-n64 = {
     title = "ParaLLEl N64";
     description = "Runs Nintendo 64 content with the ParaLLEl N64 libretro core.";
-    core = parallel-n64;
-    coreFile = "${parallel-n64}/lib/retroarch/cores/parallel_n64_libretro.so";
+    core = pkgs.libretro.parallel-n64;
+    coreFile = "${pkgs.libretro.parallel-n64}/lib/retroarch/cores/parallel_n64_libretro.so";
     systems.n64 = {
       title = "Nintendo 64";
       extensions = [
