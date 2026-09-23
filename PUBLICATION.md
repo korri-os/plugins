@@ -58,9 +58,10 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 
 - `packages` selects one or more flake package output names, separated by spaces.
   The tool rejects expressions, flags and paths. It does not hardcode a plugin ID.
-  Defaults: `korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh`.
-  RetroArch and game packages are built from this repository. SSH remains an
-  unmodified output from the locked core flake.
+  Defaults: `korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine`.
+  RetroArch and game packages are built from this repository. SSH and Sunshine
+  are unmodified outputs from the locked core flake. Sunshine cannot publish
+  until the core lock pins the verified Sunshine plugin and combined encoder build.
 - `tag` identifies the build batch. Before publication, this tag must already
   resolve to the workflow's exact source commit. The publisher never creates or
   moves a tag.
@@ -143,10 +144,10 @@ separate operator stages. Metadata upload refuses draft NAR releases.
 
 ## Device installation
 
-**The core lock gate is resolved; publication and device acceptance remain
-pending.** The lock pins reachable core commit
-`b4f1496e7c661f3b1aa58392eef9f9361a5349d7`, with the exported package set,
-compatible host, external game-runtime VM seam, and optional SSH output.
+**Publication and device acceptance remain pending.** The lock pins reachable
+Korri branch commit `d3ac888f9fd11a2aa0a1460c57ef7c442afdc13a`, with the
+Sunshine and SSH outputs. It is an unverified candidate, not permission to
+publish. Update the lock to the final verified Korri commit first.
 Production uses this GitHub lock, not a local path override. Each device still
 needs one compatible host update and explicit publisher trust configuration.
 The old host cannot inspect the named-export source and manifest contract.

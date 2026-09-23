@@ -6,7 +6,7 @@ on:
       packages:
         description: "Package output names separated by spaces; one or more per batch"
         required: true
-        default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh
+        default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine
         type: string
       tag:
         description: "Batch tag, not a plugin version; must name this main commit before publication"
@@ -72,7 +72,8 @@ jobs:
             ".#checks.$SYSTEM.korri-libretro-frontend-override" \
             ".#checks.$SYSTEM.korri-libretro-typecheck" \
             ".#checks.$SYSTEM.korri-ssh-upstream" \
-            ".#checks.$SYSTEM.korri-ssh-host-support"
+            ".#checks.$SYSTEM.korri-ssh-host-support" \
+            ".#checks.$SYSTEM.korri-sunshine-plugin-admission"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool .#korri-cache
       - name: Build the selected packages without a signing key

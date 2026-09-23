@@ -50,7 +50,7 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     packages = {
       korri-tailscale = tailscalePackage;
       korri-plugin-retroarch = retroarchPackage;
-      inherit (korri.packages.${system}) korri-plugin-ssh;
+      inherit (korri.packages.${system}) korri-plugin-ssh korri-plugin-sunshine;
       korri-plugin-host = hostPackage;
       korri-cache = cacheTool;
     }
@@ -96,6 +96,7 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-bundle-module
         korri-ssh-upstream
         korri-ssh-host-support
+        korri-sunshine-plugin-admission
         ;
       korri-runtime-plugin-host = import "${korri}/services/korrid/plugin-host/vm-test.nix" {
         inherit pkgs hostPackage tailscalePackage;
