@@ -144,10 +144,10 @@ separate operator stages. Metadata upload refuses draft NAR releases.
 
 ## Device installation
 
-**Publication and device acceptance remain pending.** The lock pins reachable
-Korri branch commit `d3ac888f9fd11a2aa0a1460c57ef7c442afdc13a`, with the
-Sunshine and SSH outputs. It is an unverified candidate, not permission to
-publish. Update the lock to the final verified Korri commit first.
+**Publication and device acceptance remain pending.** The lock pins Korri
+`main` commit `e382290e9ec62b122c05bf9542d9bd6f6fba3ccc`, with the Sunshine
+and SSH outputs. The ARM build and plugin VM have not passed. This is a build
+candidate, not permission to publish.
 Production uses this GitHub lock, not a local path override. Each device still
 needs one compatible host update and explicit publisher trust configuration.
 The old host cannot inspect the named-export source and manifest contract.

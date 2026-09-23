@@ -3,10 +3,10 @@
 This repository publishes prebuilt Linux plugins through a signed Nix cache on
 GitHub Releases. Devices download exact store outputs. They never compile them.
 
-The checked-in core lock pins commit
-`d3ac888f9fd11a2aa0a1460c57ef7c442afdc13a` on Korri's `integrate/phase3`
-branch. It supplies the native plugin builder, exact Nixpkgs package set,
-compatible host, and SSH and Sunshine packages. This pin is not yet verified.
+The checked-in core lock pins Korri `main` commit
+`e382290e9ec62b122c05bf9542d9bd6f6fba3ccc`. It supplies the native plugin
+builder, exact Nixpkgs package set, compatible host, and SSH and Sunshine
+packages. The ARM build and plugin VM have not passed.
 Devices need a compatible host update before inspecting these packages.
 Publication and physical-device acceptance remain pending. This source move
 changes neither devices nor releases.
@@ -21,9 +21,9 @@ changes neither devices nor releases.
 | `korri-plugin-ssh` | `@korri:ssh` | Locked core output, unchanged |
 | `korri-plugin-sunshine` | `@korri:sunshine` | Locked core output, built and signed by this repository |
 
-Sunshine's core lock must be updated to the final verified Korri commit before
-publishing. The current branch pin is only a build candidate. Its presence in the release does
-not select it on any device or establish streaming acceptance.
+Sunshine is a build candidate. Do not publish it until the ARM build and
+plugin lifecycle gates pass. Its presence in a release does not establish
+streaming acceptance.
 
 Supported systems are `x86_64-linux` and `aarch64-linux`. Core supplies the
 exact package set and `lib.<system>.mkPlugin`. The catalogue currently emits 90
