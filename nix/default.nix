@@ -23,6 +23,11 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     };
     libretro = import ../plugins/libretro { inherit pkgs mkPlugin; };
     hostPackage = korri.packages.${system}.korri-plugin-host;
+    vmHostPackage = import "${korri}/services/korrid/plugin-host/package.nix" {
+      inherit pkgs;
+      crane = korri.inputs.crane;
+      cargoFeatures = [ "vm-lifecycle-policy" ];
+    };
     retroarchCheck = pkgs.writeShellApplication {
       name = "korri-retroarch-check";
       runtimeInputs = [
@@ -99,7 +104,12 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-sunshine-plugin-admission
         ;
       korri-runtime-plugin-host = import "${korri}/services/korrid/plugin-host/vm-test.nix" {
-        inherit pkgs hostPackage tailscalePackage;
+        inherit
+          pkgs
+          hostPackage
+          vmHostPackage
+          tailscalePackage
+          ;
         korridPackage = korri.packages.${system}.korrid;
         sshPackage = korri.packages.${system}.korri-plugin-ssh;
         gameRuntime = libretro.packages.korri-plugin-mgba;

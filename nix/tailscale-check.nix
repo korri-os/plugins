@@ -4,7 +4,7 @@ pkgs.runCommand "korri-tailscale-package-check" { nativeBuildInputs = [ pkgs.jq 
   jq -e '
     .publisher == {"namespace": "@korri"} and
     .ports == {"allowedUDPPorts": [41641]} and
-    .requires == [] and
+    (has("requires") | not) and
     (.services | keys) == ["tailscaled"] and
     (.files | keys) == ["tailscale", "tailscaled"]
   ' "$manifest"
