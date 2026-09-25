@@ -142,6 +142,16 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
       .toEqual(["device \\"])
   })
 
+  it("prefers the Korri game controller for player 1", () => {
+    // Sunshine's seat pads can enumerate first. RetroArch's preferred
+    // reservation (type 1) moves the named device to player 1 when it appears,
+    // and leaves the default order on hosts that have no such device.
+    expect(parsed(content(), [
+      "input_player1_device_reservation_type",
+      "input_player1_reserved_device",
+    ])).toEqual(["1", "Microsoft X-Box 360 pad (Korri game)"])
+  })
+
   it("applies baseline < typed < raw prepend < raw append in native lookups", () => {
     const settings = { video_driver: "vulkan" }
     const prepend = 'video_driver = "ignored"\nvideo_driver = "sdl2"'

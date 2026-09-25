@@ -142,6 +142,11 @@ joypad_autoconfig_dir = ${quoteSetting("joypad_autoconfig_dir", input.files.auto
 input_autodetect_enable = "true"
 input_max_users = "4"
 input_player1_joypad_index = "0"
+# Korri inputd routes local play to this virtual pad. Sunshine's seat pads can
+# enumerate first; preferred reservation (1) moves the game pad to player 1
+# and keeps the default order on hosts without it.
+input_player1_device_reservation_type = "1"
+input_player1_reserved_device = "Microsoft X-Box 360 pad (Korri game)"
 input_player1_analog_dpad_mode = "1"
 # RetroArch value 2 is L3 + R3. Guide remains exclusive to Korri.
 input_menu_toggle_gamepad_combo = "2"
