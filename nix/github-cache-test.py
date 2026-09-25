@@ -12,6 +12,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import unittest
@@ -134,7 +135,16 @@ class SignedCache(unittest.TestCase):
         )
         self.assertFalse((filtered / "nars" / Path(dep_nar).name).exists())
         self.assertEqual(len(list((filtered / "nars").iterdir())), 3)
+        with tarfile.open(filtered / "offline-metadata.tar.gz", "r:gz") as bundle:
+            records = {member.name: bundle.extractfile(member).read() for member in bundle}
+        self.assertEqual(set(records), {"nix-cache-info", *(p.name for p in closure.glob("*.narinfo"))})
+        self.assertEqual(records[dep_note.name], dep_text.encode())
+        self.assertEqual(records["nix-cache-info"], (closure / "nix-cache-info").read_bytes())
         complete, _ = prepare()
+        self.assertEqual(
+            (filtered / "offline-metadata.tar.gz").read_bytes(),
+            (complete / "offline-metadata.tar.gz").read_bytes(),
+        )
         self.assertEqual(len(list((complete / "metadata").glob("*.narinfo"))), 4)
         empty_only, _ = prepare(base + "/empty")
         self.assertEqual(len(list((empty_only / "metadata").glob("*.narinfo"))), 4)
@@ -426,6 +436,7 @@ class SignedCache(unittest.TestCase):
             base + "build-2/",
             env=env,
         )
+        record_batch(another)
         upload("nars", another, "build-2")
         before = fixture_state.read_bytes()
         upload("metadata", another, "build-2")
@@ -646,6 +657,14 @@ class SignedCache(unittest.TestCase):
                     env=env,
                 )
                 prepared = site / "prepared"
+                (prepared / "revision.txt").write_text("1" * 40 + "\n")
+                batch_paths = [
+                    "/nix/store/" + Path(line.removeprefix("StorePath: ")).name
+                    for record in sorted(exported.glob("*.narinfo"))
+                    for line in record.read_text().splitlines()
+                    if line.startswith("StorePath: ")
+                ]
+                (prepared / "paths-x86_64-linux.txt").write_text("\n".join(batch_paths) + "\n")
                 combined = root / "combined"
                 run(
                     sys.executable,
@@ -786,6 +805,7 @@ class CliInputs(unittest.TestCase):
             for folder, system in zip(inputs, ("x86_64-linux", "aarch64-linux")):
                 (folder / "nars").mkdir(parents=True)
                 (folder / "metadata").mkdir()
+                (folder / "offline-metadata.tar.gz").write_bytes(system.encode())
                 (folder / "revision.txt").write_text("1" * 40 + "\n")
                 (folder / f"paths-{system}.txt").write_text(path)
 
@@ -801,6 +821,8 @@ class CliInputs(unittest.TestCase):
             self.assertEqual((output / "revision.txt").read_text(), "1" * 40 + "\n")
             self.assertEqual((output / "paths-x86_64-linux.txt").read_text(), path)
             self.assertEqual((output / "paths-aarch64-linux.txt").read_text(), path)
+            self.assertEqual((output / "offline-metadata-x86_64-linux.tar.gz").read_bytes(), b"x86_64-linux")
+            self.assertEqual((output / "offline-metadata-aarch64-linux.tar.gz").read_bytes(), b"aarch64-linux")
             shutil.rmtree(output)
             (inputs[1] / "revision.txt").write_text("2" * 40 + "\n")
             self.assertIn(
@@ -813,7 +835,7 @@ class CliInputs(unittest.TestCase):
                 path.replace("-plugin", "-different")
             )
             self.assertIn(
-                "conflicting prepared file: paths-x86_64-linux.txt",
+                "each prepared cache must name one build system",
                 run(*command, succeeds=False).stderr,
             )
             self.assertFalse(output.exists())

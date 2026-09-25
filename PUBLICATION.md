@@ -89,10 +89,21 @@ Actions artifacts expire after seven days; the same text files are uploaded
 with the NARs **before the batch is published**, so published lookup evidence
 does not expire with Actions. They never enter the mutable cache release.
 
-The workflow combines both architectures, then uploads NARs and path listings to the batch draft.
-It checks GitHub's reported SHA256 and size for each uploaded asset. It publishes
-that exact release ID before adding any metadata that refers to it. Existing
-release settings determine whether publication makes it immutable.
+The workflow combines both architectures, then uploads NARs, path listings, and
+one `offline-metadata-SYSTEM.tar.gz` asset per architecture to the batch draft.
+Each archive contains the signed, Nix-produced `nix-cache-info` and `.narinfo`
+files for the full selected closure, including paths omitted from the public
+cache because a trusted upstream already serves them. It contains no NAR or
+private key. An image builder pins the immutable asset by hash; the device
+registers these proofs only after its shipped paths are in the local Nix store.
+Nix must still verify each package's bound publisher key and closure contents.
+The archive alone grants no trust. This adds archive bytes and a first-boot
+verification step; it does not make network-dependent plugin features work
+without internet.
+
+The publisher checks GitHub's reported SHA256 and size for each uploaded asset.
+It publishes that exact release ID before adding any metadata that refers to it.
+Existing release settings determine whether publication makes it immutable.
 
 ## Commands on a build machine
 
@@ -124,9 +135,11 @@ Preparation checks metadata, not upstream payload availability; Nix checks
 payload contents during installation.
 
 For verified upstream paths, `prepare` omits both the narinfo and its compressed
-NAR. For retained paths it changes only each narinfo's `URL:` line; that field is
-outside Nix's signed fingerprint. All retained signatures remain unchanged.
-Without `--upstream-cache`, the explicit command keeps the complete closure.
+NAR from the public mutable cache. The offline metadata archive keeps the
+original signed narinfo for every path. For retained public cache paths,
+`prepare` changes only each narinfo's `URL:` line; that field is outside Nix's
+signed fingerprint. All signatures remain unchanged. Without
+`--upstream-cache`, the explicit command keeps the complete public closure.
 
 For manual batches, retain each architecture's `build --paths-file` output as
 `prepared/paths-SYSTEM.txt` and write the exact checked source commit plus a

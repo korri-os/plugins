@@ -7,6 +7,7 @@ splitting a cache between a NAR release and the shared metadata release.
 """
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -17,6 +18,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+import tarfile
 import tempfile
 from urllib.error import HTTPError
 from urllib.parse import quote, urljoin, urlsplit
@@ -227,6 +229,23 @@ def upstream_paths(records, upstreams, temporary):
     return omitted
 
 
+def offline_metadata(cache, records, output):
+    # Preserve Nix's signed fingerprints and local file-cache URLs. Image
+    # builders need only these records to register already-shipped paths;
+    # they must not download NARs or carry the signing key onto the device.
+    with output.open("wb") as stream:
+        with gzip.GzipFile(fileobj=stream, mode="wb", filename="", mtime=0) as compressed:
+            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as bundle:
+                for path in [cache / "nix-cache-info", *records]:
+                    source = regular(path)
+                    entry = tarfile.TarInfo(source.name)
+                    entry.size = source.stat().st_size
+                    entry.mode = 0o644
+                    entry.mtime = 0
+                    with source.open("rb") as content:
+                        bundle.addfile(entry, content)
+
+
 def prepare(cache, output, base, upstreams):
     base = https_base(base)
     upstreams = [https_base(url) for url in upstreams]
@@ -270,6 +289,7 @@ def prepare(cache, output, base, upstreams):
                 )
                 + "\n"
             )
+        offline_metadata(cache, records, staged / "offline-metadata.tar.gz")
         staged.rename(output)
 
 
@@ -525,7 +545,18 @@ def upload(prepared, repo, tag, cache_tag, part):
         nar = prepared / "nars" / name
         verify_nar(regular(nar), fields)
         nars[name] = nar
-    payloads = [*sorted(nars.values()), *batch_files(prepared)]
+    batch = batch_files(prepared, required=True)
+    listings = [path for path in batch if path.name.startswith("paths-")]
+    offline = []
+    for listing in listings:
+        system = listing.name.removeprefix("paths-").removesuffix(".txt")
+        name = (
+            "offline-metadata.tar.gz"
+            if len(listings) == 1
+            else f"offline-metadata-{system}.tar.gz"
+        )
+        offline.append(regular(prepared / name))
+    payloads = [*sorted(nars.values()), *offline, *batch]
     if part == "nars":
         upload_files(repo, tag, payloads)
     else:
@@ -567,7 +598,17 @@ def combine(output, inputs):
                         raise ValueError(f"conflicting prepared file: {path.name}")
                     shutil.copyfile(path, target)
         for source in inputs:
-            for path in batch_files(source):
+            batch = batch_files(source, required=True)
+            listings = [path for path in batch if path.name.startswith("paths-")]
+            if len(listings) != 1:
+                raise ValueError("each prepared cache must name one build system")
+            system = listings[0].name.removeprefix("paths-").removesuffix(".txt")
+            archive = regular(source / "offline-metadata.tar.gz")
+            target = staged / f"offline-metadata-{system}.tar.gz"
+            if target.exists() and digest(target) != digest(archive):
+                raise ValueError(f"conflicting prepared file: {target.name}")
+            shutil.copyfile(archive, target)
+            for path in batch:
                 target = staged / path.name
                 if target.exists() and digest(target) != digest(path):
                     raise ValueError(f"conflicting prepared file: {path.name}")
