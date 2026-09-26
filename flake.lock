@@ -60,11 +60,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1790383577,
-        "narHash": "sha256-TUQfsCA6TFsaH/s0nTwcH56SzPdnAkYMHSiNBHP5TV8=",
+        "lastModified": 1790405509,
+        "narHash": "sha256-ph3j05T4RwM3MeX7IivfF8Q1j00ugcVc2BmyEGKyzJw=",
         "owner": "korri-os",
         "repo": "korri",
-        "rev": "df9de3261cd4638cba74a71c505038fa5620e8ce",
+        "rev": "570a257386f5321ab11e3cbcf6b88d9267be2652",
         "type": "github"
       },
       "original": {
@@ -92,11 +92,11 @@
     "plugins": {
       "flake": false,
       "locked": {
-        "lastModified": 1790374007,
-        "narHash": "sha256-WKL8D5J6LDPB6l2ecdOToOYqOTHmpUBXhk9ys0E/sJg=",
+        "lastModified": 1790383589,
+        "narHash": "sha256-CmahJBA9wYAeLCKDrZtmSqQv83RY/opb4hzi9PZOcgk=",
         "owner": "korri-os",
         "repo": "plugins",
-        "rev": "82c969ee0f4908dc9b61601309eacace25efae3f",
+        "rev": "e5e27ed406f2d17369d26185bd400bd150473692",
         "type": "github"
       },
       "original": {
