@@ -1,4 +1,4 @@
-{ korri }:
+{ korri, baselineKorri }:
 korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   system:
   let
@@ -61,14 +61,13 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     }
     // libretro.packages
     // {
-      # Explicitly experimental outputs for an owner-approved Mini V2 trial.
-      # The workflow selects these names on both runner architectures; only
-      # the aarch64-linux outputs can be admitted on the Mini V2.
+      # The old signed Mini plugin owns the receiver and unprivileged service.
+      # Both trial outputs retain that exact producer and change only Sunshine.
       korri-plugin-sunshine-rotation-on = import "${korri}/services/sunshine/rotation-probe-plugin.nix" {
-        inherit system korri;
+        inherit system baselineKorri;
       };
       korri-plugin-sunshine-rotation-off = import "${korri}/services/sunshine/rotation-probe-plugin.nix" {
-        inherit system korri;
+        inherit system baselineKorri;
         forceOff = true;
       };
     };
