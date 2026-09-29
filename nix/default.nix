@@ -62,13 +62,10 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     // libretro.packages
     // {
       # The old signed Mini plugin owns the receiver and unprivileged service.
-      # Both trial outputs retain that exact producer and change only Sunshine.
+      # Publish only the corrected on variant; the compatible signed off
+      # variant is already available from the prior batch.
       korri-plugin-sunshine-rotation-on = import "${korri}/services/sunshine/rotation-probe-plugin.nix" {
         inherit system baselineKorri;
-      };
-      korri-plugin-sunshine-rotation-off = import "${korri}/services/sunshine/rotation-probe-plugin.nix" {
-        inherit system baselineKorri;
-        forceOff = true;
       };
     };
     apps = {
