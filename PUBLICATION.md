@@ -49,6 +49,34 @@ non-NixOS). The new host checks the actual NAR signature with that bound key.
 A matching signature label or another globally trusted signer is insufficient.
 Administrator approval to start the plugin remains a separate step.
 
+## Core updates and plugin publication
+
+The locked Core input supplies build dependencies. It is not a requirement
+that every new Core commit publish new plugin packages. Keep this pin for
+unrelated Core changes. Current Core tests the unchanged published packages
+with `nix run .#korri-published-plugins-check` in the Core repository. That gate
+checks both architecture selections and offline closure proofs. Its x86 VM
+checks image receipts, approval refusal, SSH lifecycle and the game registry.
+The packaged mGBA callback test checks route and `launch.prepare` behavior,
+not emulator gameplay. A host-only operation-name break must fail that test.
+
+Advance the publisher pin only for a consumed builder, contract, native
+package or toolchain change that needs adoption. Evaluate the candidate
+package outputs on a build machine. Compare their exact paths with prior
+published outputs, using the existing architecture path lists and verified
+host declarations. The lists do not map IDs to paths. Select only affected
+outputs in the workflow's existing `packages` input. An unchanged output
+needs no publication. Batch 1's source-mutation gate remains unchanged.
+
+Core images name exact published output paths in native Nix composition and
+pin the matching immutable offline metadata assets by hash. They no longer
+import this publisher's recipes or advance its Core pin during image builds.
+A plugin update requires an explicit image pin edit and acceptance before
+image delivery. Publication and deployment need separate approval; a
+successful Core test grants neither. Independent closures can retain old dependency versions and use
+more disk. A Core dependency update does not update those plugin dependencies;
+security updates to them still require deliberate plugin publication.
+
 ## Workflow
 
 Only `simonwjackson` can dispatch or rerun `main`. Review the `plugin-release`
