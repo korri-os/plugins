@@ -314,10 +314,33 @@ in 1285.35 seconds. Its unchanged rerun reused the result in 10.63 seconds.
 The typecheck's actual derivation inputs contain the consumed contract file,
 not the Core source root.
 
-These are build-host measurements, not new CI timings. The regression adds an
-evaluation gate. Neither these numbers nor cache configuration establish a
-speedup. Identical uncached checks still run, and changed dependencies still
-require builds. No live publication or handheld operation belongs to this batch.
+These local numbers are build-host measurements, not CI timings. The regression
+adds an evaluation gate. Identical uncached checks still run, and changed
+dependencies still require builds.
+
+Post-change [run 36651820275](https://github.com/korri-os/plugins/actions/runs/36651820275)
+passed on 2026-09-30 at `dc51e438e97b31c6f35d7adf382086676b963416` with
+`publish=false`. Both architecture jobs passed the real cache-configuration and
+source-invalidation gates, all existing checks, selected package builds, signing,
+and preparation. The cold-host lifecycle passed. Publication was skipped.
+
+| CI step | x86 | ARM |
+| --- | --- | --- |
+| Cache configuration | 3s | 3s |
+| Cache-configuration regression | 6s | 5s |
+| Source-invalidation regression | 1m23s | 1m07s |
+| Broad validation | 26m16s | 7m35s |
+| Selected package builds | 7s | 6s |
+| Signing and preparation | 4m09s | 3m32s |
+| Cold-host lifecycle | 49m31s | Not run |
+
+These step durations come from GitHub's completed-job timestamps. Jobs overlap.
+Selected builds follow broad validation, which can already build their outputs;
+that step's short duration alone does not prove a cache speedup. This run did not
+show an overall speedup: x86 validation and lifecycle both took longer than the
+recorded baseline. The Core input also changed between the two runs, so this is
+not a controlled comparison. No live publication or handheld operation belongs
+to this batch.
 
 ## Capacity and verification limits
 
