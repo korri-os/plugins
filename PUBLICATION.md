@@ -82,6 +82,11 @@ security updates to them still require deliberate plugin publication.
 
 Only `simonwjackson` can dispatch or rerun `main`. Review the `plugin-release`
 environment before the first run. Jobs use standard x86_64 and ARM runners.
+The installer is pinned to Nix 2.34.1, matching verified local native checks.
+A run using the unpinned Nix 2.35.1 installer failed the administrative retirement
+fixture on both architectures. The version is an observed difference, not a
+proven cause. Retest the native and lifecycle gates before changing this pin.
+The pin does not relax state ownership, permissions, metadata or signature checks.
 
 Inputs to `.github/workflows/plugin-repository.yml`:
 

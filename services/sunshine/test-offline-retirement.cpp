@@ -339,6 +339,25 @@ int main(int argc, char **argv) {
   assert(::chmod(directory.c_str(), 0755) == 0);
   refuse(request);
   assert(::chmod(directory.c_str(), 0700) == 0);
+  // A private leaf does not make a group-writable ancestor safe. Build
+  // directories can have this mode; the fixture must not live beneath them.
+  const auto unsafe_ancestor = directory / "unsafe-ancestor";
+  fs::create_directory(unsafe_ancestor);
+  assert(::chmod(unsafe_ancestor.c_str(), 0700) == 0);
+  const auto private_leaf = unsafe_ancestor / "private-leaf";
+  fs::create_directory(private_leaf);
+  assert(::chmod(private_leaf.c_str(), 0700) == 0);
+  const auto unsafe_state = private_leaf / "sunshine_state.json";
+  write(unsafe_state, original);
+  wrong = request;
+  wrong.state_path = unsafe_state.string();
+  assert(retirement::retire_all_clients(wrong).retired_clients == 2);
+  assert(read(unsafe_state) == candidate);
+  write(unsafe_state, original);
+  assert(::chmod(unsafe_ancestor.c_str(), 0770) == 0);
+  refuse(wrong);
+  assert(read(unsafe_state) == original);
+  fs::remove_all(unsafe_ancestor);
   fs::create_hard_link(state, directory / "hardlink");
   refuse(request);
   fs::remove(directory / "hardlink");
@@ -412,6 +431,9 @@ int main(int argc, char **argv) {
       (void) retirement::retire_all_clients(request, fault);
     } catch (const retirement::error &error) {
       rejected = error.mutation_attempted;
+      if (!rejected) {
+        std::fprintf(stderr, "expected mutation-stage refusal, got preflight refusal: %s\n", error.what());
+      }
     }
     audit->active = false;
     assert(rejected);

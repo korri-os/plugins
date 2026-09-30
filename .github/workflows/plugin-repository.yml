@@ -56,6 +56,8 @@ jobs:
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          # Match verified local tooling; newer Nix needs a separate CI check.
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
       - name: Read the existing signed publisher cache
         run: python3 .github/workflows/trust-plugin-caches.py
       - name: Test the effective signed-cache configuration
@@ -142,6 +144,7 @@ jobs:
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
       - name: Read the existing signed Core and publisher caches
         run: python3 .github/workflows/trust-plugin-caches.py --include-core
       - name: Existing cold-host lifecycle acceptance
@@ -160,6 +163,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: cache-*
