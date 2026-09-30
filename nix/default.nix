@@ -1,4 +1,4 @@
-{ korri, baselineKorri }:
+{ korri }:
 korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   system:
   let
@@ -59,15 +59,7 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-host = hostPackage;
       korri-cache = cacheTool;
     }
-    // libretro.packages
-    // {
-      # The old signed Mini plugin owns the receiver and unprivileged service.
-      # Publish only the corrected on variant; the compatible signed off
-      # variant is already available from the prior batch.
-      korri-plugin-sunshine-rotation-on = import "${korri}/services/sunshine/rotation-probe-plugin.nix" {
-        inherit system baselineKorri;
-      };
-    };
+    // libretro.packages;
     apps = {
       korri-cache = {
         type = "app";
