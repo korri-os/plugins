@@ -69,6 +69,34 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 - `publish` defaults to false. True explicitly permits NAR release creation,
   publication and metadata uploads after both builds and the lifecycle gate pass.
 
+Build jobs read the signed publisher cache before their test and build commands.
+Lifecycle verification also reads Core's signed cache through `--include-core`.
+`nix/ci-cache-settings.nix` reads URLs from the locked Core product requirements,
+Core keys from `korri.cache`, and publisher trust from the existing `@korri`
+binding. The helper preserves stock and inherited settings, verifies the
+effective configuration, and requires signatures. Publishing builds refuse an
+inherited Core cache, including a URI with priority parameters.
+
+Core cache imports can retain Core signatures when Nix exports the same path
+with a publisher signature. This makes an unchanged path fail the publisher's
+strict append-only metadata comparison. A real isolated-store fixture reproduced
+that conflict on Nix 2.31 and 2.34. On 2026-09-29, the owner chose publisher-only
+build reuse and both caches for lifecycle verification. Export, signature checks,
+and the upstream filter remain unchanged. Build jobs lose Core-only reuse.
+Missing outputs still require builds on CI. Cache outages can stop downloads.
+
+Each build job runs `korri-plugin-churn-check` for its architecture. The check
+evaluates the real Mini V2 selection from Core, rather than maintaining another
+package list. It proves an unrelated documentation change preserves the selected
+package paths and the libretro typecheck, plugin-host, and settings check paths.
+Contract, helper, settings-producer, and RetroArch source changes must invalidate
+only their expected outputs. Copies retain executable bits and symlinks. This
+is an evaluation check, not a build or device acceptance test.
+
+The libretro typecheck copies only the consumed contract file into the store.
+Changes elsewhere in Core no longer invalidate it. Changes to the contract bytes
+still invalidate the check. Generated contract source remains read-only.
+
 Builds run before the signing key is exposed. Signed exports use `nix copy` with
 zero build jobs and no remote builders. The secret is removed before artifacts
 upload. When publication is false and no signing secret exists, the build uses a
@@ -236,6 +264,60 @@ metadata. It cannot make a cache-wide update atomic. Nix sees missing paths as
 cache misses, and devices must refuse builds. A retry repairs missing assets;
 it does not remove valid assets from another batch. An administrator can still
 change releases outside the workflow. Do not edit them during publication.
+
+## CI reuse verification
+
+Run these checks on a build host, never on a handheld:
+
+```sh
+nix run .#korri-plugin-churn-check
+python3 nix/ci-cache-config-test.py
+python3 nix/ci-cache-substitution-test.py "$CORE_STORE_OUTPUT" "$PUBLISHER_STORE_OUTPUT"
+```
+
+The churn command checks both supported architectures by default. Use
+`-- --system x86_64-linux` or `-- --system aarch64-linux` for one architecture.
+The substitution command needs two existing, input-addressed published outputs
+without references. It downloads each into an empty isolated store, verifies signatures and content,
+and proves unsigned and wrong-key exports fail without registering paths.
+It neither builds nor installs the fetched outputs in the host store.
+Source evaluation uses the normal Nix store. The test depends on live cache access.
+
+The 2026-09-29 verification passed all five source mutations on both architectures,
+with 21 selected packages per architecture. The original typecheck failed the
+unrelated-change assertion on both architectures before the contract-file fix.
+The final source-copy fixture preserves the original NAR hash before mutation.
+Two real signed cache downloads and four signature refusals passed. Both job
+configurations passed effective-configuration tests. Publishing also refuses an
+inherited Core cache before writing the GitHub environment.
+
+Read-only metadata probes found coverage for seven of twelve queried current
+outputs across both architectures. Both Tailscale outputs, both Sunshine outputs,
+and the x86 plugin-host output lacked metadata in either custom cache. These
+probes did not verify their complete closures. A later live probe received HTTP
+403 from GitHub. Cache coverage and availability still limit reuse.
+
+Before this batch, [run 36588085951](https://github.com/korri-os/plugins/actions/runs/36588085951)
+measured these CI steps. Jobs overlap, so these durations are not additive.
+
+| CI step | Measured time |
+| --- | --- |
+| Cold-host lifecycle gate | 38m04s |
+| Broad x86 validation | 20m24s |
+| Selected x86 package builds | 5m54s |
+| x86 signing and preparation | 2m47s |
+
+Local mutation evaluations took 72.37 seconds for x86 and 55.54 seconds for ARM.
+All eleven x86 check outputs were reused without builds on two subsequent runs,
+at 49.21 and 48.05 seconds. The existing cold-host lifecycle gate passed locally
+in 1285.35 seconds. Its unchanged rerun reused the result in 10.63 seconds.
+The typecheck's actual derivation inputs contain the consumed contract file,
+not the Core source root.
+
+These are build-host measurements, not new CI timings. The regression adds an
+evaluation gate. Neither these numbers nor cache configuration establish a
+speedup. Identical uncached checks still run, and changed dependencies still
+require builds. No live publication or handheld operation belongs to this batch.
 
 ## Capacity and verification limits
 

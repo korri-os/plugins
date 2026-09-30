@@ -56,6 +56,14 @@ jobs:
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Read the existing signed publisher cache
+        run: python3 .github/workflows/trust-plugin-caches.py
+      - name: Test the effective signed-cache configuration
+        run: python3 nix/ci-cache-config-test.py
+      - name: Check plugin paths and scoped input invalidation
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: nix run .#korri-plugin-churn-check -- --system "$SYSTEM"
       - name: Validate the destination and test the publisher
         env:
           SYSTEM: ${{ matrix.system }}
@@ -126,6 +134,8 @@ jobs:
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Read the existing signed Core and publisher caches
+        run: python3 .github/workflows/trust-plugin-caches.py --include-core
       - name: Existing cold-host lifecycle acceptance
         run: nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host
 

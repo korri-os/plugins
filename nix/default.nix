@@ -39,6 +39,16 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         exec ${pkgs.bash}/bin/bash ${../plugins/retroarch/check.sh}
       '';
     };
+    churnCheck = pkgs.writeShellApplication {
+      name = "korri-plugin-churn-check";
+      runtimeInputs = [
+        pkgs.python3
+        pkgs.nix
+      ];
+      text = ''
+        exec python3 ${./plugin-churn-check.py} --publisher ${../.} --korri ${korri} "$@"
+      '';
+    };
     cacheTool = pkgs.writeShellApplication {
       name = "korri-cache";
       runtimeInputs = [
@@ -58,12 +68,17 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       inherit (korri.packages.${system}) korri-plugin-ssh korri-plugin-sunshine;
       korri-plugin-host = hostPackage;
       korri-cache = cacheTool;
+      korri-plugin-churn-check = churnCheck;
     }
     // libretro.packages;
     apps = {
       korri-cache = {
         type = "app";
         program = "${cacheTool}/bin/korri-cache";
+      };
+      korri-plugin-churn-check = {
+        type = "app";
+        program = "${churnCheck}/bin/korri-plugin-churn-check";
       };
       korri-retroarch-check = {
         type = "app";
