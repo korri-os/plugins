@@ -122,8 +122,12 @@ Contract, helper, settings-producer, and RetroArch source changes must invalidat
 only their expected outputs. A real builder derivation change must invalidate
 all selected plugins and the shared builder gate. A host-free case refuses all
 Core host recipes and checks the actual build dependency graph for host inputs.
-Copies retain executable bits and symlinks. This
-is an evaluation check, not a build or device acceptance test.
+Copies retain executable bits and symlinks. A caller-owned OpenSSH compiler-flag
+fixture also checks declared native dependencies. It changes 20 wrapper drv files
+but only SSH's wrapper output on each architecture. Fixed-output fetches can
+change a drv file without changing the downstream output path. The report records
+these separately, so drv churn alone does not imply compilation or publication.
+This is an evaluation check, not a build or device acceptance test.
 
 The libretro typecheck copies only the consumed contract file into the store.
 It uses Core's supported `pluginContract` reference to the existing generated
@@ -277,7 +281,7 @@ The consumer refuses duplicate paths and lists larger than 64 KiB. The
 publisher's list validation does not impose those two limits, and arbitrary
 package selections can include non-plugin outputs that inspection refuses.
 Keep commit-lookup batches to distinct plugin outputs; the workflow's default
-four-plugin selection satisfies that contract. Raw-cache exact-path installation
+five-plugin selection satisfies that contract. Raw-cache exact-path installation
 remains available independently.
 
 ## Retries and failures
