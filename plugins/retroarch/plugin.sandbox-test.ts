@@ -142,14 +142,19 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
       .toEqual(["device \\"])
   })
 
-  it("prefers the Korri game controller for player 1", () => {
-    // Sunshine's seat pads can enumerate first. RetroArch's preferred
-    // reservation (type 1) moves the named device to player 1 when it appears,
-    // and leaves the default order on hosts that have no such device.
-    expect(parsed(content(), [
-      "input_player1_device_reservation_type",
-      "input_player1_reserved_device",
-    ])).toEqual(["1", "Microsoft X-Box 360 pad (Korri game)"])
+  it("prefers each Korri seat pad for its own player", () => {
+    // udev enumerates the persistent seat pads in sysfs-name order
+    // (input10 before input8), so default order put Seat P3 on player 1.
+    // Preferred reservation (type 1) matches the device name and leaves the
+    // default order on hosts that have no seat pads.
+    const keys = [1, 2, 3, 4].flatMap((player) => [
+      `input_player${player}_device_reservation_type`,
+      `input_player${player}_reserved_device`,
+    ])
+    expect(parsed(content(), keys)).toEqual([1, 2, 3, 4].flatMap((player) => [
+      "1",
+      `Korri Seat P${player}`,
+    ]))
   })
 
   it("applies baseline < typed < raw prepend < raw append in native lookups", () => {
