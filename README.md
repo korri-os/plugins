@@ -3,13 +3,16 @@
 This repository publishes prebuilt Linux plugins through a signed Nix cache on
 GitHub Releases. Devices download exact store outputs. They never compile them.
 
-The checked-in core lock pins Korri `main` commit
-`e382290e9ec62b122c05bf9542d9bd6f6fba3ccc`. It supplies the native plugin
-builder, exact Nixpkgs package set, compatible host, and SSH and Sunshine
-packages. The ARM build and plugin VM have not passed.
-Devices need a compatible host update before inspecting these packages.
-Publication and physical-device acceptance remain pending. This source move
-changes neither devices nor releases.
+Core supplies the supported builder and generated launch contract. This
+repository owns its Nixpkgs and flake-utils inputs, initially locked to the
+same revisions previously consumed through Core. Plugin builds do not use
+Core's Rust overlay or host binaries. Host admission and lifecycle checks use
+Core's own host composition, separately from plugin builds.
+
+This ownership move changes neither devices nor releases. Publication and
+physical-device acceptance need separate approval. Batch 3 validation uses a
+candidate Core input override. Before production use, update the GitHub lock to
+the reviewed, reachable Core revision that exports the new interface.
 
 ## Packages
 
@@ -18,15 +21,15 @@ changes neither devices nor releases.
 | `korri-tailscale` | `@korri:tailscale` | `plugins/tailscale/` |
 | `korri-plugin-retroarch` | `@korri:retroarch` | `plugins/retroarch/` |
 | `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
-| `korri-plugin-ssh` | `@korri:ssh` | Locked core output, unchanged |
-| `korri-plugin-sunshine` | `@korri:sunshine` | Locked core output, built and signed by this repository |
+| `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
+| `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |
 
 Sunshine is a build candidate. Do not publish it until the ARM build and
 plugin lifecycle gates pass. Its presence in a release does not establish
 streaming acceptance.
 
-Supported systems are `x86_64-linux` and `aarch64-linux`. Core supplies the
-exact package set and `lib.<system>.mkPlugin`. The catalogue currently emits 90
+Supported systems are `x86_64-linux` and `aarch64-linux`. Publisher composition
+binds `korri.lib.<system>.mkPlugin { pkgs = publisherPkgs; }`. The catalogue currently emits 90
 core packages. Each core package carries its selected RetroArch frontend and
 core library in one closure. Nix deduplicates identical store paths.
 
@@ -37,7 +40,7 @@ for identity and Korri contributions. The libretro catalogue generates one
 ordinary plugin source and package per core. Generated plugins use the same
 builder and admission rules as hand-written plugins.
 
-`nix/default.nix` calls core's builder with `publisher.namespace = "@korri"`.
+`nix/default.nix` calls Core's supported builder with `publisher.namespace = "@korri"`.
 The builder renders service units with the same pinned Nixpkgs, checks named
 files, and creates `manifest.json`. The immutable output contains the closed
 TypeScript source root and manifest. The Nix closure contains its packages and
@@ -101,7 +104,7 @@ These commands need no system generation switch. The package listens on TCP
 2222, uses existing accounts with public-key authentication, and creates its
 own device-local host key. It leaves recovery SSH on TCP 22 unchanged. Root
 authority is device-wide; disabling the listener does not undo administrative
-changes. Core's `plugins/ssh/README.md` documents native policy and verification.
+changes. [`plugins/ssh/README.md`](plugins/ssh/README.md) documents native policy and verification.
 
 The owner still needs an existing administrator path to install and toggle it.
 Local owner enrollment and a graphical plugin-management interface are not
@@ -111,8 +114,8 @@ provided by this package. No owner or host private key is published.
 
 [PUBLICATION.md](PUBLICATION.md) covers signed exports, verified upstream
 omission, append-only metadata, immutable batch path listings and retries.
-This repository now owns RetroArch and the generated libretro core packages.
-SSH remains a locked core output. The combined x86_64 cold-host lifecycle gate
+This repository owns RetroArch, generated libretro core packages, SSH, and
+Sunshine native recipes and producer gates. The combined x86_64 cold-host lifecycle gate
 passed on 2026-09-17 with the external mGBA package. Physical-hardware
 acceptance remains pending.
 
@@ -121,6 +124,7 @@ Run focused checks on a build machine:
 ```sh
 python3 nix/github-cache-test.py # requires Nix, Python, OpenSSL and Bash
 nix build --no-link .#checks.x86_64-linux.korri-github-cache
+nix build --no-link .#checks.x86_64-linux.korri-plugin-builder
 nix run .#korri-retroarch-check
 nix build --no-link .#checks.x86_64-linux.korri-tailscale-package
 nix build --no-link .#checks.x86_64-linux.korri-retroarch-package
@@ -151,4 +155,21 @@ Building a selected core still fails when nixpkgs does not support that target.
 For future updates, select a reachable reviewed core commit and verify its
 GitHub revision and hash in `flake.lock`. Recheck both architectures and
 mGBA's exact RetroArch frontend path before publication. Never commit a local
-source path or add a second Nixpkgs input.
+source path. Update publisher Nixpkgs separately; its changes can require a
+new native dependency review and new plugin outputs.
+
+## Native tools and boundaries
+
+Publisher owns `sunshine-korri`, `sunshine-retire-all-clients`, and the ARM-only
+`sunshine-korri-v4l2m2m` and `sunshine-v4l2m2m-probe` outputs. The existing
+`sunshine-retire-all-clients` app moves here too. The ARM plugin uses one reviewed
+FFmpeg archive with RKMPP and V4L2 M2M, not two independent bundles. The standalone
+probe retains its separate V4L2 FFmpeg recipe. Tool ownership does not authorize
+running probes or retiring client state.
+
+Core retains host authority, shared input seats, certificate authorization,
+SSH account/PAM support, and packaged consumer checks. `nix/integration.nix`
+uses host binaries only for tests and the existing publisher CLI tooling. It
+imports no Core host recipe with publisher pkgs.
+Historical rotation tools keep their exact Core baseline. The Android check
+remains inactive historical source; neither is a shipping dependency.

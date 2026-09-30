@@ -1,9 +1,31 @@
-{ korri }:
-korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
+{
+  korri,
+  nixpkgs,
+  flake-utils,
+}:
+flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   system:
   let
-    pkgs = korri.lib.${system}.pkgs;
-    mkPlugin = korri.lib.${system}.mkPlugin;
+    pkgs = import nixpkgs {
+      inherit system;
+      config.allowUnfree = true;
+    };
+    mkPlugin = korri.lib.${system}.mkPlugin { inherit pkgs; };
+    sunshine = import ../services/sunshine { inherit pkgs system; };
+    sshPackage = mkPlugin {
+      publisher.namespace = "@korri";
+      source = ../plugins/ssh;
+      plugin = ../plugins/ssh/plugin.nix;
+    };
+    sunshineDefinition = import ../plugins/sunshine/plugin.nix {
+      inherit pkgs;
+      sunshinePackage = sunshine.pluginPackage;
+    };
+    sunshinePlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = ../plugins/sunshine;
+      plugin = _: sunshineDefinition;
+    };
     # Publisher identity enters the immutable manifest before signing. Never
     # rewrite a built package: mGBA already pins RetroArch's exact store path.
     tailscalePackage = mkPlugin {
@@ -22,11 +44,16 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin = _: retroarchDefinition;
     };
     libretro = import ../plugins/libretro { inherit pkgs mkPlugin; };
-    hostPackage = korri.packages.${system}.korri-plugin-host;
-    vmHostPackage = import "${korri}/services/korrid/plugin-host/package.nix" {
-      inherit pkgs;
-      crane = korri.inputs.crane;
-      cargoFeatures = [ "vm-lifecycle-policy" ];
+    integration = import ./integration.nix {
+      inherit
+        pkgs
+        system
+        korri
+        tailscalePackage
+        sshPackage
+        sunshinePlugin
+        ;
+      gameRuntime = libretro.packages.korri-plugin-mgba;
     };
     retroarchCheck = pkgs.writeShellApplication {
       name = "korri-retroarch-check";
@@ -39,6 +66,20 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         exec ${pkgs.bash}/bin/bash ${../plugins/retroarch/check.sh}
       '';
     };
+    # Local path overrides can include Git/worktree metadata. The mutation gate
+    # compares pristine NAR content, so give it the same clean source as CI.
+    churnCore = builtins.path {
+      path = korri;
+      name = "korri-churn-source";
+      filter =
+        path: _:
+        !(builtins.elem (builtins.baseNameOf path) [
+          ".git"
+          ".worktree"
+          ".worktrees"
+          "__pycache__"
+        ]);
+    };
     churnCheck = pkgs.writeShellApplication {
       name = "korri-plugin-churn-check";
       runtimeInputs = [
@@ -46,7 +87,7 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         pkgs.nix
       ];
       text = ''
-        exec python3 ${./plugin-churn-check.py} --publisher ${../.} --korri ${korri} "$@"
+        exec python3 ${./plugin-churn-check.py} --publisher ${../.} --korri ${churnCore} "$@"
       '';
     };
     cacheTool = pkgs.writeShellApplication {
@@ -65,13 +106,15 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     packages = {
       korri-tailscale = tailscalePackage;
       korri-plugin-retroarch = retroarchPackage;
-      inherit (korri.packages.${system}) korri-plugin-ssh korri-plugin-sunshine;
-      korri-plugin-host = hostPackage;
+      korri-plugin-ssh = sshPackage;
+      korri-plugin-sunshine = sunshinePlugin;
       korri-cache = cacheTool;
       korri-plugin-churn-check = churnCheck;
     }
-    // libretro.packages;
-    apps = {
+    // libretro.packages
+    // sunshine.packages
+    // integration.packages;
+    apps = sunshine.apps // {
       korri-cache = {
         type = "app";
         program = "${cacheTool}/bin/korri-cache";
@@ -85,51 +128,39 @@ korri.inputs.flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         program = "${retroarchCheck}/bin/korri-retroarch-check";
       };
     };
-    checks = {
-      korri-github-cache = import ./github-cache-check.nix { inherit pkgs; };
-      korri-tailscale-package = import ./tailscale-check.nix {
-        inherit pkgs;
-        tailscale = tailscalePackage;
+    checks =
+      sunshine.checks
+      // integration.checks
+      // {
+        korri-plugin-builder = korri.lib.${system}.pluginBuilderCheck { inherit pkgs; };
+        korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
+        korri-sunshine-plugin-native = import ../plugins/sunshine/native-check.nix {
+          inherit pkgs;
+          plugin = sunshineDefinition;
+        };
+        korri-github-cache = import ./github-cache-check.nix { inherit pkgs; };
+        korri-tailscale-package = import ./tailscale-check.nix {
+          inherit pkgs;
+          tailscale = tailscalePackage;
+        };
+        korri-retroarch-package = import ./retroarch-check.nix {
+          inherit pkgs;
+          package = retroarchPackage;
+          definition = retroarchDefinition;
+        };
+        korri-retroarch-settings = retroarchDefinition.packages.retroarch-settings;
+        korri-libretro-example = import ../plugins/libretro/example-check.nix {
+          inherit pkgs mkPlugin;
+        };
+        korri-libretro-frontend-override = import ../plugins/libretro/frontend-override-check.nix {
+          inherit pkgs mkPlugin;
+        };
+        korri-libretro-typecheck = import ./libretro-typecheck.nix {
+          inherit pkgs;
+          helper = ../plugins/libretro/retroarch.ts;
+          settings = retroarchDefinition.packages.retroarch-settings;
+          contract = korri.lib.${system}.pluginContract;
+        };
       };
-      korri-retroarch-package = import ./retroarch-check.nix {
-        inherit pkgs;
-        package = retroarchPackage;
-        definition = retroarchDefinition;
-      };
-      korri-retroarch-settings = retroarchDefinition.packages.retroarch-settings;
-      korri-libretro-example = import ../plugins/libretro/example-check.nix {
-        inherit pkgs mkPlugin;
-      };
-      korri-libretro-frontend-override = import ../plugins/libretro/frontend-override-check.nix {
-        inherit pkgs mkPlugin;
-      };
-      korri-libretro-typecheck = import ./libretro-typecheck.nix {
-        inherit pkgs;
-        helper = ../plugins/libretro/retroarch.ts;
-        settings = retroarchDefinition.packages.retroarch-settings;
-        contract = "${korri}/contracts/generated/korrid.ts";
-      };
-      korri-plugin-host = hostPackage;
-      inherit (korri.checks.${system})
-        korri-device-cache
-        korri-input-module
-        korri-bundle-module
-        korri-ssh-upstream
-        korri-ssh-host-support
-        korri-sunshine-plugin-admission
-        ;
-      korri-runtime-plugin-host = import "${korri}/services/korrid/plugin-host/vm-test.nix" {
-        inherit
-          pkgs
-          hostPackage
-          vmHostPackage
-          tailscalePackage
-          ;
-        korridPackage = korri.packages.${system}.korrid;
-        sshPackage = korri.packages.${system}.korri-plugin-ssh;
-        gameRuntime = libretro.packages.korri-plugin-mgba;
-        hostModule = korri.nixosModules.korri-plugin-host;
-      };
-    };
   }
 )

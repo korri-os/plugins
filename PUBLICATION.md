@@ -51,8 +51,9 @@ Administrator approval to start the plugin remains a separate step.
 
 ## Core updates and plugin publication
 
-The locked Core input supplies build dependencies. It is not a requirement
-that every new Core commit publish new plugin packages. Keep this pin for
+The locked Core input supplies the supported builder and generated contract.
+Publisher-owned Nixpkgs and flake-utils supply plugin dependencies and tools.
+A new Core commit does not require new plugin publication. Keep this pin for
 unrelated Core changes. Current Core tests the unchanged published packages
 with `nix run .#korri-published-plugins-check` in the Core repository. That gate
 checks both architecture selections and offline closure proofs. Its x86 VM
@@ -60,13 +61,13 @@ checks image receipts, approval refusal, SSH lifecycle and the game registry.
 The packaged mGBA callback test checks route and `launch.prepare` behavior,
 not emulator gameplay. A host-only operation-name break must fail that test.
 
-Advance the publisher pin only for a consumed builder, contract, native
-package or toolchain change that needs adoption. Evaluate the candidate
-package outputs on a build machine. Compare their exact paths with prior
+Advance the Core pin only for a consumed builder or contract change that needs
+adoption. Update publisher dependencies and native recipes independently.
+Evaluate the candidate package outputs on a build machine. Compare their exact paths with prior
 published outputs, using the existing architecture path lists and verified
 host declarations. The lists do not map IDs to paths. Select only affected
 outputs in the workflow's existing `packages` input. An unchanged output
-needs no publication. Batch 1's source-mutation gate remains unchanged.
+needs no publication. Batch 1's source-mutation assertions remain intact.
 
 Core images name exact published output paths in native Nix composition and
 pin the matching immutable offline metadata assets by hash. They no longer
@@ -87,9 +88,9 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 - `packages` selects one or more flake package output names, separated by spaces.
   The tool rejects expressions, flags and paths. It does not hardcode a plugin ID.
   Defaults: `korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine`.
-  RetroArch and game packages are built from this repository. SSH and Sunshine
-  are unmodified outputs from the locked core flake. Sunshine cannot publish
-  until the core lock pins the verified Sunshine plugin and combined encoder build.
+  RetroArch, game packages, SSH and Sunshine are built from this repository.
+  Sunshine retains its approved source, base derivation, ordered patch and ABI
+  refusals. Native producer and host lifecycle gates must pass before publication.
 - `tag` identifies the build batch. Before publication, this tag must already
   resolve to the workflow's exact source commit. The publisher never creates or
   moves a tag.
@@ -118,11 +119,15 @@ evaluates the real Mini V2 selection from Core, rather than maintaining another
 package list. It proves an unrelated documentation change preserves the selected
 package paths and the libretro typecheck, plugin-host, and settings check paths.
 Contract, helper, settings-producer, and RetroArch source changes must invalidate
-only their expected outputs. Copies retain executable bits and symlinks. This
+only their expected outputs. A real builder derivation change must invalidate
+all selected plugins and the shared builder gate. A host-free case refuses all
+Core host recipes and checks the actual build dependency graph for host inputs.
+Copies retain executable bits and symlinks. This
 is an evaluation check, not a build or device acceptance test.
 
 The libretro typecheck copies only the consumed contract file into the store.
-Changes elsewhere in Core no longer invalidate it. Changes to the contract bytes
+It uses Core's supported `pluginContract` reference to the existing generated
+`korrid.ts`. Changes elsewhere in Core no longer invalidate it. Changes to the contract bytes
 still invalidate the check. Generated contract source remains read-only.
 
 Builds run before the signing key is exposed. Signed exports use `nix copy` with
@@ -213,11 +218,11 @@ separate operator stages. Metadata upload refuses draft NAR releases.
 
 ## Device installation
 
-**Publication and device acceptance remain pending.** The lock pins Korri
-`main` commit `e382290e9ec62b122c05bf9542d9bd6f6fba3ccc`, with the Sunshine
-and SSH outputs. The ARM build and plugin VM have not passed. This is a build
-candidate, not permission to publish.
-Production uses this GitHub lock, not a local path override. Each device still
+**This ownership move grants no publication or device acceptance.** SSH and
+Sunshine are now publisher recipes, not Core package outputs. Batch 3 validation
+uses the candidate Core interface through a temporary input override. Before
+production use, the lock must pin the reviewed, reachable Core revision that
+exports that interface. Never commit a developer path. Each device still
 needs one compatible host update and explicit publisher trust configuration.
 The old host cannot inspect the named-export source and manifest contract.
 After that update, approved SSH enable/disable commands need no system

@@ -28,6 +28,14 @@ def source_hash(path):
     return subprocess.check_output(['nix', 'hash', 'path', str(path)], text=True).strip()
 
 
+def replace(path, before, after):
+    path.chmod(0o644)
+    text = path.read_text()
+    if text.count(before) != 1:
+        raise AssertionError(f'Expected one mutation target in {path}')
+    path.write_text(text.replace(before, after))
+
+
 def append(path, text):
     path.chmod(0o644)
     with path.open('a') as handle:
@@ -55,11 +63,46 @@ def evaluate(publisher, korri, system, selection):
     checks = subprocess.run(
         command + [f'path:{publisher}#checks.{system}', '--apply', f'''c:
           builtins.mapAttrs (name: {identity}) {{
-            inherit (c) korri-libretro-typecheck korri-plugin-host korri-retroarch-settings;
+            inherit (c) korri-libretro-typecheck korri-plugin-host korri-retroarch-settings korri-plugin-builder;
           }}'''],
         text=True, capture_output=True, check=True,
     )
     return {'packages': json.loads(packages.stdout), 'checks': json.loads(checks.stdout)}
+
+
+def host_free(publisher, korri, system, baseline):
+    # A real dependency check, not just an assertion about the source imports.
+    command = [
+        'nix', 'eval', '--json', '--no-write-lock-file',
+        '--option', 'eval-cache', 'false',
+        '--option', 'allow-import-from-derivation', 'false',
+        '--override-input', 'korri', f'path:{korri}',
+    ]
+    packages = json.loads(subprocess.check_output(
+        command + [f'path:{publisher}#packages.{system}', '--apply', '''p:
+          builtins.mapAttrs (_: package: { output = toString package; derivation = package.drvPath; }) {
+            inherit (p) korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine;
+          }'''], text=True,
+    ))
+    builder = json.loads(subprocess.check_output(
+        command + [f'path:{publisher}#checks.{system}.korri-plugin-builder', '--apply',
+                   'package: { output = toString package; derivation = package.drvPath; }'], text=True,
+    ))
+    for name, identity in packages.items():
+        if name in baseline['packages'] and baseline['packages'][name] != identity:
+            raise AssertionError(f'{system}: refusing host recipes changed {name}')
+    if builder != baseline['checks']['korri-plugin-builder']:
+        raise AssertionError(f'{system}: refusing host recipes changed the builder gate')
+    dependencies = subprocess.check_output(
+        ['nix-store', '--query', '--requisites', builder['derivation'],
+         *[package['derivation'] for package in packages.values()]], text=True,
+    ).splitlines()
+    forbidden = [path for path in dependencies if
+                 Path(path).name.split('-', 1)[1].startswith(
+                     ('korri-plugin-host-', 'korrid-', 'korri-inputd-'))]
+    if forbidden:
+        raise AssertionError(f'{system}: host build dependency in plugin graph: {forbidden}')
+    return len(dependencies)
 
 
 def changed(before, after):
@@ -89,6 +132,19 @@ def main():
         append(unrelated / 'README.md', '\nPlugin churn regression: unrelated documentation.\n')
         copy_source(korri, contract)
         append(contract / 'contracts/generated/korrid.ts', '\n// Contract bytes changed for the churn regression.\n')
+        builder = root / 'builder-korri'
+        copy_source(korri, builder)
+        # Change the actual derivation construction, not an unused comment.
+        replace(builder / 'services/korrid/plugin-host/builder.nix',
+                'pluginSource = source;',
+                'pluginSource = source; builderRegression = "changed";')
+        no_host = root / 'host-free-korri'
+        copy_source(korri, no_host)
+        for relative in ('services/korrid/plugin-host/package.nix',
+                         'services/korrid/package.nix', 'services/inputd/package.nix'):
+            path = no_host / relative
+            path.chmod(0o644)
+            path.write_text('throw "Host recipes must not be evaluated by plugin builds"\n')
         sources = {}
         for case, relative_path, text in [
             ('helper', 'plugins/libretro/retroarch.ts', '\n// Helper bytes changed for the churn regression.\n'),
@@ -106,6 +162,7 @@ def main():
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),
                 ('contract', publisher, contract, set(), {'korri-libretro-typecheck'}),
+                ('builder', publisher, builder, set(baseline['packages']), {'korri-plugin-builder'}),
                 ('helper', sources['helper'], korri, game_plugins,
                  {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
                 ('settings', sources['settings'], korri, game_plugins,
@@ -132,6 +189,10 @@ def main():
                 }
                 measurements.append(record)
                 print(json.dumps(record), flush=True)
+            dependencies = host_free(publisher, no_host, system, baseline)
+            record = {'system': system, 'case': 'host-free', 'build_dependencies': dependencies}
+            measurements.append(record)
+            print(json.dumps(record), flush=True)
             print(f'{system}: all churn assertions passed in {time.monotonic() - start:.2f}s', flush=True)
     if args.report:
         args.report.write_text(json.dumps(measurements, indent=2) + '\n')

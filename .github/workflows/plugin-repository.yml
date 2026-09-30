@@ -73,6 +73,7 @@ jobs:
           nix run .#korri-retroarch-check
           nix build --no-link \
             ".#checks.$SYSTEM.korri-device-cache" \
+            ".#checks.$SYSTEM.korri-plugin-builder" \
             ".#checks.$SYSTEM.korri-tailscale-package" \
             ".#checks.$SYSTEM.korri-retroarch-package" \
             ".#checks.$SYSTEM.korri-retroarch-settings" \
@@ -81,7 +82,14 @@ jobs:
             ".#checks.$SYSTEM.korri-libretro-typecheck" \
             ".#checks.$SYSTEM.korri-ssh-upstream" \
             ".#checks.$SYSTEM.korri-ssh-host-support" \
-            ".#checks.$SYSTEM.korri-sunshine-plugin-admission"
+            ".#checks.$SYSTEM.korri-sunshine-plugin-admission" \
+            ".#checks.$SYSTEM.korri-sunshine-plugin-native" \
+            ".#checks.$SYSTEM.sunshine-korri-package" \
+            ".#checks.$SYSTEM.sunshine-korri-runtime-settings" \
+            ".#checks.$SYSTEM.sunshine-korri-input-seat-patch" \
+            ".#checks.$SYSTEM.sunshine-korri-certificate-control" \
+            ".#checks.$SYSTEM.sunshine-korri-v4l2m2m" \
+            ".#checks.$SYSTEM.sunshine-offline-retirement"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool .#korri-cache
       - name: Build the selected packages without a signing key
@@ -137,7 +145,7 @@ jobs:
       - name: Read the existing signed Core and publisher caches
         run: python3 .github/workflows/trust-plugin-caches.py --include-core
       - name: Existing cold-host lifecycle acceptance
-        run: nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host
+        run: nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host .#checks.x86_64-linux.sunshine-korri-input-presence
 
   publish:
     needs: [build, lifecycle]
