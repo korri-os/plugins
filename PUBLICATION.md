@@ -323,6 +323,10 @@ passed on 2026-09-30 at `dc51e438e97b31c6f35d7adf382086676b963416` with
 `publish=false`. Both architecture jobs passed the real cache-configuration and
 source-invalidation gates, all existing checks, selected package builds, signing,
 and preparation. The cold-host lifecycle passed. Publication was skipped.
+Logs show publisher-cache downloads in both build jobs and lifecycle verification.
+This run shows no Core-cache download; the isolated-store test separately verifies
+that source. The downloaded architecture artifacts combine locally without
+metadata or signature conflicts. This is not live publication acceptance.
 
 | CI step | x86 | ARM |
 | --- | --- | --- |
