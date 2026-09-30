@@ -42,6 +42,42 @@ def append(path, text):
         handle.write(text)
 
 
+def derivations(paths):
+    data = json.loads(subprocess.check_output(
+        ['nix', 'derivation', 'show', *sorted(set(paths))], text=True,
+    ))
+    # Nix 2.34 uses store-relative paths in its versioned JSON format.
+    if 'derivations' in data:
+        data = {f'/nix/store/{path}': drv for path, drv in data['derivations'].items()}
+        for drv in data.values():
+            drv['inputDrvs'] = {f'/nix/store/{path}': value for path, value in drv['inputs']['drvs'].items()}
+            for output in drv['outputs'].values():
+                if 'path' in output:
+                    output['path'] = f"/nix/store/{output['path']}"
+    return data
+
+
+def declared_packages(packages):
+    # Read the builder's real manifest construction, without building wrappers.
+    wrappers = derivations(package['derivation'] for package in packages.values())
+    manifests = {}
+    for name, package in packages.items():
+        inputs = wrappers[package['derivation']]['inputDrvs']
+        matches = [path for path in inputs if path.endswith('-plugin-manifest-base.json.drv')]
+        if len(matches) != 1:
+            raise AssertionError(f'{name}: expected one builder manifest, found {matches}')
+        manifests[name] = matches[0]
+    manifest_drvs = derivations(manifests.values())
+    dependencies = derivations(path for drv in manifest_drvs.values() for path in drv['inputDrvs'])
+    by_output = {output['path']: path for path, drv in dependencies.items()
+                 for output in drv['outputs'].values() if 'path' in output}
+    return {
+        f'{name}:{key}': {'output': output, 'derivation': by_output[output]}
+        for name, path in manifests.items()
+        for key, output in json.loads(manifest_drvs[path]['env']['text'])['packages'].items()
+    }
+
+
 def evaluate(publisher, korri, system, selection):
     command = [
         'nix', 'eval', '--json', '--impure', '--no-write-lock-file',
@@ -67,7 +103,9 @@ def evaluate(publisher, korri, system, selection):
           }}'''],
         text=True, capture_output=True, check=True,
     )
-    return {'packages': json.loads(packages.stdout), 'checks': json.loads(checks.stdout)}
+    packages = json.loads(packages.stdout)
+    return {'packages': packages, 'checks': json.loads(checks.stdout),
+            'declared_packages': declared_packages(packages)}
 
 
 def host_free(publisher, korri, system, baseline):
@@ -105,10 +143,11 @@ def host_free(publisher, korri, system, baseline):
     return len(dependencies)
 
 
-def changed(before, after):
+def changed(before, after, field=None):
     if before.keys() != after.keys():
         raise AssertionError('The Mini V2 selection changed during the regression check')
-    return {name for name in before if before[name] != after[name]}
+    return {name for name in before if
+            (before[name][field] != after[name][field] if field else before[name] != after[name])}
 
 
 def main():
@@ -155,9 +194,21 @@ def main():
             copy_source(publisher, destination)
             append(destination / relative_path, text)
             sources[case] = destination
+        toolchain = root / 'toolchain-publisher'
+        copy_source(publisher, toolchain)
+        # The caller owns pkgs. Change real compiler flags only for OpenSSH,
+        # which plugins/ssh/plugin.nix consumes, not the whole native toolchain.
+        # withCFlags is the pinned nixpkgs stdenv adapter on both architectures.
+        replace(toolchain / 'nix/default.nix', 'config.allowUnfree = true;', '''config.allowUnfree = true;
+      overlays = [ (_: prev: {
+        openssh = prev.openssh.override {
+          stdenv = prev.withCFlags [ "-fno-omit-frame-pointer" ] prev.stdenv;
+        };
+      }) ];''')
         for system in systems:
             start = time.monotonic()
             baseline = evaluate(publisher, korri, system, selection)
+            measurements.append({'system': system, 'case': 'baseline', 'identities': baseline})
             game_plugins = set(baseline['packages']) - {'korri-plugin-ssh', 'korri-plugin-sunshine'}
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),
@@ -168,26 +219,71 @@ def main():
                 ('settings', sources['settings'], korri, game_plugins,
                  {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
                 ('retroarch', sources['retroarch'], korri, {'korri-plugin-retroarch'}, set()),
+                ('toolchain', toolchain, korri, game_plugins | {'korri-plugin-ssh'},
+                 {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
             ]
             for case, publisher_source, korri_source, expected_packages, expected_checks in cases:
                 case_start = time.monotonic()
                 result = evaluate(publisher_source, korri_source, system, selection)
                 package_changes = changed(baseline['packages'], result['packages'])
                 check_changes = changed(baseline['checks'], result['checks'])
+                declared_changes = changed(baseline['declared_packages'], result['declared_packages'])
+                expected_declared = set()
+                if case in ('helper', 'settings'):
+                    expected_declared = {f'{name}:retroarch-settings' for name in game_plugins}
+                elif case == 'toolchain':
+                    # Netpbm's fixed-output SVN fetch uses OpenSSH. The path
+                    # through GTK/SDL preserves game outputs, not drv files.
+                    expected_declared = {key for key in baseline['declared_packages']
+                                         if key.split(':')[0] in game_plugins and not key.endswith(':autoconfig')}
+                    expected_declared.add('korri-plugin-ssh:openssh')
+                if declared_changes != expected_declared:
+                    raise AssertionError(
+                        f'{system} {case}: declared packages changed {sorted(declared_changes)}, '
+                        f'expected {sorted(expected_declared)}'
+                    )
                 if package_changes != expected_packages or check_changes != expected_checks:
                     raise AssertionError(
                         f'{system} {case}: packages changed {sorted(package_changes)}, '
                         f'expected {sorted(expected_packages)}; checks changed {sorted(check_changes)}, '
                         f'expected {sorted(expected_checks)}'
                     )
+                output_changes = {
+                    group: changed(baseline[group], result[group], 'output')
+                    for group in baseline
+                }
+                expected_outputs = {
+                    'packages': {'korri-plugin-ssh'} if case == 'toolchain' else expected_packages,
+                    'checks': set() if case == 'toolchain' else expected_checks,
+                    'declared_packages': {'korri-plugin-ssh:openssh'} if case == 'toolchain' else expected_declared,
+                }
+                if output_changes != expected_outputs:
+                    raise AssertionError(f'{system} {case}: outputs changed {output_changes}, expected {expected_outputs}')
                 record = {
                     'system': system, 'case': case,
                     'selected_packages': len(baseline['packages']),
                     'changed_packages': sorted(package_changes),
                     'changed_checks': sorted(check_changes),
+                    'changed_declared_packages': sorted(declared_changes),
+                    'changed_package_outputs': sorted(output_changes['packages']),
+                    'changed_check_outputs': sorted(output_changes['checks']),
+                    'changed_declared_package_outputs': sorted(output_changes['declared_packages']),
                     'evaluation_seconds': round(time.monotonic() - case_start, 2),
                 }
-                measurements.append(record)
+                if case == 'toolchain':
+                    key = 'korri-plugin-ssh:openssh'
+                    before, after = (derivations([state['declared_packages'][key]['derivation']])
+                                     for state in (baseline, result))
+                    before_env, after_env = (next(iter(state.values()))['env'] for state in (before, after))
+                    flag = '-fno-omit-frame-pointer'
+                    if flag in before_env.get('NIX_CFLAGS_COMPILE', '').split() or flag not in after_env.get('NIX_CFLAGS_COMPILE', '').split():
+                        raise AssertionError(f'{system}: toolchain fixture did not change compiler flags')
+                    for field in ('src', 'patches', 'buildInputs', 'nativeBuildInputs', 'stdenv'):
+                        if before_env.get(field) != after_env.get(field):
+                            raise AssertionError(f'{system}: toolchain fixture unexpectedly changed {field}')
+                    record['compile_inputs'] = {field: after_env.get(field) for field in
+                                                ('NIX_CFLAGS_COMPILE', 'src', 'patches', 'buildInputs', 'nativeBuildInputs', 'stdenv')}
+                measurements.append({**record, 'identities': result})
                 print(json.dumps(record), flush=True)
             dependencies = host_free(publisher, no_host, system, baseline)
             record = {'system': system, 'case': 'host-free', 'build_dependencies': dependencies}
