@@ -45,22 +45,20 @@ It adds no game tiles and does not register cartridges in the library.
 Into Ruins remains a known FAKE-08 failure, not a verified compatible game.
 See [the pack instructions](plugins/starter-pack/README.md) for license conditions and limits.
 
-The locked Core builder does not yet support `requires`. Validation of this
-candidate needs the reviewed Core input override. Keep the lock unchanged until
-that Core revision is approved and reachable. Image composition must select
-both the pack and FAKE-08 because image seeding emits one receipt per root.
-The Core seed entry point must support exact dependency graphs, not only leaf plugins.
+The locked Core supports exact `requires` and dependency-aware image seeding.
+Image composition must select both the pack and its exact FAKE-08 dependency.
+Seeding uses each publisher's own binding and preserves normal runtime approval
+and signature checks.
 
-On a build host, set `REVIEWED_CORE` to the approved candidate flake reference, then run:
+Run on a build host, never on a target device:
 
 ```sh
-nix build --no-link --no-write-lock-file --override-input korri "$REVIEWED_CORE" \
-  .#korri-plugin-starter-pack .#starter-pack-cartridges \
+nix build --no-link .#korri-plugin-starter-pack .#starter-pack-cartridges \
   .#checks.x86_64-linux.korri-starter-pack-package \
   .#checks.x86_64-linux.korri-starter-pack-admission
+nix build --no-link .#checks.aarch64-linux.korri-starter-pack-package \
+  .#checks.aarch64-linux.korri-starter-pack-admission
 ```
-
-Repeat with `aarch64-linux` for ARM checks. Do not publish until the reachable Core pin and admission gates pass.
 
 ## Authoring
 

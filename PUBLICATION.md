@@ -78,7 +78,7 @@ successful Core test grants neither. Independent closures can retain old depende
 more disk. A Core dependency update does not update those plugin dependencies;
 security updates to them still require deliberate plugin publication.
 
-## Starter pack candidate
+## Starter pack
 
 `korri-plugin-starter-pack` builds `@korri:starter-pack` with the title
 `Starter pack`. Its exact `@korri:fake08` dependency comes from this repository.
@@ -90,12 +90,15 @@ Installation does not register library entries. Into Ruins remains a known failu
 The publication validation list includes cartridge integrity, rejection controls
 and host seeding for both exact plugin roots. Seeding is an admission check,
 not signature, device lifecycle or gameplay acceptance.
-The current locked Core lacks `requires`; these checks need the candidate Core
-override until an approved, reachable revision replaces the pin.
-Core's seed entry point must inspect the exact dependency graph. A leaf-only
-seed entry point refuses the pack even when both roots are selected.
-Do not dispatch publication with the old pin or commit a local source override.
-No live publication or device operation is part of this move.
+The locked Core supports exact `requires` and `seed-graph`. The check supplies
+the existing publisher-binding format and selects both exact plugin roots.
+The original leaf `seed` still refuses the pack.
+
+For a signed batch, select `korri-plugin-starter-pack korri-plugin-fake08` in the
+workflow's `packages` input. Product images must pin the resulting output paths
+and offline archive hashes after checking the actual release evidence.
+The owner approved signed publication and product-image defaults for this move.
+Existing-device installation and firmware writes are not authorized by that approval.
 
 ## Workflow
 
