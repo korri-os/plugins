@@ -80,6 +80,8 @@ jobs:
             ".#checks.$SYSTEM.korri-retroarch-package" \
             ".#checks.$SYSTEM.korri-retroarch-settings" \
             ".#checks.$SYSTEM.korri-libretro-example" \
+            ".#checks.$SYSTEM.korri-fake08-package" \
+            ".#checks.$SYSTEM.korri-fake08-admission" \
             ".#checks.$SYSTEM.korri-libretro-frontend-override" \
             ".#checks.$SYSTEM.korri-libretro-typecheck" \
             ".#checks.$SYSTEM.korri-ssh-upstream" \
