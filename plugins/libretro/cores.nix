@@ -10,6 +10,7 @@
 # needs it.
 { pkgs }:
 let
+  fake08 = pkgs.callPackage ./fake08/package.nix { };
   # nixpkgs marks PPSSPP `badPlatforms = [ "aarch64-linux" ]`. It is the only
   # first-party PSP libretro core and it is wanted on the SM8550 target, so the
   # platform block is lifted for this catalogue only. Every other core keeps
@@ -34,6 +35,21 @@ in
     systems.gba = {
       title = "Game Boy Advance";
       extensions = [ "gba" ];
+    };
+  };
+
+  fake08 = {
+    title = "FAKE-08";
+    description = "Runs PICO-8 cartridges with the FAKE-08 libretro reimplementation.";
+    core = fake08;
+    coreFile = "${fake08}/lib/retroarch/cores/fake08_libretro.so";
+    systems.pico8 = {
+      title = "PICO-8";
+      # Upstream accepts png, but only compound cartridge PNGs belong here.
+      extensions = [
+        "p8"
+        "p8.png"
+      ];
     };
   };
 

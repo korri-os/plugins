@@ -149,6 +149,20 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           definition = retroarchDefinition;
         };
         korri-retroarch-settings = retroarchDefinition.packages.retroarch-settings;
+        korri-fake08-package = import ../plugins/libretro/fake08/check.nix {
+          inherit pkgs;
+          package = libretro.packages.korri-plugin-fake08;
+          core = libretro.catalogue.fake08.core;
+          contract = korri.lib.${system}.pluginContract;
+        };
+        korri-fake08-admission =
+          pkgs.runCommand "korri-fake08-admission" { nativeBuildInputs = [ pkgs.jq ]; }
+            ''
+              ${korri.packages.${system}.korri-plugin-host}/bin/korri-plugin seed \
+                ${libretro.packages.korri-plugin-fake08} https://cache.example.invalid > receipt.json
+              jq -e '.id == "@korri:fake08" and .desired.state == "Enabled" and .previous == null' receipt.json
+              touch "$out"
+            '';
         korri-libretro-example = import ../plugins/libretro/example-check.nix {
           inherit pkgs mkPlugin;
         };
