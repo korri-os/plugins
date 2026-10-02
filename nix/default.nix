@@ -2,7 +2,6 @@
   korri,
   nixpkgs,
   flake-utils,
-  skate3,
 }:
 flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   system:
@@ -13,19 +12,6 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     };
     mkPlugin = korri.lib.${system}.mkPlugin { inherit pkgs; };
     sunshine = import ../services/sunshine { inherit pkgs system; };
-    # Upstream's prebuilt Linux release supports x86_64 only. Do not invent an
-    # ARM build or pull the source-build output that requires game executables.
-    skate3Packages = pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-      korri-plugin-skate-3 = mkPlugin {
-        publisher.namespace = "@korri";
-        source = ../plugins/skate-3;
-        plugin =
-          _:
-          import ../plugins/skate-3/plugin.nix {
-            skate3Package = skate3.packages.${system}.skate3;
-          };
-      };
-    };
     sshPackage = mkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/ssh;
@@ -126,7 +112,6 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-churn-check = churnCheck;
     }
     // libretro.packages
-    // skate3Packages
     // sunshine.packages
     // integration.packages;
     apps = sunshine.apps // {
@@ -175,15 +160,6 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           helper = ../plugins/libretro/retroarch.ts;
           settings = retroarchDefinition.packages.retroarch-settings;
           contract = korri.lib.${system}.pluginContract;
-        };
-      }
-      // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-        korri-skate3-plugin = import ./skate3-check.nix {
-          inherit pkgs;
-          package = skate3Packages.korri-plugin-skate-3;
-          contract = korri.lib.${system}.pluginContract;
-          hostPackage = korri.packages.${system}.korri-plugin-host;
-          korridPackage = korri.packages.${system}.korrid;
         };
       };
   }

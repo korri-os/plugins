@@ -123,22 +123,6 @@
         "type": "github"
       }
     },
-    "nixpkgs_3": {
-      "locked": {
-        "lastModified": 1790822859,
-        "narHash": "sha256-69xHQhAeMAD2wDXO7T2pcOZIF9Sga2W+JkmY2a11Ops=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "c59305bab2065cfecc4944690d9eedbb56f3a9fa",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "proseql": {
       "flake": false,
       "locked": {
@@ -160,8 +144,7 @@
       "inputs": {
         "flake-utils": "flake-utils",
         "korri": "korri",
-        "nixpkgs": "nixpkgs_2",
-        "skate3": "skate3"
+        "nixpkgs": "nixpkgs_2"
       }
     },
     "rust-overlay": {
@@ -182,25 +165,6 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "type": "github"
-      }
-    },
-    "skate3": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_3"
-      },
-      "locked": {
-        "lastModified": 1790907186,
-        "narHash": "sha256-XGn9uTTAdwdJnGlPCWaMZczPuuccOKRXWidW3wlDW18=",
-        "owner": "simonwjackson",
-        "repo": "skate-3-flake",
-        "rev": "e309e451f644eab95490c8e7c4bab9de398cda40",
-        "type": "github"
-      },
-      "original": {
-        "owner": "simonwjackson",
-        "repo": "skate-3-flake",
-        "rev": "e309e451f644eab95490c8e7c4bab9de398cda40",
         "type": "github"
       }
     },
