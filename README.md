@@ -23,6 +23,13 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
 | `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |
+| `korri-plugin-skate-3` (x86_64 only) | `@korri:skate-3` | `plugins/skate-3/` |
+
+Skate 3 is a local build candidate, not an approved public cache package.
+It reuses the pinned prebuilt release and requires Core's hash-matched runner
+API. Upstream has no redistribution license. See
+[`plugins/skate-3/README.md`](plugins/skate-3/README.md) for the measured disc
+identity, runtime limits, and checks.
 
 Sunshine is a build candidate. Do not publish it until the ARM build and
 plugin lifecycle gates pass. Its presence in a release does not establish
