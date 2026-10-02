@@ -1,0 +1,17 @@
+DeFacto
+Creator credits: NuSan
+Source: https://www.lexaloffle.com/bbs/?tid=30631
+Cartridge: 48406
+Original download: https://www.lexaloffle.com/bbs/cposts/4/48406.p8.png
+SHA-256: 9e2c7759826af559697e0c69a331c8a14db2ddd5b1108bc91ea9fbe1570706d1
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #48406
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

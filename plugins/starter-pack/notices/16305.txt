@@ -1,0 +1,17 @@
+PICORACER-2048
+Creator credits: impbox
+Source: https://www.lexaloffle.com/bbs/?tid=2243
+Cartridge: 16305
+Original download: https://www.lexaloffle.com/bbs/cposts/1/16305.p8.png
+SHA-256: a88221fbd390c819d91db8438575325002cd4e85de4274690108958aa0aa3e65
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #16305
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

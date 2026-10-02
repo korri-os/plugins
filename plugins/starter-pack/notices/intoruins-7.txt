@@ -1,0 +1,21 @@
+Into Ruins
+Creator credits: Eric Billingsley / ericb
+Source: https://www.lexaloffle.com/bbs/?tid=49928
+Cartridge: intoruins-7
+Original download: https://www.lexaloffle.com/bbs/cposts/in/intoruins-7.p8.png
+SHA-256: 6da0e1e3f2bfe0beb0746565f6f8d1773148c652ca18b6d9eedd4fa8dce9c2f4
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #intoruins-7
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.
+
+This BBS release establishes the selected v1.07 release. The pack uses the
+author's original offline variant instead. See intoruins-offline.txt for
+the two included files and their separate original download hashes.

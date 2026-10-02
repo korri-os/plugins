@@ -44,6 +44,15 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin = _: retroarchDefinition;
     };
     libretro = import ../plugins/libretro { inherit pkgs mkPlugin; };
+    starterPackDefinition = import ../plugins/starter-pack/plugin.nix {
+      inherit pkgs;
+      fake08Plugin = libretro.packages.korri-plugin-fake08;
+    };
+    starterPack = mkPlugin {
+      publisher.namespace = "@korri";
+      source = ../plugins/starter-pack;
+      plugin = _: starterPackDefinition;
+    };
     integration = import ./integration.nix {
       inherit
         pkgs
@@ -108,6 +117,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-retroarch = retroarchPackage;
       korri-plugin-ssh = sshPackage;
       korri-plugin-sunshine = sunshinePlugin;
+      korri-plugin-starter-pack = starterPack;
+      starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cache = cacheTool;
       korri-plugin-churn-check = churnCheck;
     }
@@ -163,6 +174,18 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
               jq -e '.id == "@korri:fake08" and .desired.state == "Enabled" and .previous == null' receipt.json
               touch "$out"
             '';
+        korri-starter-pack-package = import ./starter-pack-check.nix {
+          inherit pkgs;
+          package = starterPack;
+          cartridges = starterPackDefinition.packages.cartridges;
+          fake08Plugin = libretro.packages.korri-plugin-fake08;
+        };
+        korri-starter-pack-admission = import ./starter-pack-admission.nix {
+          inherit pkgs;
+          package = starterPack;
+          fake08Plugin = libretro.packages.korri-plugin-fake08;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+        };
         korri-libretro-example = import ../plugins/libretro/example-check.nix {
           inherit pkgs mkPlugin;
         };

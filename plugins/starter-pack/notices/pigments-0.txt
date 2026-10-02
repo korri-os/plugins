@@ -1,0 +1,17 @@
+pigments
+Creator credits: benjamin_soule
+Source: https://www.lexaloffle.com/bbs/?pid=pigments-0.p8
+Cartridge: pigments-0
+Original download: https://www.lexaloffle.com/bbs/cposts/pi/pigments-0.p8.png
+SHA-256: 6022f3e36884e02ea851f35663a6ebeef0bde51d2146a65ec1d541fc8d1b9f56
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #pigments-0
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

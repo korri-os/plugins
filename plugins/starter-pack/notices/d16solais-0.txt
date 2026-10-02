@@ -1,0 +1,17 @@
+Solais
+Creator credits: DragonXVI
+Source: https://www.lexaloffle.com/bbs/?pid=d16solais-0
+Cartridge: d16solais-0
+Original download: https://www.lexaloffle.com/bbs/cposts/d1/d16solais-0.p8.png
+SHA-256: e10ffc1f3bc69267cc8b19e23ba1fca3c2bace9663fcbbb4bbb4722dd9865001
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #d16solais-0
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

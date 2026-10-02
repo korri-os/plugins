@@ -71,11 +71,15 @@ def declared_packages(packages):
     dependencies = derivations(path for drv in manifest_drvs.values() for path in drv['inputDrvs'])
     by_output = {output['path']: path for path, drv in dependencies.items()
                  for output in drv['outputs'].values() if 'path' in output}
-    return {
+    manifest_data = {name: json.loads(manifest_drvs[path]['env']['text'])
+                     for name, path in manifests.items()}
+    declared = {
         f'{name}:{key}': {'output': output, 'derivation': by_output[output]}
-        for name, path in manifests.items()
-        for key, output in json.loads(manifest_drvs[path]['env']['text'])['packages'].items()
+        for name, manifest in manifest_data.items()
+        for key, output in manifest['packages'].items()
     }
+    requires = {name: manifest.get('requires', []) for name, manifest in manifest_data.items()}
+    return declared, requires
 
 
 def evaluate(publisher, korri, system, selection):
@@ -104,8 +108,9 @@ def evaluate(publisher, korri, system, selection):
         text=True, capture_output=True, check=True,
     )
     packages = json.loads(packages.stdout)
+    declared, requires = declared_packages(packages)
     return {'packages': packages, 'checks': json.loads(checks.stdout),
-            'declared_packages': declared_packages(packages)}
+            'declared_packages': declared, 'requires': requires}
 
 
 def host_free(publisher, korri, system, baseline):
@@ -117,10 +122,11 @@ def host_free(publisher, korri, system, baseline):
         '--override-input', 'korri', f'path:{korri}',
     ]
     packages = json.loads(subprocess.check_output(
-        command + [f'path:{publisher}#packages.{system}', '--apply', '''p:
-          builtins.mapAttrs (_: package: { output = toString package; derivation = package.drvPath; }) {
-            inherit (p) korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine;
-          }'''], text=True,
+        command + [f'path:{publisher}#packages.{system}', '--apply', f'''p:
+          builtins.listToAttrs (map (name: {{
+            inherit name;
+            value = {{ output = toString p.${{name}}; derivation = p.${{name}}.drvPath; }};
+          }}) (builtins.fromJSON {json.dumps(json.dumps(sorted(set(baseline['packages']) | {'korri-tailscale'})))}))'''], text=True,
     ))
     builder = json.loads(subprocess.check_output(
         command + [f'path:{publisher}#checks.{system}.korri-plugin-builder', '--apply',
@@ -148,6 +154,20 @@ def changed(before, after, field=None):
         raise AssertionError('The Mini V2 selection changed during the regression check')
     return {name for name in before if
             (before[name][field] != after[name][field] if field else before[name] != after[name])}
+
+
+def with_dependents(names, baseline):
+    # An exact required plugin can change a data-only wrapper without changing
+    # its declared cartridges. Read these edges from real builder manifests.
+    affected = set(names)
+    while True:
+        outputs = {baseline['packages'][name]['output'] for name in affected}
+        dependents = {name for name, required in baseline['requires'].items()
+                      if outputs.intersection(required)}
+        expanded = affected | dependents
+        if expanded == affected:
+            return affected
+        affected = expanded
 
 
 def main():
@@ -209,17 +229,19 @@ def main():
             start = time.monotonic()
             baseline = evaluate(publisher, korri, system, selection)
             measurements.append({'system': system, 'case': 'baseline', 'identities': baseline})
-            game_plugins = set(baseline['packages']) - {'korri-plugin-ssh', 'korri-plugin-sunshine'}
+            runtime_plugins = {key.split(':')[0] for key in baseline['declared_packages']
+                               if key.endswith(':retroarch-settings')}
+            runtime_wrappers = with_dependents(runtime_plugins, baseline)
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),
                 ('contract', publisher, contract, set(), {'korri-libretro-typecheck'}),
                 ('builder', publisher, builder, set(baseline['packages']), {'korri-plugin-builder'}),
-                ('helper', sources['helper'], korri, game_plugins,
+                ('helper', sources['helper'], korri, runtime_wrappers,
                  {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
-                ('settings', sources['settings'], korri, game_plugins,
+                ('settings', sources['settings'], korri, runtime_wrappers,
                  {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
                 ('retroarch', sources['retroarch'], korri, {'korri-plugin-retroarch'}, set()),
-                ('toolchain', toolchain, korri, game_plugins | {'korri-plugin-ssh'},
+                ('toolchain', toolchain, korri, with_dependents(runtime_plugins | {'korri-plugin-ssh'}, baseline),
                  {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
             ]
             for case, publisher_source, korri_source, expected_packages, expected_checks in cases:
@@ -228,14 +250,23 @@ def main():
                 package_changes = changed(baseline['packages'], result['packages'])
                 check_changes = changed(baseline['checks'], result['checks'])
                 declared_changes = changed(baseline['declared_packages'], result['declared_packages'])
+                updated_paths = {identity['output']: result['packages'][name]['output']
+                                 for name, identity in baseline['packages'].items()}
+                expected_requires = {name: [updated_paths.get(path, path) for path in required]
+                                     for name, required in baseline['requires'].items()}
+                if result['requires'] != expected_requires:
+                    raise AssertionError(f'{system} {case}: exact plugin dependency edges changed unexpectedly')
                 expected_declared = set()
                 if case in ('helper', 'settings'):
-                    expected_declared = {f'{name}:retroarch-settings' for name in game_plugins}
+                    expected_declared = {f'{name}:retroarch-settings' for name in runtime_plugins}
                 elif case == 'toolchain':
                     # Netpbm's fixed-output SVN fetch uses OpenSSH. The path
                     # through GTK/SDL preserves game outputs, not drv files.
+                    # The custom FAKE-08 core has no GTK/SDL native dependency;
+                    # only its frontend and settings use that fetch graph.
                     expected_declared = {key for key in baseline['declared_packages']
-                                         if key.split(':')[0] in game_plugins and not key.endswith(':autoconfig')}
+                                         if key.split(':')[0] in runtime_plugins
+                                         and not key.endswith((':autoconfig', ':fake08'))}
                     expected_declared.add('korri-plugin-ssh:openssh')
                 if declared_changes != expected_declared:
                     raise AssertionError(
@@ -250,7 +281,7 @@ def main():
                     )
                 output_changes = {
                     group: changed(baseline[group], result[group], 'output')
-                    for group in baseline
+                    for group in ('packages', 'checks', 'declared_packages')
                 }
                 expected_outputs = {
                     'packages': {'korri-plugin-ssh'} if case == 'toolchain' else expected_packages,

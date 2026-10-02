@@ -1,0 +1,17 @@
+Vitreous
+Creator credits: Mush
+Source: https://www.lexaloffle.com/bbs/?tid=36983
+Cartridge: vitreous-0
+Original download: https://www.lexaloffle.com/bbs/cposts/vi/vitreous-0.p8.png
+SHA-256: cacfc19bd8aaa6e7f19aea36e5c8c726e43a895e45a8a208912ecb18699862fe
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #vitreous-0
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

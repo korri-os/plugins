@@ -1,0 +1,17 @@
+Proserpina's Quest
+Creator credits: Fred Osterero; music by Nicolas Grandgirard
+Source: https://www.lexaloffle.com/bbs/?tid=50174
+Cartridge: proserpinasquest-3
+Original download: https://www.lexaloffle.com/bbs/cposts/pr/proserpinasquest-3.p8.png
+SHA-256: 264e426b4409aa847b190eca90f45508be02e8d7992b04249294b18388ea615f
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #proserpinasquest-3
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

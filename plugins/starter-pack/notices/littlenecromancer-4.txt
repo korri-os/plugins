@@ -1,0 +1,17 @@
+Little Necromancer
+Creator credits: Fred Osterero; music by Nicolas Grandgirard
+Source: https://www.lexaloffle.com/bbs/?pid=littlenecromancer-4.p8
+Cartridge: littlenecromancer-4
+Original download: https://www.lexaloffle.com/bbs/cposts/li/littlenecromancer-4.p8.png
+SHA-256: e6d04a2d2e4be24fb6ab8082a6eb5ab789930f98fec1a5307b80c4f30b19b4ef
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #littlenecromancer-4
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

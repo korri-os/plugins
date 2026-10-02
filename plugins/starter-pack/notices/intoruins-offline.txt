@@ -1,0 +1,38 @@
+Into Ruins v1.07: original offline cartridges
+
+Creator: Eric Billingsley / ericb / SPARSE//GameDev
+Source post: https://www.lexaloffle.com/bbs/?tid=49928
+Developer page: https://sparsegamedev.itch.io/into-ruins
+Original repository commit: 25fd2e196f9cf970de6ee7aa2ba211bcbb94bfe3
+Captured: 2026-10-02
+
+The developer page states:
+"The full cart/assets are licensed under CC4-BY-NC-SA and available on github."
+
+Complete original repository license.md:
+https://raw.githubusercontent.com/Woflox/intoruins/25fd2e196f9cf970de6ee7aa2ba211bcbb94bfe3/license.md
+
+Licensed under CC4-BY-NC-SA:
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+Original archive:
+https://raw.githubusercontent.com/Woflox/intoruins/25fd2e196f9cf970de6ee7aa2ba211bcbb94bfe3/carts/offline/intoruins_offline_carts.zip
+SHA-256: 8a30c1f26e0ac562a1839a7d8b539fafb872f0947e825659c59c0ae4ddd8cc46
+
+Original files, byte-identical to their ZIP entries:
+https://raw.githubusercontent.com/Woflox/intoruins/25fd2e196f9cf970de6ee7aa2ba211bcbb94bfe3/carts/offline/intoruins.p8.png
+SHA-256: 552d29bb795c2c28ccc743d59be2b47f0361a13d778cf608a205cdf04229c62b
+https://raw.githubusercontent.com/Woflox/intoruins/25fd2e196f9cf970de6ee7aa2ba211bcbb94bfe3/carts/offline/intoruins_main.p8.png
+SHA-256: da3a290c42138af8b95e236e33aea75e19024c38b583f4b8fb34c016bd3ac171
+
+The original offline title loads "intoruins_main" and the main cart returns to
+"intoruins". Keep both files in the same cartridge directory and start the
+intoruins.p8.png title cartridge. Do not rename these two files.
+
+These are the author's offline variants, not Korri edits. The BBS cartridges
+use # identifiers that fetch BBS carts. Their names and bytes are different.
+The BBS publisher's source citation and license metadata are retained in intoruins-7.txt.
+
+The developer page credits Brogue by Brian Walker as inspiration and thanks
+FReDs72, Heracleum, James Edward Smith, morgan, Oli414, Sim, SlainteES,
+SmellyFishstiks and Waporwave for beta testing and feedback.

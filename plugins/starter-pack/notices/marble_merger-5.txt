@@ -1,0 +1,17 @@
+Marble Merger
+Creator credits: 2darray
+Source: https://www.lexaloffle.com/bbs/?pid=136646
+Cartridge: marble_merger-5
+Original download: https://www.lexaloffle.com/bbs/cposts/ma/marble_merger-5.p8.png
+SHA-256: 9d98592e889a7e8a6efaac2534f09f70b3770d96b521911c36adfefe346f0c07
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #marble_merger-5
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

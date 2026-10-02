@@ -1,0 +1,17 @@
+High Stakes
+Creator credits: Krystman; music by Gruber Music
+Source: https://www.lexaloffle.com/bbs/?pid=83548
+Cartridge: highstakes-2
+Original download: https://www.lexaloffle.com/bbs/cposts/hi/highstakes-2.p8.png
+SHA-256: a5cff876236fdc4a225684b43f5acf92cb8e9e06bc12de819dcac521233c3ab6
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #highstakes-2
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

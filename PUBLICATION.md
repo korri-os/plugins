@@ -78,6 +78,25 @@ successful Core test grants neither. Independent closures can retain old depende
 more disk. A Core dependency update does not update those plugin dependencies;
 security updates to them still require deliberate plugin publication.
 
+## Starter pack candidate
+
+`korri-plugin-starter-pack` builds `@korri:starter-pack` with the title
+`Starter pack`. Its exact `@korri:fake08` dependency comes from this repository.
+`starter-pack-cartridges` exposes the player-free payload separately.
+The payload contains 24 games and 25 unchanged cartridges licensed under
+noncommercial CC BY-NC-SA 4.0. Keep the credits, license and notices with it.
+Installation does not register library entries. Into Ruins remains a known failure.
+
+The publication validation list includes cartridge integrity, rejection controls
+and host seeding for both exact plugin roots. Seeding is an admission check,
+not signature, device lifecycle or gameplay acceptance.
+The current locked Core lacks `requires`; these checks need the candidate Core
+override until an approved, reachable revision replaces the pin.
+Core's seed entry point must inspect the exact dependency graph. A leaf-only
+seed entry point refuses the pack even when both roots are selected.
+Do not dispatch publication with the old pin or commit a local source override.
+No live publication or device operation is part of this move.
+
 ## Workflow
 
 Only `simonwjackson` can dispatch or rerun `main`. Review the `plugin-release`
@@ -124,7 +143,10 @@ evaluates the real Mini V2 selection from Core, rather than maintaining another
 package list. It proves an unrelated documentation change preserves the selected
 package paths and the libretro typecheck, plugin-host, and settings check paths.
 Contract, helper, settings-producer, and RetroArch source changes must invalidate
-only their expected outputs. A real builder derivation change must invalidate
+only their expected outputs. Runtime roots are identified by their actual
+`retroarch-settings` package declarations. Exact `requires` edges also invalidate
+data-only wrappers such as starter-pack, without inventing runtime settings in them.
+A real builder derivation change must invalidate
 all selected plugins and the shared builder gate. A host-free case refuses all
 Core host recipes and checks the actual build dependency graph for host inputs.
 Copies retain executable bits and symlinks. A caller-owned OpenSSH compiler-flag

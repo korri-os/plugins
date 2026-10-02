@@ -1,0 +1,17 @@
+UFO Swamp Odyssey
+Creator credits: paranoidcactus
+Source: https://www.lexaloffle.com/bbs/?pid=ufo-0.p8
+Cartridge: ufo-0
+Original download: https://www.lexaloffle.com/bbs/cposts/uf/ufo-0.p8.png
+SHA-256: 47364d1982fed967b4c867a104fd9cade13606cfe505989525979186bb28b9eb
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #ufo-0
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

@@ -21,6 +21,8 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-tailscale` | `@korri:tailscale` | `plugins/tailscale/` |
 | `korri-plugin-retroarch` | `@korri:retroarch` | `plugins/retroarch/` |
 | `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
+| `korri-plugin-starter-pack` | `@korri:starter-pack` | `plugins/starter-pack/` |
+| `starter-pack-cartridges` | Standalone cartridge payload | `plugins/starter-pack/` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
 | `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |
 
@@ -32,6 +34,33 @@ Supported systems are `x86_64-linux` and `aarch64-linux`. Publisher composition
 binds `korri.lib.<system>.mkPlugin { pkgs = publisherPkgs; }`. The catalogue currently emits 90
 core packages. Each core package carries its selected RetroArch frontend and
 core library in one closure. Nix deduplicates identical store paths.
+
+## Starter pack
+
+`@korri:starter-pack` displays `Starter pack`. It contains 24 PICO-8 games in
+25 unchanged cartridge files under `share/starter-pack`, with credits, notices,
+checksums and the noncommercial CC BY-NC-SA 4.0 license.
+The plugin requires this repository's exact `@korri:fake08` output.
+It adds no game tiles and does not register cartridges in the library.
+Into Ruins remains a known FAKE-08 failure, not a verified compatible game.
+See [the pack instructions](plugins/starter-pack/README.md) for license conditions and limits.
+
+The locked Core builder does not yet support `requires`. Validation of this
+candidate needs the reviewed Core input override. Keep the lock unchanged until
+that Core revision is approved and reachable. Image composition must select
+both the pack and FAKE-08 because image seeding emits one receipt per root.
+The Core seed entry point must support exact dependency graphs, not only leaf plugins.
+
+On a build host, set `REVIEWED_CORE` to the approved candidate flake reference, then run:
+
+```sh
+nix build --no-link --no-write-lock-file --override-input korri "$REVIEWED_CORE" \
+  .#korri-plugin-starter-pack .#starter-pack-cartridges \
+  .#checks.x86_64-linux.korri-starter-pack-package \
+  .#checks.x86_64-linux.korri-starter-pack-admission
+```
+
+Repeat with `aarch64-linux` for ARM checks. Do not publish until the reachable Core pin and admission gates pass.
 
 ## Authoring
 

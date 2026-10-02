@@ -1,0 +1,17 @@
+Mai-Chan's Sweet Buns
+Creator credits: Krystman; music by Sebastian Haßler
+Source: https://www.lexaloffle.com/bbs/?pid=56576
+Cartridge: 56576
+Original download: https://www.lexaloffle.com/bbs/cposts/5/56576.p8.png
+SHA-256: ba3250ad0f3e73844d7003139ec0f46efe708d4764bac7d55075f851ddbfe1de
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #56576
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

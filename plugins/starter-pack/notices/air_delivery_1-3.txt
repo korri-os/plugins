@@ -1,0 +1,17 @@
+Air Delivery
+Creator credits: pianoman373
+Source: https://www.lexaloffle.com/bbs/?tid=52598
+Cartridge: air_delivery_1-3
+Original download: https://www.lexaloffle.com/bbs/cposts/ai/air_delivery_1-3.p8.png
+SHA-256: 683adaf19233595077a904465343c2bc4e38eebf17e4b57a111f001ff7b7a0a3
+Captured: 2026-10-02
+
+Original BBS cartridge metadata:
+Cart #air_delivery_1-3
+License: CC4-BY-NC-SA
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This records the developer's cartridge license label, original source and
+attribution. CREDITS.md retains additional designated creator credits.
+The game cartridge retains its original bytes, including its embedded notices.
+It is not relicensed under a plugin-code license.

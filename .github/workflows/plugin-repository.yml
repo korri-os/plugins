@@ -82,6 +82,8 @@ jobs:
             ".#checks.$SYSTEM.korri-libretro-example" \
             ".#checks.$SYSTEM.korri-fake08-package" \
             ".#checks.$SYSTEM.korri-fake08-admission" \
+            ".#checks.$SYSTEM.korri-starter-pack-package" \
+            ".#checks.$SYSTEM.korri-starter-pack-admission" \
             ".#checks.$SYSTEM.korri-libretro-frontend-override" \
             ".#checks.$SYSTEM.korri-libretro-typecheck" \
             ".#checks.$SYSTEM.korri-ssh-upstream" \
