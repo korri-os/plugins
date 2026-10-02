@@ -61,10 +61,15 @@ reset-to-title, sound, save states and device performance remain unverified.
 ## Licensing
 
 Read the installed original `LICENSE.MD`, `THIRD-PARTY.md` and
-`original-notices/`. MIT alone does not describe the linked code: it includes
-WTFPL 2, zlib-style, Unicode ConvertUTF, and upstream-declared CC BY-SA 3.0
-oval-drawing code. The latter's Stack Overflow answer also credits a Michael
-Abrash algorithm; upstream's declaration is not independent legal clearance.
+`original-notices/`. The original compiled miniz source preserves Martin
+Raiber's MIT notice and its Unlicense/public-domain section. Original LodePNG
+source/header preserve the 2005-2020 copyright, not just the older standalone
+license. Focused checks require byte equality with the pinned source and
+presence of these notices. MIT alone does not describe the linked code: it
+includes WTFPL 2, zlib-style, Unicode ConvertUTF, and upstream-declared
+CC BY-SA 3.0 oval-drawing code. The latter's Stack Overflow answer also credits
+a Michael Abrash algorithm; upstream's declaration is not independent legal
+clearance.
 No publication or signing is part of this producer work.
 
 ## Checks

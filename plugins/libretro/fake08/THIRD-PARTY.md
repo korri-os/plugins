@@ -9,9 +9,18 @@ The package's nix-support/libretro-fake08/manifest.txt records immutable
 FAKE-08 and z8lua source links. original-notices/ preserves original source
 files with the Lua, Eris (Florian Nuecke), Zepto-8 (Sam Hocevar), LodePNG
 (Lode Vandevenne), miniz, SimpleIni (Brodie Thiesfield), Unicode ConvertUTF,
-and libretro notices. Lua/z8lua and Eris are MIT; Zepto-8 code is WTFPL 2;
-LodePNG has its original zlib-style license. ConvertUTF has its original
-Unicode 2001-2004 permission notice, not SimpleIni's MIT license.
+and libretro notices. Lua/z8lua and Eris are MIT; Zepto-8 code is WTFPL 2.
+LodePNG's actual compiled `libs/lodepng/lodepng.cpp` and included `lodepng.h`
+are preserved unchanged with their 2005-2020 Lode Vandevenne copyright and
+zlib-style permission terms; the standalone LICENSE only lists 2005-2018.
+The actual compiled `libs/miniz/miniz.c` is also preserved unchanged. It
+includes `Copyright 2016 Martin Raiber` and its MIT permission notice in
+addition to the RAD Game Tools/Valve and Rich Geldreich/Tenacious Software
+notices, plus its Unlicense/public-domain section. The standalone miniz
+LICENSE omits Raiber and the public-domain section. These original source
+files are available under `original-notices/` and the pinned FAKE-08 source
+link in the provenance manifest. ConvertUTF has its original Unicode
+2001-2004 permission notice, not SimpleIni's MIT license.
 
 Additional source credits used by the core:
 

@@ -38,7 +38,8 @@ stdenv.mkDerivation {
     # Preserve complete original files containing transitive notices, not a
     # rewritten list of license names. Read from pristine src, before patching.
     for file in libs/z8lua/lua.h libs/z8lua/eris.c libs/z8lua/fix32.h \
-      libs/z8lua/lpico8lib.c libs/lodepng/LICENSE libs/miniz/LICENSE \
+      libs/z8lua/lpico8lib.c libs/lodepng/LICENSE libs/lodepng/lodepng.cpp \
+      libs/lodepng/lodepng.h libs/miniz/LICENSE libs/miniz/miniz.c \
       libs/simpleini/SimpleIni.h libs/simpleini/ConvertUTF.h \
       libs/simpleini/ConvertUTF.c source/emojiconversion.cpp \
       source/filter.cpp source/synth.cpp source/graphics.cpp \
