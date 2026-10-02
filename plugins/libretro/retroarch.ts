@@ -164,6 +164,9 @@ quit_press_twice = "false"
 kiosk_mode_enable = "true"
 menu_driver = "null"
 input_overlay_enable = "false"
+# Preserve legacy launch-spec: PNG cartridges belong to the selected core,
+# not RetroArch's built-in image viewer.
+builtin_imageviewer_enable = "false"
 video_fullscreen = "true"
 quit_on_close_content = "true"
 config_save_on_exit = "false"
