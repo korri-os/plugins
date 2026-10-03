@@ -1,0 +1,64 @@
+name: Check Solarus and starter pack
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - plugins/solarus/**
+      - plugins/starter-pack/**
+      - nix/solarus-*
+      - nix/solarus-quest/**
+      - nix/*starter-pack*
+      - nix/check-solarus-credits.py
+      - nix/default.nix
+      - flake.nix
+      - flake.lock
+      - .github/workflows/solarus.yml
+  pull_request:
+    paths:
+      - plugins/solarus/**
+      - plugins/starter-pack/**
+      - nix/solarus-*
+      - nix/solarus-quest/**
+      - nix/*starter-pack*
+      - nix/check-solarus-credits.py
+      - nix/default.nix
+      - flake.nix
+      - flake.lock
+      - .github/workflows/solarus.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            system: aarch64-linux
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
+      - name: Read existing signed build caches without publishing
+        run: python3 .github/workflows/trust-plugin-caches.py --include-core
+      - name: Check engine, original content bytes and exact runtime graph
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          nix build --no-link --print-build-logs \
+            ".#checks.$SYSTEM.korri-solarus-plugin" \
+            ".#checks.$SYSTEM.korri-starter-pack-package" \
+            ".#checks.$SYSTEM.korri-starter-pack-admission" \
+            ".#checks.$SYSTEM.korri-starter-pack-solarus-runtime"

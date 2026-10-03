@@ -1,12 +1,19 @@
-{ pkgs, fake08Plugin }:
+{
+  pkgs,
+  fake08Plugin,
+  solarusPlugin,
+}:
 let
   cartridges = import ./cartridges-package.nix { inherit pkgs; };
   payload = "${cartridges}/share/starter-pack";
 in
 {
-  # FAKE-08 owns the runner and runtime. Pin its exact Korri plugin output,
-  # not the raw core or frontend package.
-  requires = [ fake08Plugin ];
+  # Runtimes own discovery and launch. Pin their exact Korri plugin outputs,
+  # not raw engines or cores. Keep the existing native file treaty unchanged.
+  requires = [
+    fake08Plugin
+    solarusPlugin
+  ];
   packages = { inherit cartridges; };
   files = {
     cartridges = "${payload}/cartridges";

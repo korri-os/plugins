@@ -1,0 +1,7 @@
+-- Fields from Solarus v2.1.4 tests/testing_quest/data/quest.dat.
+quest{
+  solarus_version = "2.1",
+  write_dir = "korri_plugin_test",
+  title = "Korri save persistence test",
+  normal_quest_size = "320x240",
+}
