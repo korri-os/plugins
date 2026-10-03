@@ -81,24 +81,35 @@ security updates to them still require deliberate plugin publication.
 ## Starter pack
 
 `korri-plugin-starter-pack` builds `@korri:starter-pack` with the title
-`Starter pack`. Its exact `@korri:fake08` dependency comes from this repository.
-`starter-pack-cartridges` exposes the player-free payload separately.
-The payload contains 24 games and 25 unchanged cartridges licensed under
-noncommercial CC BY-NC-SA 4.0. Keep the credits, license and notices with it.
+`Starter pack`. Its exact `@korri:fake08` and `@korri:solarus` dependencies come
+from this repository. `starter-pack-cartridges` exposes the player-free payload
+separately. The payload retains 24 games and 25 unchanged PICO-8 cartridges
+licensed under noncommercial CC BY-NC-SA 4.0, and adds the two owner-selected
+Solarus quests. Keep the credits, individual licenses, corresponding source
+links and notices with it. The mixed pack remains noncommercial because of
+the retained PICO-8 content; that does not relicense the Solarus quests.
 Installation does not register library entries. Into Ruins remains a known failure.
 
 The publication validation list includes cartridge integrity, rejection controls
-and host seeding for both exact plugin roots. Seeding is an admission check,
+and host seeding for all three exact plugin roots. The Solarus gate also checks
+native save isolation and the installed controller database; bounded startup
+checks do not establish full game, display, audio or physical-input acceptance. Seeding is an admission check,
 not signature, device lifecycle or gameplay acceptance.
 The locked Core supports exact `requires` and `seed-graph`. The check supplies
-the existing publisher-binding format and selects both exact plugin roots.
+the existing publisher-binding format and selects all three exact plugin roots.
 The original leaf `seed` still refuses the pack.
 
 For a signed batch, select `korri-plugin-starter-pack korri-plugin-fake08` in the
-workflow's `packages` input. Product images must pin the resulting output paths
+workflow's `packages` input for the prior PICO-8-only version. For this update,
+select the affected `korri-plugin-starter-pack` and `korri-plugin-solarus`
+outputs. FAKE-08 remains an exact dependency in their exported closure and its
+unchanged published output needs no replacement. Product images must pin the resulting output paths
 and offline archive hashes after checking the actual release evidence.
-The owner approved signed publication and product-image defaults for this move.
-Existing-device installation and firmware writes are not authorized by that approval.
+The earlier owner approval covered the published PICO-8-only move and its
+product-image defaults. The Solarus source move and two quest selections are
+approved, but this does not replace separate approval for a new signed binary
+publication, product-image pin update or existing-device installation.
+No firmware write is authorized.
 
 ## Workflow
 

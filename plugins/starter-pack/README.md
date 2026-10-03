@@ -1,18 +1,22 @@
 # Starter pack
 
-This contains 24 selected games and 25 original PNG cartridge files.
+This contains 24 selected PICO-8 games and two owner-approved Solarus quests.
+There are 25 unchanged PNG cartridges and two native `.solarus` archives.
 Into Ruins needs the developer's two-file offline release.
-The pack contains credits, source notices, the noncommercial CC BY-NC-SA 4.0 license and checksums.
+The pack contains credits, source notices, game licenses and checksums.
+The PICO-8 cartridges remain noncommercial CC BY-NC-SA 4.0. The Solarus quests
+retain their own GPL code and individual media grants.
 It includes no PICO-8 application, emulator, native service, installer or library registration.
 
 ## Use the cartridges
 
-The Korri plugin requires the separate `@korri:fake08` plugin.
+The Korri plugin requires the separate `@korri:fake08` and `@korri:solarus` plugins.
 Core must approve each exact package under its own publisher binding before activation.
-Enabling the approved pack activates FAKE-08 first.
+Enabling the approved pack activates its exact runtimes first.
 The standalone cartridge output has no player dependency; supply a compatible player when using it alone.
 Copy the complete pack to the device.
-Keep `CREDITS.md`, `CC-BY-NC-SA-4.0.txt` and `notices/` with the cartridges when sharing them.
+Keep `CREDITS.md`, `CC-BY-NC-SA-4.0.txt` and `notices/` with the content when sharing it.
+The noncommercial PICO-8 license does not replace the Solarus file licenses.
 Add the `cartridges/` folder manually to your player's library or cartridge search path.
 Installing this Korri package does not perform that step or add game tiles.
 
@@ -25,6 +29,30 @@ To verify the copied cartridge bytes, run this from the pack directory:
 cd cartridges
 sha256sum --check ../SHA256SUMS
 ```
+
+## Solarus quests
+
+Perlshaw's Problems 0.8 is a short test game. Vegan on a Desert Island 0.3 is an
+unfinished development game. The owner selected both. Blue Isle and Yarntown
+are excluded. A licensed source release is not proof of gameplay completion.
+
+Use `perlshaws-problems.solarus` and `voadi.solarus` from the same `cartridges/`
+folder with `@korri:solarus/solarus`. Discovery uses the existing `.solarus`
+extension. The archives contain the original runtime files, with byte-identical
+media, scripts and metadata. Packaging moves each upstream `data/` directory
+to the native archive root and includes Perlshaw's root metadata. It adds the
+original GPL `LICENSE`; it does not alter gameplay or asset grants.
+
+`solarus-quests.nix` pins the actual source archives. The original README,
+GPL text, per-file attribution database and source/pin records ship in
+`notices/perlshaws-problems/` and `notices/voadi/`. Preserve them. `CREDITS.md`
+links the fixed original source revisions and records the layout change.
+
+Solarus keeps native saves under the account root supplied by Korri, not the
+content folder or the desktop user's HOME. Installing or updating this pack
+does not move saves, register games, or change existing library folder records.
+A device that already uses the personal `@simonwjackson:solarus` plugin needs
+separate normal approval for `@korri:solarus`; no identity alias is installed.
 
 ## Into Ruins
 
@@ -53,7 +81,8 @@ DeFacto saving uses the pause menu and needs persistent player storage.
 
 Building requires the pinned original files to remain available or already exist in the Nix cache.
 A changed download fails its hash check rather than silently updating a game.
-The checks verify package contents, cartridge structure and byte hashes.
+The checks verify package contents, cartridge structure, original quest file
+bytes, native metadata placement, exact runtime dependencies and byte hashes.
 They check the presence of credits, license text and source notices, not rights ownership or gameplay.
 Published licenses do not independently prove every contributor's ownership or grant creator endorsement.
 
@@ -61,7 +90,8 @@ Published licenses do not independently prove every contributor's ownership or g
 
 `plugin.ts` exports identity only.
 `plugin.nix` uses the existing native `packages`, `files` and `requires` fields.
-The dependency names an exact FAKE-08 Korri plugin output, not a raw core or RetroArch package.
+Dependencies name exact FAKE-08 and Solarus Korri plugin outputs, not raw cores,
+engines or frontend packages.
 Core's supported builder generates the plugin manifest.
 The `files.cartridges` entry names the packaged cartridge directory.
 The other named files expose credits, license, notices, checksums and these instructions.
@@ -71,5 +101,6 @@ This package claims `@korri:starter-pack` with the displayed title `Starter pack
 That manifest claim alone establishes no device trust.
 Building does not sign or publish a cache, configure a signing key, install trust or approve device installation.
 Normal signature checks and exact-package approval remain required for plugin installation.
-Both this pack and FAKE-08 need approval for their exact outputs under the administrator's `@korri` publisher binding.
+This pack, FAKE-08 and Solarus need approval for their exact outputs under the
+administrator's `@korri` publisher binding.
 No command in this package installs that trust binding.
