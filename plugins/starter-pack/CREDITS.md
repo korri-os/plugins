@@ -1,6 +1,9 @@
-# PICO-8 starter pack credits
+# Starter pack credits
 
-These are the user's 24 selected games, not the larger discovery catalogue.
+## PICO-8 cartridges
+
+These are the user's 24 selected PICO-8 games, not the larger discovery catalogue.
+Their noncommercial license does not replace the Solarus quests' separate licenses.
 Each original developer's linked BBS post publishes a CC4-BY-NC-SA cartridge grant.
 That label means [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 The full license and warranty disclaimer are included in `CC-BY-NC-SA-4.0.txt`.
@@ -49,7 +52,7 @@ Both files match the entries in the author's `intoruins_offline_carts.zip` exact
 [The developer states](https://sparsegamedev.itch.io/into-ruins) that the full cartridge and assets are CC4-BY-NC-SA.
 The pinned repository's original license text is retained in `notices/intoruins-offline.txt`.
 
-## Redistribution conditions
+## PICO-8 redistribution conditions
 
 Retain these credits, supplied notices, source links and the game licenses when sharing the pack.
 Noncommercial use means use not primarily directed toward commercial advantage or monetary compensation.
@@ -57,3 +60,42 @@ A free download alone does not establish that condition.
 Identify game modifications and meet ShareAlike when distributing game adaptations.
 Do not impose terms or DRM that restrict the games' licensed copying and reuse.
 These permissions do not license the official PICO-8 application or grant trademark rights.
+
+## Solarus quests
+
+| Game and pinned original source | Creator credits | Packaged quest |
+|---|---|---|
+| [Perlshaw's Problems](https://github.com/AgentNintaku/perlshaws-problems/tree/cdc5ea95d84be7051da08a1c770e511648aae1b0) | Nintaku and the contributors credited in `notices/perlshaws-problems/project_db.dat` | `perlshaws-problems.solarus` |
+| [Vegan on a Desert Island](https://gitlab.com/voadi/voadi/-/tree/197105cb25eb0de1b7e6d4acc25303ece1be479f) | voadi.com and the contributors credited in `notices/voadi/project_db.dat` and the original README | `voadi.solarus` |
+
+Both upstreams supply GPL v3 software licenses. Individual code and media
+grants remain in each original `project_db.dat`; they are not replaced by the
+PICO-8 license. Some Vegan map files and a test script carry CC or mixed
+GPL/CC notices. Preserve those exceptions, not a GPL-only label for every file.
+Original GPL text, README, file credits and source provenance ship under
+`notices/perlshaws-problems/` and `notices/voadi/`, and inside the quest archives
+where applicable. The original Vegan `attributions.txt` and version-pinned
+wiki credits also ship under `notices/voadi/`. Full CC texts ship under
+`notices/solarus-licenses/`. Keep these notices with the quests. Meet each
+file's credit, license, source and ShareAlike requirements when redistributing it.
+
+Additional Vegan credits from embedded notices: `musics/adam/melody-1.ogg`
+names Adam Kol and serviceshock. Avgvst requests the attribution `AVGVSTA`
+for `musics/avgvst/09 - Z 339 - Here the Deities approve.ogg`. The Comicoro and
+Poco font metadata names jeti, also credited as fontenddev.com. Original
+`items/random.lua` comments additionally credit Christopho. Preserve original
+spellings and both the current database and older attribution notice.
+Directory declarations with several licenses are retained in full; no file
+is silently reclassified as CC0 or attributed to only one listed creator.
+
+The package changes only source layout: it places `data/` contents at the
+native quest archive root and includes Perlshaw's repository-root metadata.
+It preserves every original runtime file byte and includes the original GPL
+`LICENSE`. The upstream source links and this repository's packaging recipe
+identify the corresponding source and the packaging change.
+
+Perlshaw is version 0.8 and a short test game. Vegan is an unfinished development
+version 0.3. The owner selected both with those limits. Blue Isle and Yarntown
+are not included. These grants do not independently prove every contributor's
+ownership or grant creator endorsement. The retained PICO-8 content still
+prevents treating the complete mixed pack as commercially licensed.

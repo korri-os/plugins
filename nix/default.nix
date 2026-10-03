@@ -44,8 +44,14 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin = _: retroarchDefinition;
     };
     libretro = import ../plugins/libretro { inherit pkgs mkPlugin; };
+    solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
+    solarusPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = ../plugins/solarus;
+      plugin = _: import ../plugins/solarus/plugin.nix { inherit solarusPackage; };
+    };
     starterPackDefinition = import ../plugins/starter-pack/plugin.nix {
-      inherit pkgs;
+      inherit pkgs solarusPlugin;
       fake08Plugin = libretro.packages.korri-plugin-fake08;
     };
     starterPack = mkPlugin {
@@ -117,6 +123,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-retroarch = retroarchPackage;
       korri-plugin-ssh = sshPackage;
       korri-plugin-sunshine = sunshinePlugin;
+      korri-plugin-solarus = solarusPlugin;
+      solarus = solarusPackage;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cache = cacheTool;
@@ -174,14 +182,25 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
               jq -e '.id == "@korri:fake08" and .desired.state == "Enabled" and .previous == null' receipt.json
               touch "$out"
             '';
+        korri-solarus-plugin = import ./solarus-check.nix {
+          inherit pkgs solarusPackage;
+          package = solarusPlugin;
+          contract = korri.lib.${system}.pluginContract;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+          korridPackage = korri.packages.${system}.korrid;
+        };
+        korri-starter-pack-solarus-runtime = import ./solarus-starter-runtime-check.nix {
+          inherit pkgs solarusPackage;
+          cartridges = starterPackDefinition.packages.cartridges;
+        };
         korri-starter-pack-package = import ./starter-pack-check.nix {
-          inherit pkgs;
+          inherit pkgs solarusPlugin;
           package = starterPack;
           cartridges = starterPackDefinition.packages.cartridges;
           fake08Plugin = libretro.packages.korri-plugin-fake08;
         };
         korri-starter-pack-admission = import ./starter-pack-admission.nix {
-          inherit pkgs;
+          inherit pkgs solarusPlugin;
           package = starterPack;
           fake08Plugin = libretro.packages.korri-plugin-fake08;
           hostPackage = korri.packages.${system}.korri-plugin-host;

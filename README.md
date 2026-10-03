@@ -21,8 +21,10 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-tailscale` | `@korri:tailscale` | `plugins/tailscale/` |
 | `korri-plugin-retroarch` | `@korri:retroarch` | `plugins/retroarch/` |
 | `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
+| `korri-plugin-solarus` | `@korri:solarus` | `plugins/solarus/` |
+| `solarus` | Standalone Solarus 2.1.4 engine | `plugins/solarus/` |
 | `korri-plugin-starter-pack` | `@korri:starter-pack` | `plugins/starter-pack/` |
-| `starter-pack-cartridges` | Standalone cartridge payload | `plugins/starter-pack/` |
+| `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
 | `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |
 
@@ -37,16 +39,22 @@ core library in one closure. Nix deduplicates identical store paths.
 
 ## Starter pack
 
-`@korri:starter-pack` displays `Starter pack`. It contains 24 PICO-8 games in
-25 unchanged cartridge files under `share/starter-pack`, with credits, notices,
-checksums and the noncommercial CC BY-NC-SA 4.0 license.
-The plugin requires this repository's exact `@korri:fake08` output.
+`@korri:starter-pack` displays `Starter pack`. It retains 24 PICO-8 games in
+25 unchanged cartridge files and adds Perlshaw's Problems 0.8 and Vegan on a
+Desert Island 0.3 as native Solarus archives under `share/starter-pack`.
+Credits, notices and checksums accompany all 27 files. The PICO-8 cartridges
+remain noncommercial CC BY-NC-SA 4.0; the quests retain their own GPL and
+per-file CC/public-domain grants. The complete mixed pack is not commercially
+licensed. Blue Isle and Yarntown are excluded.
+The plugin requires this repository's exact `@korri:fake08` and `@korri:solarus` outputs.
 It adds no game tiles and does not register cartridges in the library.
 Into Ruins remains a known FAKE-08 failure, not a verified compatible game.
 See [the pack instructions](plugins/starter-pack/README.md) for license conditions and limits.
 
 The locked Core supports exact `requires` and dependency-aware image seeding.
-Image composition must select both the pack and its exact FAKE-08 dependency.
+Image composition must select the pack and both exact runtime dependencies.
+This source change does not update existing product-image pins, install a
+package on a device, or grant signature/permission approval.
 Seeding uses each publisher's own binding and preserves normal runtime approval
 and signature checks.
 
@@ -59,6 +67,22 @@ nix build --no-link .#korri-plugin-starter-pack .#starter-pack-cartridges \
 nix build --no-link .#checks.aarch64-linux.korri-starter-pack-package \
   .#checks.aarch64-linux.korri-starter-pack-admission
 ```
+
+## Solarus
+
+`@korri:solarus` is the official, standalone Solarus 2.1.4 producer. Its runner
+is `@korri:solarus/solarus`. It discovers `.solarus` archives and keeps native
+saves under the account root supplied by Core. The engine plugin contains no
+quests. Its controller patch retains the accepted D-pad correction, sticks
+and buttons. There is no alias for the previous personal publisher identity.
+See [the engine instructions](plugins/solarus/README.md) for native checks,
+account isolation, corresponding source and installation limits.
+
+`.github/workflows/solarus.yml` checks the real engine and starter pack on
+native x86_64 and ARM64 build runners without signing or publishing a cache.
+It validates original content bytes, the three-root approval graph and bounded
+headless startup. Display, sound, physical controls and full gameplay remain
+separate acceptance checks.
 
 ## Authoring
 
