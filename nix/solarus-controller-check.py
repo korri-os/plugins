@@ -30,14 +30,15 @@ for name, arguments, result in [
 assert sdl.SDL_SetHint(b"SDL_GAMECONTROLLERCONFIG_FILE", database.encode())
 assert sdl.SDL_Init(0x2000) == 0, sdl.SDL_GetError().decode()
 try:
-    # The generic Linux Xbox 360 GUID in Solarus's database and the four GUIDs
-    # observed from real Korri player seats on the Mini V2. SDL adds their CRCs.
+    # Korri seats report USB 045e:028e version 0x0114 (korri-os/korri#82): the
+    # generic GUID, then "Korri Seat P1".."P4" with SDL's name CRCs. Upstream's
+    # row for version 0x0001 swaps the D-pad; seats must not resolve to it.
     for identifier in [
-        "030000005e0400008e02000001000000",
-        "030082db5e0400008e02000001000000",
-        "0300c2da5e0400008e02000001000000",
-        "0300031a5e0400008e02000001000000",
-        "030042d85e0400008e02000001000000",
+        "030000005e0400008e02000014010000",
+        "030082db5e0400008e02000014010000",
+        "0300c2da5e0400008e02000014010000",
+        "0300031a5e0400008e02000014010000",
+        "030042d85e0400008e02000014010000",
     ]:
         guid = Guid((ctypes.c_uint8 * 16).from_buffer_copy(bytes.fromhex(identifier)))
         pointer = sdl.SDL_GameControllerMappingForGUID(guid)

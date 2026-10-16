@@ -73,8 +73,8 @@ nix build --no-link .#checks.aarch64-linux.korri-starter-pack-package \
 `@korri:solarus` is the official, standalone Solarus 2.1.4 producer. Its runner
 is `@korri:solarus/solarus`. It discovers `.solarus` archives and keeps native
 saves under the account root supplied by Core. The engine plugin contains no
-quests. Its controller patch retains the accepted D-pad correction, sticks
-and buttons. There is no alias for the previous personal publisher identity.
+quests. Its controller database is upstream's; Korri seats avoid its swapped
+D-pad row by reporting a different controller version. There is no alias for the previous personal publisher identity.
 See [the engine instructions](plugins/solarus/README.md) for native checks,
 account isolation, corresponding source and installation limits.
 

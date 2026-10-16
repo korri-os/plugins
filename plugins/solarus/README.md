@@ -24,11 +24,11 @@ quest paths. Emulator cores and Korri launch overrides are rejected.
 Use each quest's native settings instead. The plugin does not force fullscreen
 or add RetroArch session controls. Display and audio defaults remain unchanged.
 
-The packaged controller database corrects one upstream Linux Xbox 360 entry.
-Its four D-pad hat bindings were inverted. This entry also matches Korri's
-player seats on the Mini V2. The patch retains all button and stick bindings
-and leaves other controller entries unchanged. It does not change A/B actions
-chosen by a quest or repair the separate OpenGOAL/Jak input path.
+The engine's bundled controller database is upstream's, unchanged. Its Linux
+row for Xbox 360 version `0x0001` swaps all four D-pad directions. Korri
+player seats report version `0x0114` instead, so they never match that row
+(korri-os/korri#82). The check below proves the seat identity still maps
+correctly through this database.
 
 Upstream 2.1.4 accepts quest formats 1.5, 1.6, 2.0 and 2.1 at its version gate.
 That is not proof that every quest works. Older quests can still depend on
@@ -74,8 +74,8 @@ overrides, native ELF architecture, archive/directory launch, persistent
 save/reload across processes, two supplied account roots, and preservation
 of desktop saves and quest bytes. An SDL lookup test loads the installed
 controller database and checks D-pad, button, and stick bindings for the
-Linux Xbox 360 GUID and four observed Korri-seat GUIDs. It fails on the original
-inverted database. The test quest uses native save APIs and contains no
+Korri seat identity: the generic version `0x0114` GUID and the four seat GUIDs
+with SDL's name CRCs. The test quest uses native save APIs and contains no
 third-party assets.
 
 A test-only launcher adds upstream's `-no-video` and `-no-audio` flags. These
@@ -112,8 +112,7 @@ The pinned upstream engine source remains available through the package's `src`:
 nix build .#solarus.src --out-link result-solarus-source
 ```
 
-The local `xbox360-dpad.patch` and build recipe are also part of the patched
-engine's corresponding source. Any binary publication must satisfy the
+The local build recipe is also part of the engine's corresponding source. Any binary publication must satisfy the
 applicable source and asset license obligations. Packaging is not approval
 to redistribute a quest.
 
