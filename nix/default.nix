@@ -213,6 +213,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         };
         korri-libretro-typecheck = import ./libretro-typecheck.nix {
           inherit pkgs;
+          inherit (libretro) catalogue;
+          plugins = libretro.packages;
           helper = ../plugins/libretro/retroarch.ts;
           settings = retroarchDefinition.packages.retroarch-settings;
           contract = korri.lib.${system}.pluginContract;

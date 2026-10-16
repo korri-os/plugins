@@ -9,7 +9,12 @@ export const description = "Runs Solarus quests with saves in Korri account stor
 
 // Retain the Solarus identity from legacy's app integration and system example.
 export const systems = {
-  solarus: { id: "solarus", title: "Solarus" },
+  solarus: {
+    id: "solarus",
+    title: "Solarus",
+    // Upstream's quest archive suffix. Do not claim every general ZIP file.
+    content: { extensions: ["solarus"] },
+  },
 }
 
 export const runners = {
@@ -17,19 +22,6 @@ export const runners = {
     id: "@korri:solarus/solarus",
     program: "solarus",
     systems: ["solarus"],
-  },
-}
-
-export const discovery = {
-  fileReleases: {
-    "solarus-files": {
-      id: "@korri:solarus/solarus-files",
-      title: "Solarus quests",
-      // Upstream's quest archive suffix. Do not claim every general ZIP file.
-      extensions: ["solarus"],
-      system: "solarus",
-      runners: [runners.solarus.id],
-    },
   },
 }
 

@@ -5,7 +5,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import process from "node:process"
 import type { PluginLaunchInput } from "../contracts/generated/korrid"
-import { discovery, handlers, name, runners, systems } from "../plugins/solarus/plugin"
+import * as plugin from "../plugins/solarus/plugin"
+
+const { handlers, name, runners, systems } = plugin
+assert.ok(!("discovery" in plugin))
+assert.ok(!("sessionControls" in plugin))
 
 const [packagePath, hostCli, korridCli, recordArguments] = process.argv.slice(2)
 assert(packagePath && hostCli && korridCli && recordArguments)
@@ -21,18 +25,11 @@ assert.deepEqual(manifest.services, {})
 assert.deepEqual(manifest.ports, {})
 accessSync(manifest.files.solarus, constants.X_OK)
 assert.equal(name, "solarus")
-assert.deepEqual(systems, { solarus: { id: "solarus", title: "Solarus" } })
+assert.deepEqual(systems, {
+  solarus: { id: "solarus", title: "Solarus", content: { extensions: ["solarus"] } },
+})
 assert.deepEqual(runners, {
   solarus: { id: "@korri:solarus/solarus", program: "solarus", systems: ["solarus"] },
-})
-assert.deepEqual(discovery.fileReleases, {
-  "solarus-files": {
-    id: "@korri:solarus/solarus-files",
-    title: "Solarus quests",
-    extensions: ["solarus"],
-    system: "solarus",
-    runners: [runners.solarus.id],
-  },
 })
 assert.deepEqual(Object.keys(handlers), ["launch.prepare"])
 

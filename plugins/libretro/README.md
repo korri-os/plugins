@@ -6,11 +6,13 @@ install every core, and removing it does not disturb the others.
 | File | What it holds |
 |---|---|
 | `cores.nix` | The catalogue. One entry per core |
+| `systems.nix` | One content definition per system, shared across cores |
+| `groups.nix` | Related-system groups |
 | `core-plugin.nix` | Turns one entry into one plugin package |
 | `retroarch.ts` | The shared launch helper every generated core uses |
 | `example-check.nix` | Proves the committed mGBA example still matches the generator |
 | `frontend-override-check.nix` | Proves one core can name its own frontend build |
-| `nix/libretro-typecheck.nix` | Checks the helper against the locked core contract and generated settings |
+| `nix/libretro-typecheck.nix` | Typechecks supported generated plugins and the helper; runs `content-check.ts` |
 | `default.nix` | Maps the catalogue to `korri-plugin-<name>` packages |
 
 ## Adding a core
@@ -23,23 +25,37 @@ gambatte = {
   description = "Runs Game Boy and Game Boy Color content with the Gambatte libretro core.";
   core = pkgs.libretro.gambatte;
   coreFile = "${pkgs.libretro.gambatte}/lib/retroarch/cores/gambatte_libretro.so";
-  systems = {
-    gb = { title = "Game Boy"; extensions = [ "gb" ]; };
-    gbc = { title = "Game Boy Color"; extensions = [ "gbc" ]; };
-  };
+  systems = [ "gb" "gbc" ];
 };
 ```
 
 That is the whole change. The package `korri-plugin-gambatte` appears, with the
 plugin id `@korri:gambatte`, the runner `@korri:gambatte/gambatte`, its own
-session controls, and one discovery claim per system.
+`controls`, each system's `content` rules, and the `gameboy` group. A core
+contributes a group when it runs at least two members. Groups keep their full
+member lists; Core ignores members no enabled plugin declares.
 
 Name the core file exactly. A file name is not derived from a package name,
 because the two disagree: `beetle-pce-fast` ships
 `mednafen_pce_fast_libretro.so`.
 
+Add new system content rules to `systems.nix`, not to a core entry. Extensions
+are the union of the catalogue's former per-core lists. NES and FDS are separate
+systems. Only FCEUmm, Mesen and Nestopia run both; QuickNES runs NES only.
+
 Keep extensions conservative. An extension owned by several systems, such as
-`bin`, stays out until a real library needs it.
+`bin`, stays out until a real library needs it. Do not add general archive
+extensions or Lynx `o` object files. Mega Drive keeps `md`; an explicit source
+pairing scopes it to content rather than arbitrary README files.
+
+`content-check.ts` checks all systems and all four groups from the generated
+modules. On x86_64 this covers all 91 cores. Other targets keep nixpkgs' platform
+restrictions and check only supported cores.
+
+The shared table cites the header detectors for NES, FDS, Lynx, Atari 7800 and
+SNES, and the GBA logo evidence. Systems without an explicit layout use Core's
+`**/{title}.{ext}` default. Content rules identify files without requiring an
+enabled runner.
 
 ## Naming a different frontend
 
@@ -52,7 +68,7 @@ mgba-nightly = {
   core = pkgs.libretro.mgba;
   coreFile = "${pkgs.libretro.mgba}/lib/retroarch/cores/mgba_libretro.so";
   frontend = pinnedRetroarch;
-  systems.gba = { title = "Game Boy Advance"; extensions = [ "gba" ]; };
+  systems = [ "gba" ];
 };
 ```
 
@@ -82,8 +98,8 @@ installed together share one store path, so the disk cost is paid once, but
 neither can break the other by being removed. `@korri:retroarch` names a
 settings family, not a package a core depends on.
 
-Two cores may claim one system. Genesis Plus GX and PicoDrive both claim Mega
-Drive. Discovery returns both claims and the player chooses the runner.
+Two cores may run one system. Genesis Plus GX and PicoDrive both run Mega
+Drive. Their content rules combine and the player chooses the runner.
 
 ## The runner owns its settings
 

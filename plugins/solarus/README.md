@@ -8,14 +8,13 @@ It includes no quests, editor, desktop launcher, ROMs, or game assets.
 ## Quest discovery and launch
 
 The runner is `@korri:solarus/solarus`. It contributes the `solarus`
-system and discovers files ending in `.solarus` in folders already selected
-for Korri scanning. These are Solarus's native ZIP-format quest archives.
+system with `content.extensions = ["solarus"]`. Discovery finds these files
+in sources explicitly paired with `solarus`. These are Solarus's native ZIP-format quest archives.
 There is no automatic download or library-folder registration.
 
 Solarus also accepts an unpacked quest directory or `data.solarus.zip` when
 an existing library release explicitly points to it. The plugin deliberately
-does not claim every `.zip` file or directory. Core's extension-based scanner
-cannot distinguish arbitrary ZIPs from quests. Do not rename an unrelated
+does not claim every `.zip` file or directory. The content rules cannot distinguish arbitrary ZIPs from quests. Do not rename an unrelated
 archive and expect it to become a Solarus quest.
 
 The engine receives the absolute content path as one literal argument.
