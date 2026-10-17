@@ -1,0 +1,68 @@
+--- auto_scopes.zplay
++++ auto_scopes.zplay
+@@ -63,31 +63,31 @@
+ C 35 g C2#
+ C 36 g DxJ
+ C 37 g GRJ
+-C 38 g F%j
+-C 39 g FiD
+-C 40 g EUU
+-C 41 g FTQ
+-C 42 g D8(
+-C 43 g UL
+-C 44 g Cp4
+-C 45 g Bn=
+-C 46 g FNh
+-C 47 g CU=
+-C 48 g Fok
+-C 49 g GUV
+-C 50 g Ghe
+-C 51 g E2@
+-C 52 g B_u
+-C 53 g D"u
+-C 54 g G#p
+-C 55 g Hmy
+-C 56 g D+H
+-C 57 g FzV
+-C 58 g C0d
+-C 59 g Ea%
+-C 60 g FUH
+-C 61 g E;j
+-C 62 g G0B
++C 38 g BZI
++C 39 g B8|
++C 40 g E[X
++C 41 g bq
++C 42 g FD|
++C 43 g E1#
++C 44 g BEn
++C 45 g H7I
++C 46 g DLy
++C 47 g E]b
++C 48 g G8J
++C 49 g H4*
++C 50 g Hr`
++C 51 g 7K
++C 52 g HK]
++C 53 g Ef<
++C 54 g BBa
++C 55 g GBn
++C 56 g bt
++C 57 g Ezj
++C 58 g G||
++C 59 g MF
++C 60 g E7z
++C 61 g Hm7
++C 62 g Hs"
+ C 66 Trace: [Test] Running scopes
+ C 66   at tests/scripts/playground/auto/test_runner.zs:91
+ C 66 Trace: [Test] started: dmap 5 screen 0
+@@ -177,7 +177,7 @@
+ C 66 Trace: 6.0045
+ C 66   at tests/scripts/playground/auto/scopes.zs:282
+ C 66   at tests/scripts/playground/auto/scopes.zs:430
+-C 66 g YQ
++C 66 g D%,
+ C 69 Trace: [Test] done
+ C 69   at tests/scripts/playground/auto/test_runner.zs:17
+ C 69   at tests/scripts/playground/auto/scopes.zs:446

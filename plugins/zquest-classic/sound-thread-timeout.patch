@@ -1,0 +1,10 @@
+--- third_party/allegro_legacy/src/a5/a5_sound.c
++++ third_party/allegro_legacy/src/a5/a5_sound.c
+@@ -71,6 +71,7 @@
+     while(!al_get_thread_should_stop(thread))
+     {
+ #ifdef ALLEGRO_LEGACY_CLOSE_THREADS
++        al_init_timeout(&timeout, 0.1);
+         if (al_wait_for_event_until(queue, &event, &timeout))
+ #else
+         al_wait_for_event(queue, &event);

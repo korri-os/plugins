@@ -50,8 +50,21 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = ../plugins/solarus;
       plugin = _: import ../plugins/solarus/plugin.nix { inherit solarusPackage; };
     };
+    zquestEngine = import ../plugins/zquest-classic/package.nix { inherit pkgs; };
+    zquestLauncher = import ../plugins/zquest-classic/launcher.nix {
+      inherit pkgs;
+      engine = zquestEngine;
+    };
+    zquestPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = pkgs.lib.fileset.toSource {
+        root = ../plugins/zquest-classic;
+        fileset = ../plugins/zquest-classic/plugin.ts;
+      };
+      plugin = _: import ../plugins/zquest-classic/plugin.nix { launcher = zquestLauncher; };
+    };
     starterPackDefinition = import ../plugins/starter-pack/plugin.nix {
-      inherit pkgs solarusPlugin;
+      inherit pkgs solarusPlugin zquestPlugin;
       fake08Plugin = libretro.packages.korri-plugin-fake08;
     };
     starterPack = mkPlugin {
@@ -125,6 +138,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-sunshine = sunshinePlugin;
       korri-plugin-solarus = solarusPlugin;
       solarus = solarusPackage;
+      korri-plugin-zquest-classic = zquestPlugin;
+      zquest-classic = zquestLauncher;
+      zquest-classic-source = import ./zquest-source-release.nix {
+        inherit pkgs;
+        engine = zquestEngine;
+      };
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cache = cacheTool;
@@ -193,14 +212,27 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           inherit pkgs solarusPackage;
           cartridges = starterPackDefinition.packages.cartridges;
         };
+        korri-zquest-classic-plugin = import ./zquest-check.nix {
+          inherit pkgs;
+          package = zquestPlugin;
+          engine = zquestEngine;
+          contract = korri.lib.${system}.pluginContract;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+          korridPackage = korri.packages.${system}.korrid;
+        };
+        korri-starter-pack-lantern-hollow = import ./lantern-hollow-check.nix {
+          inherit pkgs;
+          engine = zquestEngine;
+          cartridges = starterPackDefinition.packages.cartridges;
+        };
         korri-starter-pack-package = import ./starter-pack-check.nix {
-          inherit pkgs solarusPlugin;
+          inherit pkgs solarusPlugin zquestPlugin;
           package = starterPack;
           cartridges = starterPackDefinition.packages.cartridges;
           fake08Plugin = libretro.packages.korri-plugin-fake08;
         };
         korri-starter-pack-admission = import ./starter-pack-admission.nix {
-          inherit pkgs solarusPlugin;
+          inherit pkgs solarusPlugin zquestPlugin;
           package = starterPack;
           fake08Plugin = libretro.packages.korri-plugin-fake08;
           hostPackage = korri.packages.${system}.korri-plugin-host;

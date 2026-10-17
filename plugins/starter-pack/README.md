@@ -1,16 +1,17 @@
 # Starter pack
 
-This contains 24 selected PICO-8 games and two owner-approved Solarus quests.
-There are 25 unchanged PNG cartridges and two native `.solarus` archives.
+This contains 24 selected PICO-8 games, two owner-approved Solarus quests and
+Lantern Hollow, an original ZQuest Classic quest made for this pack.
+There are 25 unchanged PNG cartridges, two native `.solarus` archives and one `.qst` file.
 Into Ruins needs the developer's two-file offline release.
 The pack contains credits, source notices, game licenses and checksums.
 The PICO-8 cartridges remain noncommercial CC BY-NC-SA 4.0. The Solarus quests
-retain their own GPL code and individual media grants.
+retain their own GPL code and individual media grants. Lantern Hollow is CC0.
 It includes no PICO-8 application, emulator, native service, installer or library registration.
 
 ## Use the cartridges
 
-The Korri plugin requires the separate `@korri:fake08` and `@korri:solarus` plugins.
+The Korri plugin requires the separate `@korri:fake08`, `@korri:solarus` and `@korri:zquest-classic` plugins.
 Core must approve each exact package under its own publisher binding before activation.
 Enabling the approved pack activates its exact runtimes first.
 The standalone cartridge output has no player dependency; supply a compatible player when using it alone.
@@ -53,6 +54,14 @@ content folder or the desktop user's HOME. Installing or updating this pack
 does not move saves, register games, or change existing library folder records.
 A device that already uses the personal `@simonwjackson:solarus` plugin needs
 separate normal approval for `@korri:solarus`; no identity alias is installed.
+
+## Lantern Hollow
+
+Use `lantern-hollow.qst` from the same `cartridges/` folder with
+`@korri:zquest-classic`. It is an original quest built for this pack from CC0
+art, music and sound effects. `notices/lantern-hollow/` holds its license, an
+asset table with sources, and the exact authoring scripts. See
+`notices/lantern-hollow/README.md` for what was checked and what was not.
 
 ## Into Ruins
 

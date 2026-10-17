@@ -6,6 +6,7 @@ on:
     paths:
       - plugins/solarus/**
       - plugins/starter-pack/**
+      - plugins/zquest-classic/**
       - nix/solarus-*
       - nix/solarus-quest/**
       - nix/*starter-pack*
@@ -18,6 +19,7 @@ on:
     paths:
       - plugins/solarus/**
       - plugins/starter-pack/**
+      - plugins/zquest-classic/**
       - nix/solarus-*
       - nix/solarus-quest/**
       - nix/*starter-pack*

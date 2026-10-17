@@ -111,6 +111,15 @@ approved, but this does not replace separate approval for a new signed binary
 publication, product-image pin update or existing-device installation.
 No firmware write is authorized.
 
+The Starter pack also requires `@korri:zquest-classic`, moved on 2026-10-17
+from the personal repository, and adds Lantern Hollow, an original CC0 ZQuest
+Classic quest made for the pack (`plugins/starter-pack/lantern-hollow/`). For
+that update, select `korri-plugin-zquest-classic korri-plugin-starter-pack`.
+Upload both architectures' `zquest-classic-source` archives as release assets
+of this repository first: the player is GPLv3 with a cleaned resource set, and
+its corresponding source must sit next to the binaries. The ZQuest checks are
+`korri-zquest-classic-plugin` and `korri-starter-pack-lantern-hollow`.
+
 ## Workflow
 
 Only `simonwjackson` can dispatch or rerun `main`. Review the `plugin-release`

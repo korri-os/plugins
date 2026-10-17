@@ -1,0 +1,14 @@
+SPDX-License-Identifier: CC0-1.0
+
+The original zquest-public-fixture.py generator and its generated quest
+content (room geometry, tiles, palette, metadata, and initialization values)
+are dedicated to the public domain under CC0 1.0 Universal.
+
+To the extent possible under law, the authors waive all copyright and
+related or neighboring rights in this work. The work is provided without
+warranty.
+
+CC0 1.0 Universal legal code:
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+This dedication does not change the license of ZQuest Classic itself.

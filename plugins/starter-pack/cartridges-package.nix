@@ -27,10 +27,14 @@ pkgs.runCommand "korri-starter-pack-cartridges" { } ''
   cp ${./SOLARUS-PROVENANCE.md} "$destination/notices/solarus-licenses/PROVENANCE.md"
   ${pkgs.python3}/bin/python ${./package-solarus-quest.py} --credits \
     ${solarusNotices.credits} "$destination/notices/voadi"
+  cp ${./lantern-hollow/lantern-hollow.qst} "$destination/cartridges/lantern-hollow.qst"
+  mkdir -p "$destination/notices/lantern-hollow"
+  cp -r ${./lantern-hollow}/README.md ${./lantern-hollow}/ASSETS.md ${./lantern-hollow}/LICENSE.txt ${./lantern-hollow}/source "$destination/notices/lantern-hollow/"
+  chmod -R u+w "$destination/notices/lantern-hollow"
   cp ${./CREDITS.md} "$destination/CREDITS.md"
   cp ${./README.md} "$destination/README.md"
   cp ${./CC-BY-NC-SA-4.0.txt} "$destination/CC-BY-NC-SA-4.0.txt"
   cp ${./notices}/*.txt "$destination/notices/"
   cd "$destination/cartridges"
-  sha256sum -- *.p8.png *.solarus > "$destination/SHA256SUMS"
+  sha256sum -- *.p8.png *.solarus *.qst > "$destination/SHA256SUMS"
 ''

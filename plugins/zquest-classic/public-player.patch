@@ -1,0 +1,316 @@
+diff --git src/core/qst.cpp src/core/qst.cpp
+index 7611d26..9c35a48 100644
+--- src/core/qst.cpp
++++ src/core/qst.cpp
+@@ -141,7 +141,8 @@ const char *qst_error[] =
+     "Missing new data"  ,                                     /* but let it pass in ZQuest */
+     "Internal error occurred", "Invalid password",
+     "Quest title doesn't match saved game", "Save file is for older version of quest; please start new save",
+-    "Out of memory", "File Debug Mode", "Canceled", "", "No quest assigned"
++    "Out of memory", "File Debug Mode", "Canceled", "", "No quest assigned",
++    "This quest needs legacy default tiles (190_tiles.qst), which this player does not include. Use a quest with embedded tiles."
+ };
+ 
+ byte deprecated_rules[QUESTRULES_NEW_SIZE];
+@@ -2820,6 +2821,10 @@ int32_t loadquest(const char *filename, zquestheader *Header, miscQdata *Misc,
+ 	auto start = std::chrono::steady_clock::now();
+ 	zprint2("Loading qst: %s\n", filename);
+ 	int32_t ret = _lq_int(filename, Header, Misc, tunes, show_progress, skip_flags, printmetadata);
++	// checkstatus can return an error before the legacy-reader cleanup.
++	legacy_skip_flags = nullptr;
++	if (ret)
++		restore_prev_qstload_global_state();
+ 	int32_t load_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+ 	zprint2("Time to load qst: %d ms\n", load_ms);
+ 	if (ret)
+diff --git src/core/qst.h src/core/qst.h
+index 87cfb26..f7aa8c5 100644
+--- src/core/qst.h
++++ src/core/qst.h
+@@ -101,7 +101,8 @@ enum
+ {
+     qe_OK, qe_notfound, qe_invalid, qe_version, qe_obsolete,
+     qe_missing, qe_internal, qe_pwd, qe_match, qe_minver,
+-    qe_nomem, qe_debug, qe_cancel, qe_silenterr, qe_no_qst
++    qe_nomem, qe_debug, qe_cancel, qe_silenterr, qe_no_qst,
++    qe_missing_tiles
+ };
+ 
+ enum
+diff --git src/core/qst_tiles.cpp src/core/qst_tiles.cpp
+index 35242c8..a1efd59 100644
+--- src/core/qst_tiles.cpp
++++ src/core/qst_tiles.cpp
+@@ -67,14 +67,10 @@ int32_t readtiles(PACKFILE *f, tiledata *buf, zquestheader *Header, word version
+ 	
+     if(Header!=NULL&&(!Header->data_flags[ZQ_TILES]&&!from_init))         //keep for old quests
+     {
+-		if(!init_tiles_for_190(true, Header))
+-		{
+-			al_trace("Unable to initialize tiles\n");
+-		}
+-        
++        // This player ships no legacy default artwork. Do not report a
++        // successful load with missing graphics or try an external fallback.
+         delete[] temp_tile;
+-        temp_tile=NULL;
+-        return 0;
++        return qe_missing_tiles;
+     }
+     else
+     {
+diff --git src/zc/ending.cpp src/zc/ending.cpp
+index 06a3261..fd5ccd7 100644
+--- src/zc/ending.cpp
++++ src/zc/ending.cpp
+@@ -39,52 +39,45 @@ namespace
+ 		int32_t color;
+ 	};
+ 	
+-	const int32_t numCreditsLines = 12;
++	// Public-player presentation. Engine/license credits remain in their
++	// original notices; this replaces only the stock game's ending text.
++	const int32_t numCreditsLines = 3;
+ 	const EndingTextLine credits[]=
+ 	{
+-		{ " STAFF ",                104, 240, white },
+-		{ "EXECUTIVE",              40,  272, blue  },
+-		{ "PRODUCER... H.YAMAUCHI", 40,  280, blue  },
+-		{ "PRODUCER.... S.MIYAHON", 40,  320, green },
+-		{ "DIRECTOR.... S.MIYAHON", 40,  360, red   },
+-		{ "        ...... TEN TEN", 40,  384, red   },
+-		{ "DESIGNER...... TEN TEN", 40,  424, blue  },
+-		{ "PROGRAMMER.. T.NAKAZOO", 40,  464, green },
+-		{ "          ..... YACHAN", 40,  488, green },
+-		{ "          ... MARUMARU", 40,  512, green },
+-		{ "SOUND",                  40,  552, red   },
+-		{ "COMPOSER...... KONCHAN", 40,  560, red   }
++		{ "QUEST COMPLETE",          72, 240, white },
++		{ "Thank you for playing.",  44, 400, white },
++		{ "ZQuest Classic",          72, 560, white }
+ 	};
+ 	
+ 	const int32_t numQuest1EndLines = 4;
+ 	const EndingTextLine quest1End[]=
+ 	{
+-		{ "ANOTHER QUEST WILL START", 32, 656, white },
+-		{ "FROM HERE.",               88, 672, white },
+-		{ "PRESS THE START BUTTON.",  40, 696, white },
+-		{ "\2731986 NINTENDO",        72, 760, white }
++		{ "Quest complete.",        68, 656, white },
++		{ "Well done.",             88, 672, white },
++		{ "Press START to save.",   48, 696, white },
++		{ "ZQuest Classic",         72, 760, white }
+ 	};
+ 	
+ 	const int32_t numQuest2EndLines = 4;
+ 	const EndingTextLine quest2End[]=
+ 	{
+-		{ "YOU ARE GREAT.",      72, 768, white },
++		{ "Quest complete.",      68, 768, white },
+ 		/* name - deaths */
+-		{ "YOU HAVE AN AMAZING", 48, 816, white },
+-		{ "WISDOM AND POWER.",   64, 832, white },
+-		{ "\2731986 NINTENDO",   72, 912, blue  }
++		{ "Thanks for playing.",  52, 816, white },
++		{ "Press START to save.", 48, 832, white },
++		{ "ZQuest Classic",       72, 912, blue  }
+ 	};
+ 	
+ 	const int32_t numQuest34EndLines = 6;
+ 	const EndingTextLine quest34End[]=
+ 	{
+-		{ "YOU ARE GREAT.",            72,  768, white },
++		{ "Quest complete.",      68, 768, white },
+ 		/* name - deaths */
+-		{ "YOU HAVE AN AMAZING",       48,  816, white },
+-		{ "WISDOM AND POWER.",         64,  832, white },
+-		{ "END OF",                    104, 880, white },
+-		{ "\"THE LEGEND OF ZELDA 1\"", 32,  896, white },
+-		{ "\2731986 NINTENDO",         72,  912, blue  }
++		{ "Thanks for playing.",  52, 816, white },
++		{ "Press START to save.", 48, 832, white },
++		{ "End of quest",         80, 880, white },
++		{ "Well done.",           88, 896, white },
++		{ "ZQuest Classic",       72, 912, blue  }
+ 	};
+ 	
+ 	const int32_t numCustomQuestEndLines = 4;
+@@ -93,8 +86,8 @@ namespace
+ 		{ "Congratulations!", 64, 768, white },
+ 		/* name - deaths */
+ 		/* time */
+-		{ "You finished a",   72, 816, white },
+-		{ "custom quest.",    76, 832, white },
++		{ "Quest complete.",      68, 816, white },
++		{ "Press START to save.", 48, 832, white },
+ 		{ "ZQUEST CLASSIC",   76, 880, white }
+ 	};
+ }
+@@ -264,29 +257,35 @@ void ending()
+ 	int32_t len=600*2;
+ 	int32_t creditsLine=0;
+ 	int32_t endTextLine=0;
+-	
++	char tmpmsg[6][25] = {};
+ 	
+ 	if ( FFCore.skip_ending_credits ) goto credits_skip;
+ 	
+ 	draw_screen_clip_rect_x1=0;
+ 	draw_screen_clip_rect_x2=255;
+ 	
+-	char tmpmsg[6][25];
+-	
+-	for(int32_t x=0; x<3; x++)
+-	{
+-		snprintf(tmpmsg[x], sizeof(tmpmsg[x]), "%.24s", MsgStrings[QMisc.endstring].s.c_str()+(24*x));
+-	}
+-
+-	for(int32_t x=0; x<3; x++)
++	// Default, missing, and short messages leave the unused lines empty.
++	if (QMisc.endstring != 0 && MsgStrings)
+ 	{
+-		snprintf(tmpmsg[x+3], sizeof(tmpmsg[x+3]), "%.24s", MsgStrings[QMisc.endstring+1].s.c_str()+(24*x));
++		for (int32_t message = 0; message < 2; ++message)
++		{
++			int32_t index = int32_t(QMisc.endstring) + message;
++			if (index >= msg_count || index >= msg_strings_size)
++				continue;
++			const auto& text = MsgStrings[index].s;
++			for (int32_t line = 0; line < 3; ++line)
++			{
++				size_t offset = 24 * line;
++				if (offset < text.size())
++					text.copy(tmpmsg[message * 3 + line], 24, offset);
++			}
++		}
+ 	}
+ 	
+ 	if(QMisc.endstring==0)
+ 	{
+-		putendmsg("THANKS HERO,YOU'RE",32,96,6,noproc);
+-		putendmsg("THE HERO OF HYRULE.",32,112,6,noproc);
++		putendmsg("QUEST COMPLETE.",68,96,6,noproc);
++		putendmsg("WELL DONE.",88,112,6,noproc);
+ 	}
+ 	else
+ 	{
+@@ -351,7 +350,7 @@ void ending()
+ 		if(f==861)
+ 		{
+ 			blit(scrollbuf,framebuf,0,0,0,playing_field_offset!=0?176:0,256,passive_subscreen_height);
+-			try_zcmusic("zelda.nsf", qstpath, 1, ZC_MIDI_ENDING, get_emusic_volume());
++			jukebox(ZC_MIDI_ENDING); // use the public player's replacement MIDI
+ 			
+ 			for(int32_t y=0; y<224; y++)
+ 			{
+@@ -380,9 +379,9 @@ void ending()
+ 	
+ 	if(QMisc.endstring==0)
+ 	{
+-		putendmsg("FINALLY,",96,160,8,put_triforce);
+-		putendmsg("PEACE RETURNS TO HYRULE.",32,176,8,put_triforce);
+-		putendmsg("THIS ENDS THE STORY.",48,200,8,put_triforce);
++		putendmsg("QUEST COMPLETE.",68,160,8,put_triforce);
++		putendmsg("THANK YOU FOR PLAYING.",44,176,8,put_triforce);
++		putendmsg("WELL DONE.",88,200,8,put_triforce);
+ 	}
+ 	else
+ 	{
+@@ -414,8 +413,9 @@ void ending()
+ 	clear_bitmap(scrollbuf_old);
+ 	blit(framebuf,scrollbuf_old,0,0,0,0,framebuf->w,framebuf->h);
+ 	endingpal();
+-	// draw the brick
+-	puttile16(scrollbuf_old,3,256,0,csBOSS,0);
++	// A plain border cell, independent of the user's quest tile indices.
++	rectfill(scrollbuf_old,256,0,263,7,0);
++	rect(scrollbuf_old,256,0,263,7,CSET(csBOSS)+2);
+ 	
+ 	if(game->get_quest()>1)
+ 	{
+diff --git src/zc/zc_sys.cpp src/zc/zc_sys.cpp
+index 2b95319..0e6dd72 100644
+--- src/zc/zc_sys.cpp
++++ src/zc/zc_sys.cpp
+@@ -619,25 +619,46 @@ void load_mouse()
+ 
+ void null_quest()
+ {
+-	std::string title_assets_path = "modules/classic/title_gfx.dat";
+-	if (get_last_loaded_qstpath() == title_assets_path)
+-		return;
++	// Public player: original geometric menu/credits art, not a stock quest.
++	// Rebuild on every entry, since loading a user's quest replaces these buffers.
++	constexpr int menu_tiles = 238; // includes the legacy save-icon slot (237)
++	for (int tile = 0; tile < menu_tiles; ++tile)
++		reset_tile(newtilebuf, tile, tf4Bit);
++
++	// Four 8x8 meter cells per tile: full, half, quarter, three-quarter.
++	for (int quarter = 0; quarter < 4; ++quarter)
++	{
++		const int fill_width[] = {6, 3, 1, 4};
++		for (int y = 1; y < 7; ++y)
++			for (int x = 1; x < 7; ++x)
++			{
++				int offset = ((quarter / 2) * 8 + y) * 16 + (quarter % 2) * 8 + x;
++				bool edge = x == 1 || x == 6 || y == 1 || y == 6;
++				newtilebuf[0].data[offset] = edge || x <= fill_width[quarter] ? 1 : 0;
++				newtilebuf[1].data[offset] = edge ? 1 : 0;
++			}
++	}
+ 
+-	byte skip_flags[4];
+-	for (int i = 0; i < skip_max; i++)
+-		set_bit(skip_flags, i, 1);
+-	set_bit(skip_flags, skip_tiles, 0);
+-	set_bit(skip_flags, skip_csets, 0);
+-	loadquest(title_assets_path.c_str(), &QHeader, &QMisc, tunes+ZC_MIDI_COUNT, false, skip_flags, 0, false);
++	// Simple square completion/save markers at the legacy menu tile indices.
++	for (int tile : {175, 176, 237})
++		for (int y = 1; y < 15; ++y)
++			for (int x = 1; x < 15; ++x)
++				if (x == 1 || x == 14 || y == 1 || y == 14)
++					newtilebuf[tile].data[y * 16 + x] = 1;
++	register_blank_tiles(menu_tiles);
++
++	// All palette banks are defined, including level/fade and sprite banks.
++	// RGB bytes here are 8-bit; loadpalset/loadfullpal perform the conversion.
++	const byte shades[16] = {0, 255, 144, 224, 192, 160, 128, 96,
++		80, 112, 144, 176, 208, 224, 240, 255};
++	for (int i = 0; i < psTOTAL255; ++i)
++		colordata[i] = shades[(i / 3) % 16];
+ 	if (!sfxdat)
+ 	{
+ 		sfxdat = 1;
+ 		setupsfx(); // reload default sfx from sfxdat
+ 	}
+ 	// TODO: sfx.dat is ~1.2 MB. Could be better to break that up into individual files and load on demand / not at startup.
+-	// TODO: can we cache the tiles/colordata so we don't have to read title_gfx.dat more than once?
+-	//       colordata is tiny, but tilebuf is huge, so limit that to just what the title screen needs.
+-	//       Another option: embed this data into the binary (`xxd -i resources/modules/classic/title_gfx.dat > title_gfx.h`)
+ }
+ 
+ void init_NES_mode()
+diff --git src/zc/zelda.cpp src/zc/zelda.cpp
+index fb6ca33..b8d4ac9 100644
+--- src/zc/zelda.cpp
++++ src/zc/zelda.cpp
+@@ -1482,7 +1482,7 @@ int32_t load_quest(gamedata *g, bool report, byte printmetadata)
+ 		ret = loadquest(qstpath,&QHeader,&QMisc,tunes+ZC_MIDI_COUNT,false,skip_flags,printmetadata,report,qst_num);
+ 		
+ 		const char* title = g->header.title.c_str();
+-		if(!title[0] || g->get_hasplayed() == 0)
++		if(!ret && (!title[0] || g->get_hasplayed() == 0))
+ 		{
+ 			g->header.title = QHeader.title;
+ 			strncpy(g->version,QHeader.version,sizeof(g->version));
+@@ -1495,7 +1495,7 @@ int32_t load_quest(gamedata *g, bool report, byte printmetadata)
+ 			}
+ 		}
+ 		
+-		if(QHeader.minver[0])
++		if(!ret && QHeader.minver[0])
+ 		{
+ 			if(smart_vercmp(g->version,QHeader.minver) < 0)
+ 				ret = qe_minver;

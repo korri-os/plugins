@@ -2,6 +2,7 @@
   pkgs,
   fake08Plugin,
   solarusPlugin,
+  zquestPlugin,
 }:
 let
   cartridges = import ./cartridges-package.nix { inherit pkgs; };
@@ -13,6 +14,7 @@ in
   requires = [
     fake08Plugin
     solarusPlugin
+    zquestPlugin
   ];
   packages = { inherit cartridges; };
   files = {

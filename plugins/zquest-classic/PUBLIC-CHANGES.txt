@@ -1,0 +1,41 @@
+Korri ZQuest Classic public-player modifications, 2026-10-03
+
+Upstream: ZQuestClassic/ZQuestClassic
+Revision: 882c906b17e35b4105188e6305ae2929aeba30e3
+Integration: https://github.com/korri-os/plugins
+
+This is a modified, unofficial Linux player build, not an upstream release.
+The native engine modifications retain upstream's GNU GPL version 3 terms.
+The complete engine license and authors list are installed in licenses/.
+The corresponding-source release includes these modifications and recipes.
+
+Changes:
+- Account-owned standalone saves use a whole-quest SHA-256 identity.
+- The player uses the selected quest path even when loading an existing save.
+- The audio worker initializes its wait timeout.
+- A control scheme can select its gamepad by name (joystick_name), so adding
+  or reordering gamepads does not change which one it reads. A named gamepad
+  that is absent gives no gamepad input instead of another gamepad's input.
+- A D-pad hat moves the hero on any gamepad, in addition to the scheme's
+  movement stick or buttons.
+- ARM uses the scalar tile renderer and the ZScript interpreter.
+- Runtime resources are selected before compilation, not hidden at launch.
+- Default sound samples and MIDI songs are replaced by original procedural
+  cues and silent tracks. User-supplied music is unchanged.
+- Common runtime bitmap glyphs use Tiny5 fitted to the existing font-slot
+  metrics. Uncovered Unicode/symbol glyphs retain licensed ProggyVector
+  rendering. ProggyVector also remains for the debugger.
+- Native menu graphics and built-in ending text use neutral replacement content.
+- Quests needing legacy default tiles fail with an explicit error.
+- Ending messages use bounded string reads.
+- Updater, WebSocket scripting, native file-dialog integration and editor
+  binaries are excluded. The player still supports user-supplied quests.
+
+Generated-asset and font notices are in ASSET-LICENSES.md and
+public-assets-font-license.txt, including the complete Tiny5 OFL 1.1 and
+ProggyVector terms. Corresponding source includes tiny5.glyphs.txt and
+tiny5-OFL.txt. ZQuest Commons assets retain their separate license and
+credits in assets/zc/. Do not delete these notices.
+
+No bundled community quest is included. User content has its own rights and
+is not licensed or cleared by this engine package.

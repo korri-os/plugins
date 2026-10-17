@@ -4,6 +4,7 @@
   cartridges,
   fake08Plugin,
   solarusPlugin,
+  zquestPlugin,
 }:
 let
   source = ../plugins/starter-pack;
@@ -34,12 +35,17 @@ in
 pkgs.runCommand "korri-starter-pack-package-check" { } ''
   payload=${cartridges}/share/starter-pack
   ${python}/bin/python ${./check-starter-pack.py} \
-    "$payload" ${pins} ${questPins} ${package} ${fake08Plugin} ${solarusPlugin}
+    "$payload" ${pins} ${questPins} ${package} ${fake08Plugin} ${solarusPlugin} ${zquestPlugin}
   ${pkgs.typescript}/bin/tsc --noEmit --strict --target es2022 ${package}/plugin.ts
   for file in CREDITS.md README.md CC-BY-NC-SA-4.0.txt; do
     cmp ${source}/"$file" "$payload/$file"
   done
-  diff -r ${questNoticeExclusions} --exclude=solarus-licenses ${source}/notices "$payload/notices"
+  diff -r ${questNoticeExclusions} --exclude=solarus-licenses --exclude=lantern-hollow ${source}/notices "$payload/notices"
+  cmp ${source}/lantern-hollow/lantern-hollow.qst "$payload/cartridges/lantern-hollow.qst"
+  for file in README.md ASSETS.md LICENSE.txt; do
+    cmp ${source}/lantern-hollow/"$file" "$payload/notices/lantern-hollow/$file"
+  done
+  diff -r ${source}/lantern-hollow/source "$payload/notices/lantern-hollow/source"
   ${pkgs.lib.concatMapStringsSep "\n" (
     license: "cmp ${license} \"$payload/notices/solarus-licenses/${license.name}\""
   ) solarusNotices.licenses}

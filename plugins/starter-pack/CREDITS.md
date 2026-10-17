@@ -99,3 +99,13 @@ version 0.3. The owner selected both with those limits. Blue Isle and Yarntown
 are not included. These grants do not independently prove every contributor's
 ownership or grant creator endorsement. The retained PICO-8 content still
 prevents treating the complete mixed pack as commercially licensed.
+
+## ZQuest Classic quests
+
+| Game | Creator credits | Packaged quest |
+|---|---|---|
+| [Lantern Hollow](lantern-hollow/README.md) | Korri. Art by Kenney (Tiny Town, Tiny Dungeon), music by Aureolus_Omicron, sound effects by Juhani Junkala; all CC0 | `lantern-hollow.qst` |
+
+Lantern Hollow is original to this pack and dedicated to the public domain
+under CC0 1.0. Its notices, asset table and authoring source ship under
+`notices/lantern-hollow/`. Play it with `@korri:zquest-classic`.

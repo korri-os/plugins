@@ -1,0 +1,280 @@
+diff --git src/dialog/control_binding.cpp src/dialog/control_binding.cpp
+index 9ff0a9d..f13f4ed 100644
+--- src/dialog/control_binding.cpp
++++ src/dialog/control_binding.cpp
+@@ -112,6 +112,8 @@ void ControlBindingDialog::check_joystick()
+ 	set_binding_joystick(nullptr);
+ 	if (!(num_gamepads && al_get_num_joysticks() > 0)) return;
+ 	
++	if (int32_t named = scheme_joystick_index(local_scheme); named >= 0)
++		local_scheme.joystick_index = named;
+ 	if (local_scheme.joystick_index >= al_get_num_joysticks())
+ 	{
+ 		local_scheme.joystick_index = 0;
+@@ -457,6 +459,9 @@ std::shared_ptr<GUI::Widget> ControlBindingDialog::view()
+ 					onSelectFunc = [&](int val)
+ 					{
+ 						local_scheme.joystick_index = val;
++						// Keep the choice when gamepads are added or reordered.
++						ALLEGRO_JOYSTICK* joystick = al_get_joystick(val);
++						local_scheme.joystick_name = joystick ? al_get_joystick_name(joystick) : "";
+ 						refresh_dlg();
+ 					}
+ 				)
+diff --git src/gui/button.cpp src/gui/button.cpp
+index 4b2f992..1bbfb14 100644
+--- src/gui/button.cpp
++++ src/gui/button.cpp
+@@ -50,7 +50,7 @@ void set_binding_joystick(ALLEGRO_JOYSTICK* stick)
+ 
+ bool joybtn(int stick_idx, int b)
+ {
+-	if(b == 0)
++	if(b == 0 || stick_idx < 0 || stick_idx >= MAX_JOYSTICKS)
+ 		return false;
+ 	if (b-1 >= joy[stick_idx].num_buttons)
+ 		return false;
+diff --git src/zc/control_scheme.cpp src/zc/control_scheme.cpp
+index d2c66b2..ceb1cca 100644
+--- src/zc/control_scheme.cpp
++++ src/zc/control_scheme.cpp
+@@ -24,6 +24,7 @@
+ #include <fmt/format.h>
+ #include "base/util.h"
+ #include "zc/replay.h"
++#include "allegro5/joystick.h"
+ 
+ // the key used to store quest-specific schemes in the config
+ // if empty, no quest is active
+@@ -159,6 +160,19 @@ bool activate_control_scheme(string const& name)
+ 	active_control_scheme = replay_is_replaying() ? &replay_control_scheme : &control_schemes[name];
+ 	return true;
+ }
++int32_t scheme_joystick_index(control_scheme const& scheme)
++{
++	if (scheme.joystick_name.empty())
++		return scheme.joystick_index;
++	// 'joy[]' follows Allegro's own gamepad order.
++	for (int32_t q = 0; q < num_joysticks; ++q)
++	{
++		ALLEGRO_JOYSTICK* joystick = al_get_joystick(q);
++		if (joystick && scheme.joystick_name == al_get_joystick_name(joystick))
++			return q;
++	}
++	return -1;
++}
+ bool create_control_scheme(string const& name)
+ {
+ 	if (control_schemes.contains(name))
+@@ -326,6 +340,7 @@ void control_scheme::load_from_section(const char* scheme_name)
+ 	
+ 	analog_movement = control_config.get_config_int(scheme_name,"analog_movement").value_or(default_control_scheme.analog_movement ? 1 : 0);
+ 	joystick_index = control_config.get_config_int(scheme_name,"joystick_index").value_or(0);
++	joystick_name = control_config.get_config(scheme_name,"joystick_name").value_or("");
+ 	for (int id1 = 0; id1 < control_scheme::num_sticks; ++id1)
+ 		for (int id2 = 0; id2 < control_scheme::num_axes; ++id2)
+ 			for(int id3 = 0; id3 < control_scheme::num_data; ++id3)
+@@ -404,6 +419,7 @@ void control_scheme::save_to_section(const char* scheme_name) const
+ 	
+ 	control_config.set_config(scheme_name,"analog_movement", analog_movement ? 1 : 0);
+ 	control_config.set_config(scheme_name,"joystick_index", joystick_index);
++	control_config.set_config(scheme_name,"joystick_name", joystick_name.empty() ? nullptr : joystick_name.c_str());
+ 	for (int id1 = 0; id1 < control_scheme::num_sticks; ++id1)
+ 		for (int id2 = 0; id2 < control_scheme::num_axes; ++id2)
+ 			for(int id3 = 0; id3 < control_scheme::num_data; ++id3)
+diff --git src/zc/control_scheme.h src/zc/control_scheme.h
+index c109327..74adb1b 100644
+--- src/zc/control_scheme.h
++++ src/zc/control_scheme.h
+@@ -28,6 +28,8 @@ bool activate_control_scheme(string const& name);
+ bool create_control_scheme(string const& name);
+ bool delete_control_scheme(string const& name);
+ bool rename_control_scheme(string const& oldname, string const& newname);
++// The scheme's gamepad in 'joy[]', or -1 when it names a gamepad that is absent.
++int32_t scheme_joystick_index(control_scheme const& scheme);
+ 
+ #define NUM_SCHEME_KEYS (btnEx4+1)
+ struct control_scheme
+@@ -59,6 +61,10 @@ struct control_scheme
+ 	void save_to_section(const char* section_name) const;
+ 	
+ 	int joystick_index = 0;
++	// When set, selects the gamepad with this name instead of 'joystick_index'.
++	// Allegro numbers gamepads in device-scan order, so an index can select a
++	// different gamepad when gamepads are added or reordered; a name cannot.
++	std::string joystick_name;
+ 	int btn_menu = 9;
+ 	bool analog_movement = true;
+ 	int cheat_modifier_keys[4] = {
+diff --git src/zc/scripting/types/input.cpp src/zc/scripting/types/input.cpp
+index 9c18bb7..dc79f2d 100644
+--- src/zc/scripting/types/input.cpp
++++ src/zc/scripting/types/input.cpp
+@@ -231,7 +231,7 @@ static ArrayRegistrar JOYPADPRESS_registrar(JOYPADPRESS, []{
+ 	static ScriptingArray_GlobalComputed<bool> impl(
+ 		[](int) { return MAX_JOYSTICK_BUTTONS; },
+ 		[](int, int index) -> bool {
+-			return joybtn(active_control_scheme->joystick_index, index);
++			return joybtn(scheme_joystick_index(*active_control_scheme), index);
+ 		},
+ 		[](int, int, bool) {
+ 			return false;
+diff --git src/zc/zc_sys.cpp src/zc/zc_sys.cpp
+index 0e6dd72..8d7f4fb 100644
+--- src/zc/zc_sys.cpp
++++ src/zc/zc_sys.cpp
+@@ -6187,12 +6187,13 @@ int32_t pan(int32_t x)
+ 
+ int32_t button_pressed()
+ {
+-	if (active_control_scheme->joystick_index >= MAX_JOYSTICKS)
++	int32_t pad = scheme_joystick_index(*active_control_scheme);
++	if (pad < 0 || pad >= MAX_JOYSTICKS)
+ 		return 0;
+ 
+-	for(int32_t i=1; i<=joy[active_control_scheme->joystick_index].num_buttons; i++)
++	for(int32_t i=1; i<=joy[pad].num_buttons; i++)
+ 	{
+-		if(joybtn(active_control_scheme->joystick_index, i))
++		if(joybtn(pad, i))
+ 			return i;
+ 	}
+ 
+@@ -6252,13 +6253,45 @@ static bool key_system_press[127];
+ bool button_press[controls::btnLast];
+ bool button_hold[controls::btnLast];
+ 
+-#define STICK_1_X joy[active_control_scheme->joystick_index].stick[active_control_scheme->stick_data[control_scheme::stick_1][control_scheme::axis_x][control_scheme::data_stick]].axis[active_control_scheme->stick_data[control_scheme::stick_1][control_scheme::axis_x][control_scheme::data_axis]]
+-#define STICK_1_Y joy[active_control_scheme->joystick_index].stick[active_control_scheme->stick_data[control_scheme::stick_1][control_scheme::axis_y][control_scheme::data_stick]].axis[active_control_scheme->stick_data[control_scheme::stick_1][control_scheme::axis_y][control_scheme::data_axis]]
++// The axis that the active scheme assigns to a movement stick, or a resting
++// axis when the scheme's gamepad is absent or lacks that stick or axis.
++static JOYSTICK_AXIS_INFO const& scheme_axis(int32_t pad, int stick_id, int axis_id)
++{
++	static const JOYSTICK_AXIS_INFO resting = {};
++	if (pad < 0 || pad >= MAX_JOYSTICKS)
++		return resting;
++	int stick = active_control_scheme->stick_data[stick_id][axis_id][control_scheme::data_stick];
++	int axis = active_control_scheme->stick_data[stick_id][axis_id][control_scheme::data_axis];
++	if (stick < 0 || stick >= joy[pad].num_sticks || axis < 0 || axis >= joy[pad].stick[stick].num_axis)
++		return resting;
++	return joy[pad].stick[stick].axis[axis];
++}
++
++// Allegro reports a D-pad hat as a digital stick. A hat moves the hero on any
++// gamepad, whichever stick or buttons the scheme assigns to movement.
++static bool hat_held(int32_t pad, int axis, bool positive)
++{
++	ALLEGRO_JOYSTICK* joystick = pad < 0 || pad >= MAX_JOYSTICKS ? nullptr : al_get_joystick(pad);
++	if (!joystick)
++		return false;
++	for (int stick = 0; stick < joy[pad].num_sticks; ++stick)
++	{
++		if (!(al_get_joystick_stick_flags(joystick, stick) & ALLEGRO_JOYFLAG_DIGITAL) || axis >= joy[pad].stick[stick].num_axis)
++			continue;
++		auto const& state = joy[pad].stick[stick].axis[axis];
++		if (positive ? state.d2 : state.d1)
++			return true;
++	}
++	return false;
++}
++
++#define STICK_1_X scheme_axis(pad, control_scheme::stick_1, control_scheme::axis_x)
++#define STICK_1_Y scheme_axis(pad, control_scheme::stick_1, control_scheme::axis_y)
+ #define STICK_1_X_OFFSET active_control_scheme->stick_data[control_scheme::stick_1][control_scheme::axis_x][control_scheme::data_offset]
+ #define STICK_1_Y_OFFSET active_control_scheme->stick_data[control_scheme::stick_1][control_scheme::axis_y][control_scheme::data_offset]
+ 
+-#define STICK_2_X joy[active_control_scheme->joystick_index].stick[active_control_scheme->stick_data[control_scheme::stick_2][control_scheme::axis_x][control_scheme::data_stick]].axis[active_control_scheme->stick_data[control_scheme::stick_2][control_scheme::axis_x][control_scheme::data_axis]]
+-#define STICK_2_Y joy[active_control_scheme->joystick_index].stick[active_control_scheme->stick_data[control_scheme::stick_2][control_scheme::axis_y][control_scheme::data_stick]].axis[active_control_scheme->stick_data[control_scheme::stick_2][control_scheme::axis_y][control_scheme::data_axis]]
++#define STICK_2_X scheme_axis(pad, control_scheme::stick_2, control_scheme::axis_x)
++#define STICK_2_Y scheme_axis(pad, control_scheme::stick_2, control_scheme::axis_y)
+ #define STICK_2_X_OFFSET active_control_scheme->stick_data[control_scheme::stick_2][control_scheme::axis_x][control_scheme::data_offset]
+ #define STICK_2_Y_OFFSET active_control_scheme->stick_data[control_scheme::stick_2][control_scheme::axis_y][control_scheme::data_offset]
+ #define STICK_PRECISION   56 //define your own sensitivity
+@@ -6266,6 +6299,7 @@ bool button_hold[controls::btnLast];
+ void load_control_state()
+ {
+ 	load_control_called_this_frame = true;
++	int32_t pad = scheme_joystick_index(*active_control_scheme);
+ 
+ 	if (replay_version_check(8, 11))
+ 	{
+@@ -6275,20 +6309,20 @@ void load_control_state()
+ 
+ 	if (!replay_is_replaying())
+ 	{
+-		raw_control_state[0]=zc_getrawkey(active_control_scheme->keys[btnUp], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d1 || STICK_1_Y.pos - STICK_1_Y_OFFSET < -STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnUp]));
+-		raw_control_state[1]=zc_getrawkey(active_control_scheme->keys[btnDown], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d2 || STICK_1_Y.pos - STICK_1_Y_OFFSET > STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnDown]));
+-		raw_control_state[2]=zc_getrawkey(active_control_scheme->keys[btnLeft], true)||(active_control_scheme->analog_movement ? STICK_1_X.d1 || STICK_1_X.pos - STICK_1_X_OFFSET < -STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnLeft]));
+-		raw_control_state[3]=zc_getrawkey(active_control_scheme->keys[btnRight], true)||(active_control_scheme->analog_movement ? STICK_1_X.d2 || STICK_1_X.pos - STICK_1_X_OFFSET > STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnRight]));
+-		raw_control_state[4]=zc_getrawkey(active_control_scheme->keys[btnA], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnA]);
+-		raw_control_state[5]=zc_getrawkey(active_control_scheme->keys[btnB], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnB]);
+-		raw_control_state[6]=zc_getrawkey(active_control_scheme->keys[btnS], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnS]);
+-		raw_control_state[7]=zc_getrawkey(active_control_scheme->keys[btnL], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnL]);
+-		raw_control_state[8]=zc_getrawkey(active_control_scheme->keys[btnR], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnR]);
+-		raw_control_state[9]=zc_getrawkey(active_control_scheme->keys[btnP], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnP]);
+-		raw_control_state[10]=zc_getrawkey(active_control_scheme->keys[btnEx1], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx1]);
+-		raw_control_state[11]=zc_getrawkey(active_control_scheme->keys[btnEx2], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx2]);
+-		raw_control_state[12]=zc_getrawkey(active_control_scheme->keys[btnEx3], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx3]);
+-		raw_control_state[13]=zc_getrawkey(active_control_scheme->keys[btnEx4], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx4]);
++		raw_control_state[0]=zc_getrawkey(active_control_scheme->keys[btnUp], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d1 || STICK_1_Y.pos - STICK_1_Y_OFFSET < -STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnUp]))||hat_held(pad, 1, false);
++		raw_control_state[1]=zc_getrawkey(active_control_scheme->keys[btnDown], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d2 || STICK_1_Y.pos - STICK_1_Y_OFFSET > STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnDown]))||hat_held(pad, 1, true);
++		raw_control_state[2]=zc_getrawkey(active_control_scheme->keys[btnLeft], true)||(active_control_scheme->analog_movement ? STICK_1_X.d1 || STICK_1_X.pos - STICK_1_X_OFFSET < -STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnLeft]))||hat_held(pad, 0, false);
++		raw_control_state[3]=zc_getrawkey(active_control_scheme->keys[btnRight], true)||(active_control_scheme->analog_movement ? STICK_1_X.d2 || STICK_1_X.pos - STICK_1_X_OFFSET > STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnRight]))||hat_held(pad, 0, true);
++		raw_control_state[4]=zc_getrawkey(active_control_scheme->keys[btnA], true)||joybtn(pad, active_control_scheme->btns[btnA]);
++		raw_control_state[5]=zc_getrawkey(active_control_scheme->keys[btnB], true)||joybtn(pad, active_control_scheme->btns[btnB]);
++		raw_control_state[6]=zc_getrawkey(active_control_scheme->keys[btnS], true)||joybtn(pad, active_control_scheme->btns[btnS]);
++		raw_control_state[7]=zc_getrawkey(active_control_scheme->keys[btnL], true)||joybtn(pad, active_control_scheme->btns[btnL]);
++		raw_control_state[8]=zc_getrawkey(active_control_scheme->keys[btnR], true)||joybtn(pad, active_control_scheme->btns[btnR]);
++		raw_control_state[9]=zc_getrawkey(active_control_scheme->keys[btnP], true)||joybtn(pad, active_control_scheme->btns[btnP]);
++		raw_control_state[10]=zc_getrawkey(active_control_scheme->keys[btnEx1], true)||joybtn(pad, active_control_scheme->btns[btnEx1]);
++		raw_control_state[11]=zc_getrawkey(active_control_scheme->keys[btnEx2], true)||joybtn(pad, active_control_scheme->btns[btnEx2]);
++		raw_control_state[12]=zc_getrawkey(active_control_scheme->keys[btnEx3], true)||joybtn(pad, active_control_scheme->btns[btnEx3]);
++		raw_control_state[13]=zc_getrawkey(active_control_scheme->keys[btnEx4], true)||joybtn(pad, active_control_scheme->btns[btnEx4]);
+ 		
+ 		if(num_joysticks != 0)
+ 		{
+@@ -6361,20 +6395,21 @@ void load_control_state()
+ bool zc_key_pressed()
+ //may also need to use zc_getrawkey
+ {
+-	if((zc_getrawkey(active_control_scheme->keys[btnUp], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d1 || STICK_1_Y.pos - STICK_1_Y_OFFSET< -STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnUp]))) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnDown], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d2 || STICK_1_Y.pos - STICK_1_Y_OFFSET > STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnDown]))) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnLeft], true)||(active_control_scheme->analog_movement ? STICK_1_X.d1 || STICK_1_X.pos - STICK_1_X_OFFSET < -STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnLeft]))) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnRight], true)||(active_control_scheme->analog_movement ? STICK_1_X.d2 || STICK_1_X.pos - STICK_1_X_OFFSET > STICK_PRECISION : joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnRight]))) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnA], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnA])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnB], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnB])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnS], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnS])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnL], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnL])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnR], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnR])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnP], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnP])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnEx1], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx1])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnEx2], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx2])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnEx3], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx3])) ||
+-	   (zc_getrawkey(active_control_scheme->keys[btnEx4], true)||joybtn(active_control_scheme->joystick_index, active_control_scheme->btns[btnEx4]))) // Skipping joystick axes
++	int32_t pad = scheme_joystick_index(*active_control_scheme);
++	if((zc_getrawkey(active_control_scheme->keys[btnUp], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d1 || STICK_1_Y.pos - STICK_1_Y_OFFSET< -STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnUp]))||hat_held(pad, 1, false)) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnDown], true)||(active_control_scheme->analog_movement ? STICK_1_Y.d2 || STICK_1_Y.pos - STICK_1_Y_OFFSET > STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnDown]))||hat_held(pad, 1, true)) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnLeft], true)||(active_control_scheme->analog_movement ? STICK_1_X.d1 || STICK_1_X.pos - STICK_1_X_OFFSET < -STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnLeft]))||hat_held(pad, 0, false)) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnRight], true)||(active_control_scheme->analog_movement ? STICK_1_X.d2 || STICK_1_X.pos - STICK_1_X_OFFSET > STICK_PRECISION : joybtn(pad, active_control_scheme->btns[btnRight]))||hat_held(pad, 0, true)) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnA], true)||joybtn(pad, active_control_scheme->btns[btnA])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnB], true)||joybtn(pad, active_control_scheme->btns[btnB])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnS], true)||joybtn(pad, active_control_scheme->btns[btnS])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnL], true)||joybtn(pad, active_control_scheme->btns[btnL])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnR], true)||joybtn(pad, active_control_scheme->btns[btnR])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnP], true)||joybtn(pad, active_control_scheme->btns[btnP])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnEx1], true)||joybtn(pad, active_control_scheme->btns[btnEx1])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnEx2], true)||joybtn(pad, active_control_scheme->btns[btnEx2])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnEx3], true)||joybtn(pad, active_control_scheme->btns[btnEx3])) ||
++	   (zc_getrawkey(active_control_scheme->keys[btnEx4], true)||joybtn(pad, active_control_scheme->btns[btnEx4]))) // Skipping joystick axes
+ 		return true;
+ 	
+ 	return false;
+@@ -6419,7 +6454,7 @@ std::pair<bool, bool> menu_buttons(bool just_pressed)
+ {
+ 	static bool menu_pressed_state = false;
+ 	bool menu_kb = key[KEY_ESC];
+-	bool menu_joy = joybtn(active_control_scheme->joystick_index, active_control_scheme->btn_menu);
++	bool menu_joy = joybtn(scheme_joystick_index(*active_control_scheme), active_control_scheme->btn_menu);
+ 	if (just_pressed)
+ 	{
+ 		if (menu_pressed_state)

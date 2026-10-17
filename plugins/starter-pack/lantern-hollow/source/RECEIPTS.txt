@@ -1,0 +1,5 @@
+# sha256  file  url  licence-page   (fetched 2026-10-17T04:50:55Z)
+9768692dccff1d706408a5aedd6ca4f6cd1409506cbc84cb2f862919764be977  kenney_tiny-town.zip  https://kenney.nl/media/pages/assets/tiny-town/a415fbeb49-1735736916/kenney_tiny-town.zip  https://kenney.nl/assets/tiny-town
+c109438ab06f65fd80f9b2686a4cf9c7c11dc64444b47333ec71d602f8bb5fc7  kenney_tiny-dungeon.zip  https://kenney.nl/media/pages/assets/tiny-dungeon/f8422efb44-1674742415/kenney_tiny-dungeon.zip  https://kenney.nl/assets/tiny-dungeon
+dd918e6400e879b09cdec2eaba659838fa0d1605ce15e0f6f7420745fc99f357  15_melodic_rpg_chiptunes_mid.zip  https://opengameart.org/sites/default/files/15_melodic_rpg_chiptunes_mid.zip  https://opengameart.org/content/15-melodic-rpg-chiptunes
+6d4519229c6e2c9e09502cd4967940052f68664140549a467615b56bdfd1d031  subspace_512_sfx.zip  https://opengameart.org/sites/default/files/The%20Essential%20Retro%20Video%20Game%20Sound%20Effects%20Collection%20%5B512%20sounds%5D.zip  https://opengameart.org/content/512-sound-effects-8-bit-style

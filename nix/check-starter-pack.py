@@ -222,13 +222,36 @@ def check_quest(payload, original, checksums):
         require(expected in source_lines, message)
 
 
+# Original ZQuest Classic quest built for this pack; see lantern-hollow/README.md.
+LANTERN_HOLLOW = "lantern-hollow.qst"
+ZQUEST_PLUGIN = None  # set by main(); keeps the existing check signatures
+
+
+def check_lantern_hollow(payload, checksums):
+    path = payload / "cartridges" / LANTERN_HOLLOW
+    regular_file(path, "Lantern Hollow must be a regular file")
+    binary = path.read_bytes()
+    require(
+        hashlib.sha256(binary).hexdigest() == checksums[LANTERN_HOLLOW],
+        "changed Lantern Hollow checksum",
+    )
+    notices = payload / "notices" / "lantern-hollow"
+    require(notices.is_dir() and not notices.is_symlink(), "missing Lantern Hollow notices")
+    for filename in ["README.md", "LICENSE.txt", "ASSETS.md"]:
+        regular_file(notices / filename, "missing Lantern Hollow notice: " + filename)
+    require(
+        "CC0 1.0 Universal" in (notices / "LICENSE.txt").read_text()[:200],
+        "wrong Lantern Hollow license",
+    )
+
+
 def check_payload(payload, originals, quests):
     require(len(originals) == 25, "expected 25 files for the 24 selected games")
     pico_names = [entry["name"] for entry in originals]
     require(len(set(pico_names)) == 25, "duplicate original cartridge names")
-    names = pico_names + [quest["archive"] for quest in quests]
+    names = pico_names + [quest["archive"] for quest in quests] + [LANTERN_HOLLOW]
     require(
-        len(names) == 27 and len(set(names)) == 27, "expected 27 distinct payload files"
+        len(names) == 28 and len(set(names)) == 28, "expected 28 distinct payload files"
     )
     cartridges = payload / "cartridges"
     require(
@@ -236,13 +259,22 @@ def check_payload(payload, originals, quests):
         "unexpected or missing cartridge",
     )
     credits = (payload / "CREDITS.md").read_text()
-    pico_rows, solarus_rows = [], []
+    pico_rows, solarus_rows, zquest_rows = [], [], []
     section = None
     for line in credits.splitlines():
         if line.startswith("## "):
             section = line
         if line.startswith("| ["):
-            (solarus_rows if section == "## Solarus quests" else pico_rows).append(line)
+            {
+                "## Solarus quests": solarus_rows,
+                "## ZQuest Classic quests": zquest_rows,
+            }.get(section, pico_rows).append(line)
+    require(
+        credits.splitlines().count("## ZQuest Classic quests") == 1
+        and len(zquest_rows) == 1
+        and LANTERN_HOLLOW in zquest_rows[0],
+        "expected credits for one ZQuest Classic quest",
+    )
     require(len(pico_rows) == 24, "expected credits for 24 games")
     require(
         credits.splitlines().count("## Solarus quests") == 1 and len(solarus_rows) == 2,
@@ -321,6 +353,27 @@ def check_payload(payload, originals, quests):
     )
     for quest in quests:
         check_quest(payload, quest, checksums)
+    check_lantern_hollow(payload, checksums)
+
+
+def check_zquest_runtime(plugin):
+    manifest = json.loads((plugin / "manifest.json").read_text())
+    require(
+        manifest["publisher"] == {"namespace": "@korri"},
+        "wrong ZQuest Classic publisher claim",
+    )
+    require(
+        'export const name = "zquest-classic"' in (plugin / "plugin.ts").read_text(),
+        "wrong required plugin identity",
+    )
+    require(
+        not manifest.get("requires", []), "required runtime must remain a leaf plugin"
+    )
+    launcher = Path(manifest["packages"]["zquest-classic"]) / "bin/zplayer"
+    require(
+        manifest["files"].get("zplayer") == str(launcher) and launcher.is_file(),
+        "wrong required native artifact: zplayer",
+    )
 
 
 def check_runtime(plugin, name, native_files):
@@ -355,9 +408,11 @@ def check_runtime(plugin, name, native_files):
 def check_plugin(plugin, payload, fake08_plugin, solarus_plugin):
     manifest = json.loads((plugin / "manifest.json").read_text())
     require(
-        manifest.get("requires") == [str(fake08_plugin), str(solarus_plugin)],
-        "missing exact FAKE-08 and Solarus plugin dependencies",
+        manifest.get("requires")
+        == [str(fake08_plugin), str(solarus_plugin), str(ZQUEST_PLUGIN)],
+        "missing exact FAKE-08, Solarus and ZQuest Classic plugin dependencies",
     )
+    check_zquest_runtime(ZQUEST_PLUGIN)
     check_runtime(
         fake08_plugin,
         "fake08",
@@ -594,6 +649,7 @@ def negative_dependency_checks(plugin, payload, fake08_plugin, solarus_plugin):
             "files"
         ]["fake08"]
         solarus_manifest = json.loads((solarus_plugin / "manifest.json").read_text())
+        zquest_files = json.loads((ZQUEST_PLUGIN / "manifest.json").read_text())["files"]
         # Neither a raw core/engine package nor its executable is a Korri plugin.
         for requires in [
             [],
@@ -604,12 +660,15 @@ def negative_dependency_checks(plugin, payload, fake08_plugin, solarus_plugin):
             [str(fake08_plugin), solarus_manifest["files"]["solarus"]],
             [str(fake08_plugin), solarus_manifest["packages"]["solarus"]],
             [str(solarus_plugin), str(fake08_plugin)],
+            [str(fake08_plugin), str(solarus_plugin)],
+            [str(fake08_plugin), str(ZQUEST_PLUGIN), str(solarus_plugin)],
+            [str(fake08_plugin), str(solarus_plugin), zquest_files["zplayer"]],
         ]:
             manifest["requires"] = requires
             manifest_path.write_text(json.dumps(manifest))
             expect_failure(
                 lambda: check_plugin(damaged, payload, fake08_plugin, solarus_plugin),
-                "missing exact FAKE-08 and Solarus plugin dependencies",
+                "missing exact FAKE-08, Solarus and ZQuest Classic plugin dependencies",
             )
 
 
@@ -669,12 +728,13 @@ def expect_failure(action, fragment):
 
 
 def main():
-    if len(sys.argv) != 7:
+    global ZQUEST_PLUGIN
+    if len(sys.argv) != 8:
         raise SystemExit(
             "usage: check-starter-pack.py PAYLOAD ORIGINAL_FETCHURL_PINS "
-            "QUEST_FETCHURL_PINS PLUGIN FAKE08_PLUGIN SOLARUS_PLUGIN"
+            "QUEST_FETCHURL_PINS PLUGIN FAKE08_PLUGIN SOLARUS_PLUGIN ZQUEST_PLUGIN"
         )
-    payload, pins, quest_pins, plugin, fake08_plugin, solarus_plugin = map(
+    payload, pins, quest_pins, plugin, fake08_plugin, solarus_plugin, ZQUEST_PLUGIN = map(
         Path, sys.argv[1:]
     )
     originals = json.loads(pins.read_text())
@@ -687,8 +747,9 @@ def main():
     negative_identity_checks(plugin, payload, fake08_plugin, solarus_plugin)
     print(
         "Verified 25 original cartridge pins and images, two byte-identical upstream quests, "
-        "27 checksums, 24 PICO-8 and two Solarus credits, original GPL and source notices, "
-        "unchanged Starter pack treaty, exact FAKE-08/Solarus plugin dependencies, "
+        "Lantern Hollow, 28 checksums, 24 PICO-8, two Solarus and one ZQuest credits, "
+        "original GPL and source notices, unchanged Starter pack treaty, "
+        "exact FAKE-08/Solarus/ZQuest Classic plugin dependencies, "
         "@korri runtime claims, native ELF files and rejection controls."
     )
 
