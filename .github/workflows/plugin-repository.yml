@@ -73,30 +73,42 @@ jobs:
           nix run .#korri-cache -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
           test_output=$(nix build --no-link --print-out-paths ".#checks.$SYSTEM.korri-github-cache")
           nix run .#korri-retroarch-check
-          nix build --no-link \
-            ".#checks.$SYSTEM.korri-device-cache" \
-            ".#checks.$SYSTEM.korri-plugin-builder" \
-            ".#checks.$SYSTEM.korri-tailscale-package" \
-            ".#checks.$SYSTEM.korri-retroarch-package" \
-            ".#checks.$SYSTEM.korri-retroarch-settings" \
-            ".#checks.$SYSTEM.korri-libretro-example" \
-            ".#checks.$SYSTEM.korri-fake08-package" \
-            ".#checks.$SYSTEM.korri-fake08-admission" \
-            ".#checks.$SYSTEM.korri-solarus-plugin" \
-            ".#checks.$SYSTEM.korri-starter-pack-package" \
-            ".#checks.$SYSTEM.korri-starter-pack-admission" \
-            ".#checks.$SYSTEM.korri-starter-pack-solarus-runtime" \
-            ".#checks.$SYSTEM.korri-libretro-frontend-override" \
-            ".#checks.$SYSTEM.korri-libretro-typecheck" \
-            ".#checks.$SYSTEM.korri-ssh-upstream" \
-            ".#checks.$SYSTEM.korri-ssh-host-support" \
-            ".#checks.$SYSTEM.korri-sunshine-plugin-admission" \
-            ".#checks.$SYSTEM.korri-sunshine-plugin-native" \
-            ".#checks.$SYSTEM.sunshine-korri-package" \
-            ".#checks.$SYSTEM.sunshine-korri-runtime-settings" \
-            ".#checks.$SYSTEM.sunshine-korri-certificate-control" \
-            ".#checks.$SYSTEM.sunshine-korri-v4l2m2m" \
+          # GitHub's ARM runners intermittently get HTTP 403 from github.com for
+          # source downloads made inside build recipes (FAKE-08 and Sunshine's
+          # build-deps, runs 38840426871 and 38988905589). Nix keeps finished
+          # work, so a retry fetches only what failed. Do not retry the VM test
+          # below: a real hang would cost 60 minutes per try.
+          checks=(
+            ".#checks.$SYSTEM.korri-device-cache"
+            ".#checks.$SYSTEM.korri-plugin-builder"
+            ".#checks.$SYSTEM.korri-tailscale-package"
+            ".#checks.$SYSTEM.korri-retroarch-package"
+            ".#checks.$SYSTEM.korri-retroarch-settings"
+            ".#checks.$SYSTEM.korri-libretro-example"
+            ".#checks.$SYSTEM.korri-fake08-package"
+            ".#checks.$SYSTEM.korri-fake08-admission"
+            ".#checks.$SYSTEM.korri-solarus-plugin"
+            ".#checks.$SYSTEM.korri-starter-pack-package"
+            ".#checks.$SYSTEM.korri-starter-pack-admission"
+            ".#checks.$SYSTEM.korri-starter-pack-solarus-runtime"
+            ".#checks.$SYSTEM.korri-libretro-frontend-override"
+            ".#checks.$SYSTEM.korri-libretro-typecheck"
+            ".#checks.$SYSTEM.korri-ssh-upstream"
+            ".#checks.$SYSTEM.korri-ssh-host-support"
+            ".#checks.$SYSTEM.korri-sunshine-plugin-admission"
+            ".#checks.$SYSTEM.korri-sunshine-plugin-native"
+            ".#checks.$SYSTEM.sunshine-korri-package"
+            ".#checks.$SYSTEM.sunshine-korri-runtime-settings"
+            ".#checks.$SYSTEM.sunshine-korri-certificate-control"
+            ".#checks.$SYSTEM.sunshine-korri-v4l2m2m"
             ".#checks.$SYSTEM.sunshine-offline-retirement"
+          )
+          for attempt in 1 2 3; do
+            if nix build --no-link "${checks[@]}"; then break; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            echo "::warning::Check build failed on attempt $attempt; retrying in 120 s"
+            sleep 120
+          done
           # This check boots an emulated VM. ARM runners have no KVM. Beside the
           # parallel builds above, its guest never finished booting in 60 min
           # (run 38840426871, attempts 2 and 3). Alone on the runner it boots in
