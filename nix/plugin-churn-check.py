@@ -100,6 +100,20 @@ def evaluate(publisher, korri, system, selection):
           }}) names)'''],
         text=True, capture_output=True, check=True,
     )
+    # Required plugins can sit outside the device selection (Starter pack
+    # requires Solarus). Map every publisher plugin output, so a changed
+    # requirement is compared with its real new output.
+    plugin_outputs = subprocess.run(
+        command + [f'path:{publisher}#packages.{system}', '--apply', '''p:
+          let
+            names = builtins.filter (name: builtins.substring 0 13 name == "korri-plugin-")
+              (builtins.attrNames p);
+            # Cores nixpkgs marks unsupported on this system do not evaluate.
+            outputs = map (name: { inherit name; value = builtins.tryEval (toString p.${name}); }) names;
+          in builtins.listToAttrs (map (o: { inherit (o) name; value = o.value.value; })
+            (builtins.filter (o: o.value.success) outputs))'''],
+        text=True, capture_output=True, check=True,
+    )
     checks = subprocess.run(
         command + [f'path:{publisher}#checks.{system}', '--apply', f'''c:
           builtins.mapAttrs (name: {identity}) {{
@@ -110,7 +124,8 @@ def evaluate(publisher, korri, system, selection):
     packages = json.loads(packages.stdout)
     declared, requires = declared_packages(packages)
     return {'packages': packages, 'checks': json.loads(checks.stdout),
-            'declared_packages': declared, 'requires': requires}
+            'declared_packages': declared, 'requires': requires,
+            'plugin_outputs': json.loads(plugin_outputs.stdout)}
 
 
 def host_free(publisher, korri, system, baseline):
@@ -250,8 +265,9 @@ def main():
                 package_changes = changed(baseline['packages'], result['packages'])
                 check_changes = changed(baseline['checks'], result['checks'])
                 declared_changes = changed(baseline['declared_packages'], result['declared_packages'])
-                updated_paths = {identity['output']: result['packages'][name]['output']
-                                 for name, identity in baseline['packages'].items()}
+                updated_paths = {output: result['plugin_outputs'][name]
+                                 for name, output in baseline['plugin_outputs'].items()
+                                 if name in result['plugin_outputs']}
                 expected_requires = {name: [updated_paths.get(path, path) for path in required]
                                      for name, required in baseline['requires'].items()}
                 if result['requires'] != expected_requires:
