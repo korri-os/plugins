@@ -3,13 +3,17 @@ name: Publish Nix cache
 on:
   workflow_dispatch:
     inputs:
+      expected_source_sha:
+        description: "Full 40-character SHA of the tested source; all jobs check out this exact commit"
+        required: true
+        type: string
       packages:
         description: "Package output names separated by spaces; one or more per batch"
         required: true
         default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine
         type: string
       tag:
-        description: "Batch tag, not a plugin version; must name this main commit before publication"
+        description: "Batch tag, not a plugin version; must already point at expected_source_sha"
         required: true
         type: string
       cache_tag:
@@ -31,6 +35,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
   NAR_TAG: ${{ inputs.tag }}
   CACHE_TAG: ${{ inputs.cache_tag }}
   PACKAGES: ${{ inputs.packages }}
@@ -53,23 +58,40 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           # Match verified local tooling; newer Nix needs a separate CI check.
           install_url: https://releases.nixos.org/nix/nix-2.34.1/install
       - name: Read the existing signed publisher cache
-        run: python3 .github/workflows/trust-plugin-caches.py
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          python3 .github/workflows/trust-plugin-caches.py
       - name: Test the effective signed-cache configuration
-        run: python3 nix/ci-cache-config-test.py
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          python3 nix/ci-cache-config-test.py
       - name: Check plugin paths and scoped input invalidation
         env:
           SYSTEM: ${{ matrix.system }}
-        run: nix run .#korri-plugin-churn-check -- --system "$SYSTEM"
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          nix run .#korri-plugin-churn-check -- --system "$SYSTEM"
       - name: Validate the destination and test the publisher
         env:
           SYSTEM: ${{ matrix.system }}
         run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           nix run .#korri-cache -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
           test_output=$(nix build --no-link --print-out-paths ".#checks.$SYSTEM.korri-github-cache")
           nix run .#korri-retroarch-check
@@ -121,6 +143,9 @@ jobs:
         env:
           SYSTEM: ${{ matrix.system }}
         run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           nix eval --json ".#packages.$SYSTEM" \
             --apply 'packages: builtins.attrNames packages' \
             >/dev/null
@@ -132,6 +157,9 @@ jobs:
           PUBLISH: ${{ inputs.publish }}
           SYSTEM: ${{ matrix.system }}
         run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           umask 077
           key="$RUNNER_TEMP/cache-key"
           trap 'rm -f "$key"' EXIT
@@ -148,7 +176,7 @@ jobs:
           ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
           ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org
           cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
+          printf '%s\n' "$EXPECTED_SOURCE_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cache-${{ matrix.system }}
@@ -164,14 +192,24 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           install_url: https://releases.nixos.org/nix/nix-2.34.1/install
       - name: Read the existing signed Core and publisher caches
-        run: python3 .github/workflows/trust-plugin-caches.py --include-core
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          python3 .github/workflows/trust-plugin-caches.py --include-core
       - name: Existing cold-host lifecycle acceptance
-        run: nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host .#checks.x86_64-linux.sunshine-korri-input-presence
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host .#checks.x86_64-linux.sunshine-korri-input-presence
 
   publish:
     needs: [build, lifecycle]
@@ -185,6 +223,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
       - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
         with:
           install_url: https://releases.nixos.org/nix/nix-2.34.1/install
@@ -194,9 +234,16 @@ jobs:
           path: artifacts
       - name: Prepare the tool before exposing a write token
         run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           nix build --out-link cache-tool .#korri-cache
           ./cache-tool/bin/korri-cache combine prepared artifacts/cache-x86_64-linux artifacts/cache-aarch64-linux
       - name: Publish the batch then append cache metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG" --revision "$GITHUB_SHA"
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG" --revision "$EXPECTED_SOURCE_SHA"
