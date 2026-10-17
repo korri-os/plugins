@@ -94,10 +94,14 @@ jobs:
             ".#checks.$SYSTEM.korri-sunshine-plugin-native" \
             ".#checks.$SYSTEM.sunshine-korri-package" \
             ".#checks.$SYSTEM.sunshine-korri-runtime-settings" \
-            ".#checks.$SYSTEM.sunshine-korri-input-seat-patch" \
             ".#checks.$SYSTEM.sunshine-korri-certificate-control" \
             ".#checks.$SYSTEM.sunshine-korri-v4l2m2m" \
             ".#checks.$SYSTEM.sunshine-offline-retirement"
+          # This check boots an emulated VM. ARM runners have no KVM. Beside the
+          # parallel builds above, its guest never finished booting in 60 min
+          # (run 38840426871, attempts 2 and 3). Alone on the runner it boots in
+          # about 2 min (run 38983221358). Build it last, with live output.
+          nix build --no-link --print-build-logs ".#checks.$SYSTEM.sunshine-korri-input-seat-patch"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool .#korri-cache
       - name: Build the selected packages without a signing key
