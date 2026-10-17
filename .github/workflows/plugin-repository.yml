@@ -88,6 +88,7 @@ jobs:
             ".#checks.$SYSTEM.korri-fake08-package"
             ".#checks.$SYSTEM.korri-fake08-admission"
             ".#checks.$SYSTEM.korri-solarus-plugin"
+            ".#checks.$SYSTEM.korri-gamescope-plugin"
             ".#checks.$SYSTEM.korri-starter-pack-package"
             ".#checks.$SYSTEM.korri-starter-pack-admission"
             ".#checks.$SYSTEM.korri-starter-pack-solarus-runtime"

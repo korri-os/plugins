@@ -44,6 +44,17 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin = _: retroarchDefinition;
     };
     libretro = import ../plugins/libretro { inherit pkgs mkPlugin; };
+    gamescopePackage = import ../plugins/gamescope/package.nix { inherit pkgs; };
+    gamescopeSource = pkgs.runCommand "korri-gamescope-source" { } ''
+      mkdir -p "$out"
+      cp ${../plugins/gamescope/plugin.ts} "$out/plugin.ts"
+      cp ${../plugins/gamescope/compose.ts} "$out/compose.ts"
+    '';
+    gamescopePlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = gamescopeSource;
+      plugin = _: import ../plugins/gamescope/plugin.nix { inherit gamescopePackage; };
+    };
     solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
     solarusPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -144,6 +155,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         inherit pkgs;
         engine = zquestEngine;
       };
+      korri-plugin-gamescope = gamescopePlugin;
+      gamescope = gamescopePackage;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cache = cacheTool;
@@ -201,6 +214,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
               jq -e '.id == "@korri:fake08" and .desired.state == "Enabled" and .previous == null' receipt.json
               touch "$out"
             '';
+        korri-gamescope-plugin = import ./gamescope-check.nix {
+          inherit pkgs gamescopePackage;
+          package = gamescopePlugin;
+          contract = korri.lib.${system}.pluginContract;
+        };
         korri-solarus-plugin = import ./solarus-check.nix {
           inherit pkgs solarusPackage;
           package = solarusPlugin;
