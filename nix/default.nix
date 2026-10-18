@@ -55,6 +55,34 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = gamescopeSource;
       plugin = _: import ../plugins/gamescope/plugin.nix { inherit gamescopePackage; };
     };
+    # Steam on arm64: FEX and Proton-CachyOS download their payloads on first
+    # use into korrid's cache root (Core ADR 0010). Steam requires both exact
+    # outputs, so its manifest names the builds published beside it.
+    pluginSourceOnly =
+      dir:
+      pkgs.lib.fileset.toSource {
+        root = dir;
+        fileset = dir + "/plugin.ts";
+      };
+    fexPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = pluginSourceOnly ../plugins/fex;
+      plugin = ../plugins/fex/plugin.nix;
+    };
+    protonPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = pluginSourceOnly ../plugins/proton;
+      plugin = ../plugins/proton/plugin.nix;
+    };
+    steamPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = pluginSourceOnly ../plugins/steam;
+      plugin =
+        _:
+        import ../plugins/steam/plugin.nix {
+          inherit pkgs fexPlugin protonPlugin;
+        };
+    };
     solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
     solarusPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -157,6 +185,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       };
       korri-plugin-gamescope = gamescopePlugin;
       gamescope = gamescopePackage;
+      korri-plugin-fex = fexPlugin;
+      korri-plugin-proton = protonPlugin;
+      korri-plugin-steam = steamPlugin;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cache = cacheTool;
@@ -214,6 +245,21 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
               jq -e '.id == "@korri:fake08" and .desired.state == "Enabled" and .previous == null' receipt.json
               touch "$out"
             '';
+        korri-fex-package = import ../plugins/fex/packages/plugin-check.nix {
+          inherit pkgs;
+          plugin = fexPlugin;
+        };
+        korri-proton-package = import ../plugins/proton/packages/plugin-check.nix {
+          inherit pkgs;
+          plugin = protonPlugin;
+        };
+        korri-steam-package = import ../plugins/steam/packages/plugin-check.nix {
+          inherit pkgs fexPlugin protonPlugin;
+          plugin = steamPlugin;
+        };
+        korri-fex-source = import ../plugins/fex/packages/check.nix { inherit pkgs; };
+        korri-proton-source = import ../plugins/proton/packages/check.nix { inherit pkgs; };
+        korri-steam-source = import ../plugins/steam/packages/check.nix { inherit pkgs; };
         korri-gamescope-plugin = import ./gamescope-check.nix {
           inherit pkgs gamescopePackage;
           package = gamescopePlugin;
