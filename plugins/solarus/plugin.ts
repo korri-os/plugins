@@ -38,10 +38,13 @@ function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   ) {
     throw new Error("Configure Solarus through the quest's native settings")
   }
+  // Provider-ref routes carry no file. Solarus always loads one quest.
+  const contentPath = input.contentPath
   if (
-    !input.contentPath.startsWith("/") ||
+    contentPath === undefined ||
+    !contentPath.startsWith("/") ||
     !input.accountRoot.startsWith("/") ||
-    input.contentPath.includes("\0") ||
+    contentPath.includes("\0") ||
     input.accountRoot.includes("\0")
   ) {
     throw new Error("Solarus requires absolute quest and account paths without NUL bytes")
@@ -50,7 +53,7 @@ function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   // accountRoot as HOME, retaining .solarus/<quest write_dir> without migration.
   return {
     command: input.program,
-    args: [input.contentPath],
+    args: [contentPath],
     env: { HOME: input.accountRoot },
     // Upstream can write error.txt relative to cwd. Keep it off the media folder.
     cwd: input.accountRoot,

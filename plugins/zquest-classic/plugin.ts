@@ -35,6 +35,10 @@ function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   ) {
     throw new Error("ZQuest Classic does not implement Korri launch overrides")
   }
+  // Provider-ref routes carry no file. ZQuest Classic always loads one quest.
+  if (!input.contentPath) {
+    throw new Error("ZQuest Classic requires a quest file")
+  }
   // Account-owned storage follows Zelda3. The launcher owns native state files.
   return {
     command: input.program,

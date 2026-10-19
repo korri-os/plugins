@@ -91,6 +91,9 @@ function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   const root = input.accountRoot
   if (!input.corePath) throw new Error("RetroArch runner requires a core path")
   const corePath = input.corePath
+  // Provider-ref routes carry no file. RetroArch always loads one.
+  if (!input.contentPath) throw new Error("RetroArch runner requires a content file")
+  const contentPath = input.contentPath
   const states = `${root}/states/${input.runnerId}`
   const configPath = `${root}/retroarch.cfg`
   const config = input.overrides?.config
@@ -196,7 +199,7 @@ video_driver = "gl"`
   const content = `${merged.join("\n")}\n`
   return {
     command: input.program,
-    args: ["--config", configPath, "-L", corePath, input.contentPath],
+    args: ["--config", configPath, "-L", corePath, contentPath],
     directories: [
       `${root}/system`,
       `${root}/saves`,
