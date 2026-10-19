@@ -1,0 +1,59 @@
+From: Korri contributors
+Subject: [PATCH] WaylandBackend: await reconfigure after a mapped toplevel unmap
+
+Backport upstream c50ddfa9b71a75ec8df94bda8cf31d425dbdda24 and its
+follow-up 6867f509874f9bc52e12d6f4c4596cdf0d5be6b4. A NULL attach
+unmaps a configured xdg_toplevel. Do not attach a new buffer until the
+host configure is acknowledged. Only wait after a real unmap, not a NULL
+attach before the first frame (otherwise Steam startup can stay blank).
+
+Adapted to 3.16.18 plus patch 0003: guard before OnCompositorAcquire so
+a skipped attachment does not retain a framebuffer reference.
+Upstream: https://github.com/ValveSoftware/gamescope/commit/c50ddfa9b71a75ec8df94bda8cf31d425dbdda24
+Upstream: https://github.com/ValveSoftware/gamescope/commit/6867f509874f9bc52e12d6f4c4596cdf0d5be6b4
+
+--- a/src/Backends/WaylandBackend.cpp
++++ b/src/Backends/WaylandBackend.cpp
+@@ -295,6 +295,8 @@
+         libdecor_window_state m_eWindowState = LIBDECOR_WINDOW_STATE_NONE;
+         std::vector<wl_output *> m_pOutputs;
+         bool m_bNeedsDecorCommit = false;
++        bool m_bUnmappedAwaitingConfigure = false;
++        bool m_bHasAttachedBuffer = false;
+         uint32_t m_uFractionalScale = 120;
+         bool m_bHasRecievedScale = false;
+ 
+@@ -1606,6 +1608,11 @@
+             }
+             // The x/y here does nothing? Why? What is it for...
+             // Use the subsurface set_position thing instead.
++            if ( m_pFrame && m_bUnmappedAwaitingConfigure )
++                return;
++
++            m_bHasAttachedBuffer = true;
++
+             oState->pFb->OnCompositorAcquire();
+             wl_surface_attach( m_pSurface, oState->pFb->GetHostBuffer(), 0, 0 );
+             wl_surface_damage( m_pSurface, 0, 0, INT32_MAX, INT32_MAX );
+@@ -1614,6 +1621,12 @@
+         }
+         else
+         {
++            // Attaching NULL only unmaps (and so requires a new configure) if a buffer was mapped.
++            if ( m_pFrame && m_bHasAttachedBuffer )
++                m_bUnmappedAwaitingConfigure = true;
++
++            m_bHasAttachedBuffer = false;
++
+             wl_surface_attach( m_pSurface, nullptr, 0, 0 );
+             wl_surface_damage( m_pSurface, 0, 0, INT32_MAX, INT32_MAX );
+         }
+@@ -1746,6 +1759,8 @@
+         g_nOutputWidth  = WaylandScaleToPhysical( nWidth, uScale );
+         g_nOutputHeight = WaylandScaleToPhysical( nHeight, uScale );
+ 
++        m_bUnmappedAwaitingConfigure = false;
++
+         CommitLibDecor( pConfiguration );
+ 
+         force_repaint();

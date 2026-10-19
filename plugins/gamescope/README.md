@@ -77,6 +77,7 @@ system-library patches stay intact. These additional patches are applied:
 | `0001` | Unchanged ROCKNIX nested Wayland `wl_touch` patch (ValveSoftware/gamescope#1606), copied from Korri `b22b82d6a24e6164846ad97adb347e783579b531`. |
 | `0002` | Unchanged upstream `c2d8f0c33266e36f8d91978171ba74a7cbd8a2e4`: skip planes that clip to zero or negative size. |
 | `0003` | ROCKNIX `0024-WaylandBackend-acquire-only-attached-buffers.patch`, adapted to 3.16.18's `Unwrap` API. Acquire framebuffers at attachment, not before clipping, so skipped planes do not retain references waiting for a release that cannot arrive. |
+| `0004` | Upstream `c50ddfa9b71a75ec8df94bda8cf31d425dbdda24` plus `6867f509874f9bc52e12d6f4c4596cdf0d5be6b4`: after a real toplevel unmap, wait for a new configure before attaching another buffer. Adapted around `0003` so skipped attachments do not acquire framebuffers. |
 
 Patch `0003`'s ROCKNIX source was reviewed at distribution commit
 `8d6ef76cf7bd13a44538e5ef45aa97c3937e2d18`, under
@@ -108,7 +109,8 @@ wl_display#1.error(wp_viewport#59, 0, "wl_viewport.set_source sent with invalid 
 The preceding request has source size `-760 x -920`. The input thread then
 calls `abort()`. This is not a touch-patch crash: the X11 repro needs no touch
 input. The patched package must remain alive through `REPRO_COMPLETE` after
-about 97 seconds, including 20 main-window unmap/remap cycles. The popup is
+about 50 seconds, including 20 main-window unmap/remap cycles and 25
+focus-window destroy/recreate handoffs. The popup is
 visible before it moves offscreen; the main window remains visible afterward.
 
 With the patched package on Mini V2, injecting a centre tap through its
@@ -116,9 +118,42 @@ With the patched package on Mini V2, injecting a centre tap through its
 client as `XEVENT 4` then `XEVENT 5` (button press/release). A Sway-injected
 mouse click produced the same X11 events. The existing `0001` is sufficient
 for this path and is retained unchanged. This is synthetic input verification,
-not a physical-panel or Steam/Proton session acceptance test. The original
-Steam core dumps have no retained protocol log, so their exact error cannot
-be confirmed from those dumps alone.
+not a physical-panel or Steam/Proton session acceptance test.
+
+### Launch handoff regression (#105)
+
+The post-clipping-fix Steam core (2026-10-19 06:33 UTC, PID 319891) retains
+`xdg_surface#51: error 3: xdg_surface has never been configured` in memory.
+The shortened-gap destroy/recreate case on Mini V2 with Sway 1.12 reproduced
+this on the installed package (`iw35i62ccjdirpd5z99837rpx08rnhf9`) with
+`WAYLAND_DEBUG=client`:
+
+```text
+wl_display#1.error(xdg_surface#51, 3, "xdg_surface has never been configured")
+```
+
+Losing the last focus window makes Gamescope attach NULL to its host
+toplevel. xdg-shell resets that toplevel's configured state on unmap.
+Gamescope can attach the next game's buffer before receiving and acknowledging
+a new configure. Sway disconnects it; the input thread then aborts.
+`0004` waits for configure only when an attached buffer was actually unmapped.
+Waiting after a NULL attach before the first frame would instead leave Steam
+startup blank (the upstream follow-up fixes that case). Subsurface planes do
+not wait: they have no libdecor configure callback.
+
+The regression varies handoff gaps from 20 to 320 ms. Unmap/remap alone can
+retain Gamescope's old focus/held commit and does not reliably exercise the
+host toplevel unmap. A pass requires `RECREATE_COMPLETE 25`, `REPRO_COMPLETE`,
+a successful Gamescope exit, and no host protocol error. Confirm that buffers
+are attached after the remaps too; an alive but permanently blank window is
+not a pass. This synthetic test does not replace published-plugin Steam
+launch acceptance.
+
+On 2026-10-19 the final client aborted with signal 6 on its first handoff
+using the installed package. With `0004`, two device runs each completed all
+25 handoffs and 20 unmap/remap cycles with exit status 0 and no protocol error.
+The host trace contained new buffer attachments in every handoff (115 and 113
+toplevel buffer attachments in total), not just a live but blank process.
 
 Building or checking this package does not publish it, grant permissions,
 configure cascade enablement, install it on a device, or approve deployment.

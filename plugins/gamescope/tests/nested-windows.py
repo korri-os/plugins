@@ -1,8 +1,12 @@
 """X11 regression client for nested Gamescope (Python stdlib + libX11).
 
 Map a main window, a transient dialog and an override-redirect popup. Move
-that popup offscreen, then repeatedly unmap/remap the main window. Gamescope
-3.16.18 without the clipping backport aborts at MOVING_POPUP_OFFSCREEN.
+that popup offscreen, unmap/remap the main window, then destroy and recreate
+the only focus window like a launcher handing off to its game. Vary the gap
+across frame boundaries to race a new buffer against the host reconfigure.
+Without the configure backport, Sway rejects the next buffer with
+xdg_surface error 3 (issue #105).
+Gamescope without the clipping backport aborts at MOVING_POPUP_OFFSCREEN.
 XEVENT 4/5 records button press/release, including touch-to-pointer delivery.
 Set X11_LIB to libX11.so.6. Run as the child of gamescope, not against Sway.
 """
@@ -109,7 +113,7 @@ x.XMapWindow(d, popup)
 x.XFlush(d)
 print("ALL_WINDOWS_MAPPED", flush=True)
 event = (C.c_long * 24)()
-for i in range(900):
+for i in range(100):
     while x.XPending(d):
         x.XNextEvent(d, C.byref(event))
         print("XEVENT", C.cast(event, C.POINTER(C.c_int))[0], flush=True)
@@ -121,12 +125,25 @@ for i in range(900):
         x.XDestroyWindow(d, dialog)
         x.XDestroyWindow(d, popup)
         x.XFlush(d)
-    if 100 <= i < 140 and i % 2 == 0:
-        print("UNMAP_REMAP_MAIN", i, flush=True)
-        x.XUnmapWindow(d, main)
-        x.XFlush(d)
-        time.sleep(0.05)
-        x.XMapWindow(d, main)
-        x.XFlush(d)
     time.sleep(0.1)
+for cycle in range(20):
+    print("UNMAP_REMAP_MAIN", cycle + 1, flush=True)
+    x.XUnmapWindow(d, main)
+    x.XFlush(d)
+    time.sleep(0.05)
+    x.XMapWindow(d, main)
+    x.XFlush(d)
+    time.sleep(0.1)
+for cycle in range(25):
+    print("DESTROY_MAIN", cycle + 1, flush=True)
+    x.XDestroyWindow(d, main)
+    x.XFlush(d)
+    # Destroy the focus window like a launcher handing off to its game.
+    # Unmapping alone can leave the old focus/held commit alive in Gamescope.
+    time.sleep((0.02, 0.04, 0.08, 0.16, 0.32)[cycle % 5])
+    main = window("Gamescope recreated game window", 640, 480, 0x225577)
+    x.XMapWindow(d, main)
+    x.XFlush(d)
+    time.sleep(1)
+    print("RECREATE_COMPLETE", cycle + 1, flush=True)
 print("REPRO_COMPLETE", flush=True)
