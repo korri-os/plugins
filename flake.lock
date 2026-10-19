@@ -77,27 +77,27 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1792205451,
-        "narHash": "sha256-KcsbgBiP+rjkR0v50GfhRjVie/Uz50fykIj2wJ8aLvA=",
+        "lastModified": 1792382424,
+        "narHash": "sha256-P1TEPd/QYkSbw8OAl1vAaLj1tj0vp7w0SesDdPCv21M=",
         "owner": "korri-os",
         "repo": "korri",
-        "rev": "ce5228aec4e13283099ebae9521ac0c4ea5019bc",
+        "rev": "fc4c190ce7970562bbeaa819fa99d3cb6c340ff2",
         "type": "github"
       },
       "original": {
         "owner": "korri-os",
         "repo": "korri",
-        "rev": "ce5228aec4e13283099ebae9521ac0c4ea5019bc",
+        "rev": "fc4c190ce7970562bbeaa819fa99d3cb6c340ff2",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1766309749,
-        "narHash": "sha256-3xY8CZ4rSnQ0NqGhMKAy5vgC+2IVK0NoVEzDoOh4DA4=",
+        "lastModified": 1790185690,
+        "narHash": "sha256-xJ+X4hBtOcAFGBOe5nAMyMUeF9foJBmIOu3NjBqBycU=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+        "rev": "4975466d324710c576dc11ad614684e6bd8cad8e",
         "type": "github"
       },
       "original": {
