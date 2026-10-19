@@ -46,7 +46,9 @@ if "-applaunch" in sys.argv:
     (home / ("restart" if behavior == "restart" and forwards == 1 else "launch")).touch()
     sys.exit(0)
 
-(home / "shutdown").unlink(missing_ok=True)
+# Never clear the shutdown marker here: a client the session starts an
+# instant before it shuts down would erase the proof that -shutdown ran.
+# Every test uses a fresh home, and the EXIT trap sends -shutdown once.
 manifest = home / "package/steam_client_steamdeck_stable_linuxarm64.manifest"
 with (home / "manifest-seen").open("a") as stream:
     stream.write(manifest.read_text() if manifest.exists() else "missing\n")
