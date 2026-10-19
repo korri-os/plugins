@@ -407,6 +407,9 @@ class SignedCache(unittest.TestCase):
         )
         state = json.loads(fixture_state.read_text())
         self.assertFalse(state["releases"][0]["draft"])
+        self.assertEqual(
+            len([r for r in state["releases"] if r["tag_name"] == "build-1"]), 1
+        )
         batch_assets = {a["name"]: a for a in state["assets"] if a["release"] == 1}
         for name in ("revision.txt", "paths-x86_64-linux.txt"):
             self.assertEqual(
@@ -454,7 +457,7 @@ class SignedCache(unittest.TestCase):
             env=env,
         )
         record_batch(third)
-        run(
+        command = [
             sys.executable,
             str(SCRIPT),
             "publish",
@@ -467,9 +470,29 @@ class SignedCache(unittest.TestCase):
             "cache",
             "--revision",
             "1" * 40,
-            env=env,
-        )
+        ]
+        # A genuine create failure must stop before uploads or publication.
         state = json.loads(fixture_state.read_text())
+        state["fail_before_release_create"] = True
+        fixture_state.write_text(json.dumps(state))
+        before = fixture_state.read_bytes()
+        refused = run(*command, env=env, succeeds=False)
+        self.assertIn("release creation failed", refused.stderr)
+        self.assertEqual(before, fixture_state.read_bytes())
+        del state["fail_before_release_create"]
+        # Another creator (or a lost response) can leave a draft even though
+        # our create request failed. Reuse it, without creating another draft.
+        state["fail_after_release_create"] = True
+        fixture_state.write_text(json.dumps(state))
+        run(*command, env=env)
+        state = json.loads(fixture_state.read_text())
+        self.assertEqual(
+            len([r for r in state["releases"] if r["tag_name"] == "build-3"]), 1
+        )
+        # Identical publication retries must accept the existing release too.
+        before = fixture_state.read_bytes()
+        run(*command, env=env)
+        self.assertEqual(before, fixture_state.read_bytes())
         new_release = next(r for r in state["releases"] if r["tag_name"] == "build-3")
         self.assertFalse(new_release["draft"])
         self.assertTrue(new_release["immutable"])

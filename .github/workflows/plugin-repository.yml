@@ -44,7 +44,7 @@ jobs:
   build:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - system: x86_64-linux
@@ -174,7 +174,14 @@ jobs:
           unset SIGNING_KEY
           mapfile -t paths < "$RUNNER_TEMP/paths.txt"
           ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
-          ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org
+          # prepare fetches upstream metadata over HTTPS. It stages atomically,
+          # so a failed fetch leaves no output and is safe to retry.
+          for attempt in 1 2 3; do
+            if ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org; then break; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            echo "::warning::Cache preparation failed on attempt $attempt; retrying in 120 s"
+            sleep 120
+          done
           cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
           printf '%s\n' "$EXPECTED_SOURCE_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -185,6 +192,8 @@ jobs:
           retention-days: 7
 
   lifecycle:
+    # Do not start the hour-long VM gate if either architecture build fails.
+    needs: [build]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -211,6 +220,8 @@ jobs:
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host .#checks.x86_64-linux.sunshine-korri-input-presence
 
+  # Only this non-matrix job may create the batch release. Build jobs prepare
+  # local artifacts without a write token; manually created drafts are reused.
   publish:
     needs: [build, lifecycle]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson' && inputs.publish

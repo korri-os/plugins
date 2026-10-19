@@ -15,6 +15,8 @@ state = json.loads((root / "state.json").read_text())
 if args[:2] == ["release", "create"]:
     assert args[args.index("--repo") + 1] == "owner/plugins"
     assert "--draft" in args and "--verify-tag" in args
+    if state.get("fail_before_release_create"):
+        sys.exit("release creation failed")
     state["releases"].append(
         {
             "id": len(state["releases"]) + 1,
@@ -24,6 +26,8 @@ if args[:2] == ["release", "create"]:
         }
     )
     (root / "state.json").write_text(json.dumps(state))
+    if state.get("fail_after_release_create"):
+        sys.exit("release appeared while creation failed")
     sys.exit(0)
 assert args[:3] == ["api", "--hostname", "github.com"], args
 args = args[3:]

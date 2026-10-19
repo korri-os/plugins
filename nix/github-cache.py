@@ -632,20 +632,26 @@ def publish(prepared, repo, tag, cache_tag, revision):
     # Do not treat a failed request as an absent release.
     found = release_records(repo, tag)
     if not found:
-        run(
-            "gh",
-            "release",
-            "create",
-            tag,
-            "--repo",
-            repo,
-            "--verify-tag",
-            "--draft",
-            "--title",
-            tag,
-            "--notes",
-            f"Prebuilt Nix cache payloads from {revision}. Exact package paths are in this release's paths-SYSTEM.txt assets; revision.txt records the source commit.",
-        )
+        try:
+            run(
+                "gh",
+                "release",
+                "create",
+                tag,
+                "--repo",
+                repo,
+                "--verify-tag",
+                "--draft",
+                "--title",
+                tag,
+                "--notes",
+                f"Prebuilt Nix cache payloads from {revision}. Exact package paths are in this release's paths-SYSTEM.txt assets; revision.txt records the source commit.",
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            # A manual creator can win the race, or GitHub can accept a request
+            # whose response is lost. Continue only if exactly one release exists.
+            if not release_records(repo, tag):
+                raise
     payload = release(repo, tag)
     upload(prepared, repo, tag, cache_tag, "nars")
     if payload["draft"]:
