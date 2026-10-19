@@ -22,6 +22,7 @@ for (const key of ["retroarch", "retroarch-settings", "autoconfig", "fake08"]) {
 }
 const launch = plugin.handlers["launch.prepare"]({
   accountRoot: "/tmp/account",
+  cacheRoot: "/tmp/cache",
   runnerId: "@korri:fake08/fake08",
   program: manifest.files.retroarch,
   corePath: manifest.files.fake08,

@@ -107,9 +107,16 @@ def command(quest, account):
         "program": str(launcher),
         "contentPath": str(quest),
         "accountRoot": str(account),
+        "cacheRoot": str(root / "cache"),
         "files": manifest["files"],
     }
-    return [korrid, "plugin-launch", str(package / "plugin.ts"), json.dumps(request)]
+    return [
+        korrid,
+        "plugin-launch",
+        str(package / "plugin.ts"),
+        json.dumps(request),
+        json.dumps({"modifiers": []}),
+    ]
 
 
 def account(name):

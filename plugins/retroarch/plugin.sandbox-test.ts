@@ -19,6 +19,7 @@ function input(overrides?: PluginLaunchInput["overrides"]): PluginLaunchInput {
     corePath: "/core",
     contentPath: "/rom",
     accountRoot: "/account",
+    cacheRoot: "/cache",
     files: { autoconfig: "/autoconfig" },
     overrides,
   }
@@ -35,6 +36,11 @@ const reserved = [
 ]
 
 describe("RetroArch native configuration", () => {
+  it("refuses provider routes without a content file", () => {
+    expect(() => launch({ ...input(), contentPath: undefined, ref: "123" }))
+      .toThrow("requires a content file")
+  })
+
   it("emits one assignment per key across baseline, typed and repeated raw values", () => {
     const cfg = content({
       settings: { video_driver: "vulkan", audio_volume: -3.5 },

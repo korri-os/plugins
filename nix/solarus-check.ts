@@ -57,6 +57,7 @@ try {
       program: recordArguments,
       contentPath,
       accountRoot,
+      cacheRoot: join(work, "cache"),
       files: manifest.files,
     }
     const expected = {
@@ -72,6 +73,7 @@ try {
     }), expected)
     const launch = spawnSync(korridCli, [
       "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(input),
+      JSON.stringify({ modifiers: [] }),
     ], { encoding: "utf8", timeout: 30_000 })
     assert.equal(launch.status, 0, launch.stderr)
     assert.equal(launch.stdout, `${contentPath}\0${accountRoot}\0${accountRoot}\0`)
@@ -81,6 +83,7 @@ try {
       { corePath: "/core.so" },
       { overrides: { config: { replace: "ignored settings" } } },
       { overrides: { settings: { fullscreen: true } } },
+      { contentPath: undefined, ref: "123" },
       { contentPath: "-help" },
       { contentPath: "relative.solarus" },
       { contentPath: "/library/quest\0.solarus" },
@@ -91,6 +94,7 @@ try {
       assert.throws(() => handlers["launch.prepare"](invalid))
       const rejected = spawnSync(korridCli, [
         "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(invalid),
+        JSON.stringify({ modifiers: [] }),
       ], { encoding: "utf8", timeout: 30_000 })
       assert.notEqual(rejected.status, 0)
       assert.equal(rejected.stdout, "")
