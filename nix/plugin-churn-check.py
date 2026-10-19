@@ -247,6 +247,10 @@ def main():
             runtime_plugins = {key.split(':')[0] for key in baseline['declared_packages']
                                if key.endswith(':retroarch-settings')}
             runtime_wrappers = with_dependents(runtime_plugins, baseline)
+            # Gamescope (through GTK) and Solarus (through SDL) reach the same
+            # OpenSSH-backed fetch graph. Core 1c758a01b and f1de4b8fe added
+            # them to the Mini V2 selection this check evaluates.
+            fetch_graph_plugins = {'korri-plugin-gamescope', 'korri-plugin-solarus'} & set(baseline['packages'])
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),
                 ('contract', publisher, contract, set(), {'korri-libretro-typecheck'}),
@@ -256,7 +260,8 @@ def main():
                 ('settings', sources['settings'], korri, runtime_wrappers,
                  {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
                 ('retroarch', sources['retroarch'], korri, {'korri-plugin-retroarch'}, set()),
-                ('toolchain', toolchain, korri, with_dependents(runtime_plugins | {'korri-plugin-ssh'}, baseline),
+                ('toolchain', toolchain, korri,
+                 with_dependents(runtime_plugins | fetch_graph_plugins | {'korri-plugin-ssh'}, baseline),
                  {'korri-libretro-typecheck', 'korri-retroarch-settings'}),
             ]
             for case, publisher_source, korri_source, expected_packages, expected_checks in cases:
@@ -283,6 +288,8 @@ def main():
                     expected_declared = {key for key in baseline['declared_packages']
                                          if key.split(':')[0] in runtime_plugins
                                          and not key.endswith((':autoconfig', ':fake08'))}
+                    expected_declared |= {key for key in baseline['declared_packages']
+                                          if key.split(':')[0] in fetch_graph_plugins}
                     expected_declared.add('korri-plugin-ssh:openssh')
                 if declared_changes != expected_declared:
                     raise AssertionError(

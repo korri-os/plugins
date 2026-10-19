@@ -2,7 +2,7 @@
   description = "Korri plugin packages and release preparation";
 
   inputs = {
-    korri.url = "github:korri-os/korri/fc4c190ce7970562bbeaa819fa99d3cb6c340ff2";
+    korri.url = "github:korri-os/korri/2735a7f78f7f034b4c800307ac54ab25c3d9e590";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
