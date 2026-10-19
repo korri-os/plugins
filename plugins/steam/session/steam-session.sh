@@ -104,6 +104,10 @@ kill_leftovers() {
 }
 shutdown() {
   local deadline=$((SECONDS + 15))
+  # A stop delivers SIGTERM more than once: systemd signals the whole unit and
+  # Gamescope's reaper forwards its own. A second TERM must not run the TERM
+  # trap's exit while this cleanup runs, or leftovers keep the unit alive.
+  trap '' TERM INT HUP
   [[ -n "$steam_pid" ]] || return 0
   say 'end: stopping Steam'
   timeout 15 @fhs@/bin/steam-arm64-fhs -shutdown >/dev/null 2>&1 || true

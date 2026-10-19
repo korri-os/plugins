@@ -72,11 +72,12 @@ while not (home / "shutdown").exists():
             # The client clears its channel and this file during a session.
             manifest.unlink()
         game = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(2)"],
+            [sys.executable, "-c",
+             "import time; time.sleep(%d)" % (60 if behavior == "leftover-hold" else 2)],
             env={**os.environ, "SteamAppId": "401710"},
         )
         event("Game process added : AppID 401710")
-        if behavior == "leftover":
+        if behavior in ("leftover", "leftover-hold"):
             # A Wine helper that ignores SIGTERM and outlives the game.
             helper = subprocess.Popen(
                 [sys.executable, "-c",
