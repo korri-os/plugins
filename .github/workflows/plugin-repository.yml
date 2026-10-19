@@ -54,6 +54,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     environment: plugin-release
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -190,10 +193,15 @@ jobs:
           path: ${{ runner.temp }}/prepared/
           if-no-files-found: error
           retention-days: 7
+      - name: Cancel the run after a failed build
+        if: failure()
+        # Only this step receives GH_TOKEN. The build job uses the token's
+        # Actions write permission for nothing else.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
 
   lifecycle:
-    # Do not start the hour-long VM gate if either architecture build fails.
-    needs: [build]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -221,7 +229,7 @@ jobs:
           nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host .#checks.x86_64-linux.sunshine-korri-input-presence
 
   # Only this non-matrix job may create the batch release. Build jobs prepare
-  # local artifacts without a write token; manually created drafts are reused.
+  # local artifacts without release-write permission; manual drafts are reused.
   publish:
     needs: [build, lifecycle]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson' && inputs.publish
