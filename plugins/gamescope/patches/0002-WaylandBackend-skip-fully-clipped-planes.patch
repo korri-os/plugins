@@ -1,0 +1,45 @@
+From c2d8f0c33266e36f8d91978171ba74a7cbd8a2e4 Mon Sep 17 00:00:00 2001
+From: Matthew Schwartz <matthew.schwartz@linux.dev>
+Date: Thu, 30 Jul 2026 23:38:55 -0700
+Subject: [PATCH] WaylandBackend: don't present planes that clip away to
+ nothing
+
+ClipPlane only clips against the right and bottom edges of the output, so
+a plane whose origin is already past either edge clips to a negative width
+or height, which scales the viewport source rectangle negative as well.
+wp_viewport rejects that with a bad_value protocol error and the host
+compositor drops our connection. The cursor hits this whenever the focus
+window is upscaled and the pointer sits outside it, such as while Steam is
+still smaller than the output during startup.
+
+Present no buffer for such a plane. Planes that keep at least one pixel
+on screen are unchanged.
+---
+ src/Backends/WaylandBackend.cpp | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/Backends/WaylandBackend.cpp b/src/Backends/WaylandBackend.cpp
+index 8c178494..f90d7c39 100644
+--- a/src/Backends/WaylandBackend.cpp
++++ b/src/Backends/WaylandBackend.cpp
+@@ -147,10 +147,16 @@ namespace gamescope
+         uint32_t uFractionalScale;
+     };
+ 
+-    inline WaylandPlaneState ClipPlane( const WaylandPlaneState &state )
++    inline std::optional<WaylandPlaneState> ClipPlane( const WaylandPlaneState &state )
+     {
+         int32_t nClippedDstWidth  = std::min<int32_t>( g_nOutputWidth,  state.nDstWidth  + state.nDestX ) - state.nDestX;
+         int32_t nClippedDstHeight = std::min<int32_t>( g_nOutputHeight, state.nDstHeight + state.nDestY ) - state.nDestY;
++
++        // A plane that starts past the edge of the output clips away to nothing.
++        // Viewport source and destination sizes must be positive, so present no buffer at all.
++        if ( nClippedDstWidth <= 0 || nClippedDstHeight <= 0 )
++            return std::nullopt;
++
+         double flClippedSrcWidth  = state.flSrcWidth  * ( nClippedDstWidth  / double( state.nDstWidth ) );
+         double flClippedSrcHeight = state.flSrcHeight * ( nClippedDstHeight / double( state.nDstHeight ) );
+ 
+-- 
+2.53.0
+

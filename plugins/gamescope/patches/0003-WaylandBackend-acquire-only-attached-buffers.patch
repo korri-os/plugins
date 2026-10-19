@@ -1,0 +1,75 @@
+From: Korri contributors
+Subject: [PATCH] WaylandBackend: acquire only attached framebuffers
+
+A fully clipped plane now presents no buffer. Acquiring its framebuffer
+before ClipPlane would retain a reference forever: the compositor cannot
+release a buffer it never received. Move acquisition to the attach site.
+
+Backport of ROCKNIX 0024-WaylandBackend-acquire-only-attached-buffers.patch
+to 3.16.18 (Unwrap rather than the later EnsureImported API).
+Source: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/packages/apps/gamescope/patches/0024-WaylandBackend-acquire-only-attached-buffers.patch
+
+--- a/src/Backends/WaylandBackend.cpp
++++ b/src/Backends/WaylandBackend.cpp
+@@ -132,7 +132,7 @@
+ 
+     struct WaylandPlaneState
+     {
+-        wl_buffer *pBuffer;
++        CWaylandFb *pFb;
+         int32_t nDestX;
+         int32_t nDestY;
+         double flSrcX;
+@@ -1114,13 +1114,11 @@
+                 uint32_t uCurrentPlane = 0;
+                 if ( bNeedsBacking )
+                 {
+-                    m_pBackend->GetBlackFb()->OnCompositorAcquire();
+-
+                     CWaylandPlane *pPlane = &m_Planes[uCurrentPlane++];
+                     pPlane->Present(
+                         WaylandPlaneState
+                         {
+-                            .pBuffer     = m_pBackend->GetBlackFb()->GetHostBuffer(),
++                            .pFb         = m_pBackend->GetBlackFb(),
+                             .flSrcWidth  = 1.0,
+                             .flSrcHeight = 1.0,
+                             .nDstWidth   = int32_t( g_nOutputWidth ),
+@@ -1469,7 +1467,7 @@
+ 
+         if ( oState )
+         {
+-            assert( oState->pBuffer );
++            assert( oState->pFb && oState->pFb->GetHostBuffer() );
+ 
+             if ( m_pFrame )
+             {
+@@ -1608,7 +1606,8 @@
+             }
+             // The x/y here does nothing? Why? What is it for...
+             // Use the subsurface set_position thing instead.
+-            wl_surface_attach( m_pSurface, oState->pBuffer, 0, 0 );
++            oState->pFb->OnCompositorAcquire();
++            wl_surface_attach( m_pSurface, oState->pFb->GetHostBuffer(), 0, 0 );
+             wl_surface_damage( m_pSurface, 0, 0, INT32_MAX, INT32_MAX );
+             wl_surface_set_opaque_region( m_pSurface, oState->bOpaque ? m_pBackend->GetFullRegion() : nullptr );
+             wl_surface_set_buffer_scale( m_pSurface, 1 );
+@@ -1652,16 +1651,13 @@
+     void CWaylandPlane::Present( const FrameInfo_t::Layer_t *pLayer )
+     {
+         CWaylandFb *pWaylandFb = pLayer && pLayer->tex != nullptr ? static_cast<CWaylandFb*>( pLayer->tex->GetBackendFb()->Unwrap() ) : nullptr;
+-        wl_buffer *pBuffer = pWaylandFb ? pWaylandFb->GetHostBuffer() : nullptr;
+-
+-        if ( pBuffer )
++        if ( pWaylandFb && pWaylandFb->GetHostBuffer() )
+         {
+-            pWaylandFb->OnCompositorAcquire();
+ 
+             Present(
+                 ClipPlane( WaylandPlaneState
+                 {
+-                    .pBuffer     = pBuffer,
++                    .pFb         = pWaylandFb,
+                     .nDestX      = int32_t( -pLayer->offset.x ),
+                     .nDestY      = int32_t( -pLayer->offset.y ),
+                     .flSrcX      = 0.0,
