@@ -471,13 +471,15 @@ Core's `korri-publish declaration` command, introduced by
 Core revision is reachable, use an explicit local override for checks:
 
 ```sh
-nix build --no-link --override-input korri "path:$CORE_CHECKOUT" \
+nix build --no-link --override-input korri "git+file://$CORE_CHECKOUT" \
   .#checks.x86_64-linux.korri-steam-declaration \
   .#checks.x86_64-linux.korri-proton-tool-name \
   .#checks.x86_64-linux.korri-steam-package
 ```
 
-Do not commit that local path or a nonexistent remote pin. Publication is
+Stage intended source files before using the Git-filtered override. Ignored build
+caches must not enter the source snapshot. Do not commit that local path or a
+nonexistent remote pin. Publication is
 blocked until Core lands and is published, this repository pins that reachable
 revision, and both architectures pass again at the exact publication source.
 No contract or signature check is bypassed by the override. The old pin is

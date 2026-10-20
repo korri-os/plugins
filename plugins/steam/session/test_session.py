@@ -1,6 +1,7 @@
 """Run the real session state machine with filesystem IPC and real processes."""
 import json
 import os
+import shutil
 import signal
 from pathlib import Path
 import subprocess
@@ -19,7 +20,8 @@ def program(path, source):
 
 
 class SteamSessionTests(unittest.TestCase):
-    def run_session(self, behavior, seeded=True, setup=None, installed=True, shm=None):
+    def run_session(self, behavior, seeded=True, setup=None, installed=True, shm=None,
+                    copy_behavior=None):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -38,6 +40,21 @@ class SteamSessionTests(unittest.TestCase):
             client.touch()
             client.chmod(0o755)
         (root / "bin").mkdir()
+        if copy_behavior:
+            # Exercise the real cp after a controlled filesystem mutation at
+            # the copy boundary. Production has no test hook or timing knob.
+            program(root / "bin/cp", f"""import os
+from pathlib import Path
+import sys
+home = Path(os.environ["STEAM_HOME"])
+args = sys.argv[1:]
+if '.korri/' in args[-1] and '.tmp.' in args[-1]:
+    if {copy_behavior!r} == 'delete-source':
+        (home / 'package/steam_client_steamdeck_stable_linuxarm64.manifest').unlink(missing_ok=True)
+    else:
+        args[-2] = str(home / 'missing-copy-source')
+os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
+""")
         (root / "fex-config").mkdir()
         # The ready artifact directories korrid hands the launch.
         self.rootfs = root / "cache/fex/rootfs/archlinux-fixture"
@@ -65,6 +82,7 @@ class SteamSessionTests(unittest.TestCase):
             env={
                 **os.environ, "STEAM_HOME": str(home), "HOME": str(root), "CLIENT_BEHAVIOR": behavior,
                 "STEAM_BETA": "steamdeck_stable",
+                "PATH": str(root / "bin") + os.pathsep + os.environ["PATH"],
                 "KORRI_FEX_CONFIG": str(root / "fex-config"),
                 "KORRI_FEX_ROOTFS": str(self.rootfs),
                 "KORRI_PROTON_CACHYOS": str(self.proton),
@@ -169,6 +187,23 @@ class SteamSessionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("restoring the installed Steam client manifest", result.stderr)
         self.assertEqual((home / "manifest-seen").read_text(), manifest)
+
+    def test_manifest_deletion_between_open_and_copy_retains_the_saved_bytes(self):
+        manifest = '"linuxarm64"\n{\n\t"version"\t\t"1791918634"\n}\n'
+
+        def installed_client(home):
+            (home / "package").mkdir()
+            (home / "package/steam_client_steamdeck_stable_linuxarm64.installed").write_text("x\n")
+            (home / "package/steam_client_steamdeck_stable_linuxarm64.manifest").write_text(manifest)
+
+        result, home, _ = self.run_session("game", setup=installed_client,
+                                           copy_behavior="delete-source")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        saved = home / ".korri/steam_client_steamdeck_stable_linuxarm64.manifest"
+        self.assertEqual(saved.read_text(), manifest)
+        result, _, _ = self.run_session("game", setup=installed_client, copy_behavior="failure")
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertIn("missing-copy-source", result.stderr)
 
     def test_leftover_steam_shared_memory_is_removed(self):
         uid = os.getuid()

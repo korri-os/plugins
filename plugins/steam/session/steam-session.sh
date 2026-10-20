@@ -131,11 +131,20 @@ trap 'exit 143' TERM
 # start reinstalls the same client. Keep a copy of the manifest Steam itself
 # installed and put it back before every start.
 save_client_manifest() {
+  local manifest_fd
   [[ -f "$client_manifest" ]] || return 0
-  cmp -s "$client_manifest" "$saved_manifest" && return 0
-  mkdir -p "${saved_manifest%/*}"
-  cp -f "$client_manifest" "$saved_manifest.tmp.$$"
-  mv -f "$saved_manifest.tmp.$$" "$saved_manifest"
+  # Steam may unlink the pathname at any point. Retain the opened inode for
+  # both comparison and copying; do not turn a copy failure into success.
+  if ! { exec {manifest_fd}< "$client_manifest"; } 2>/dev/null; then
+    [[ ! -e "$client_manifest" ]] && return 0
+    fail 126 'Steam failed: cannot open the installed client manifest'
+  fi
+  if ! cmp -s "/proc/self/fd/$manifest_fd" "$saved_manifest"; then
+    mkdir -p "${saved_manifest%/*}"
+    cp -f "/proc/self/fd/$manifest_fd" "$saved_manifest.tmp.$$"
+    mv -f "$saved_manifest.tmp.$$" "$saved_manifest"
+  fi
+  exec {manifest_fd}<&-
 }
 restore_client_channel() {
   mkdir -p "$package_dir"
