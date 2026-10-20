@@ -173,8 +173,10 @@ A real builder derivation change must invalidate
 all selected plugins and the shared builder gate. A host-free case refuses all
 Core host recipes and checks the actual build dependency graph for host inputs.
 Copies retain executable bits and symlinks. A caller-owned OpenSSH compiler-flag
-fixture also checks declared native dependencies. It changes 20 wrapper drv files
-but only SSH's wrapper output on each architecture. Fixed-output fetches can
+fixture also checks declared native dependencies. On 2026-10-20 it changed 25
+wrapper drv files but only SSH's wrapper output on each architecture. Steam is
+one of them: its FHS rootfs reaches Netpbm's fixed-output SVN fetch through
+zenity and sdl2-compat. Fixed-output fetches can
 change a drv file without changing the downstream output path. The report records
 these separately, so drv churn alone does not imply compilation or publication.
 This is an evaluation check, not a build or device acceptance test.
