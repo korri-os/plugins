@@ -64,6 +64,7 @@ for (const contentPath of [
     accountRoot: "/accounts/Player One '; $(exit 21)",
     cacheRoot: "/cache",
     files: manifest.files,
+    artifacts: {},
   }
   const args = ["--", contentPath, `${input.accountRoot}/zquest-classic`]
   assert.deepEqual(handlers["launch.prepare"](input), {

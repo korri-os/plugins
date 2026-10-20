@@ -81,6 +81,7 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
             "accountRoot": str(account),
             "cacheRoot": str(work / "cache"),
             "files": manifest["files"],
+            "artifacts": {},
         }
         output = execute(
             [
@@ -137,6 +138,7 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
             "accountRoot": str(first),
             "cacheRoot": str(work / "cache"),
             "files": manifest["files"],
+            "artifacts": {},
         }
         output = execute(
             [

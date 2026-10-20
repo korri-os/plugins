@@ -465,25 +465,21 @@ Refresh those snapshots from the committed producer, never from a working tree.
 
 The acquisition port is grounded in Core base
 `129e4381154622579e38819852ee935195ab8161` (ADR 0012). Build metadata also needs
-Core's `korri-publish declaration` command, introduced by
-`32367c49f129e57a8efdb5cf56700240f1b1e6c1`. The committed Core input
-`c9d541159ecd7a36be8b0290fb9c80d25c95ad9a` is too old. Until the compatible
-Core revision is reachable, use an explicit local override for checks:
+Core's `korri-publish declaration` command. The committed Core input is
+`github:korri-os/korri/8166648d49f47014a5c2f0cd99a36d4717c4f010`
+("feat(plugin-host): expose closed declaration metadata to builders"), which
+provides that command and the current launch contract. Run the checks against
+the checked-in lock, without an input override:
 
 ```sh
-nix build --no-link --override-input korri "git+file://$CORE_CHECKOUT" \
+nix build --no-link \
   .#checks.x86_64-linux.korri-steam-declaration \
   .#checks.x86_64-linux.korri-proton-tool-name \
   .#checks.x86_64-linux.korri-steam-package
 ```
 
-Stage intended source files before using the Git-filtered override. Ignored build
-caches must not enter the source snapshot. Do not commit that local path or a
-nonexistent remote pin. Publication is
-blocked until Core lands and is published, this repository pins that reachable
-revision, and both architectures pass again at the exact publication source.
-No contract or signature check is bypassed by the override. The old pin is
-expected to fail, not silently accept the new declarations.
+Publication still needs both architectures to pass again at the exact
+publication source, and separate approval.
 
 Proton's declaration alone defines the artifact version. Build-time evaluation
 feeds its derived tool name to both Proton and Steam builders. The existing

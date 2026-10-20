@@ -109,6 +109,7 @@ def command(quest, account):
         "accountRoot": str(account),
         "cacheRoot": str(root / "cache"),
         "files": manifest["files"],
+        "artifacts": {},
     }
     return [
         korrid,

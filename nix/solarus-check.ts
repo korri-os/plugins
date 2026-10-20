@@ -59,6 +59,7 @@ try {
       accountRoot,
       cacheRoot: join(work, "cache"),
       files: manifest.files,
+      artifacts: {},
     }
     const expected = {
       command: recordArguments,

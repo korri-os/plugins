@@ -28,6 +28,7 @@ const launch = plugin.handlers["launch.prepare"]({
   corePath: manifest.files.fake08,
   contentPath: "/tmp/carts/intoruins.p8.png",
   files: manifest.files,
+  artifacts: {},
 })
 assert.equal(launch.command, manifest.files.retroarch)
 assert.deepEqual(launch.args, ["--config", "/tmp/account/retroarch.cfg", "-L", manifest.files.fake08, "/tmp/carts/intoruins.p8.png"])
