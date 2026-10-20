@@ -225,6 +225,65 @@ def check_quest(payload, original, checksums):
 # Original ZQuest Classic quest built for this pack; see lantern-hollow/README.md.
 LANTERN_HOLLOW = "lantern-hollow.qst"
 ZQUEST_PLUGIN = None  # set by main(); keeps the existing check signatures
+# Loaded by intoruins.p8.png (CREDITS.md "offline pair"); it is not a game.
+INTO_RUINS_COMPANION = "intoruins_main.p8.png"
+DECLARED_SYSTEMS = {".p8.png": "pico8", ".solarus": "solarus", ".qst": "zelda-classic"}
+CREDIT_ROW = re.compile(r"\| \[([^\]]+)\]\([^)]*\) \|.*\| `([^`]+)`")
+
+
+def credited_titles(payload):
+    """Map each credited game's first named file to its CREDITS.md title."""
+    titles = {}
+    for line in (payload / "CREDITS.md").read_text().splitlines():
+        match = CREDIT_ROW.match(line)
+        if match:
+            title, name = match.groups()
+            require(name not in titles, "duplicate credited file: " + name)
+            titles[name] = title
+    return titles
+
+
+def check_games(games, payload):
+    """Declared games must be exactly the credited files, titles and hashes."""
+    checksums = read_checksums(payload)
+    titles = credited_titles(payload)
+    require(
+        set(titles) == set(checksums) - {INTO_RUINS_COMPANION},
+        "credits do not name every payload game file",
+    )
+    expected = {}
+    for name, title in titles.items():
+        system = next(
+            (s for suffix, s in DECLARED_SYSTEMS.items() if name.endswith(suffix)), None
+        )
+        require(system is not None, "no declared system for " + name)
+        expected[checksums[name]] = (title, system)
+    require(isinstance(games, dict) and len(games) == 27, "expected 27 declared games")
+    declared = set()
+    for key, game in games.items():
+        require(
+            re.fullmatch(r"[a-z0-9][a-z0-9._-]*", key) is not None,
+            "invalid declared game key: " + key,
+        )
+        require(set(game) == {"title", "releases"}, "unexpected declared game shape: " + key)
+        releases = game["releases"]
+        require(list(releases) == ["original"], "unexpected declared releases: " + key)
+        release = releases["original"]
+        require(
+            set(release) == {"system", "hashes"} and len(release["hashes"]) == 1,
+            "unexpected declared release shape: " + key,
+        )
+        digest = release["hashes"][0].removeprefix("sha256:")
+        require(
+            release["hashes"][0] == "sha256:" + digest and digest in expected,
+            "declared hash is not a credited game file: " + key,
+        )
+        require(digest not in declared, "game declared twice: " + key)
+        declared.add(digest)
+        title, system = expected[digest]
+        require(game["title"] == title, "declared title differs from CREDITS.md: " + key)
+        require(release["system"] == system, "wrong declared system: " + key)
+    require(declared == set(expected), "a credited game is not declared")
 
 
 def check_lantern_hollow(payload, checksums):
@@ -453,7 +512,7 @@ def check_plugin(plugin, payload, fake08_plugin, solarus_plugin):
     source = (plugin / "plugin.ts").read_text()
     require(
         set(re.findall(r"export const (\w+) =", source))
-        == {"name", "title", "description"},
+        == {"name", "title", "description", "games"},
         "unexpected plugin contribution",
     )
     require('export const name = "starter-pack"' in source, "wrong plugin identity")
@@ -711,11 +770,52 @@ def negative_identity_checks(plugin, payload, fake08_plugin, solarus_plugin):
                 lambda: check_plugin(damaged, payload, fake08_plugin, solarus_plugin),
                 fragment,
             )
-        source_path.write_text(original_source + "\nexport const games = {}\n")
+        source_path.write_text(original_source + "\nexport const controls = {}\n")
         expect_failure(
             lambda: check_plugin(damaged, payload, fake08_plugin, solarus_plugin),
             "unexpected plugin contribution",
         )
+
+
+def negative_game_checks(games, payload):
+    checksums = read_checksums(payload)
+
+    def damaged(change):
+        copy = json.loads(json.dumps(games))
+        change(copy)
+        return copy
+
+    first = next(iter(games))
+    controls = [
+        (lambda g: g.pop(first), "expected 27 declared games"),
+        (
+            lambda g: g[first].__setitem__("title", "celeste_classic_2-5"),
+            "declared title differs from CREDITS.md",
+        ),
+        (
+            lambda g: g[first]["releases"]["original"].__setitem__(
+                "hashes", ["sha256:" + "0" * 64]
+            ),
+            "declared hash is not a credited game file",
+        ),
+        (
+            lambda g: g[first]["releases"]["original"].__setitem__(
+                "hashes", ["sha256:" + checksums[INTO_RUINS_COMPANION]]
+            ),
+            "declared hash is not a credited game file",
+        ),
+        (
+            lambda g: g[first]["releases"]["original"].__setitem__("system", "gba"),
+            "wrong declared system",
+        ),
+        (
+            lambda g: g.__setitem__("Celeste", g.pop(first)),
+            "invalid declared game key",
+        ),
+    ]
+    for change, fragment in controls:
+        broken = damaged(change)
+        expect_failure(lambda: check_games(broken, payload), fragment)
 
 
 def expect_failure(action, fragment):
@@ -729,14 +829,16 @@ def expect_failure(action, fragment):
 
 def main():
     global ZQUEST_PLUGIN
-    if len(sys.argv) != 8:
+    if len(sys.argv) != 9:
         raise SystemExit(
             "usage: check-starter-pack.py PAYLOAD ORIGINAL_FETCHURL_PINS "
-            "QUEST_FETCHURL_PINS PLUGIN FAKE08_PLUGIN SOLARUS_PLUGIN ZQUEST_PLUGIN"
+            "QUEST_FETCHURL_PINS PLUGIN FAKE08_PLUGIN SOLARUS_PLUGIN ZQUEST_PLUGIN "
+            "DECLARED_GAMES_JSON"
         )
     payload, pins, quest_pins, plugin, fake08_plugin, solarus_plugin, ZQUEST_PLUGIN = map(
-        Path, sys.argv[1:]
+        Path, sys.argv[1:8]
     )
+    games = json.loads(Path(sys.argv[8]).read_text())
     originals = json.loads(pins.read_text())
     quests = read_quest_originals(json.loads(quest_pins.read_text()))
     check_payload(payload, originals, quests)
@@ -745,10 +847,13 @@ def main():
     negative_quest_checks(payload, originals, quests)
     negative_dependency_checks(plugin, payload, fake08_plugin, solarus_plugin)
     negative_identity_checks(plugin, payload, fake08_plugin, solarus_plugin)
+    check_games(games, payload)
+    negative_game_checks(games, payload)
     print(
         "Verified 25 original cartridge pins and images, two byte-identical upstream quests, "
         "Lantern Hollow, 28 checksums, 24 PICO-8, two Solarus and one ZQuest credits, "
         "original GPL and source notices, unchanged Starter pack treaty, "
+        "27 declared games matching CREDITS.md titles and SHA256SUMS hashes, "
         "exact FAKE-08/Solarus/ZQuest Classic plugin dependencies, "
         "@korri runtime claims, native ELF files and rejection controls."
     )
