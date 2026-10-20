@@ -55,9 +55,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = gamescopeSource;
       plugin = _: import ../plugins/gamescope/plugin.nix { inherit gamescopePackage; };
     };
-    # Steam on arm64: FEX and Proton-CachyOS download their payloads on first
-    # use into korrid's cache root (Core ADR 0010). Steam requires both exact
-    # outputs, so its manifest names the builds published beside it.
+    # Core ADR 0012: korrid acquires declared artifacts before launch. Steam's
+    # manifest still names the exact runtime plugin builds published beside it.
+    protonToolName = import ../plugins/proton/cachyos/tool-name.nix {
+      inherit pkgs;
+      evaluator = korri.packages.${system}.korri-plugin-host;
+    };
     pluginSourceOnly =
       dir:
       pkgs.lib.fileset.toSource {
@@ -72,7 +75,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     protonPlugin = mkPlugin {
       publisher.namespace = "@korri";
       source = pluginSourceOnly ../plugins/proton;
-      plugin = ../plugins/proton/plugin.nix;
+      plugin = _: import ../plugins/proton/plugin.nix { inherit pkgs protonToolName; };
     };
     steamPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -80,7 +83,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin =
         _:
         import ../plugins/steam/plugin.nix {
-          inherit pkgs fexPlugin protonPlugin;
+          inherit
+            pkgs
+            fexPlugin
+            protonPlugin
+            protonToolName
+            ;
         };
     };
     solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
@@ -252,6 +260,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-proton-package = import ../plugins/proton/packages/plugin-check.nix {
           inherit pkgs;
           plugin = protonPlugin;
+          inherit protonToolName;
         };
         korri-steam-package = import ../plugins/steam/packages/plugin-check.nix {
           inherit pkgs fexPlugin protonPlugin;
@@ -259,6 +268,14 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         };
         korri-fex-source = import ../plugins/fex/packages/check.nix { inherit pkgs; };
         korri-proton-source = import ../plugins/proton/packages/check.nix { inherit pkgs; };
+        korri-proton-tool-name = import ../plugins/proton/packages/tool-name-check.nix {
+          inherit pkgs protonToolName;
+          evaluator = korri.packages.${system}.korri-plugin-host;
+        };
+        korri-steam-declaration = import ../plugins/steam/packages/declaration-check.nix {
+          inherit pkgs;
+          contract = korri.lib.${system}.pluginContract;
+        };
         korri-steam-source = import ../plugins/steam/packages/check.nix { inherit pkgs; };
         korri-gamescope-plugin = import ./gamescope-check.nix {
           inherit pkgs gamescopePackage;

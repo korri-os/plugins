@@ -1,13 +1,10 @@
-{ pkgs }:
+{ pkgs, protonToolName }:
 let
-  # The single Nix definition of the tool name, owned by @korri:proton.
-  protonToolName = (import ../../proton/cachyos/pin.nix).toolName;
   native = import ./steam-korri { inherit pkgs settings; };
-  settingsSource = pkgs.writeText "vdf-settings.py" (
-    pkgs.lib.replaceStrings [ "@protonToolName@" ] [ protonToolName ] (
-      builtins.readFile ../session/vdf-settings.py
-    )
-  );
+  settingsSource = pkgs.runCommand "vdf-settings.py" { } ''
+    substitute ${../session/vdf-settings.py} "$out" \
+      --replace-fail @protonToolName@ "$(cat ${protonToolName})"
+  '';
   settings = pkgs.writeShellApplication {
     name = "steam-vdf-settings";
     runtimeInputs = [ pkgs.python3 ];
@@ -24,14 +21,17 @@ let
       procps
       util-linux
     ];
+    # Substitute before writeShellApplication's syntax and shellcheck checks.
+    derivationArgs.preCheck = ''
+      substituteInPlace "$target" --replace-fail @protonToolName@ "$(cat ${protonToolName})"
+    '';
     text =
       pkgs.lib.replaceStrings
-        [ "@fhs@" "@helpers@" "@settings@" "@protonToolName@" ]
+        [ "@fhs@" "@helpers@" "@settings@" ]
         [
           "${native.fhs}"
           "${native.helpers}"
           "${settings}"
-          protonToolName
         ]
         (builtins.readFile ../session/steam-session.sh);
   };
@@ -55,21 +55,18 @@ let
         exit 2
       fi
       # plugin.ts passes these from the exact required @korri:fex and
-      # @korri:proton builds and korrid's cache root.
-      for name in KORRI_CACHE_ROOT KORRI_FEX_PREPARE KORRI_FEX_CONFIG KORRI_PROTON_CACHYOS_PREPARE; do
+      # @korri:proton builds: the FEX config file and the artifact
+      # directories korrid readied before the launch.
+      for name in KORRI_FEX_CONFIG KORRI_FEX_ROOTFS KORRI_PROTON_CACHYOS; do
         if [[ "''${!name:-}" != /* ]]; then
           echo "steam-session: $name must be an absolute path" >&2
           exit 2
         fi
+        if [[ ! -d "''${!name}" ]]; then
+          echo "steam-session: $name is not a directory" >&2
+          exit 2
+        fi
       done
-      if [[ ! -d "$KORRI_CACHE_ROOT" || ! -w "$KORRI_CACHE_ROOT" ]]; then
-        echo 'steam-session: KORRI_CACHE_ROOT is not a writable directory' >&2
-        exit 2
-      fi
-      if [[ ! -x "$KORRI_FEX_PREPARE" || ! -x "$KORRI_PROTON_CACHYOS_PREPARE" || ! -d "$KORRI_FEX_CONFIG" ]]; then
-        echo 'steam-session: a FEX or Proton runtime file is missing' >&2
-        exit 2
-      fi
       status=0
       dbus-run-session -- ${sessionRun}/bin/steam-session-run "$1" || status=$?
       case "$status" in
@@ -83,6 +80,7 @@ native
 // {
   inherit
     settings
+    settingsSource
     session
     sessionRun
     protonToolName

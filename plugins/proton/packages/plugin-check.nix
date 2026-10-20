@@ -1,15 +1,16 @@
 # Package checks for the built plugin. Build for the target system on a
 # build machine; nothing here downloads Proton.
-{ pkgs, plugin }:
-let
-  cachyos = import ../cachyos/pin.nix;
-in
+{
+  pkgs,
+  plugin,
+  protonToolName,
+}:
 pkgs.runCommand "proton-plugin-package-check"
   {
     nativeBuildInputs = [ pkgs.python3 ];
   }
   ''
-    python3 - ${plugin} ${cachyos.toolName} <<'PY'
+    python3 - ${plugin} "$(cat ${protonToolName})" <<'PY'
     import json
     from pathlib import Path
     import re
@@ -23,16 +24,16 @@ pkgs.runCommand "proton-plugin-package-check"
     assert manifest['services'] == {}
     assert 'requires' not in manifest
     files = manifest['files']
-    assert sorted(files) == ['cachyos-prepare'], files
-    prepare = files['cachyos-prepare']
+    assert sorted(files) == ['cachyos-unpack'], files
+    unpack = files['cachyos-unpack']
     # The program installs the vdf it references from its own closure.
-    vdfs = re.findall(r'/nix/store/[^"]+/compatibilitytool[.]vdf', Path(prepare).read_text())
+    vdfs = re.findall(r'/nix/store/[^"]+/compatibilitytool[.]vdf', Path(unpack).read_text())
     assert len(vdfs) == 1, vdfs
     vdf = Path(vdfs[0]).read_text()
     assert f'"{tool}"' in vdf and '@' not in vdf, vdf
-    for arguments in ([], ['relative'], ['/nonexistent-cache-root']):
-        result = subprocess.run([prepare, *arguments], capture_output=True)
-        assert result.returncode == 2, (arguments, result)
+    for arguments in ([], ['/nonexistent-work-dir'], ['/nonexistent-work-dir', '/nonexistent.tar.xz']):
+        result = subprocess.run([unpack, *arguments], capture_output=True)
+        assert result.returncode == 1, (arguments, result)
         assert not result.stdout, result.stdout
     PY
     touch "$out"

@@ -455,3 +455,41 @@ and mismatched metadata. GitHub operations use a
 file-backed test process. Live release downloads and physical ARM installation
 remain separate acceptance gates. No claim of live verification follows from
 these tests.
+
+## Steam acquisition ownership cut (#110, #113)
+
+This repository owns Steam, FEX and Proton declarations, native recipes,
+scripts and plugin tests. Core keeps mechanically copied declaration snapshots
+for its consumer integration tests, with the producer commit and SHA-256 hashes.
+Refresh those snapshots from the committed producer, never from a working tree.
+
+The acquisition port is grounded in Core base
+`129e4381154622579e38819852ee935195ab8161` (ADR 0012). Build metadata also needs
+Core's `korri-publish declaration` command, introduced by
+`32367c49f129e57a8efdb5cf56700240f1b1e6c1`. The committed Core input
+`c9d541159ecd7a36be8b0290fb9c80d25c95ad9a` is too old. Until the compatible
+Core revision is reachable, use an explicit local override for checks:
+
+```sh
+nix build --no-link --override-input korri "path:$CORE_CHECKOUT" \
+  .#checks.x86_64-linux.korri-steam-declaration \
+  .#checks.x86_64-linux.korri-proton-tool-name \
+  .#checks.x86_64-linux.korri-steam-package
+```
+
+Do not commit that local path or a nonexistent remote pin. Publication is
+blocked until Core lands and is published, this repository pins that reachable
+revision, and both architectures pass again at the exact publication source.
+No contract or signature check is bypassed by the override. The old pin is
+expected to fail, not silently accept the new declarations.
+
+Proton's declaration alone defines the artifact version. Build-time evaluation
+feeds its derived tool name to both Proton and Steam builders. The existing
+`proton-cachyos-11.0-20260601-slr-arm64` name and per-game selections stay intact.
+The regression check changes the declaration version and checks both consumers.
+The publisher retains its architecture-specific FEX packaging and Steam's
+second-SIGTERM cleanup and daemon-read-access fixes.
+
+Native package checks are not device or deployment proof. This batch performs
+no publication, VM tests, device tests, deployment, or operational cache reset.
+ADR 0012's cache reset remains an operator action in a later coordinated window.
