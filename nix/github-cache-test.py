@@ -18,6 +18,28 @@ import threading
 import unittest
 
 SCRIPT = Path(__file__).with_name("github-cache.py")
+# Run the real publisher CLI, but record each time.sleep request made by the
+# publisher on stderr instead of waiting. Other callers, such as subprocess's
+# own wait loop, keep the real sleep.
+RECORDED_SLEEP = """
+import runpy, sys, time
+script, wait = sys.argv[1], time.sleep
+def sleep(seconds):
+    if sys._getframe(1).f_code.co_filename != script:
+        return wait(seconds)
+    print(f'slept {seconds}', file=sys.stderr)
+time.sleep = sleep
+sys.argv = sys.argv[1:]
+runpy.run_path(script, run_name='__main__')
+"""
+
+
+def sleeps(result):
+    return [
+        float(line.removeprefix("slept "))
+        for line in result.stderr.splitlines()
+        if line.startswith("slept ")
+    ]
 
 
 def run(*args, env=None, succeeds=True):
@@ -459,6 +481,8 @@ class SignedCache(unittest.TestCase):
         record_batch(third)
         command = [
             sys.executable,
+            "-c",
+            RECORDED_SLEEP,
             str(SCRIPT),
             "publish",
             str(third),
@@ -479,6 +503,8 @@ class SignedCache(unittest.TestCase):
         refused = run(*command, env=env, succeeds=False)
         self.assertIn("release creation failed", refused.stderr)
         self.assertEqual(before, fixture_state.read_bytes())
+        # The failed create was rechecked for the whole bounded wait.
+        self.assertEqual(sum(sleeps(refused)), 60)
         del state["fail_before_release_create"]
         # Another creator (or a lost response) can leave a draft even though
         # our create request failed. Reuse it, without creating another draft.
@@ -504,6 +530,74 @@ class SignedCache(unittest.TestCase):
         refused = upload("nars", third, "build-3", succeeds=False)
         self.assertEqual(before, fixture_state.read_bytes())
         record_batch(third)
+
+        def publish_new(tag, succeeds=True):
+            folder = root / f"github-{tag}"
+            if not folder.exists():
+                run(
+                    sys.executable,
+                    str(SCRIPT),
+                    "prepare",
+                    str(exported),
+                    str(folder),
+                    "--nar-base-url",
+                    base + tag + "/",
+                    env=env,
+                )
+                record_batch(folder)
+            return run(
+                *command[:4],
+                "publish",
+                str(folder),
+                "--repo",
+                "owner/plugins",
+                "--tag",
+                tag,
+                "--cache-tag",
+                "cache",
+                "--revision",
+                "1" * 40,
+                env=env,
+                succeeds=succeeds,
+            )
+
+        def releases(tag):
+            state = json.loads(fixture_state.read_text())
+            return [r for r in state["releases"] if r["tag_name"] == tag]
+
+        # GitHub's release list can lag a successful create. Wait for the new
+        # draft, then publish it, without creating a second release.
+        state = json.loads(fixture_state.read_text())
+        del state["fail_after_release_create"]
+        state["list_lag"] = 3
+        fixture_state.write_text(json.dumps(state))
+        result = publish_new("build-4")
+        self.assertEqual(len(sleeps(result)), 3)
+        [lagged] = releases("build-4")
+        self.assertFalse(lagged["draft"])
+        self.assertNotIn("hidden", json.loads(fixture_state.read_text()))
+        # The same lag can follow a create whose response was lost.
+        state = json.loads(fixture_state.read_text())
+        state.update(fail_after_release_create=True, list_lag=2)
+        fixture_state.write_text(json.dumps(state))
+        result = publish_new("build-5")
+        self.assertEqual(len(sleeps(result)), 2)
+        [lagged] = releases("build-5")
+        self.assertFalse(lagged["draft"])
+        state = json.loads(fixture_state.read_text())
+        del state["fail_after_release_create"]
+        # A release that never appears stops after the bound, before uploads.
+        state["list_lag"] = 1000
+        fixture_state.write_text(json.dumps(state))
+        refused = publish_new("build-6", succeeds=False)
+        self.assertIn("did not appear in GitHub's release list", refused.stderr)
+        self.assertEqual(sum(sleeps(refused)), 60)
+        [missing] = releases("build-6")
+        self.assertTrue(missing["draft"])
+        state = json.loads(fixture_state.read_text())
+        self.assertFalse(any(a["release"] == missing["id"] for a in state["assets"]))
+        del state["hidden"]
+        fixture_state.write_text(json.dumps(state))
         # A conflicting remote file stops before writing anything else.
         state = json.loads(fixture_state.read_text())
         first = next(

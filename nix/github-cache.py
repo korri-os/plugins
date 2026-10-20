@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from urllib.error import HTTPError
 from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, build_opener
@@ -353,6 +354,22 @@ def release_records(repo, tag):
     return found
 
 
+# GitHub's release list can omit a release for a while after its creation.
+# Drafts appear only in that list. Seconds between rechecks; 60 in total.
+RELEASE_LIST_DELAYS = (1, 2, 4, 8, 15, 30)
+
+
+def created_release_records(repo, tag):
+    """Wait a bounded time for a just-created release to appear in the list."""
+    found = release_records(repo, tag)
+    for delay in RELEASE_LIST_DELAYS:
+        if found:
+            break
+        time.sleep(delay)
+        found = release_records(repo, tag)
+    return found
+
+
 def release(repo, tag):
     found = release_records(repo, tag)
     if not found or type(found[0].get("id")) is not int:
@@ -650,8 +667,16 @@ def publish(prepared, repo, tag, cache_tag, revision):
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             # A manual creator can win the race, or GitHub can accept a request
             # whose response is lost. Continue only if exactly one release exists.
-            if not release_records(repo, tag):
+            if not created_release_records(repo, tag):
                 raise
+        else:
+            if not created_release_records(repo, tag):
+                raise ValueError(
+                    f"created release {tag} did not appear in GitHub's release"
+                    f" list after {sum(RELEASE_LIST_DELAYS)} seconds; inspect"
+                    " the repository's releases before a retry, which would"
+                    " create another draft"
+                )
     payload = release(repo, tag)
     upload(prepared, repo, tag, cache_tag, "nars")
     if payload["draft"]:

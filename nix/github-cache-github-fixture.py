@@ -17,14 +17,19 @@ if args[:2] == ["release", "create"]:
     assert "--draft" in args and "--verify-tag" in args
     if state.get("fail_before_release_create"):
         sys.exit("release creation failed")
+    identity = len(state["releases"]) + 1
     state["releases"].append(
         {
-            "id": len(state["releases"]) + 1,
+            "id": identity,
             "tag_name": args[2],
             "draft": True,
             "immutable": False,
         }
     )
+    if state.get("list_lag"):
+        # GitHub's release list can omit a fresh release for a while. Hide this
+        # one from the next list_lag list requests.
+        state.setdefault("hidden", {})[str(identity)] = state.pop("list_lag")
     (root / "state.json").write_text(json.dumps(state))
     if state.get("fail_after_release_create"):
         sys.exit("release appeared while creation failed")
@@ -43,7 +48,17 @@ if parts[3] == "commits":
 elif len(parts) == 4:
     assert parts[3] == "releases"
     page = int(parse_qs(parsed.query)["page"][0])
-    result = state["releases"][(page - 1) * 100 : page * 100]
+    hidden = state.get("hidden", {})
+    result = [r for r in state["releases"] if str(r["id"]) not in hidden]
+    result = result[(page - 1) * 100 : page * 100]
+    if hidden:
+        for identity in list(hidden):
+            hidden[identity] -= 1
+            if hidden[identity] <= 0:
+                del hidden[identity]
+        if not hidden:
+            del state["hidden"]
+        (root / "state.json").write_text(json.dumps(state))
 elif parts[4] == "tags":
     result = next(r for r in state["releases"] if r["tag_name"] == parts[5])
     if result["draft"]:
