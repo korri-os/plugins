@@ -2,12 +2,13 @@
 # and names `cachyos-unpack` as its unpack program. The tool itself is not
 # in the closure: korrid downloads the release plugin.ts pins into its cache
 # and runs cachyos-unpack on it.
-{ pkgs, protonToolName }:
+{ pkgs }:
 let
+  cachyos = import ./cachyos/tool-name.nix;
   compatibilitytool = pkgs.runCommand "korri-proton-cachyos-compatibilitytool" { } ''
     mkdir -p "$out/share"
     substitute ${./cachyos/compatibilitytool.vdf} "$out/share/compatibilitytool.vdf" \
-      --replace-fail @toolName@ "$(cat ${protonToolName})"
+      --replace-fail @toolName@ ${pkgs.lib.escapeShellArg cachyos.toolName}
   '';
   unpack = pkgs.writeShellApplication {
     name = "cachyos-unpack";
@@ -18,8 +19,7 @@ let
       xz
     ];
     text =
-      pkgs.lib.replaceStrings
-        [ "@compatibilitytool@" ]
+      pkgs.lib.replaceStrings [ "@compatibilitytool@" ]
         [ "${compatibilitytool}/share/compatibilitytool.vdf" ]
         (builtins.readFile ./cachyos/unpack.sh);
   };

@@ -1,17 +1,8 @@
-# Build-time metadata only. Evaluate the actual source with Core's closed module
-# loader; do not parse TypeScript or import a derivation during Nix evaluation.
+# Steam's name for the Proton-CachyOS tool: the compatibilitytools.d
+# directory, the compatibilitytool.vdf entry and the CompatToolMapping value.
+# The single Nix definition; plugin.nix and the Steam plugin substitute it.
+# It embeds the artifact version pinned in plugin.ts: the two must move
+# together. No URL, hash or version pin lives here.
 {
-  pkgs,
-  evaluator,
-  source ? ../plugin.ts,
-}:
-pkgs.runCommand "proton-cachyos-tool-name" { nativeBuildInputs = [ pkgs.jq ]; } ''
-  mkdir source
-  cp ${source} source/plugin.ts
-  ${evaluator}/bin/korri-publish declaration @korri "$PWD/source" plugin.ts > declaration.json
-  jq -er '
-    select(.name == "proton" and .artifacts.cachyos.id == "@korri:proton/cachyos") |
-    .artifacts.cachyos.version | select(type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._+-]*$")) |
-    "proton-cachyos-" + .
-  ' declaration.json > "$out"
-''
+  toolName = "proton-cachyos-11.0-20260601-slr-arm64";
+}

@@ -1,16 +1,15 @@
 # Package checks for the built plugin. Build for the target system on a
 # build machine; nothing here downloads Proton.
-{
-  pkgs,
-  plugin,
-  protonToolName,
-}:
+{ pkgs, plugin }:
+let
+  cachyos = import ../cachyos/tool-name.nix;
+in
 pkgs.runCommand "proton-plugin-package-check"
   {
     nativeBuildInputs = [ pkgs.python3 ];
   }
   ''
-    python3 - ${plugin} "$(cat ${protonToolName})" <<'PY'
+    python3 - ${plugin} ${cachyos.toolName} <<'PY'
     import json
     from pathlib import Path
     import re

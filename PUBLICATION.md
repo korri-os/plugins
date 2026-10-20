@@ -464,12 +464,11 @@ for its consumer integration tests, with the producer commit and SHA-256 hashes.
 Refresh those snapshots from the committed producer, never from a working tree.
 
 The acquisition port is grounded in Core base
-`129e4381154622579e38819852ee935195ab8161` (ADR 0012). Build metadata also needs
-Core's `korri-publish declaration` command. The committed Core input is
-`github:korri-os/korri/8166648d49f47014a5c2f0cd99a36d4717c4f010`
-("feat(plugin-host): expose closed declaration metadata to builders"), which
-provides that command and the current launch contract. Run the checks against
-the checked-in lock, without an input override:
+`129e4381154622579e38819852ee935195ab8161` (ADR 0012). No plugin build runs
+Core's host: Proton's tool name is written by hand in
+`plugins/proton/cachyos/tool-name.nix`, as in Core, and `korri-proton-tool-name`
+checks it against the artifact version in `plugin.ts` as text. Run the checks
+against the checked-in lock, without an input override:
 
 ```sh
 nix build --no-link \
@@ -481,10 +480,9 @@ nix build --no-link \
 Publication still needs both architectures to pass again at the exact
 publication source, and separate approval.
 
-Proton's declaration alone defines the artifact version. Build-time evaluation
-feeds its derived tool name to both Proton and Steam builders. The existing
+Proton's declaration defines the artifact version; the hand-written tool name
+must embed it, and the check fails when the two diverge. The existing
 `proton-cachyos-11.0-20260601-slr-arm64` name and per-game selections stay intact.
-The regression check changes the declaration version and checks both consumers.
 The publisher retains its architecture-specific FEX packaging and Steam's
 second-SIGTERM cleanup and daemon-read-access fixes.
 

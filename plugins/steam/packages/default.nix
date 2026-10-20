@@ -1,10 +1,13 @@
-{ pkgs, protonToolName }:
+{ pkgs }:
 let
+  # The single Nix definition of the tool name, owned by @korri:proton.
+  protonToolName = (import ../../proton/cachyos/tool-name.nix).toolName;
   native = import ./steam-korri { inherit pkgs settings; };
-  settingsSource = pkgs.runCommand "vdf-settings.py" { } ''
-    substitute ${../session/vdf-settings.py} "$out" \
-      --replace-fail @protonToolName@ "$(cat ${protonToolName})"
-  '';
+  settingsSource = pkgs.writeText "vdf-settings.py" (
+    pkgs.lib.replaceStrings [ "@protonToolName@" ] [ protonToolName ] (
+      builtins.readFile ../session/vdf-settings.py
+    )
+  );
   settings = pkgs.writeShellApplication {
     name = "steam-vdf-settings";
     runtimeInputs = [ pkgs.python3 ];
@@ -21,17 +24,14 @@ let
       procps
       util-linux
     ];
-    # Substitute before writeShellApplication's syntax and shellcheck checks.
-    derivationArgs.preCheck = ''
-      substituteInPlace "$target" --replace-fail @protonToolName@ "$(cat ${protonToolName})"
-    '';
     text =
       pkgs.lib.replaceStrings
-        [ "@fhs@" "@helpers@" "@settings@" ]
+        [ "@fhs@" "@helpers@" "@settings@" "@protonToolName@" ]
         [
           "${native.fhs}"
           "${native.helpers}"
           "${settings}"
+          protonToolName
         ]
         (builtins.readFile ../session/steam-session.sh);
   };

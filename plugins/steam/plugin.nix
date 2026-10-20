@@ -5,10 +5,9 @@
   pkgs,
   fexPlugin,
   protonPlugin,
-  protonToolName,
 }:
 let
-  steam = import ./packages { inherit pkgs protonToolName; };
+  steam = import ./packages { inherit pkgs; };
 in
 {
   requires = [

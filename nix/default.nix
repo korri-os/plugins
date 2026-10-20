@@ -57,10 +57,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     };
     # Core ADR 0012: korrid acquires declared artifacts before launch. Steam's
     # manifest still names the exact runtime plugin builds published beside it.
-    protonToolName = import ../plugins/proton/cachyos/tool-name.nix {
-      inherit pkgs;
-      evaluator = korri.packages.${system}.korri-plugin-host;
-    };
+    # Proton's tool name is written by hand (cachyos/tool-name.nix), so no
+    # plugin build runs Core's host.
     pluginSourceOnly =
       dir:
       pkgs.lib.fileset.toSource {
@@ -75,7 +73,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     protonPlugin = mkPlugin {
       publisher.namespace = "@korri";
       source = pluginSourceOnly ../plugins/proton;
-      plugin = _: import ../plugins/proton/plugin.nix { inherit pkgs protonToolName; };
+      plugin = ../plugins/proton/plugin.nix;
     };
     steamPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -83,12 +81,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin =
         _:
         import ../plugins/steam/plugin.nix {
-          inherit
-            pkgs
-            fexPlugin
-            protonPlugin
-            protonToolName
-            ;
+          inherit pkgs fexPlugin protonPlugin;
         };
     };
     # Acquisition plugins (Core ADR 0013/0014): source only. pico8 is a search
@@ -289,7 +282,6 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-proton-package = import ../plugins/proton/packages/plugin-check.nix {
           inherit pkgs;
           plugin = protonPlugin;
-          inherit protonToolName;
         };
         korri-steam-package = import ../plugins/steam/packages/plugin-check.nix {
           inherit pkgs fexPlugin protonPlugin;
@@ -297,10 +289,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         };
         korri-fex-source = import ../plugins/fex/packages/check.nix { inherit pkgs; };
         korri-proton-source = import ../plugins/proton/packages/check.nix { inherit pkgs; };
-        korri-proton-tool-name = import ../plugins/proton/packages/tool-name-check.nix {
-          inherit pkgs protonToolName;
-          evaluator = korri.packages.${system}.korri-plugin-host;
-        };
+        korri-proton-tool-name = import ../plugins/proton/packages/tool-name-check.nix { inherit pkgs; };
         korri-steam-declaration = import ../plugins/steam/packages/declaration-check.nix {
           inherit pkgs;
           contract = korri.lib.${system}.pluginContract;

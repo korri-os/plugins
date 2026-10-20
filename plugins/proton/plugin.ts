@@ -13,7 +13,8 @@ export const description =
 export const artifacts = {
   cachyos: {
     id: "@korri:proton/cachyos",
-    // Build metadata derives Steam's tool name from this artifact version.
+    // Steam's tool name in cachyos/tool-name.nix embeds this version: the
+    // two must move together.
     version: "11.0-20260601-slr-arm64",
     files: [
       {
