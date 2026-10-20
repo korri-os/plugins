@@ -250,7 +250,13 @@ def main():
             # Gamescope (through GTK) and Solarus (through SDL) reach the same
             # OpenSSH-backed fetch graph. Core 1c758a01b and f1de4b8fe added
             # them to the Mini V2 selection this check evaluates.
-            fetch_graph_plugins = {'korri-plugin-gamescope', 'korri-plugin-solarus'} & set(baseline['packages'])
+            # Steam's FHS rootfs (plugins/steam/packages/steam-korri/fhs.nix)
+            # reaches it through zenity (GTK4) and sdl2-compat. Core 9ff6e1644
+            # added Steam to that selection. Only steam-session's drv changes;
+            # the derived Proton tool name does not reach OpenSSH.
+            fetch_graph_plugins = {
+                'korri-plugin-gamescope', 'korri-plugin-solarus', 'korri-plugin-steam',
+            } & set(baseline['packages'])
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),
                 ('contract', publisher, contract, set(), {'korri-libretro-typecheck'}),
