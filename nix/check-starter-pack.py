@@ -243,8 +243,8 @@ def credited_titles(payload):
     return titles
 
 
-def check_games(games, payload):
-    """Declared games must be exactly the credited files, titles and hashes."""
+def check_games(games, payload, files):
+    """Declared games must use each credited package file once with its real hash."""
     checksums = read_checksums(payload)
     titles = credited_titles(payload)
     require(
@@ -260,30 +260,80 @@ def check_games(games, payload):
         expected[checksums[name]] = (title, system)
     require(isinstance(games, dict) and len(games) == 27, "expected 27 declared games")
     declared = set()
+    used_files = set()
     for key, game in games.items():
         require(
             re.fullmatch(r"[a-z0-9][a-z0-9._-]*", key) is not None,
             "invalid declared game key: " + key,
         )
-        require(set(game) == {"title", "releases"}, "unexpected declared game shape: " + key)
+        require(
+            set(game) == {"title", "releases"}, "unexpected declared game shape: " + key
+        )
         releases = game["releases"]
         require(list(releases) == ["original"], "unexpected declared releases: " + key)
         release = releases["original"]
         require(
-            set(release) == {"system", "hashes"} and len(release["hashes"]) == 1,
+            set(release) == {"system", "hashes", "file"}
+            and len(release["hashes"]) == 1,
             "unexpected declared release shape: " + key,
         )
+        file = release["file"]
+        require(
+            isinstance(file, dict) and set(file) == {"packageFile", "path"},
+            "expected a packageFile release file: " + key,
+        )
+        package_file = file["packageFile"]
+        require(
+            isinstance(package_file, str) and package_file in files,
+            "unknown manifest file key: " + key,
+        )
+        name = file["path"]
+        require(
+            isinstance(name, str)
+            and bool(name)
+            and not PurePosixPath(name).is_absolute()
+            and not {"", ".", ".."}.intersection(name.split("/"))
+            and "\\" not in name
+            and "\0" not in name,
+            "unsafe package file path: " + key,
+        )
+        root = Path(files[package_file]).resolve()
+        require(root.is_dir(), "packageFile must name a directory: " + key)
+        path = root / name
+        require(
+            path.resolve().is_relative_to(root),
+            "package file escapes manifest directory: " + key,
+        )
+        regular_file(path, "missing regular package file: " + key)
+        require(path.resolve() not in used_files, "package file used twice: " + key)
+        used_files.add(path.resolve())
         digest = release["hashes"][0].removeprefix("sha256:")
         require(
             release["hashes"][0] == "sha256:" + digest and digest in expected,
             "declared hash is not a credited game file: " + key,
         )
+        require(
+            "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+            in release["hashes"],
+            "package file hash differs from release: " + key,
+        )
         require(digest not in declared, "game declared twice: " + key)
         declared.add(digest)
         title, system = expected[digest]
-        require(game["title"] == title, "declared title differs from CREDITS.md: " + key)
+        require(
+            game["title"] == title, "declared title differs from CREDITS.md: " + key
+        )
         require(release["system"] == system, "wrong declared system: " + key)
     require(declared == set(expected), "a credited game is not declared")
+    require(
+        used_files
+        == {
+            path.resolve()
+            for path in (payload / "cartridges").iterdir()
+            if path.name != INTO_RUINS_COMPANION
+        },
+        "every cartridge except Into Ruins' companion must be used exactly once",
+    )
 
 
 def check_lantern_hollow(payload, checksums):
@@ -355,8 +405,9 @@ def check_payload(payload, originals, quests):
     instructions = (payload / "README.md").read_text()
     require("no PICO-8 application" in instructions, "missing player exclusion")
     require(
-        "does not perform that step or add game tiles" in instructions,
-        "missing manual-registration limit",
+        "Installed and enabled, the pack adds its 27 games to the Korri library"
+        in instructions,
+        "missing package library registration instructions",
     )
     notices = payload / "notices"
     require(len(list(notices.glob("*.txt"))) == 25, "missing publisher notices")
@@ -777,7 +828,7 @@ def negative_identity_checks(plugin, payload, fake08_plugin, solarus_plugin):
         )
 
 
-def negative_game_checks(games, payload):
+def negative_game_checks(games, payload, files):
     checksums = read_checksums(payload)
 
     def damaged(change):
@@ -813,9 +864,90 @@ def negative_game_checks(games, payload):
             "invalid declared game key",
         ),
     ]
+    second = list(games)[1]
+    for field, value, fragment in [
+        ("file", {"url": "https://example.invalid/cart"}, "expected a packageFile"),
+        (
+            "file",
+            {"packageFile": "absent", "path": "cart"},
+            "unknown manifest file key",
+        ),
+        ("artifacts", [], "unexpected declared release shape"),
+    ]:
+        controls.append(
+            (
+                lambda g, f=field, v=value: g[first]["releases"][
+                    "original"
+                ].__setitem__(f, v),
+                fragment,
+            )
+        )
+    controls.append(
+        (
+            lambda g: g[first]["releases"]["original"].pop("file"),
+            "unexpected declared release shape",
+        )
+    )
+    for name, fragment in [
+        *[
+            (name, "unsafe package file path")
+            for name in [
+                "",
+                "/tmp/cart",
+                "../cart",
+                "cartridges/../../cart",
+                "./cart",
+                "nested//cart",
+                "nested/./cart",
+                "nested/../cart",
+                "cart/",
+                "a\\b",
+                "a\0b",
+            ]
+        ],
+        ("missing.p8.png", "missing regular package file"),
+        (
+            games[second]["releases"]["original"]["file"]["path"],
+            "package file hash differs",
+        ),
+        (INTO_RUINS_COMPANION, "package file hash differs"),
+    ]:
+        controls.append(
+            (
+                lambda g, n=name: g[first]["releases"]["original"]["file"].__setitem__(
+                    "path", n
+                ),
+                fragment,
+            )
+        )
+    controls.append(
+        (lambda g: g.__setitem__(second, g[first]), "package file used twice")
+    )
     for change, fragment in controls:
         broken = damaged(change)
-        expect_failure(lambda: check_games(broken, payload), fragment)
+        expect_failure(lambda: check_games(broken, payload, files), fragment)
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory) / "cartridges"
+        root.mkdir()
+        (root / "escape").symlink_to(payload / "cartridges", target_is_directory=True)
+        broken = damaged(
+            lambda g: g[first]["releases"]["original"]["file"].__setitem__(
+                "path", "escape/" + games[first]["releases"]["original"]["file"]["path"]
+            )
+        )
+        expect_failure(
+            lambda: check_games(broken, payload, {**files, "cartridges": str(root)}),
+            "package file escapes manifest directory",
+        )
+        broken = damaged(
+            lambda g: g[first]["releases"]["original"]["file"].__setitem__(
+                "packageFile", "credits"
+            )
+        )
+        expect_failure(
+            lambda: check_games(broken, payload, files),
+            "packageFile must name a directory",
+        )
 
 
 def expect_failure(action, fragment):
@@ -847,13 +979,14 @@ def main():
     negative_quest_checks(payload, originals, quests)
     negative_dependency_checks(plugin, payload, fake08_plugin, solarus_plugin)
     negative_identity_checks(plugin, payload, fake08_plugin, solarus_plugin)
-    check_games(games, payload)
-    negative_game_checks(games, payload)
+    files = json.loads((plugin / "manifest.json").read_text())["files"]
+    check_games(games, payload, files)
+    negative_game_checks(games, payload, files)
     print(
         "Verified 25 original cartridge pins and images, two byte-identical upstream quests, "
         "Lantern Hollow, 28 checksums, 24 PICO-8, two Solarus and one ZQuest credits, "
         "original GPL and source notices, unchanged Starter pack treaty, "
-        "27 declared games matching CREDITS.md titles and SHA256SUMS hashes, "
+        "27 declared games matching CREDITS.md titles, SHA256SUMS hashes and safe package files, "
         "exact FAKE-08/Solarus/ZQuest Classic plugin dependencies, "
         "@korri runtime claims, native ELF files and rejection controls."
     )
