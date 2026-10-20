@@ -97,14 +97,20 @@ Published licenses do not independently prove every contributor's ownership or g
 
 ## Korri integration
 
-`plugin.ts` exports identity only.
+`plugin.ts` exports identity and declared games (Core ADR 0003).
+Each of the 27 games names its `CREDITS.md` title, its system and the
+SHA-256 hash from `SHA256SUMS`. When a paired library folder holds one of
+these exact files, the library shows the game under that title instead of its
+file name. The declaration names no file inside this package, so installing
+the pack still adds no library entries. `intoruins_main.p8.png` is Into Ruins'
+companion cartridge and is not declared.
 `plugin.nix` uses the existing native `packages`, `files` and `requires` fields.
 Dependencies name exact FAKE-08 and Solarus Korri plugin outputs, not raw cores,
 engines or frontend packages.
 Core's supported builder generates the plugin manifest.
 The `files.cartridges` entry names the packaged cartridge directory.
 The other named files expose credits, license, notices, checksums and these instructions.
-There are no game, runner, discovery, service or permission contributions.
+There are no runner, discovery, service or permission contributions.
 
 This package claims `@korri:starter-pack` with the displayed title `Starter pack`.
 That manifest claim alone establishes no device trust.

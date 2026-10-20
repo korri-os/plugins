@@ -34,8 +34,18 @@ let
 in
 pkgs.runCommand "korri-starter-pack-package-check" { } ''
   payload=${cartridges}/share/starter-pack
+  # Evaluate the packaged plugin.ts itself, so the check reads the declared
+  # games exactly as published rather than a second copy of them.
+  mkdir -p "$TMPDIR/declaration"
+  echo '{"type":"module"}' > "$TMPDIR/declaration/package.json"
+  ${pkgs.typescript}/bin/tsc --target es2022 --module es2022 \
+    --outDir "$TMPDIR/declaration" ${package}/plugin.ts
+  ${pkgs.nodejs}/bin/node --input-type=module -e \
+    "import * as plugin from '$TMPDIR/declaration/plugin.js'; console.log(JSON.stringify(plugin.games))" \
+    > "$TMPDIR/games.json"
   ${python}/bin/python ${./check-starter-pack.py} \
-    "$payload" ${pins} ${questPins} ${package} ${fake08Plugin} ${solarusPlugin} ${zquestPlugin}
+    "$payload" ${pins} ${questPins} ${package} ${fake08Plugin} ${solarusPlugin} ${zquestPlugin} \
+    "$TMPDIR/games.json"
   ${pkgs.typescript}/bin/tsc --noEmit --strict --target es2022 ${package}/plugin.ts
   for file in CREDITS.md README.md CC-BY-NC-SA-4.0.txt; do
     cmp ${source}/"$file" "$payload/$file"
