@@ -10,7 +10,7 @@ pkgs.runCommand "proton-plugin-package-check"
     nativeBuildInputs = [ pkgs.python3 ];
   }
   ''
-    python3 - ${plugin} "$(cat ${protonToolName})" <<'PY'
+    python3 - ${plugin} ${pkgs.lib.escapeShellArg protonToolName} <<'PY'
     import json
     from pathlib import Path
     import re

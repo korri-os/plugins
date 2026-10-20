@@ -7,7 +7,7 @@ let
   compatibilitytool = pkgs.runCommand "korri-proton-cachyos-compatibilitytool" { } ''
     mkdir -p "$out/share"
     substitute ${./cachyos/compatibilitytool.vdf} "$out/share/compatibilitytool.vdf" \
-      --replace-fail @toolName@ "$(cat ${protonToolName})"
+      --replace-fail @toolName@ ${pkgs.lib.escapeShellArg protonToolName}
   '';
   unpack = pkgs.writeShellApplication {
     name = "cachyos-unpack";

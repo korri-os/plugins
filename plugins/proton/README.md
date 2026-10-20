@@ -33,17 +33,24 @@ See ADR 0012.
 
 ## Tool name
 
-`plugin.ts` is the only version source. `cachyos/tool-name.nix` uses Core's
-`korri-publish declaration` command at build time to evaluate it in the empty
-sandbox. It derives `proton-cachyos-11.0-20260601-slr-arm64` from
-`artifacts.cachyos.version`. Builders read the result and substitute it into
-`compatibilitytool.vdf`, the Steam session and the VDF settings helper. Nix
-evaluation does not read build outputs. No compiled declaration is shipped.
-The current tool name and existing per-game selections are unchanged.
+`plugin.ts` is the only version source. During Nix evaluation,
+`cachyos/tool-name.nix` reads `artifacts.cachyos.version` and derives
+`proton-cachyos-11.0-20260601-slr-arm64`. It accepts only one `version:` in the
+file, inside the cachyos artifact; any other form stops evaluation. Builders
+substitute the string into `compatibilitytool.vdf`, the Steam session and the
+VDF settings helper. Nix evaluation does not read build outputs. No compiled
+declaration is shipped. The current tool name and existing per-game selections
+are unchanged.
 
-`korri-proton-tool-name` changes the real declaration's version and checks all
-three generated consumers. The metadata step needs the matching Core evaluator
-on the build machine; it does not run on a device.
+The packages do not run Core's evaluator. A build step that ran it made the
+Proton and Steam output paths depend on Core's host build: every Core host
+change would have changed them.
+
+Core's `korri-publish declaration` command stays the source of truth.
+`korri-proton-tool-name` checks that it derives the same name from the real
+declaration. It also changes the declaration's version and checks all three
+generated consumers. Only this check needs the matching Core evaluator on the
+build machine; it does not run on a device.
 
 `compatibilitytool.vdf` is the legacy file with one change: `install_path` is
 `.`. The file sits inside the tool directory, and Valve's own template in the

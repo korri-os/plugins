@@ -57,10 +57,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     };
     # Core ADR 0012: korrid acquires declared artifacts before launch. Steam's
     # manifest still names the exact runtime plugin builds published beside it.
-    protonToolName = import ../plugins/proton/cachyos/tool-name.nix {
-      inherit pkgs;
-      evaluator = korri.packages.${system}.korri-plugin-host;
-    };
+    # A plain string read during evaluation; korri-proton-tool-name checks it
+    # against Core's evaluator. Plugin builds take no host recipe.
+    protonToolName = import ../plugins/proton/cachyos/tool-name.nix { inherit (pkgs) lib; };
     pluginSourceOnly =
       dir:
       pkgs.lib.fileset.toSource {

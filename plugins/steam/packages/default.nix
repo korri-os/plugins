@@ -3,7 +3,7 @@ let
   native = import ./steam-korri { inherit pkgs settings; };
   settingsSource = pkgs.runCommand "vdf-settings.py" { } ''
     substitute ${../session/vdf-settings.py} "$out" \
-      --replace-fail @protonToolName@ "$(cat ${protonToolName})"
+      --replace-fail @protonToolName@ ${pkgs.lib.escapeShellArg protonToolName}
   '';
   settings = pkgs.writeShellApplication {
     name = "steam-vdf-settings";
@@ -21,17 +21,14 @@ let
       procps
       util-linux
     ];
-    # Substitute before writeShellApplication's syntax and shellcheck checks.
-    derivationArgs.preCheck = ''
-      substituteInPlace "$target" --replace-fail @protonToolName@ "$(cat ${protonToolName})"
-    '';
     text =
       pkgs.lib.replaceStrings
-        [ "@fhs@" "@helpers@" "@settings@" ]
+        [ "@fhs@" "@helpers@" "@settings@" "@protonToolName@" ]
         [
           "${native.fhs}"
           "${native.helpers}"
           "${settings}"
+          protonToolName
         ]
         (builtins.readFile ../session/steam-session.sh);
   };
