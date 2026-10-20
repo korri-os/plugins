@@ -7,7 +7,7 @@ Into Ruins needs the developer's two-file offline release.
 The pack contains credits, source notices, game licenses and checksums.
 The PICO-8 cartridges remain noncommercial CC BY-NC-SA 4.0. The Solarus quests
 retain their own GPL code and individual media grants. Lantern Hollow is CC0.
-It includes no PICO-8 application, emulator, native service, installer or library registration.
+It includes no PICO-8 application, emulator, native service, or installer.
 
 ## Use the cartridges
 
@@ -18,8 +18,9 @@ The standalone cartridge output has no player dependency; supply a compatible pl
 Copy the complete pack to the device.
 Keep `CREDITS.md`, `CC-BY-NC-SA-4.0.txt` and `notices/` with the content when sharing it.
 The noncommercial PICO-8 license does not replace the Solarus file licenses.
-Add the `cartridges/` folder manually to your player's library or cartridge search path.
-Installing this Korri package does not perform that step or add game tiles.
+Installed and enabled, the pack adds its 27 games to the Korri library.
+When using the standalone output, add the `cartridges/` folder manually to your
+player's library or cartridge search path.
 
 The PNG images contain code, graphics, maps and sound data.
 Do not resize, image-optimize or resave them as ordinary images.
@@ -51,7 +52,7 @@ links the fixed original source revisions and records the layout change.
 
 Solarus keeps native saves under the account root supplied by Korri, not the
 content folder or the desktop user's HOME. Installing or updating this pack
-does not move saves, register games, or change existing library folder records.
+does not move saves or change existing library folder records.
 A device that already uses the personal `@simonwjackson:solarus` plugin needs
 separate normal approval for `@korri:solarus`; no identity alias is installed.
 
@@ -92,6 +93,8 @@ Building requires the pinned original files to remain available or already exist
 A changed download fails its hash check rather than silently updating a game.
 The checks verify package contents, cartridge structure, original quest file
 bytes, native metadata placement, exact runtime dependencies and byte hashes.
+They also verify safe package-file paths, manifest keys and one release per
+cartridge, except for Into Ruins' companion.
 They check the presence of credits, license text and source notices, not rights ownership or gameplay.
 Published licenses do not independently prove every contributor's ownership or grant creator endorsement.
 
@@ -99,13 +102,14 @@ Published licenses do not independently prove every contributor's ownership or g
 
 `plugin.ts` exports identity and declared games (Core ADR 0003).
 Each of the 27 games names its `CREDITS.md` title, its system and the
-SHA-256 hash from `SHA256SUMS`. When a paired library folder holds one of
-these exact files, the library shows the game under that title instead of its
-file name. The declaration names no file inside this package, so installing
-the pack still adds no library entries. `intoruins_main.p8.png` is Into Ruins'
-companion cartridge and is not declared.
+SHA-256 hash from `SHA256SUMS`. Each release points to its content through
+`file: { packageFile: "cartridges", path: "<file name>" }`, where `cartridges`
+is the manifest's `files` key for `share/starter-pack/cartridges`. It lists no
+`artifacts`; the hash stays the SHA-256 of the content file. Installed and
+enabled, the pack's games appear in the library without a paired library folder.
+`intoruins_main.p8.png` is Into Ruins' companion cartridge and is not declared.
 `plugin.nix` uses the existing native `packages`, `files` and `requires` fields.
-Dependencies name exact FAKE-08 and Solarus Korri plugin outputs, not raw cores,
+Dependencies name exact FAKE-08, Solarus and ZQuest Classic Korri plugin outputs, not raw cores,
 engines or frontend packages.
 Core's supported builder generates the plugin manifest.
 The `files.cartridges` entry names the packaged cartridge directory.
@@ -116,6 +120,6 @@ This package claims `@korri:starter-pack` with the displayed title `Starter pack
 That manifest claim alone establishes no device trust.
 Building does not sign or publish a cache, configure a signing key, install trust or approve device installation.
 Normal signature checks and exact-package approval remain required for plugin installation.
-This pack, FAKE-08 and Solarus need approval for their exact outputs under the
+This pack, FAKE-08, Solarus and ZQuest Classic need approval for their exact outputs under the
 administrator's `@korri` publisher binding.
 No command in this package installs that trust binding.
