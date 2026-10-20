@@ -249,8 +249,12 @@ def main():
             runtime_wrappers = with_dependents(runtime_plugins, baseline)
             # Gamescope (through GTK) and Solarus (through SDL) reach the same
             # OpenSSH-backed fetch graph. Core 1c758a01b and f1de4b8fe added
-            # them to the Mini V2 selection this check evaluates.
-            fetch_graph_plugins = {'korri-plugin-gamescope', 'korri-plugin-solarus'} & set(baseline['packages'])
+            # them to the Mini V2 selection this check evaluates. Steam's
+            # session reaches it through its FHS environment (zenity, GTK 4,
+            # spandsp, Netpbm); Core 9ff6e1644 added Steam to that selection.
+            fetch_graph_plugins = {
+                'korri-plugin-gamescope', 'korri-plugin-solarus', 'korri-plugin-steam',
+            } & set(baseline['packages'])
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),
                 ('contract', publisher, contract, set(), {'korri-libretro-typecheck'}),
