@@ -26,6 +26,9 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-plugin-gamescope` | `@korri:gamescope` | `plugins/gamescope/` |
 | `gamescope` | Standalone Gamescope 3.16.18 with nested Wayland touch | `plugins/gamescope/` |
 | `korri-plugin-starter-pack` | `@korri:starter-pack` | `plugins/starter-pack/` |
+| `korri-plugin-pico8` | `@korri:pico8` (PICO-8 BBS search provider; declared host `www.lexaloffle.com`) | `plugins/pico8/` |
+| `korri-plugin-homebrewhub` | `@korri:homebrewhub` (declared games with pinned artifacts) | `plugins/homebrewhub/` |
+| `korri-plugin-retrobrews` | `@korri:retrobrews` (declared games with pinned artifacts) | `plugins/retrobrews/` |
 | `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
 | `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |

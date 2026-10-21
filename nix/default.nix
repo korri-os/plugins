@@ -90,6 +90,32 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
             ;
         };
     };
+    # Acquisition plugins (Core ADR 0013/0014): source only. pico8 is a search
+    # provider that names the hosts korrid may reach for it; homebrewhub and
+    # retrobrews declare games with pinned artifacts. Tests, fixtures and live
+    # probes stay in this repository.
+    acquisitionPlugin =
+      name:
+      mkPlugin {
+        publisher.namespace = "@korri";
+        source = pluginSourceOnly (../plugins + "/${name}");
+        plugin = ../plugins + "/${name}/plugin.nix";
+      };
+    pico8Plugin = acquisitionPlugin "pico8";
+    homebrewhubPlugin = acquisitionPlugin "homebrewhub";
+    retrobrewsPlugin = acquisitionPlugin "retrobrews";
+    acquisitionCheck =
+      name: package: hosts:
+      import ./acquisition-plugin-check.nix {
+        inherit
+          pkgs
+          package
+          name
+          hosts
+          ;
+        contract = korri.lib.${system}.pluginContract;
+        hostPackage = korri.packages.${system}.korri-plugin-host;
+      };
     solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
     solarusPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -195,6 +221,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-fex = fexPlugin;
       korri-plugin-proton = protonPlugin;
       korri-plugin-steam = steamPlugin;
+      korri-plugin-pico8 = pico8Plugin;
+      korri-plugin-homebrewhub = homebrewhubPlugin;
+      korri-plugin-retrobrews = retrobrewsPlugin;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cache = cacheTool;
@@ -276,6 +305,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           contract = korri.lib.${system}.pluginContract;
         };
         korri-steam-source = import ../plugins/steam/packages/check.nix { inherit pkgs; };
+        korri-pico8-plugin = acquisitionCheck "pico8" pico8Plugin [ "www.lexaloffle.com" ];
+        korri-homebrewhub-plugin = acquisitionCheck "homebrewhub" homebrewhubPlugin [ ];
+        korri-retrobrews-plugin = acquisitionCheck "retrobrews" retrobrewsPlugin [ ];
         korri-gamescope-plugin = import ./gamescope-check.nix {
           inherit pkgs gamescopePackage;
           package = gamescopePlugin;
