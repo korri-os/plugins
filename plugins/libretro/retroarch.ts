@@ -1,10 +1,18 @@
 import type {
   PluginLaunchInput,
   PluginLaunchOutput,
+  SaveKind,
+  SaveLocation,
 } from "../../contracts/generated/korrid"
 import { keys, version } from "./settings"
 
 type SettingValue = string | number | boolean
+
+// The sandbox ships source, not the generated treaty's runtime enums. Derive
+// their exact wire strings without adding a runtime import outside the plugin.
+type LaunchOutput = Omit<PluginLaunchOutput, "saveLocations"> & {
+  saveLocations: (Omit<SaveLocation, "kind"> & { kind: `${SaveKind}` })[]
+}
 
 interface Diagnostic {
   code: string
@@ -87,7 +95,7 @@ function quoteSetting(key: string, value: string): string {
   throw new Error(`Unsupported RetroArch string setting: ${key}`)
 }
 
-function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
+function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
   const root = input.accountRoot
   const saveRoot = input.saveRoot
   if (!input.corePath) throw new Error("RetroArch runner requires a core path")
