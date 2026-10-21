@@ -36,6 +36,13 @@ for overlay in "$@"; do
     --exclude='.BUILDINFO' --exclude='.CHANGELOG' --exclude='.INSTALL' \
     --exclude='.MTREE' --exclude='.PKGINFO' -xf "$overlay" -C "$work"
 done
+# The game user reads the rootfs through the cache's POSIX ACL entries, and
+# a file's group bits are the ACL mask that caps them. The image stores
+# owner-only modes (etc/shadow, var/lib/private). tar creates package files
+# under the cache's default ACL, whose mask is empty, and skips its chmod
+# because it expects the umask to have applied. Open the group class to read
+# and traverse, never write; the rootfs needs no setuid or setgid bit.
+chmod -R g+rX,g-w,ug-s "$work"
 
 for file in usr/lib/libgallium-26.1.2-arch1.1.so usr/lib32/libgallium-26.1.2-arch1.1.so \
   usr/share/vulkan/icd.d/freedreno_icd.x86_64.json usr/share/vulkan/icd.d/freedreno_icd.i686.json \

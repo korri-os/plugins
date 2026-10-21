@@ -37,8 +37,17 @@ korrid invokes it with the verified files in declared order.
    the overlays.
 2. It extracts each overlay package over it, in order, without the package
    metadata files.
-3. It checks the Mesa files and the x86_64 and i686 Freedreno ICD machine
+3. It opens every file and directory to the group class for read and
+   traverse, removes group write, and clears setuid and setgid bits.
+4. It checks the Mesa files and the x86_64 and i686 Freedreno ICD machine
    types, as the former Nix build did.
+
+Step 3 exists because the game user reads the rootfs through the cache's
+POSIX ACL, and the group bits of each file are its ACL mask. Without it, the
+image's owner-only modes (`etc/shadow`, `var/lib/private`) and every overlay
+file stay unreadable: tar creates them under the cache's default ACL, whose
+mask is empty, and does not chmod them afterwards. The RG353M showed 94 such
+paths, among them `usr/lib/libGLX_mesa.so.0.0.0`, on 2026-10-21.
 
 It writes only under `<work-dir>`. Exit status: 0 ready, 1 failed (including
 usage). Diagnostics go to stderr; stdout carries nothing korrid reads. tar,
@@ -48,5 +57,15 @@ squashfs-tools and zstd come from Nix. Nothing is compiled on the device.
 
 Build these on a build machine, never on a device. `packages/check.nix` runs
 `rootfs/test_unpack.py` against small synthetic archives, `bash -n` and
-shellcheck. `packages/plugin-check.nix` checks the built package for the target
+shellcheck. The tests unpack owner-only modes (0500, 0600, 0700) and assert
+group read and traverse, no group write and no setuid or setgid bit. One test
+also sets the RG353M cache ACL on the work directory and asserts the game
+user's effective rights; the Nix sandbox refuses ACLs, so that test skips
+there and runs where ACLs work:
+
+```sh
+nix shell nixpkgs#acl nixpkgs#squashfsTools nixpkgs#zstd -c \
+  sh -c 'cd plugins/fex/rootfs && python3 -m unittest -v test_unpack'
+```
+ `packages/plugin-check.nix` checks the built package for the target
 system.

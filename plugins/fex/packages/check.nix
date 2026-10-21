@@ -4,6 +4,7 @@
 pkgs.runCommand "fex-unpack-check"
   {
     nativeBuildInputs = with pkgs; [
+      acl
       bash
       coreutils
       gnutar
