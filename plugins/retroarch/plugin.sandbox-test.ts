@@ -19,6 +19,7 @@ function input(overrides?: PluginLaunchInput["overrides"]): PluginLaunchInput {
     corePath: "/core",
     contentPath: "/rom",
     accountRoot: "/account",
+    saveRoot: "/account/saves/wario-land-4",
     cacheRoot: "/cache",
     files: { autoconfig: "/autoconfig" },
     overrides,
@@ -36,6 +37,28 @@ const reserved = [
 ]
 
 describe("RetroArch native configuration", () => {
+  it("keeps each game's saves together and preserves raw runner subfolders", () => {
+    const plan = launch(input())
+    const root = input().saveRoot
+    expect(plan.saveLocations).toEqual([
+      { key: "saves", kind: "save", path: `${root}/saves` },
+      { key: "states", kind: "savestate", path: `${root}/states` },
+      { key: "screenshots", kind: "screenshot", path: `${root}/screenshots` },
+    ])
+    expect(plan.directories).toEqual([
+      "/account/system", `${root}/saves`,
+      `${root}/states/@korri:mgba/mgba`, `${root}/screenshots`,
+    ])
+    expect(plan.files![0].path).toBe("/account/retroarch.cfg")
+    expect(plan.files![0].content).toContain(`savefile_directory = "${root}/saves"`)
+    expect(plan.files![0].content).toContain(`savestate_directory = "${root}/states/@korri:mgba/mgba"`)
+    expect(plan.files![0].content).toContain(`screenshot_directory = "${root}/screenshots"`)
+    expect(plan.files![0].content).toContain('savestate_auto_save = "true"')
+    expect(plan.files![0].content).toContain('savestate_auto_load = "true"')
+    const other = launch({ ...input(), saveRoot: "/account/saves/other" })
+    expect(other.files![0].content).not.toContain(root)
+  })
+
   it("refuses provider routes without a content file", () => {
     expect(() => launch({ ...input(), contentPath: undefined, ref: "123" }))
       .toThrow("requires a content file")
@@ -141,6 +164,12 @@ function parsed(cfg: string, keys: string[]): string[] {
 }
 
 describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", () => {
+  it("reads the per-game folders through the actual RetroArch parser", () => {
+    const root = input().saveRoot
+    expect(parsed(content(), ["savefile_directory", "savestate_directory", "screenshot_directory"]))
+      .toEqual([`${root}/saves`, `${root}/states/@korri:mgba/mgba`, `${root}/screenshots`])
+  })
+
   it("proves the parser keeps the first duplicate and does not JSON-decode strings", () => {
     expect(parsed('video_driver = "gl"\nvideo_driver = "vulkan"\n', ["video_driver"]))
       .toEqual(["gl"])
