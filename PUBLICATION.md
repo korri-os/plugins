@@ -88,7 +88,8 @@ licensed under noncommercial CC BY-NC-SA 4.0, and adds the two owner-selected
 Solarus quests. Keep the credits, individual licenses, corresponding source
 links and notices with it. The mixed pack remains noncommercial because of
 the retained PICO-8 content; that does not relicense the Solarus quests.
-Installation does not register library entries. Into Ruins remains a known failure.
+Installed and enabled, the pack's games appear in the library through `packageFile` declarations.
+Into Ruins remains a known failure.
 
 The publication validation list includes cartridge integrity, rejection controls
 and host seeding for all three exact plugin roots. The Solarus gate also checks
