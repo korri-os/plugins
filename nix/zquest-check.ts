@@ -5,6 +5,7 @@ import { join } from "node:path"
 import process from "node:process"
 import type { PluginLaunchInput } from "../contracts/generated/korrid"
 import * as plugin from "../plugins/zquest-classic/plugin"
+import { preparedLaunch } from "./prepared-launch"
 
 const { handlers, name, runners, systems } = plugin
 assert.ok(!("discovery" in plugin))
@@ -62,12 +63,14 @@ for (const contentPath of [
     program: recordArguments,
     contentPath,
     accountRoot: "/accounts/Player One '; $(exit 21)",
+    saveRoot: "/accounts/Player One '; $(exit 21)/saves/quest",
     cacheRoot: "/cache",
     files: manifest.files,
     artifacts: {},
   }
   const args = ["--", contentPath, `${input.accountRoot}/zquest-classic`]
-  assert.deepEqual(handlers["launch.prepare"](input), {
+  const plan = handlers["launch.prepare"](input)
+  assert.deepEqual(plan, {
     command: recordArguments,
     args,
     env: {},
@@ -76,7 +79,7 @@ for (const contentPath of [
     korridCli,
     [
       "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(input),
-      JSON.stringify({ modifiers: [] }),
+      JSON.stringify({ modifiers: [] }), preparedLaunch(plan),
     ],
     { encoding: "utf8" },
   )
@@ -88,21 +91,11 @@ for (const contentPath of [
     { overrides: { config: { replace: "unsupported" } } },
     { overrides: { settings: { unsupported: true } } },
   ]) {
+    // The host refuses a launch whose preparation throws, before any unit
+    // starts. `korrid plugin-launch` no longer evaluates the plugin.
     assert.throws(() =>
       handlers["launch.prepare"]({ ...input, ...unsupported }),
     )
-    const rejected = spawnSync(
-      korridCli,
-      [
-        "plugin-launch",
-        join(packagePath, "plugin.ts"),
-        JSON.stringify({ ...input, ...unsupported }),
-        JSON.stringify({ modifiers: [] }),
-      ],
-      { encoding: "utf8" },
-    )
-    assert.notEqual(rejected.status, 0)
-    assert.equal(rejected.stdout, "")
   }
 }
 console.log(

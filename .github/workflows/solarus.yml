@@ -11,6 +11,7 @@ on:
       - nix/solarus-quest/**
       - nix/*starter-pack*
       - nix/check-solarus-credits.py
+      - nix/prepared-launch.ts
       - nix/default.nix
       - flake.nix
       - flake.lock
@@ -24,6 +25,7 @@ on:
       - nix/solarus-quest/**
       - nix/*starter-pack*
       - nix/check-solarus-credits.py
+      - nix/prepared-launch.ts
       - nix/default.nix
       - flake.nix
       - flake.lock

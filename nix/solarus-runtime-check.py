@@ -14,7 +14,7 @@ import tempfile
 import zipfile
 
 
-package, system, korrid, headless, fixture = sys.argv[1:]
+package, system, korrid, headless, fixture, prepared_launch = sys.argv[1:]
 package = Path(package)
 manifest = json.loads((package / "manifest.json").read_text())
 engine = Path(manifest["files"]["solarus"])
@@ -57,6 +57,26 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
         assert result.returncode == 0, result.stdout + result.stderr
         return result.stdout + result.stderr
 
+    def plugin_launch(request):
+        # The host prepares the plan; the unit's plugin-launch only executes it.
+        prepared = subprocess.run(
+            ["bun", prepared_launch, str(package / "plugin.ts"), json.dumps(request)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert prepared.returncode == 0, prepared.stderr
+        return execute(
+            [
+                korrid,
+                "plugin-launch",
+                str(package / "plugin.ts"),
+                json.dumps(request),
+                json.dumps({"modifiers": []}),
+                prepared.stdout,
+            ]
+        )
+
     assert "quest_path" in execute([str(engine), "-help"])
     data = work / "source quest/data"
     shutil.copytree(fixture, data)
@@ -79,19 +99,12 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
             "program": headless,
             "contentPath": str(content),
             "accountRoot": str(account),
+            "saveRoot": str(account / "saves/quest"),
             "cacheRoot": str(work / "cache"),
             "files": manifest["files"],
             "artifacts": {},
         }
-        output = execute(
-            [
-                korrid,
-                "plugin-launch",
-                str(package / "plugin.ts"),
-                json.dumps(request),
-                json.dumps({"modifiers": []}),
-            ]
-        )
+        output = plugin_launch(request)
         assert "Solarus 2.1.4" in output, output
         assert f"KORRI_SOLARUS_SAVE={expected}" in output, output
         assert "KORRI_SOLARUS_LOOP" in output, output
@@ -136,19 +149,12 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
             "program": headless,
             "contentPath": str(bad),
             "accountRoot": str(first),
+            "saveRoot": str(first / "saves/quest"),
             "cacheRoot": str(work / "cache"),
             "files": manifest["files"],
             "artifacts": {},
         }
-        output = execute(
-            [
-                korrid,
-                "plugin-launch",
-                str(package / "plugin.ts"),
-                json.dumps(request),
-                json.dumps({"modifiers": []}),
-            ]
-        )
+        output = plugin_launch(request)
         assert "No quest was found" in output, output
         assert "KORRI_SOLARUS_SAVE=" not in output
         assert first_save.read_bytes() == before

@@ -31,6 +31,7 @@ pkgs.runCommand "korri-solarus-plugin-check"
     cp ${package}/plugin.ts work/plugins/solarus/plugin.ts
     cp ${contractSource} work/contracts/generated/korrid.ts
     cp ${./solarus-check.ts} work/nix/solarus-check.ts
+    cp ${./prepared-launch.ts} work/nix/prepared-launch.ts
     cd work
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler plugins/solarus/plugin.ts
@@ -39,6 +40,7 @@ pkgs.runCommand "korri-solarus-plugin-check"
     python3 ${./solarus-controller-check.py} ${pkgs.SDL2}/lib/libSDL2.so \
       ${solarusPackage.lib}/share/solarus/gamecontrollerdb.txt
     python3 ${./solarus-runtime-check.py} ${package} ${pkgs.stdenv.hostPlatform.system} \
-      ${korridPackage}/bin/korrid ${headless} ${./solarus-quest}
+      ${korridPackage}/bin/korrid ${headless} ${./solarus-quest} \
+      "$PWD/nix/prepared-launch.ts"
     touch "$out"
   ''

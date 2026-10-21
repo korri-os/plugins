@@ -6,6 +6,7 @@ import { join } from "node:path"
 import process from "node:process"
 import type { PluginLaunchInput } from "../contracts/generated/korrid"
 import * as plugin from "../plugins/solarus/plugin"
+import { preparedLaunch } from "./prepared-launch"
 
 const { handlers, name, runners, systems } = plugin
 assert.ok(!("discovery" in plugin))
@@ -57,6 +58,7 @@ try {
       program: recordArguments,
       contentPath,
       accountRoot,
+      saveRoot: join(accountRoot, "saves", "quest"),
       cacheRoot: join(work, "cache"),
       files: manifest.files,
       artifacts: {},
@@ -68,13 +70,14 @@ try {
       cwd: accountRoot,
       directories: [accountRoot],
     }
-    assert.deepEqual(handlers["launch.prepare"](input), expected)
+    const plan = handlers["launch.prepare"](input)
+    assert.deepEqual(plan, expected)
     assert.deepEqual(handlers["launch.prepare"]({
       ...input, overrides: { settings: {} },
     }), expected)
     const launch = spawnSync(korridCli, [
       "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(input),
-      JSON.stringify({ modifiers: [] }),
+      JSON.stringify({ modifiers: [] }), preparedLaunch(plan),
     ], { encoding: "utf8", timeout: 30_000 })
     assert.equal(launch.status, 0, launch.stderr)
     assert.equal(launch.stdout, `${contentPath}\0${accountRoot}\0${accountRoot}\0`)
@@ -91,14 +94,9 @@ try {
       { accountRoot: "relative" },
       { accountRoot: "/account\0" },
     ]) {
-      const invalid = { ...input, ...unsupported }
-      assert.throws(() => handlers["launch.prepare"](invalid))
-      const rejected = spawnSync(korridCli, [
-        "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(invalid),
-        JSON.stringify({ modifiers: [] }),
-      ], { encoding: "utf8", timeout: 30_000 })
-      assert.notEqual(rejected.status, 0)
-      assert.equal(rejected.stdout, "")
+      // The host refuses a launch whose preparation throws, before any unit
+      // starts. `korrid plugin-launch` no longer evaluates the plugin.
+      assert.throws(() => handlers["launch.prepare"]({ ...input, ...unsupported }))
     }
   }
 } finally {

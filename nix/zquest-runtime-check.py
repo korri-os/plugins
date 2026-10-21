@@ -20,7 +20,7 @@ import time
 
 from PIL import Image
 
-package, engine, korrid, system, fixtures, public_fixture = sys.argv[1:]
+package, engine, korrid, system, fixtures, public_fixture, prepared_launch = sys.argv[1:]
 package, engine = Path(package), Path(engine)
 manifest = json.loads((package / "manifest.json").read_text())
 launcher = Path(manifest["files"]["zplayer"])
@@ -107,16 +107,26 @@ def command(quest, account):
         "program": str(launcher),
         "contentPath": str(quest),
         "accountRoot": str(account),
+        "saveRoot": str(account / "saves/quest"),
         "cacheRoot": str(root / "cache"),
         "files": manifest["files"],
         "artifacts": {},
     }
+    # The host prepares the plan; the unit's plugin-launch only executes it.
+    prepared = subprocess.run(
+        ["bun", prepared_launch, str(package / "plugin.ts"), json.dumps(request)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert prepared.returncode == 0, prepared.stderr
     return [
         korrid,
         "plugin-launch",
         str(package / "plugin.ts"),
         json.dumps(request),
         json.dumps({"modifiers": []}),
+        prepared.stdout,
     ]
 
 

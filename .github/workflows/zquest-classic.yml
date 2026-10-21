@@ -9,6 +9,7 @@ on:
       - nix/zquest-*
       - nix/lantern-hollow-*
       - nix/*starter-pack*
+      - nix/prepared-launch.ts
       - nix/default.nix
       - flake.nix
       - flake.lock
@@ -20,6 +21,7 @@ on:
       - nix/zquest-*
       - nix/lantern-hollow-*
       - nix/*starter-pack*
+      - nix/prepared-launch.ts
       - nix/default.nix
       - flake.nix
       - flake.lock

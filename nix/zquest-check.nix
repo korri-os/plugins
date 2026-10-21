@@ -58,6 +58,7 @@ pkgs.runCommand "korri-zquest-classic-plugin-check"
     cp ${package}/plugin.ts work/plugins/zquest-classic/plugin.ts
     cp ${contractSource} work/contracts/generated/korrid.ts
     cp ${./zquest-check.ts} work/nix/zquest-check.ts
+    cp ${./prepared-launch.ts} work/nix/prepared-launch.ts
     cp ${tsconfig} work/tsconfig.json
     cd work
     tsc --project tsconfig.json
@@ -80,6 +81,7 @@ pkgs.runCommand "korri-zquest-classic-plugin-check"
     xvfb-run -a python3 asset-reader/public-assets-validate.py \
       --resources ${engine.assets} --allegro-library ${engine}/lib/liballeg.so --midi-playback
     xvfb-run -a -s '-screen 0 800x600x24' python3 ${./zquest-runtime-check.py} \
-      ${package} ${engine} ${korridPackage}/bin/korrid ${pkgs.stdenv.hostPlatform.system} ${fixtures} ${publicFixture}/public-room.qst
+      ${package} ${engine} ${korridPackage}/bin/korrid ${pkgs.stdenv.hostPlatform.system} ${fixtures} ${publicFixture}/public-room.qst \
+      "$PWD/nix/prepared-launch.ts"
     touch "$out"
   ''
