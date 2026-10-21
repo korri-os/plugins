@@ -92,9 +92,11 @@ separate acceptance checks.
 ## Gamescope
 
 `@korri:gamescope` contributes the `@korri:gamescope/gamescope` launch modifier.
-It composes an existing runner plan for nested Wayland, scaling, and a
-frame-rate limit. It requires output dimensions from settings or a display
-hardware fact. Invalid settings or missing dimensions refuse composition.
+It composes an existing runner plan for nested Wayland. Typed settings, keyed
+by Gamescope's own long option names, cover scaling, frame pacing, HDR, input
+and cursor options; `--force-composition` is on unless a layer sets it to
+`false`. It requires output dimensions from settings or a display hardware
+fact. Invalid settings or missing dimensions refuse composition.
 See [the modifier instructions](plugins/gamescope/README.md) for the contract,
 checks, patch provenance, and hardware acceptance limits. The pinned Core
 predates modifier execution; production integration needs that Core support.
