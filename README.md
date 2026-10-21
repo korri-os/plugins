@@ -49,7 +49,7 @@ remain noncommercial CC BY-NC-SA 4.0; the quests retain their own GPL and
 per-file CC/public-domain grants. The complete mixed pack is not commercially
 licensed. Blue Isle and Yarntown are excluded.
 The plugin requires this repository's exact `@korri:fake08` and `@korri:solarus` outputs.
-It adds no game tiles and does not register cartridges in the library.
+Installed and enabled, the pack's games appear in the library through `packageFile` declarations.
 Into Ruins remains a known FAKE-08 failure, not a verified compatible game.
 See [the pack instructions](plugins/starter-pack/README.md) for license conditions and limits.
 
