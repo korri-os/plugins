@@ -81,6 +81,15 @@ describe("RetroArch native configuration", () => {
     }
   })
 
+  it("keeps the X11 context when a typed value names a key this build has not checked", () => {
+    // video_context_driver is not in the checked typed schema; raw config is the override.
+    const cfg = content({ settings: { video_context_driver: "wayland" } })
+    expect(cfg).toContain('video_context_driver = "x"\n')
+    expect(cfg).not.toContain('"wayland"')
+    expect(handlers["settings.validate"]({ values: { video_context_driver: "wayland" } }).diagnostics
+      .map((diagnostic) => diagnostic.code)).toEqual(["setting-unverified"])
+  })
+
   it("refuses provider routes without a content file", () => {
     expect(() => launch({ ...input(), contentPath: undefined, ref: "123" }))
       .toThrow("requires a content file")
@@ -212,6 +221,20 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
       "1",
       `Korri Seat P${player}`,
     ]))
+  })
+
+  it("selects the X11 GL context by default and lets raw config replace it", () => {
+    // Gamescope gives the game both Wayland and Xwayland; X11 keeps the picture 1:1.
+    expect(parsed(content(), ["video_driver", "video_context_driver"])).toEqual(["gl", "x"])
+    for (const [config, expected] of [
+      [{ prepend: 'video_context_driver = "wayland"' }, "wayland"],
+      [{ append: 'video_context_driver = "kms"' }, "kms"],
+      [{ prepend: 'video_context_driver = "wayland"', append: 'video_context_driver = "x_egl"' }, "x_egl"],
+    ] as const) {
+      const cfg = content({ config })
+      expect(cfg.match(/^video_context_driver = /gm)).toHaveLength(1)
+      expect(parsed(cfg, ["video_context_driver"])).toEqual([expected])
+    }
   })
 
   it("applies baseline < typed < raw prepend < raw append in native lookups", () => {

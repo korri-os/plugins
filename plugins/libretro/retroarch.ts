@@ -200,7 +200,9 @@ pause_nonactive = "true"
 autosave_interval = "10"
 savestate_auto_save = "true"
 savestate_auto_load = "true"
-video_driver = "gl"`
+video_driver = "gl"
+# Under Gamescope, X11 (Xwayland) shows the game 1:1; RetroArch's Wayland context gets a rescaled surface.
+video_context_driver = "x"`
   // Emit exactly one assignment per key. Replacing its original slot keeps
   // baseline comments intact without relying on native duplicate ordering.
   const positions = new Map<string, number>()
