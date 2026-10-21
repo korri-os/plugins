@@ -1,0 +1,31 @@
+From: Korri contributors
+Subject: [PATCH] rendervulkan: compile pipelines on demand only
+
+BInit() started a detached gamescope-shdr thread that compiled every
+pipeline variant. Its keys do not match the ones composition asks for
+(for example, BLIT with blur_layers 1 against 0 at runtime), so the
+work is never used. pipeline() already compiles a missing variant on
+first use. On an RG353M (Mali-G52, panvk) the thread held one core at
+about 100% for over a minute after start.
+
+Do not start the thread.
+
+Korri-local; not upstream.
+---
+ src/rendervulkan.cpp | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
+index 81910de..343de75 100644
+--- a/src/rendervulkan.cpp
++++ b/src/rendervulkan.cpp
+@@ -311,8 +311,7 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
+ 
+ 	m_bInitialized = true;
+ 
+-	std::thread piplelineThread([this](){compileAllPipelines();});
+-	piplelineThread.detach();
++	// No compileAllPipelines(): its keys miss runtime keys, pipeline() compiles on demand, and it costs a full core for over a minute on slow GPUs.
+ 
+ 	g_reshadeManager.init(this);
+ 

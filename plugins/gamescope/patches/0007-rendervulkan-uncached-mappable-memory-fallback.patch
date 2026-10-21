@@ -1,0 +1,34 @@
+From: Korri contributors
+Subject: [PATCH] rendervulkan: fall back to uncached coherent memory for
+ mappable images
+
+Mappable textures (screenshots, readback) ask for
+HOST_VISIBLE|HOST_COHERENT|HOST_CACHED memory. panvk exposes no cached
+coherent type, so findMemoryType() returned -1 and the allocation used
+memory type index ~0u.
+
+Only when that lookup fails, retry without HOST_CACHED. Coherent memory
+needs no flush or invalidate, so the result is correct, only slower for
+CPU reads. A driver that has a cached coherent type never reaches the
+retry; if the retry also finds nothing, behaviour is as before.
+
+Korri-local; not upstream.
+---
+ src/rendervulkan.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
+index f3d9b43..81910de 100644
+--- a/src/rendervulkan.cpp
++++ b/src/rendervulkan.cpp
+@@ -2374,6 +2374,10 @@ bool CVulkanTexture::BInit( uint32_t width, uint32_t height, uint32_t depth, uin
+ 		.allocationSize = memRequirements.size,
+ 		.memoryTypeIndex = uint32_t(g_device.findMemoryType(properties, memRequirements.memoryTypeBits)),
+ 	};
++	// panvk has no HOST_CACHED|HOST_COHERENT type. Coherent memory needs no
++	// flush or invalidate, so uncached coherent memory is correct, only slower.
++	if ( allocInfo.memoryTypeIndex == ~0u && flags.bMappable )
++		allocInfo.memoryTypeIndex = uint32_t(g_device.findMemoryType(properties & ~VK_MEMORY_PROPERTY_HOST_CACHED_BIT, memRequirements.memoryTypeBits));
+ 
+ 	m_size = allocInfo.allocationSize;
+ 

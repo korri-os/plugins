@@ -78,11 +78,69 @@ system-library patches stay intact. These additional patches are applied:
 | `0002` | Unchanged upstream `c2d8f0c33266e36f8d91978171ba74a7cbd8a2e4`: skip planes that clip to zero or negative size. |
 | `0003` | ROCKNIX `0024-WaylandBackend-acquire-only-attached-buffers.patch`, adapted to 3.16.18's `Unwrap` API. Acquire framebuffers at attachment, not before clipping, so skipped planes do not retain references waiting for a release that cannot arrive. |
 | `0004` | Upstream `c50ddfa9b71a75ec8df94bda8cf31d425dbdda24` plus `6867f509874f9bc52e12d6f4c4596cdf0d5be6b4`: after a real toplevel unmap, wait for a new configure before attaching another buffer. Adapted around `0003` so skipped attachments do not acquire framebuffers. |
+| `0005` | Korri-local. Enable `VK_EXT_robustness2` only if `nullDescriptor` is supported. Without it, bind 1x1 images (2x2 for YCbCr) to unused descriptor slots, and the shader treats a 1-texel shaper LUT as absent. panvk before v10 has no `nullDescriptor`, so `vkCreateDevice` failed. |
+| `0006` | Korri-local. Bind the constants UBO with the uploaded struct's size, not `VK_WHOLE_SIZE`. The whole-size range covers the rest of the 8 MB upload buffer, beyond `maxUniformBufferRange`. panvk v7's 12-bit UBO entry count wrapped and every composite was black. |
+| `0007` | Korri-local. If no `HOST_VISIBLE`, `HOST_COHERENT`, `HOST_CACHED` memory type fits a mappable image, retry without `HOST_CACHED`. panvk has no cached coherent type. |
+| `0008` | Korri-local. Do not start the `gamescope-shdr` precompile thread. Its keys do not match the runtime keys, `pipeline()` compiles on first use, and on the RG353M it held one core at about 100% for over a minute. |
+| `0009` | Korri-local. If no GPU qualifies, opt in to Mesa panvk for Bifrost from Gamescope's own process, retry once, then remove the opt-in from the environment. Prefer a GPU to a CPU device (llvmpipe). Details below. |
 
 Patch `0003`'s ROCKNIX source was reviewed at distribution commit
 `8d6ef76cf7bd13a44538e5ef45aa97c3937e2d18`, under
 `projects/ROCKNIX/packages/apps/gamescope/patches/0024-*`. No other ROCKNIX
 patches are included. There is no Gamescope version change or launch-flag change.
+
+### Mali Bifrost (RG353M) and other GPUs
+
+`0005` to `0009` are Korri-local. They are not upstream and were not sent
+upstream. They make the same package run on the RG353M (Mali-G52, Mesa
+26.2.3 panvk, architecture v7) with no device configuration.
+
+Mesa panvk refuses v6/v7 GPUs unless `PAN_I_WANT_A_BROKEN_VULKAN_DRIVER` is
+set. It reports Vulkan 1.0 on v7 unless `MESA_VK_VERSION_OVERRIDE` is set.
+Gamescope needs 1.2. Without both, only llvmpipe qualifies, and Gamescope
+aborts on it. `0009` changes device selection as follows:
+
+1. Select as before, but prefer a non-CPU device to a CPU device. A device
+   named by `--prefer-vk-device` still wins.
+2. If no device or only a CPU device qualifies, and there is no SDL surface,
+   set each of the two variables that is unset (`1` and `1.3`). Log
+   `no GPU Vulkan device qualified; retrying with Mesa opt-in: ...`.
+3. Destroy and recreate the Vulkan instance, and select once more.
+4. Unset the variables that step 2 set.
+
+Mesa reads both variables only while it creates the instance and enumerates
+physical devices. Gamescope initialises Vulkan inside backend `Init()`, before
+it starts Xwayland and the child, so games do not inherit the variables. A
+variable that the caller set stays as the caller set it. A GPU that qualifies
+on the first pass never reaches steps 2 to 4.
+
+`0005`, `0007` and `0009` change behaviour only where upstream fails: no
+`nullDescriptor`, no cached coherent memory type, or no qualifying GPU.
+`0005` also changes the shader for every GPU: a real shaper LUT has 4096
+texels, so the added size check is true wherever upstream's check is true.
+`0006` and `0008` run on every GPU. `0006` replaces invalid usage
+(`VUID-VkWriteDescriptorSet-descriptorType-00332`) with a range of at most
+16384 bytes, which every conformant driver must accept; a `static_assert`
+keeps each constants struct within that size. `0008` changes only when
+pipelines compile, not which pipelines run.
+
+Adreno (Turnip) on Retroid Pocket Mini V2 and AYN Odin 2 Portal has not run
+this package. Its Vulkan driver qualifies on the first pass, so only `0005`'s
+shader change, `0006` and `0008` apply there.
+
+On 2026-10-21 the aarch64 build ran on the RG353M nested in the Korri
+compositor as user `korri`, with no Vulkan variables and an empty
+`/dev/input`. Around glxgears and around Mega Man Rock N Roll it logged the
+opt-in line and selected `Mali-G52 r1 MC1`. Gamescope's own screenshot matched
+the compositor's (the game frame was pixel-identical). After start, Gamescope
+used 14.7 to 15.3% of one core with the game and 19.7 to 20.0% with glxgears
+at 60 FPS; the earlier build with exported variables used 21.1% with
+glxgears. The child, `gamescopereaper` and Xwayland had neither variable in
+`/proc/<pid>/environ`. `tests/nested-windows.py` completed all 25 handoffs
+with exit status 0 and no protocol error. The x86_64 build passed the same
+test nested in a headless Sway 1.12 on Intel, without the opt-in line. With only
+llvmpipe it logged the opt-in line, selected llvmpipe again, and stopped on the
+missing `VK_EXT_physical_device_drm`, as before the patch.
 
 ### Nested regression and input acceptance
 

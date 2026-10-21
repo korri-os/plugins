@@ -1,0 +1,261 @@
+From: Korri contributors
+Subject: [PATCH] rendervulkan: run without VK_EXT_robustness2
+ nullDescriptor
+
+Mesa panvk before Valhall (v6/v7, e.g. Mali-G52) does not expose
+VK_EXT_robustness2's nullDescriptor. Gamescope enabled it
+unconditionally, so vkCreateDevice failed there.
+
+Enable robustness2 only when nullDescriptor is supported. Otherwise
+fill unused descriptor slots with 1x1 (2x2 for YCbCr) images in the
+layouts dispatch() writes, and make the shader treat a shaper LUT of
+size 1 like a null LUT (textureQueryLevels() of a real view is 1, not 0).
+
+Korri-local; not upstream.
+---
+ src/rendervulkan.cpp    | 120 +++++++++++++++++++++++++++++++++++++++-
+ src/rendervulkan.hpp    |   9 +++
+ src/shaders/composite.h |   3 +-
+ 3 files changed, 129 insertions(+), 3 deletions(-)
+
+diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
+index df01314..28c4dfc 100644
+--- a/src/rendervulkan.cpp
++++ b/src/rendervulkan.cpp
+@@ -306,6 +306,8 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
+ 		return false;
+ 	if (!createScratchResources())
+ 		return false;
++	if (!m_bSupportsNullDescriptor && !createNullDescriptorFallbacks())
++		return false;
+ 
+ 	m_bInitialized = true;
+ 
+@@ -434,6 +436,7 @@ bool CVulkanDevice::createDevice()
+ 	bool hasDrmProps = false;
+ 	bool supportsForeignQueue = false;
+ 	bool supportsHDRMetadata = false;
++	bool supportsRobustness2 = false;
+ 	for ( uint32_t i = 0; i < supportedExtensionCount; ++i )
+ 	{
+ 		if ( strcmp(supportedExts[i].extensionName,
+@@ -451,6 +454,10 @@ bool CVulkanDevice::createDevice()
+ 		if ( strcmp(supportedExts[i].extensionName,
+ 			 VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0 )
+ 			 supportsHDRMetadata = true;
++
++		if ( strcmp(supportedExts[i].extensionName,
++			 VK_EXT_ROBUSTNESS_2_EXTENSION_NAME) == 0 )
++			 supportsRobustness2 = true;
+ 	}
+ 
+ 	vk_log.infof( "physical device %s DRM format modifiers", m_bSupportsModifiers ? "supports" : "does not support" );
+@@ -519,13 +526,21 @@ bool CVulkanDevice::createDevice()
+ 		VkPhysicalDeviceVulkan12Features vulkan12Features = {
+ 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+ 		};
++		VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features = {
++			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT,
++		};
+ 		VkPhysicalDeviceFeatures2 features2 = {
+ 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+ 			.pNext = &vulkan12Features,
+ 		};
++		if ( supportsRobustness2 )
++			vulkan12Features.pNext = &robustness2Features;
+ 		vk.GetPhysicalDeviceFeatures2( physDev(), &features2 );
+ 
+ 		m_bSupportsFp16 = vulkan12Features.shaderFloat16 && features2.features.shaderInt16;
++		m_bSupportsNullDescriptor = supportsRobustness2 && robustness2Features.nullDescriptor;
++		if ( !m_bSupportsNullDescriptor )
++			vk_log.infof( "physical device does not support nullDescriptor, using dummy descriptors" );
+ 	}
+ 
+ 	float queuePriorities = 1.0f;
+@@ -576,7 +591,8 @@ bool CVulkanDevice::createDevice()
+ 
+ 	enabledExtensions.push_back( VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME );
+ 
+-	enabledExtensions.push_back( VK_EXT_ROBUSTNESS_2_EXTENSION_NAME );
++	if ( m_bSupportsNullDescriptor )
++		enabledExtensions.push_back( VK_EXT_ROBUSTNESS_2_EXTENSION_NAME );
+ #if 0
+ 	enabledExtensions.push_back( VK_KHR_MAINTENANCE_5_EXTENSION_NAME );
+ #endif
+@@ -647,9 +663,10 @@ bool CVulkanDevice::createDevice()
+ 
+ 	VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features = {
+ 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT,
+-		.pNext = std::exchange(features2.pNext, &robustness2Features),
+ 		.nullDescriptor = VK_TRUE,
+ 	};
++	if ( m_bSupportsNullDescriptor )
++		robustness2Features.pNext = std::exchange(features2.pNext, &robustness2Features);
+ 
+ 	VkResult res = vk.CreateDevice(physDev(), &deviceCreateInfo, nullptr, &m_device);
+ 	if ( res == VK_ERROR_NOT_PERMITTED_KHR && gamescope::Process::HasCapSysNice() )
+@@ -1241,6 +1258,88 @@ int32_t CVulkanDevice::findMemoryType( VkMemoryPropertyFlags properties, uint32_
+ 	return -1;
+ }
+ 
++static VkImageViewType VulkanImageTypeToViewType(VkImageType type);
++
++bool CVulkanDevice::createNullImage( VkImageType type, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usage, VkImageLayout layout, const void *pViewNext, VkImageView *pView )
++{
++	VkImageCreateInfo imageInfo = {
++		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
++		.imageType = type,
++		.format = format,
++		.extent = { width, height, 1 },
++		.mipLevels = 1,
++		.arrayLayers = 1,
++		.samples = VK_SAMPLE_COUNT_1_BIT,
++		.tiling = VK_IMAGE_TILING_OPTIMAL,
++		.usage = usage,
++		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
++	};
++	VkImage image;
++	if ( vk.CreateImage( device(), &imageInfo, nullptr, &image ) != VK_SUCCESS )
++		return false;
++
++	VkMemoryRequirements memRequirements;
++	vk.GetImageMemoryRequirements( device(), image, &memRequirements );
++	VkMemoryAllocateInfo allocInfo = {
++		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
++		.allocationSize = memRequirements.size,
++		.memoryTypeIndex = uint32_t( findMemoryType( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memRequirements.memoryTypeBits ) ),
++	};
++	VkDeviceMemory memory;
++	if ( allocInfo.memoryTypeIndex == ~0u || vk.AllocateMemory( device(), &allocInfo, nullptr, &memory ) != VK_SUCCESS ||
++	     vk.BindImageMemory( device(), image, memory, 0 ) != VK_SUCCESS )
++		return false;
++
++	VkImageViewCreateInfo viewInfo = {
++		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
++		.pNext = pViewNext,
++		.image = image,
++		.viewType = VulkanImageTypeToViewType( type ),
++		.format = format,
++		.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
++	};
++	if ( vk.CreateImageView( device(), &viewInfo, nullptr, pView ) != VK_SUCCESS )
++		return false;
++
++	m_nullImageBarriers.push_back( VkImageMemoryBarrier {
++		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
++		.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
++		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
++		.newLayout = layout,
++		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
++		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
++		.image = image,
++		.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
++	} );
++	return true;
++}
++
++// Without VK_EXT_robustness2 nullDescriptor (panvk before v10), unused
++// descriptor slots must still point at valid views. These are never sampled,
++// so their contents stay undefined. The layouts match what dispatch() writes.
++bool CVulkanDevice::createNullDescriptorFallbacks()
++{
++	const VkSamplerYcbcrConversionInfo ycbcrInfo = {
++		.sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO,
++		.conversion = m_ycbcrConversion,
++	};
++	if ( !createNullImage( VK_IMAGE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, 1, 1, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL, nullptr, &m_nullView2D ) ||
++	     !createNullImage( VK_IMAGE_TYPE_2D, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, 2, 2, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_LAYOUT_GENERAL, &ycbcrInfo, &m_nullViewYcbcr ) ||
++	     !createNullImage( VK_IMAGE_TYPE_1D, VK_FORMAT_R16G16B16A16_UNORM, 1, 1, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, nullptr, &m_nullView1D ) ||
++	     !createNullImage( VK_IMAGE_TYPE_3D, VK_FORMAT_R16G16B16A16_UNORM, 1, 1, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, nullptr, &m_nullView3D ) )
++	{
++		vk_log.errorf( "failed to create null descriptor fallbacks" );
++		return false;
++	}
++
++	auto cmdBuffer = commandBuffer();
++	vk.CmdPipelineBarrier( cmdBuffer->rawBuffer(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
++	                       0, 0, nullptr, 0, nullptr, m_nullImageBarriers.size(), m_nullImageBarriers.data() );
++	submit( std::move( cmdBuffer ) );
++	waitIdle();
++	return true;
++}
++
+ std::unique_ptr<CVulkanCmdBuffer> CVulkanDevice::commandBuffer()
+ {
+ 	std::unique_ptr<CVulkanCmdBuffer> cmdBuffer;
+@@ -1749,10 +1848,27 @@ void CVulkanCmdBuffer::dispatch(uint32_t x, uint32_t y, uint32_t z)
+ 		lut3DDescriptor[i].imageView = m_lut3D[i] ? m_lut3D[i]->srgbView() : VK_NULL_HANDLE;
+ 	}
+ 
++	if (!m_device->supportsNullDescriptor())
++	{
++		for (auto& info : imageDescriptors)
++			info.imageView = info.imageView ? info.imageView : m_device->m_nullView2D;
++		for (auto& info : ycbcrImageDescriptors)
++			info.imageView = info.imageView ? info.imageView : m_device->m_nullViewYcbcr;
++		for (auto& info : shaperLutDescriptor)
++			info.imageView = info.imageView ? info.imageView : m_device->m_nullView1D;
++		for (auto& info : lut3DDescriptor)
++			info.imageView = info.imageView ? info.imageView : m_device->m_nullView3D;
++	}
++
+ 	if (!m_target->isYcbcr())
+ 	{
+ 		targetDescriptors[0].imageView = m_target->srgbView();
+ 		targetDescriptors[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
++		if (!m_device->supportsNullDescriptor())
++		{
++			targetDescriptors[1].imageView = m_device->m_nullView2D;
++			targetDescriptors[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
++		}
+ 	}
+ 	else
+ 	{
+diff --git a/src/rendervulkan.hpp b/src/rendervulkan.hpp
+index 63cc602..7f00308 100644
+--- a/src/rendervulkan.hpp
++++ b/src/rendervulkan.hpp
+@@ -804,6 +804,7 @@ public:
+ 	inline bool hasDrmPrimaryDevId() {return m_bHasDrmPrimaryDevId;}
+ 	inline dev_t primaryDevId() {return m_drmPrimaryDevId;}
+ 	inline bool supportsFp16() {return m_bSupportsFp16;}
++	inline bool supportsNullDescriptor() {return m_bSupportsNullDescriptor;}
+ 
+ 	inline std::pair<void *, uint32_t> uploadBufferData(uint32_t size)
+ 	{
+@@ -842,6 +843,8 @@ protected:
+ 	bool createPools();
+ 	bool createShaders();
+ 	bool createScratchResources();
++	bool createNullImage( VkImageType type, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usage, VkImageLayout layout, const void *pViewNext, VkImageView *pView );
++	bool createNullDescriptorFallbacks();
+ 	VkPipeline compilePipeline(uint32_t layerCount, uint32_t ycbcrMask, ShaderType type, uint32_t blur_layer_count, uint32_t composite_debug, uint32_t colorspace_mask, uint32_t output_eotf, bool itm_enable);
+ 	void compileAllPipelines();
+ 
+@@ -865,6 +868,12 @@ protected:
+ 	dev_t m_drmPrimaryDevId = 0;
+ 
+ 	bool m_bSupportsFp16 = false;
++	bool m_bSupportsNullDescriptor = false;
++	std::vector<VkImageMemoryBarrier> m_nullImageBarriers;
++	VkImageView m_nullView2D = VK_NULL_HANDLE;
++	VkImageView m_nullViewYcbcr = VK_NULL_HANDLE;
++	VkImageView m_nullView1D = VK_NULL_HANDLE;
++	VkImageView m_nullView3D = VK_NULL_HANDLE;
+ 	bool m_bHasDrmPrimaryDevId = false;
+ 	bool m_bSupportsModifiers = false;
+ 	bool m_bInitialized = false;
+diff --git a/src/shaders/composite.h b/src/shaders/composite.h
+index 961379b..cb7c9e1 100644
+--- a/src/shaders/composite.h
++++ b/src/shaders/composite.h
+@@ -104,7 +104,8 @@ vec3 apply_layer_color_mgmt(vec3 color, uint layer, uint colorspace) {
+     //
+     // We also need to do degamma here for non-linear views to blend in linear space.
+     // ie. PQ -> PQ would need us to manually do bilinear here.
+-    bool lut3d_enabled = textureQueryLevels(s_shaperLut[plane_eotf]) != 0;
++    // A null LUT has 0 levels; the 1x1 stand-in used without nullDescriptor has size 1.
++    bool lut3d_enabled = textureQueryLevels(s_shaperLut[plane_eotf]) != 0 && textureSize(s_shaperLut[plane_eotf], 0) > 1;
+     if (lut3d_enabled)
+     {
+         color = colorspace_plane_shaper_tf(color, colorspace);

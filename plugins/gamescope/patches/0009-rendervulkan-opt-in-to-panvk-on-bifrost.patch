@@ -1,0 +1,229 @@
+From: Korri contributors
+Subject: [PATCH] rendervulkan: opt in to Mesa panvk on Bifrost when no GPU
+ qualifies
+
+Mesa panvk refuses Mali v6/v7 GPUs (for example Mali-G52) unless
+PAN_I_WANT_A_BROKEN_VULKAN_DRIVER is set, and reports Vulkan 1.0 for
+them unless MESA_VK_VERSION_OVERRIDE is set. Gamescope needs 1.2.
+Without both, only llvmpipe qualifies, and Gamescope aborts on it.
+
+When selection finds no device, or only a CPU device, and Gamescope
+has no SDL surface on the instance: set whichever of the two variables
+is unset, log one line, destroy and recreate the instance, select once
+more, then unset what Gamescope set. Mesa reads both variables only
+while it creates the instance and enumerates physical devices, and
+Gamescope initialises Vulkan before it starts Xwayland or the child,
+so no child inherits them. A GPU that qualifies on the first pass
+never reaches this path.
+
+Also prefer a non-CPU device over a CPU device when both qualify,
+unless the CPU device is the one --prefer-vk-device names. Upstream
+picks the first device in loader order.
+
+Korri-local; not upstream.
+---
+ src/rendervulkan.cpp | 126 +++++++++++++++++++++++++++++++++++++------
+ src/rendervulkan.hpp |   1 +
+ 2 files changed, 110 insertions(+), 17 deletions(-)
+
+diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
+index 343de75..5d7ad44 100644
+--- a/src/rendervulkan.cpp
++++ b/src/rendervulkan.cpp
+@@ -320,7 +320,79 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
+ 
+ extern bool env_to_bool(const char *env);
+ 
++static VkInstance vulkan_recreate_instance( void );
++
++// Mesa's panvk hides Mali v6/v7 (Bifrost) GPUs unless
++// PAN_I_WANT_A_BROKEN_VULKAN_DRIVER is set, and reports Vulkan 1.0 for them
++// unless MESA_VK_VERSION_OVERRIDE is set. Without both, at best llvmpipe
++// qualifies; it lacks VK_EXT_physical_device_drm and Gamescope aborts on it.
++// When no GPU qualifies, set whichever of the two is unset, recreate the
++// instance (Mesa reads them only while creating the instance and enumerating
++// physical devices) and select once more. Then unset what we set, so children
++// do not inherit it. A GPU that qualifies normally never reaches this path.
+ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
++{
++	auto selectedIsCPU = [this]()
++	{
++		VkPhysicalDeviceProperties props;
++		vk.GetPhysicalDeviceProperties( m_physDev, &props );
++		return props.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU;
++	};
++
++	bool bFound = findPhysDev( surface );
++
++	// An SDL surface belongs to the current instance, so keep that instance.
++	if ( ( !bFound || selectedIsCPU() ) && surface == VK_NULL_HANDLE )
++	{
++		static const std::pair<const char *, const char *> k_MesaOptIn[] = {
++			{ "PAN_I_WANT_A_BROKEN_VULKAN_DRIVER", "1" },
++			{ "MESA_VK_VERSION_OVERRIDE", "1.3" },
++		};
++		std::vector<const char *> setByUs;
++		std::string sSet;
++		for ( const auto &[ pszName, pszValue ] : k_MesaOptIn )
++		{
++			if ( getenv( pszName ) )
++				continue;
++			setenv( pszName, pszValue, 0 );
++			setByUs.push_back( pszName );
++			sSet += std::string( " " ) + pszName + "=" + pszValue;
++		}
++
++		if ( !setByUs.empty() )
++		{
++			vk_log.infof( "no GPU Vulkan device qualified; retrying with Mesa opt-in:%s", sSet.c_str() );
++
++			m_physDev = nullptr;
++			bFound = false;
++			m_instance = vulkan_recreate_instance();
++			if ( m_instance )
++			{
++				#define VK_FUNC(x) vk.x = (PFN_vk##x) g_pfn_vkGetInstanceProcAddr(m_instance, "vk"#x);
++				VULKAN_INSTANCE_FUNCTIONS
++				#undef VK_FUNC
++				bFound = findPhysDev( surface );
++			}
++
++			for ( const char *pszName : setByUs )
++				unsetenv( pszName );
++		}
++	}
++
++	if (!bFound)
++	{
++		vk_log.errorf("failed to find physical device");
++		return false;
++	}
++
++	VkPhysicalDeviceProperties props;
++	vk.GetPhysicalDeviceProperties( m_physDev, &props );
++	vk_log.infof( "selecting physical device '%s': queue family %x (general queue family %x)", props.deviceName, m_queueFamily, m_generalQueueFamily );
++
++	return true;
++}
++
++bool CVulkanDevice::findPhysDev(VkSurfaceKHR surface)
+ {
+ 	uint32_t deviceCount = 0;
+ 	vk.EnumeratePhysicalDevices(instance(), &deviceCount, nullptr);
+@@ -338,10 +410,15 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+ 		bTryComputeOnly = false;
+ 	}
+ 
++	bool bSelectedIsCPU = false;
++	bool bSelectedIsPreferred = false;
++
+ 	for (auto cphysDev : physDevs)
+ 	{
+ 		VkPhysicalDeviceProperties deviceProperties;
+ 		vk.GetPhysicalDeviceProperties(cphysDev, &deviceProperties);
++		const bool bIsCPU = deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU;
++		const bool bIsPreferred = g_preferVendorID == deviceProperties.vendorID && g_preferDeviceID == deviceProperties.deviceID;
+ 
+ 		if (deviceProperties.apiVersion < VK_API_VERSION_1_2)
+ 			continue;
+@@ -363,9 +440,10 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+ 
+ 		if (generalIndex != ~0u || computeOnlyIndex != ~0u)
+ 		{
+-			// Select the device if it's the first one or the preferred one
+-			if (!m_physDev ||
+-			    (g_preferVendorID == deviceProperties.vendorID && g_preferDeviceID == deviceProperties.deviceID))
++			// Select the device if it's the first one, the preferred one, or
++			// the first GPU after a CPU device (llvmpipe) that was not preferred
++			if (!m_physDev || bIsPreferred ||
++			    (bSelectedIsCPU && !bSelectedIsPreferred && !bIsCPU))
+ 			{
+ 				// if we have a surface, check that the queue family can actually present on it
+ 				if (surface) {
+@@ -390,6 +468,8 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+ 				m_queueFamily = computeOnlyIndex == ~0u ? generalIndex : computeOnlyIndex;
+ 				m_generalQueueFamily = generalIndex;
+ 				m_physDev = cphysDev;
++				bSelectedIsCPU = bIsCPU;
++				bSelectedIsPreferred = bIsPreferred;
+ 
+ 				/* When Intel uses compute-only queue for Gamescope composition, some games
+ 				 * experience performance loss. Using the general queue alleviates the issue
+@@ -409,17 +489,7 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+ 		}
+ 	}
+ 
+-	if (!m_physDev)
+-	{
+-		vk_log.errorf("failed to find physical device");
+-		return false;
+-	}
+-
+-	VkPhysicalDeviceProperties props;
+-	vk.GetPhysicalDeviceProperties( m_physDev, &props );
+-	vk_log.infof( "selecting physical device '%s': queue family %x (general queue family %x)", props.deviceName, m_queueFamily, m_generalQueueFamily );
+-
+-	return true;
++	return m_physDev != nullptr;
+ }
+ 
+ bool CVulkanDevice::createDevice()
+@@ -3601,9 +3671,9 @@ static bool init_nis_data()
+ 	return true;
+ }
+ 
+-VkInstance vulkan_get_instance( void )
++static VkInstance vulkan_get_or_recreate_instance( bool bRecreate )
+ {
+-	static VkInstance s_pVkInstance = []() -> VkInstance
++	auto createInstance = []() -> VkInstance
+ 	{
+ 		VkResult result = VK_ERROR_INITIALIZATION_FAILED;
+ 
+@@ -3639,11 +3709,33 @@ VkInstance vulkan_get_instance( void )
+ 		}
+ 
+ 		return instance;
+-	}();
++	};
++
++	static VkInstance s_pVkInstance = createInstance();
++	if ( bRecreate )
++	{
++		if ( s_pVkInstance )
++		{
++			auto pfnDestroyInstance = (PFN_vkDestroyInstance) g_pfn_vkGetInstanceProcAddr( s_pVkInstance, "vkDestroyInstance" );
++			pfnDestroyInstance( s_pVkInstance, nullptr );
++		}
++		s_pVkInstance = createInstance();
++	}
+ 
+ 	return s_pVkInstance;
+ }
+ 
++VkInstance vulkan_get_instance( void )
++{
++	return vulkan_get_or_recreate_instance( false );
++}
++
++// Only valid before anything holds objects of the current instance.
++static VkInstance vulkan_recreate_instance( void )
++{
++	return vulkan_get_or_recreate_instance( true );
++}
++
+ bool vulkan_init( VkInstance instance, VkSurfaceKHR surface )
+ {
+ 	static bool s_bInitted = false;
+diff --git a/src/rendervulkan.hpp b/src/rendervulkan.hpp
+index 3f0bf73..337523b 100644
+--- a/src/rendervulkan.hpp
++++ b/src/rendervulkan.hpp
+@@ -838,6 +838,7 @@ protected:
+ 	friend class CVulkanCmdBuffer;
+ 
+ 	bool selectPhysDev(VkSurfaceKHR surface);
++	bool findPhysDev(VkSurfaceKHR surface);
+ 	bool createDevice();
+ 	bool createLayouts();
+ 	bool createPools();
