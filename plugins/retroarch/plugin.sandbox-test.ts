@@ -59,6 +59,28 @@ describe("RetroArch native configuration", () => {
     expect(other.files![0].content).not.toContain(root)
   })
 
+  it("keeps managed save paths even when typed and raw overrides replace them", () => {
+    const root = input().saveRoot
+    const expected = {
+      savefile_directory: `${root}/saves`,
+      savestate_directory: `${root}/states/@korri:mgba/mgba`,
+      screenshot_directory: `${root}/screenshots`,
+    }
+    for (const [key, path] of Object.entries(expected)) {
+      const cfg = content({
+        settings: { [key]: "/custom/typed" },
+        config: { prepend: `${key} = "/custom/prepend"`, append: `${key} = "/custom/append"` },
+      })
+      expect(cfg).toContain(`${key} = "${path}"`)
+      expect(cfg).not.toContain("/custom/")
+      const reported = handlers["settings.validate"]({ values: { [key]: "/custom/typed" } })
+      expect(reported.diagnostics).toContainEqual({
+        code: "setting-managed", severity: "warning", path: [key],
+        message: `${key} is managed by Korri for save sync; an override has no effect`,
+      })
+    }
+  })
+
   it("refuses provider routes without a content file", () => {
     expect(() => launch({ ...input(), contentPath: undefined, ref: "123" }))
       .toThrow("requires a content file")
