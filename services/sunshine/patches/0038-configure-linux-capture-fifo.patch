@@ -1,7 +1,8 @@
 What: capture_rt_priority=0 (default off) or 1..20 requests Linux FIFO for
 only the asynchronous capture thread, with SCHED_RESET_ON_FORK. Parse strict
 integers, disable on invalid input, and log/continue on EPERM or other errors.
-One operational policy line per capture thread; no timing probes/files.
+Operational policy and first-frame monotonic markers once per capture thread;
+no per-frame timing probes or observer files.
 No service-wide RT policy, affinity change, wrapper TID guessing or SYS_NICE.
 Status: experimental opt-in scheduling policy, potentially upstreamable.
 Evidence: /tmp/h700-sun/convert.md scheduling section (2026-10-22): capture
@@ -108,10 +109,9 @@ index 7ba1bd2..96577ec 100644
  
      struct {
 diff --git a/src/video.cpp b/src/video.cpp
-index 81794be..d9a4791 100644
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -13,6 +13,8 @@
+@@ -15,6 +15,8 @@
  
  #ifdef __linux__
  #include <va/va.h>
@@ -120,7 +120,7 @@ index 81794be..d9a4791 100644
  #endif
  
  extern "C" {
-@@ -27,6 +29,7 @@ extern "C" {
+@@ -29,6 +31,7 @@
  // local includes
  #include "cbs.h"
  #include "config.h"
@@ -128,7 +128,7 @@ index 81794be..d9a4791 100644
  #include "display_device.h"
  #include "globals.h"
  #include "input.h"
-@@ -1689,6 +1692,26 @@ namespace video {
+@@ -1763,11 +1766,46 @@
  
      // Capture takes place on this thread
      platf::adjust_thread_priority(platf::thread_priority_e::critical);
@@ -138,6 +138,9 @@ index 81794be..d9a4791 100644
 +      // EPERM (including a missing LimitRTPRIO) is not a capture failure.
 +      BOOST_LOG(warning) << "Capture thread "sv << capture_tid << " cannot set FIFO priority "sv << config::video.capture_rt_priority << ": "sv << std::strerror(error) << "; continuing"sv;
 +    }
++    const auto capture_policy_time = std::chrono::steady_clock::now();
++    const auto capture_policy_us = std::chrono::duration_cast<std::chrono::microseconds>(capture_policy_time.time_since_epoch()).count();
++    bool first_capture = true;
 +    const int capture_policy = sched_getscheduler(0);
 +    sched_param capture_param {};
 +    if (capture_policy >= 0 && sched_getparam(0, &capture_param) == 0) {
@@ -147,7 +150,8 @@ index 81794be..d9a4791 100644
 +      BOOST_LOG(info) << "Capture thread "sv << capture_tid << " policy "sv
 +                      << (base_policy == SCHED_FIFO ? "SCHED_FIFO" : base_policy == SCHED_OTHER ? "SCHED_OTHER" : "other")
 +                      << " priority "sv << capture_param.sched_priority
-+                      << " reset-on-fork="sv << bool(capture_policy & SCHED_RESET_ON_FORK);
++                      << " reset-on-fork="sv << bool(capture_policy & SCHED_RESET_ON_FORK)
++                      << " monotonic_us="sv << capture_policy_us;
 +    } else {
 +      BOOST_LOG(warning) << "Capture thread "sv << capture_tid << " policy query failed: "sv << std::strerror(errno) << "; continuing"sv;
 +    }
@@ -155,3 +159,19 @@ index 81794be..d9a4791 100644
  
      while (capture_ctx_queue->running()) {
        bool artificial_reinit = false;
+ 
+       auto push_captured_image_callback = [&](std::shared_ptr<platf::img_t> &&img, bool frame_captured) -> bool {
++#ifdef __linux__
++        if (frame_captured && first_capture) {
++          first_capture = false;
++          const auto first_capture_us = img->frame_timestamp ?
++            std::chrono::duration_cast<std::chrono::microseconds>(img->frame_timestamp->time_since_epoch()).count() : -1;
++          const auto completed_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
++          // One operational first-frame marker, not a per-frame timing probe.
++          BOOST_LOG(info) << "Capture thread "sv << capture_tid << " first frame capture_monotonic_us="sv << first_capture_us
++                          << " completed_monotonic_us="sv << completed_us << " policy_monotonic_us="sv << capture_policy_us;
++        }
++#endif
+         KITTY_WHILE_LOOP(auto capture_ctx = std::begin(capture_ctxs), capture_ctx != std::end(capture_ctxs), {
+           if (!capture_ctx->images->running()) {
+             capture_ctx = capture_ctxs.erase(capture_ctx);
