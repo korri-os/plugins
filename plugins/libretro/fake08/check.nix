@@ -5,6 +5,7 @@
   contract,
 }:
 let
+  saveStateCheck = import ./save-state-check.nix { inherit pkgs core; };
   contractSource = builtins.path {
     path = contract;
     name = "korrid.ts";
@@ -19,6 +20,7 @@ pkgs.runCommand "korri-fake08-package-check"
     ];
   }
   ''
+    test -e ${saveStateCheck}
     python3 ${./core-check.py} ${core}/lib/retroarch/cores/fake08_libretro.so
     # Typecheck the actual generated plugin, shared helper and pinned settings.
     mkdir -p work/plugins/libretro work/contracts/generated
@@ -49,6 +51,14 @@ pkgs.runCommand "korri-fake08-package-check"
       grep -Fq 'This notice may not be removed or altered from any source' \
         "$notices/libs/lodepng/$file"
     done
+    cmp ${./eris-save-states.patch} ${core}/share/doc/libretro-fake08/patches/eris-save-states.patch
+    cmp ${./libretro-autoload-state.patch} ${core}/share/doc/libretro-fake08/patches/libretro-autoload-state.patch
+    manifest=${core}/nix-support/libretro-fake08/manifest.txt
+    grep -Fxq 'patch=eris-save-states.patch' "$manifest"
+    grep -Fxq 'patch-head=0c958a84f433fb2ced1377d1387d63952523bfb7' "$manifest"
+    grep -Fxq 'patch-status=unmerged' "$manifest"
+    grep -Fxq 'patch=libretro-autoload-state.patch' "$manifest"
+    grep -Fxq 'patch-origin=Korri' "$manifest"
     # Deliberately small installed shape. Do not ship upstream sample/platform art.
     test "$(find ${core}/lib -type f | wc -l)" -eq 2
     test ! -d ${core}/bin

@@ -1,0 +1,65 @@
+Subject: libretro: load a queued cart before restoring a save state
+Origin: Korri (local patch, not part of upstream PR #288)
+Upstream-status: Not submitted
+Applies-after: eris-save-states.patch (PR #288)
+
+retro_load_game only queues the cart. RetroArch's savestate_auto_load calls
+retro_unserialize before the first retro_run, so Step later loads the cart,
+resets RAM/Lua and discards the restore. Extract Step's existing queue
+processing and call it before restoring, without ticking the previous cart.
+Normal Step loading still uses the same implementation.
+
+Regression: save-state-check.c runs PR #288's savestatetest.p8, saves at
+Lua counter 30, then in a fresh process loads/restores before any retro_run.
+PR #288 alone yields counters 31 then 1 (expected 31 then 32). The running,
+fresh auto-load and unload/reload cases must all yield 31, 32, 33, for both
+memory-backed and path-backed loads. This patch changes no state format.
+
+--- a/source/vm.cpp
++++ b/source/vm.cpp
+@@ -638,6 +638,11 @@
+     }
+     lua_pop(_luaState, 1);
+ 
++    ProcessQueuedCartChange();
++    return ret;
++}
++
++void Vm::ProcessQueuedCartChange(){
+     // Process any queued cart change (from reset, load, etc.)
+     if (_cartChangeQueued) {
+         Logger_Write("Processing cart change, _pauseMenu = %s\n", _pauseMenu ? "true" : "false");
+@@ -660,8 +665,6 @@
+             _cartChangeQueued = false;
+         }
+     }
+-
+-    return ret;
+ }
+ 
+ // void Vm::UpdateAndDraw() {
+--- a/source/vm.h
++++ b/source/vm.h
+@@ -79,6 +79,7 @@
+ 
+     // void UpdateAndDraw();
+     bool Step();
++    void ProcessQueuedCartChange();
+ 
+     uint8_t* GetPicoInteralFb();
+     uint8_t* GetScreenPaletteMap();
+--- a/platform/libretro/libretro.cpp
++++ b/platform/libretro/libretro.cpp
+@@ -657,6 +657,12 @@
+ 
+ EXPORT bool retro_unserialize(const void *data, size_t size)
+ {
++    // RetroArch auto-loads states after retro_load_game, before retro_run.
++    // Finish the queued load (including vm_run) first: it resets RAM and Lua
++    // and would otherwise overwrite the restored state on the next frame.
++    // Do not tick the old cart or submit a frontend video/audio frame here.
++    _vm->ProcessQueuedCartChange();
++
+     if (log_cb) {
+         log_cb(RETRO_LOG_INFO, "lua deserialize\n");
+     }

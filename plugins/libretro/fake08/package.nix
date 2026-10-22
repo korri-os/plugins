@@ -18,6 +18,10 @@ stdenv.mkDerivation {
     fetchSubmodules = true;
     hash = "sha256-+2jhG4hMc5P1it1/ksTlWDRKAvRZUpkq2CZ2NxcEITg=";
   };
+  patches = [
+    ./eris-save-states.patch
+    ./libretro-autoload-state.patch
+  ];
   strictDeps = true;
   dontConfigure = true;
   buildPhase = ''
@@ -35,6 +39,8 @@ stdenv.mkDerivation {
     doc="$out/share/doc/libretro-fake08"
     install -Dm644 LICENSE.MD "$doc/LICENSE.MD"
     install -Dm644 ${./THIRD-PARTY.md} "$doc/THIRD-PARTY.md"
+    install -Dm644 ${./eris-save-states.patch} "$doc/patches/eris-save-states.patch"
+    install -Dm644 ${./libretro-autoload-state.patch} "$doc/patches/libretro-autoload-state.patch"
     # Preserve complete original files containing transitive notices, not a
     # rewritten list of license names. Read from pristine src, before patching.
     for file in libs/z8lua/lua.h libs/z8lua/eris.c libs/z8lua/fix32.h \
@@ -52,6 +58,14 @@ stdenv.mkDerivation {
     upstream-rev=${rev}
     upstream-source=https://github.com/jtothebell/fake-08/tree/${rev}
     z8lua-source=https://github.com/jtothebell/z8lua/tree/${z8luaRev}
+    patch=eris-save-states.patch
+    patch-source=https://github.com/jtothebell/fake-08/pull/288
+    patch-head=0c958a84f433fb2ced1377d1387d63952523bfb7
+    patch-status=unmerged
+    patch=libretro-autoload-state.patch
+    patch-origin=Korri
+    patch-status=local-not-submitted
+    patches=/share/doc/libretro-fake08/patches
     target=platform/libretro platform=unix
     core=/lib/retroarch/cores/fake08_libretro.so
     notices=/share/doc/libretro-fake08

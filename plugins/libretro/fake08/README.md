@@ -8,6 +8,8 @@ It uses the existing protected launch helper without changes.
 | Item | Pin / installed path |
 |---|---|
 | FAKE-08 | `jtothebell/fake-08`, `814991a2571ad3970e386cef48f3b148aa1c27b9` |
+| Upstream save-state patch | `eris-save-states.patch`: [PR #288](https://github.com/jtothebell/fake-08/pull/288), head `0c958a84f433fb2ced1377d1387d63952523bfb7`, **unmerged** when retrieved |
+| Korri save-state patch | `libretro-autoload-state.patch`: finish queued loading before restore; local, not submitted upstream |
 | Recursive z8lua | `jtothebell/z8lua`, `e6928578d46b61fd5ea30cfcf547e855a30a0553` |
 | Recursive source NAR hash | `sha256-+2jhG4hMc5P1it1/ksTlWDRKAvRZUpkq2CZ2NxcEITg=` |
 | Core (inside its native output) | `lib/retroarch/cores/fake08_libretro.so` |
@@ -56,7 +58,53 @@ for 2,400 frames with simulated X presses. Cart 2 raised
 It also emitted the breadcrumb warning. Into Ruins is therefore **not verified
 playable on this pin**; this is a concrete compatibility issue, not a passing
 game test. No emulator or cartridge workaround is included. All 24 games,
-reset-to-title, sound, save states and device performance remain unverified.
+reset-to-title, sound and device performance remain unverified. Save-state
+verification is limited to the regression cartridge below, not these games.
+
+## Save states
+
+New states hold the cart's Lua state (including globals, functions and
+coroutines), PICO-8 RAM and the core's saved music-channel state. Previously,
+Lua serialization failed silently, leaving only RAM and music-channel data.
+Existing states cannot recover Lua state that was never saved. No migration
+or new compatibility path is added.
+
+Two patches are carried on the unchanged source pin:
+
+- `eris-save-states.patch` is the complete, unmerged upstream PR #288 at the
+  head SHA in the table. It restores eris persistence, stops GC while restoring,
+  collects the restore's garbage, re-registers the restored sandbox, and adds
+  `stat(0)` memory reporting plus upstream regression cartridges/tests.
+- `libretro-autoload-state.patch` is Korri's separate fix. RetroArch auto-loads
+  immediately after `retro_load_game`, before any `retro_run`. The queued cart
+  must load and run its initialization before restoring; otherwise the next
+  frame wipes the restored Lua/RAM. The patch reuses normal queue processing
+  without ticking the old cart or sending a frontend frame.
+
+The C harness compiles and runs inside the Nix build sandbox. It uses PR #288's
+`test/carts/savestatetest.p8` unchanged. Its counter `n` lives only in Lua and
+is copied to RAM at `0x4300` on each update. The check reads that byte through
+the real libretro serialization ABI, after subsequent updates, so restoring
+only RAM cannot pass. It tests running-cart restore, fresh-process auto-load
+from a previous process's state, and unload/reload before the first frame.
+Each runs with both memory-backed and path-backed cartridge loading.
+
+Verified regression evidence (saved counter 30; negative controls on x86_64):
+
+| Core | Running-cart restore | Fresh auto-load |
+|---|---|---|
+| Unpatched pin | 61 instead of 31; zero serialized Lua bytes | 30 instead of 31 |
+| PR #288 only | 31, 32, 33 | 31, then 1 instead of 32 |
+| Both patches, x86_64 and aarch64 | 31, 32, 33 | 31, 32, 33 |
+
+Both patches and their provenance are installed under
+`share/doc/libretro-fake08/patches/` and recorded in the native manifest.
+Original notices still come from pristine `$src`, not the patched tree.
+
+The core's fixed 1 MiB Lua serialization buffer and state-input validation
+are unchanged. Oversized/malformed states, cross-version/cross-architecture
+state portability, and real-game/device restore behavior are not validated
+by this regression cartridge.
 
 ## Licensing
 
@@ -85,6 +133,9 @@ nix build --no-link .#packages.x86_64-linux.korri-plugin-fake08 \
 Replace `x86_64-linux` with `aarch64-linux` for the other build. The package
 check loads the real `.so`, typechecks the real generated source, reads the
 real plugin manifest and exercises its unchanged launch/settings helper.
+It also runs the headless C save-state harness on both architectures. The
+publication CI matrix (`.github/workflows/cache.yml`) runs this same package
+check on x86_64 and aarch64 build runners; neither builds on a handheld.
 Admission uses the normal Core host's local `seed` check, like Sunshine's
 existing admission check. It does not establish publisher trust or approve a
 real device install.
