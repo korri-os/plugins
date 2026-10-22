@@ -184,8 +184,14 @@ jobs:
           cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
           printf '%s\n' "$EXPECTED_SOURCE_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
       - name: Refuse credential-bearing publication artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          if grep -aErq 'ghs_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|eC1hY2Nlc3MtdG9rZW46' "$RUNNER_TEMP/prepared"; then
+          # Match this job's actual token and its Basic encoding, not only
+          # known prefixes: token formats change.
+          basic=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          if grep -aFrq -e "$GITHUB_TOKEN" -e "$basic" "$RUNNER_TEMP/prepared" ||
+            grep -aErq 'ghs_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|eC1hY2Nlc3MtdG9rZW46' "$RUNNER_TEMP/prepared"; then
             echo 'Source credential marker found in prepared artifacts' >&2
             exit 1
           fi

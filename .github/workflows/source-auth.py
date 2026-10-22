@@ -20,7 +20,16 @@ HOSTS = ("github.com", "api.github.com", "codeload.github.com")
 
 
 def write_files(root, token, nix, hosts=HOSTS, origins=None):
-    if not re.fullmatch(r"[A-Za-z0-9_]+", token):
+    # Actions job tokens are no longer plain alphanumerics (run 39734003897).
+    # Accept URL-safe token characters; anything that could break a netrc or
+    # Git config line (whitespace, quotes, backslash, comment markers) stays out.
+    if not re.fullmatch(r"[A-Za-z0-9_.~+/=-]{20,4096}", token):
+        # Report only the length and the non-alphanumeric character classes.
+        others = sorted({c for c in token if not c.isalnum()})
+        print(
+            f"GITHUB_TOKEN format: length {len(token)}, other characters {others!r}",
+            file=sys.stderr,
+        )
         raise ValueError("GITHUB_TOKEN has an unexpected format")
     root.mkdir(mode=0o700)
     credentials = root / "netrc"
