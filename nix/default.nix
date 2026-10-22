@@ -2,14 +2,29 @@
   korri,
   nixpkgs,
   flake-utils,
+  gitConfigFile ? null,
 }:
 flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   system:
   let
-    pkgs = import nixpkgs {
+    canonicalPkgs = import nixpkgs {
       inherit system;
       config.allowUnfree = true;
     };
+    pkgs =
+      if gitConfigFile == null then
+        canonicalPkgs
+      else
+        import nixpkgs {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            inherit gitConfigFile;
+          };
+          # Sunshine approves and records the exact upstream drv, not only its
+          # output. Keep that guarded base intact; custom fetches still use CI.
+          overlays = [ (_: _: { sunshine = canonicalPkgs.sunshine; }) ];
+        };
     mkPlugin = korri.lib.${system}.mkPlugin { inherit pkgs; };
     sunshine = import ../services/sunshine { inherit pkgs system; };
     sshPackage = mkPlugin {
@@ -163,6 +178,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         pkgs.nix
       ];
       text = ''
+        export KORRI_CHECKS_ATTRIBUTE=${if gitConfigFile == null then "checks" else "ci.checks"}
         exec ${pkgs.bash}/bin/bash ${../plugins/retroarch/check.sh}
       '';
     };
@@ -232,6 +248,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     // libretro.packages
     // sunshine.packages
     // integration.packages;
+    # `nix run` treats only top-level `apps.<system>` as apps, so the CI-only
+    # outputs expose the check runner as a plain derivation instead.
+    ${if gitConfigFile == null then null else "tools"} = {
+      korri-retroarch-check = retroarchCheck;
+    };
     apps = sunshine.apps // {
       korri-cache = {
         type = "app";

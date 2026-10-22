@@ -699,20 +699,37 @@ def publish(prepared, repo, tag, cache_tag, revision):
     upload(prepared, repo, tag, cache_tag, "metadata")
 
 
-def build(system, packages, paths_file):
+def build(system, packages, paths_file, ci_source_auth=False):
     if system not in ("x86_64-linux", "aarch64-linux"):
         raise ValueError("unsupported build system")
     if not packages or any(
         not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", name) for name in packages
     ):
         raise ValueError("select package output names, not Nix expressions or flags")
+    prefix = "ci.packages" if ci_source_auth else "packages"
+    expected = set()
+    if ci_source_auth:
+        for name in packages:
+            canonical = run(
+                "nix", "eval", "--raw", f".#packages.{system}.{name}.outPath"
+            )
+            candidate = run(
+                "nix", "eval", "--raw", f".#{prefix}.{system}.{name}.outPath"
+            )
+            if canonical != candidate:
+                raise ValueError(
+                    f"CI source authentication changes output path for {name}"
+                )
+            expected.add(canonical)
     paths = run(
         "nix",
         "build",
         "--no-link",
         "--print-out-paths",
-        *[f".#packages.{system}.{name}" for name in packages],
+        *[f".#{prefix}.{system}.{name}" for name in packages],
     )
+    if ci_source_auth and set(paths.splitlines()) != expected:
+        raise ValueError("CI-built paths do not match canonical package outputs")
     with paths_file.open("x") as target:
         target.write(paths + "\n")
 
@@ -727,6 +744,11 @@ def main():
     build_parser = commands.add_parser("build")
     build_parser.add_argument("--system", required=True)
     build_parser.add_argument("--paths-file", type=Path, required=True)
+    build_parser.add_argument(
+        "--ci-source-auth",
+        action="store_true",
+        help="build pure CI outputs; require canonical output-path equality",
+    )
     build_parser.add_argument("packages", nargs="+")
     export_parser = commands.add_parser("export")
     export_parser.add_argument("cache", type=Path)
@@ -762,7 +784,7 @@ def main():
     if args.command == "validate":
         validate_destination(args.repo, args.tag, args.cache_tag)
     elif args.command == "build":
-        build(args.system, args.packages, args.paths_file)
+        build(args.system, args.packages, args.paths_file, args.ci_source_auth)
     elif args.command == "export":
         export(args.cache, args.key_file, args.paths)
     elif args.command == "prepare":

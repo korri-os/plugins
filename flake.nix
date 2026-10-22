@@ -15,5 +15,11 @@
       flake-utils,
       ...
     }:
-    import ./nix { inherit korri nixpkgs flake-utils; };
+    (import ./nix { inherit korri nixpkgs flake-utils; })
+    // {
+      ci = import ./nix {
+        inherit korri nixpkgs flake-utils;
+        gitConfigFile = "/run/korri-github-source-auth/gitconfig";
+      };
+    };
 }

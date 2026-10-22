@@ -56,7 +56,6 @@ jobs:
     environment: plugin-release
     permissions:
       contents: read
-      actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -74,6 +73,16 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           python3 .github/workflows/trust-plugin-caches.py
+      - name: Configure scoped read-only GitHub source authentication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          sudo --preserve-env=GITHUB_TOKEN,GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py setup --nix "$(command -v nix)"
+      - name: Verify daemon-sandboxed source authentication
+        run: nix shell --inputs-from . nixpkgs#python3 nixpkgs#git nixpkgs#acl -c python3 .github/workflows/test-source-auth.py --integration
       - name: Test the effective signed-cache configuration
         run: |
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -87,7 +96,7 @@ jobs:
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
-          nix run .#korri-plugin-churn-check -- --system "$SYSTEM"
+          nix run ".#ci.packages.$SYSTEM.korri-plugin-churn-check" -- --system "$SYSTEM"
       - name: Validate the destination and test the publisher
         env:
           SYSTEM: ${{ matrix.system }}
@@ -95,56 +104,47 @@ jobs:
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
-          nix run .#korri-cache -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
-          test_output=$(nix build --no-link --print-out-paths ".#checks.$SYSTEM.korri-github-cache")
-          nix run .#korri-retroarch-check
-          # GitHub's ARM runners intermittently get HTTP 403 from github.com for
-          # source downloads made inside build recipes (FAKE-08 and Sunshine's
-          # build-deps, runs 38840426871 and 38988905589). Nix keeps finished
-          # work, so a retry fetches only what failed. Do not retry the VM test
-          # below: a real hang would cost 60 minutes per try.
+          nix run ".#ci.packages.$SYSTEM.korri-cache" -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
+          test_output=$(nix build --no-link --print-out-paths ".#ci.checks.$SYSTEM.korri-github-cache")
+          nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
+          # Authenticated source failures are fatal; never retry an HTTP 403.
           checks=(
-            ".#checks.$SYSTEM.korri-device-cache"
-            ".#checks.$SYSTEM.korri-plugin-builder"
-            ".#checks.$SYSTEM.korri-tailscale-package"
-            ".#checks.$SYSTEM.korri-retroarch-package"
-            ".#checks.$SYSTEM.korri-retroarch-settings"
-            ".#checks.$SYSTEM.korri-libretro-example"
-            ".#checks.$SYSTEM.korri-fake08-package"
-            ".#checks.$SYSTEM.korri-fake08-admission"
-            ".#checks.$SYSTEM.korri-solarus-plugin"
-            ".#checks.$SYSTEM.korri-gamescope-plugin"
-            ".#checks.$SYSTEM.korri-starter-pack-package"
-            ".#checks.$SYSTEM.korri-starter-pack-admission"
-            ".#checks.$SYSTEM.korri-starter-pack-solarus-runtime"
-            ".#checks.$SYSTEM.korri-libretro-frontend-override"
-            ".#checks.$SYSTEM.korri-libretro-typecheck"
-            ".#checks.$SYSTEM.korri-pico8-plugin"
-            ".#checks.$SYSTEM.korri-homebrewhub-plugin"
-            ".#checks.$SYSTEM.korri-retrobrews-plugin"
-            ".#checks.$SYSTEM.korri-ssh-upstream"
-            ".#checks.$SYSTEM.korri-ssh-host-support"
-            ".#checks.$SYSTEM.korri-sunshine-plugin-admission"
-            ".#checks.$SYSTEM.korri-sunshine-plugin-native"
-            ".#checks.$SYSTEM.sunshine-korri-package"
-            ".#checks.$SYSTEM.sunshine-korri-runtime-settings"
-            ".#checks.$SYSTEM.sunshine-korri-certificate-control"
-            ".#checks.$SYSTEM.sunshine-korri-v4l2m2m"
-            ".#checks.$SYSTEM.sunshine-offline-retirement"
+            ".#ci.checks.$SYSTEM.korri-device-cache"
+            ".#ci.checks.$SYSTEM.korri-plugin-builder"
+            ".#ci.checks.$SYSTEM.korri-tailscale-package"
+            ".#ci.checks.$SYSTEM.korri-retroarch-package"
+            ".#ci.checks.$SYSTEM.korri-retroarch-settings"
+            ".#ci.checks.$SYSTEM.korri-libretro-example"
+            ".#ci.checks.$SYSTEM.korri-fake08-package"
+            ".#ci.checks.$SYSTEM.korri-fake08-admission"
+            ".#ci.checks.$SYSTEM.korri-solarus-plugin"
+            ".#ci.checks.$SYSTEM.korri-gamescope-plugin"
+            ".#ci.checks.$SYSTEM.korri-starter-pack-package"
+            ".#ci.checks.$SYSTEM.korri-starter-pack-admission"
+            ".#ci.checks.$SYSTEM.korri-starter-pack-solarus-runtime"
+            ".#ci.checks.$SYSTEM.korri-libretro-frontend-override"
+            ".#ci.checks.$SYSTEM.korri-libretro-typecheck"
+            ".#ci.checks.$SYSTEM.korri-pico8-plugin"
+            ".#ci.checks.$SYSTEM.korri-homebrewhub-plugin"
+            ".#ci.checks.$SYSTEM.korri-retrobrews-plugin"
+            ".#ci.checks.$SYSTEM.korri-ssh-upstream"
+            ".#ci.checks.$SYSTEM.korri-ssh-host-support"
+            ".#ci.checks.$SYSTEM.korri-sunshine-plugin-admission"
+            ".#ci.checks.$SYSTEM.korri-sunshine-plugin-native"
+            ".#ci.checks.$SYSTEM.sunshine-korri-package"
+            ".#ci.checks.$SYSTEM.sunshine-korri-runtime-settings"
+            ".#ci.checks.$SYSTEM.sunshine-korri-certificate-control"
+            ".#ci.checks.$SYSTEM.sunshine-korri-v4l2m2m"
+            ".#ci.checks.$SYSTEM.sunshine-offline-retirement"
           )
-          for attempt in 1 2 3; do
-            if nix build --no-link "${checks[@]}"; then break; fi
-            if [ "$attempt" = 3 ]; then exit 1; fi
-            echo "::warning::Check build failed on attempt $attempt; retrying in 120 s"
-            sleep 120
-          done
+          nix build --no-link "${checks[@]}"
           # This check boots an emulated VM. ARM runners have no KVM. Beside the
           # parallel builds above, its guest never finished booting in 60 min
           # (run 38840426871, attempts 2 and 3). Alone on the runner it boots in
           # about 2 min (run 38983221358). Build it last, with live output.
-          nix build --no-link --print-build-logs ".#checks.$SYSTEM.sunshine-korri-input-seat-patch"
+          nix build --no-link --print-build-logs ".#ci.checks.$SYSTEM.sunshine-korri-input-seat-patch"
           python3 nix/github-cache-export-test.py "$test_output"
-          nix build --out-link cache-tool .#korri-cache
+          nix build --out-link cache-tool ".#ci.packages.$SYSTEM.korri-cache"
       - name: Build the selected packages without a signing key
         env:
           SYSTEM: ${{ matrix.system }}
@@ -156,7 +156,7 @@ jobs:
             --apply 'packages: builtins.attrNames packages' \
             >/dev/null
           read -ra selected_outputs <<< "$PACKAGES"
-          ./cache-tool/bin/korri-cache build --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
+          ./cache-tool/bin/korri-cache build --ci-source-auth --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
       - name: Sign and prepare the Nix cache without content-address conversion
         env:
           SIGNING_KEY: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
@@ -180,29 +180,25 @@ jobs:
           unset SIGNING_KEY
           mapfile -t paths < "$RUNNER_TEMP/paths.txt"
           ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
-          # prepare fetches upstream metadata over HTTPS. It stages atomically,
-          # so a failed fetch leaves no output and is safe to retry.
-          for attempt in 1 2 3; do
-            if ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org; then break; fi
-            if [ "$attempt" = 3 ]; then exit 1; fi
-            echo "::warning::Cache preparation failed on attempt $attempt; retrying in 120 s"
-            sleep 120
-          done
+          ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org
           cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
           printf '%s\n' "$EXPECTED_SOURCE_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
+      - name: Refuse credential-bearing publication artifacts
+        run: |
+          if grep -aErq 'ghs_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|eC1hY2Nlc3MtdG9rZW46' "$RUNNER_TEMP/prepared"; then
+            echo 'Source credential marker found in prepared artifacts' >&2
+            exit 1
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cache-${{ matrix.system }}
           path: ${{ runner.temp }}/prepared/
           if-no-files-found: error
           retention-days: 7
-      - name: Cancel the run after a failed build
-        if: failure()
-        # Only this step receives GH_TOKEN. The build job uses the token's
-        # Actions write permission for nothing else.
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY"
+
+      - name: Remove source credentials
+        if: always()
+        run: sudo --preserve-env=GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py cleanup
 
   lifecycle:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
@@ -224,12 +220,24 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           python3 .github/workflows/trust-plugin-caches.py --include-core
+      - name: Configure scoped read-only GitHub source authentication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          sudo --preserve-env=GITHUB_TOKEN,GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py setup --nix "$(command -v nix)"
       - name: Existing cold-host lifecycle acceptance
         run: |
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
-          nix build --no-link .#checks.x86_64-linux.korri-runtime-plugin-host .#checks.x86_64-linux.sunshine-korri-input-presence
+          nix build --no-link .#ci.checks.x86_64-linux.korri-runtime-plugin-host .#ci.checks.x86_64-linux.sunshine-korri-input-presence
+
+      - name: Remove source credentials
+        if: always()
+        run: sudo --preserve-env=GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py cleanup
 
   # Only this non-matrix job may create the batch release. Build jobs prepare
   # local artifacts without release-write permission; manual drafts are reused.

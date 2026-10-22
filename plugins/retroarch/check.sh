@@ -7,4 +7,4 @@ bun install --frozen-lockfile --ignore-scripts
 bun run typecheck
 bun test
 system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-nix build --no-link "$root#checks.$system.korri-retroarch-settings"
+nix build --no-link "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-settings"

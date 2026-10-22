@@ -154,6 +154,59 @@ binding. The helper preserves stock and inherited settings, verifies the
 effective configuration, and requires signatures. Publishing builds refuse an
 inherited Core cache, including a URI with priority parameters.
 
+### GitHub source authentication
+
+Both architecture builds and lifecycle use only `contents: read`. Their existing
+job token also reaches GitHub fixed-output fetches through the daemon sandbox.
+The build matrix uses `fail-fast: true`; it no longer has an Actions-write token
+or cancels the whole run. Lifecycle can therefore continue after a build failure.
+The publication job retains its separate write token and receives no source
+credential mount.
+
+Pure `ci.packages`, `ci.checks` and `ci.apps` outputs use Nixpkgs'
+`gitConfigFile` option with a constant path string. Normal outputs do not change.
+The job creates that native Git config and a native netrc outside the checkout
+and Nix store, under `/run/korri-github-source-auth`. Only root, the job runner
+and the Nix build group can read their contents. Header values are masked. `NIX_CONFIG` contains
+only paths, never credentials. An `always()` step removes the files and settings.
+
+A pre-build hook mounts these files only for fixed-output derivations whose
+source URLs name `github.com`, `api.github.com` or `codeload.github.com` over
+HTTPS. Those source builders can read the token; ordinary derivations cannot.
+The fixed `/homeless-shelter/.netrc` mount survives fetchgit's temporary HOME.
+Curl fetchers also get a native curlrc that enables host-scoped netrc use.
+Runner system Git config is insufficient: this fetchgit explicitly sets
+`GIT_CONFIG_NOSYSTEM=1`. Netrc alone is also insufficient for HTTP 403: Git waits
+for a 401 challenge. The mounted Git config supplies a host-scoped Basic header
+before the first request. Tokens never enter source URLs or derivation values.
+
+Sunshine's exact approved upstream derivation remains canonical; authentication
+must not bypass its base-recipe or provenance checks. Core also composes its own
+host dependencies. A GitHub fetchgit without the CI config path is refused before
+network access, so these unchanged sources must be substituted. Check their
+exact source and package paths against the configured signed caches before a run.
+A cache outage can now stop such a build instead of causing an anonymous fetch.
+
+`korri-cache build --ci-source-auth` evaluates each selected CI and canonical
+output path, refuses differences before building, and checks Nix's actual build
+outputs again before writing the path list. Source revisions and hashes stay
+unchanged. The workflow refuses credential markers in prepared artifacts and
+does not retry build or preparation failures. Keep signatures and mutable-cache
+protection enabled.
+
+Local daemon regression (synthetic credentials only):
+
+```sh
+nix shell --inputs-from . nixpkgs#python3 nixpkgs#git nixpkgs#acl -c python3 .github/workflows/test-source-auth.py --integration
+python3 nix/github-cache-test.py CliInputs.test_build_refuses_expression_inputs
+```
+
+The first test uses a real Git HTTP backend that rejects anonymous requests with
+403, plus a curl download. It checks the actual fetchgit derivation, build log and
+NAR for credential leakage, ordinary-build isolation, and refusal of an
+unconfigured fetchgit. This is local transport proof, not GitHub availability
+proof. Publication still requires one successful pinned-source dry run.
+
 Core cache imports can retain Core signatures when Nix exports the same path
 with a publisher signature. This makes an unchanged path fail the publisher's
 strict append-only metadata comparison. A real isolated-store fixture reproduced
