@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<content>
+  <gp_download>false</gp_download>
+  <check_update>false</check_update>
+  <fullscreen>true</fullscreen>
+  <Graphic>
+    <api>1</api>
+  </Graphic>
+</content>
