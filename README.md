@@ -23,6 +23,8 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
 | `korri-plugin-solarus` | `@korri:solarus` | `plugins/solarus/` |
 | `solarus` | Standalone Solarus 2.1.4 engine | `plugins/solarus/` |
+| `korri-plugin-cemu` | `@korri:cemu` (Wii U) | `plugins/cemu/` |
+| `cemu` | Standalone Cemu main with offline Github989 graphic packs | `plugins/cemu/` |
 | `korri-plugin-gamescope` | `@korri:gamescope` | `plugins/gamescope/` |
 | `gamescope` | Standalone Gamescope 3.16.18 with nested Wayland touch | `plugins/gamescope/` |
 | `korri-plugin-starter-pack` | `@korri:starter-pack` | `plugins/starter-pack/` |
@@ -88,6 +90,13 @@ native x86_64 and ARM64 build runners without signing or publishing a cache.
 It validates original content bytes, the three-root approval graph and bounded
 headless startup. Display, sound, physical controls and full gameplay remain
 separate acceptance checks.
+
+## Cemu
+
+`@korri:cemu` packages a pinned, ARM-CI-verified Cemu main with SDL3, bundled
+Cubeb and offline graphic packs. It uses account-local native configuration
+and per-game MLC saves. See [its instructions](plugins/cemu/README.md) for
+source/CI provenance, native path grounding, checks and acceptance limits.
 
 ## Gamescope
 

@@ -131,6 +131,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         contract = korri.lib.${system}.pluginContract;
         hostPackage = korri.packages.${system}.korri-plugin-host;
       };
+    cemuPackage = import ../plugins/cemu/package.nix { inherit pkgs; };
+    cemuPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = pluginSourceOnly ../plugins/cemu;
+      plugin = _: import ../plugins/cemu/plugin.nix { inherit cemuPackage; };
+    };
     solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
     solarusPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -226,6 +232,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-sunshine = sunshinePlugin;
       korri-plugin-solarus = solarusPlugin;
       solarus = solarusPackage;
+      cemu = cemuPackage;
+      korri-plugin-cemu = cemuPlugin;
       korri-plugin-zquest-classic = zquestPlugin;
       zquest-classic = zquestLauncher;
       zquest-classic-source = import ./zquest-source-release.nix {
@@ -333,6 +341,17 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           inherit pkgs gamescopePackage;
           package = gamescopePlugin;
           contract = korri.lib.${system}.pluginContract;
+        };
+        korri-cemu-package = import ./cemu-check.nix {
+          inherit pkgs cemuPackage;
+          package = cemuPlugin;
+          contract = korri.lib.${system}.pluginContract;
+        };
+        korri-cemu-admission = import ./cemu-admission.nix {
+          inherit pkgs;
+          package = cemuPlugin;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+          korridPackage = korri.packages.${system}.korrid;
         };
         korri-solarus-plugin = import ./solarus-check.nix {
           inherit pkgs solarusPackage;
