@@ -212,6 +212,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         exec python3 ${./plugin-churn-check.py} --publisher ${../.} --korri ${churnCore} "$@"
       '';
     };
+    cemuBench = import ../plugins/cemu/bench { inherit pkgs; };
     cacheTool = pkgs.writeShellApplication {
       name = "korri-cache";
       runtimeInputs = [
@@ -250,6 +251,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-retrobrews = retrobrewsPlugin;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
+      korri-cemu-bench = cemuBench;
       korri-cache = cacheTool;
       korri-plugin-churn-check = churnCheck;
     }
@@ -262,6 +264,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-retroarch-check = retroarchCheck;
     };
     apps = sunshine.apps // {
+      korri-cemu-bench = {
+        type = "app";
+        program = "${cemuBench}/bin/korri-cemu-bench";
+      };
       korri-cache = {
         type = "app";
         program = "${cacheTool}/bin/korri-cache";
