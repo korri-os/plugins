@@ -119,9 +119,17 @@ def setup(nix):
         raise RuntimeError(
             "Nix must be installed before configuring source authentication"
         )
-    config = json.loads(
-        subprocess.check_output([nix, "config", "show", "--json"], text=True)
-    )
+    features = ["--extra-experimental-features", "nix-command"]
+    try:
+        shown = subprocess.check_output(
+            [nix, *features, "config", "show", "--json"], text=True
+        )
+    except subprocess.CalledProcessError:
+        # Nix before 2.20 names this command `show-config`.
+        shown = subprocess.check_output(
+            [nix, *features, "show-config", "--json"], text=True
+        )
+    config = json.loads(shown)
     if config["pre-build-hook"]["value"]:
         raise RuntimeError("Refusing to replace an existing Nix pre-build hook")
     if config["sandbox"]["value"] is not True:
@@ -193,7 +201,17 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
-        # Never echo configuration, fetched data, subprocess diagnostics or token.
+    except Exception as error:
+        # Never echo configuration, fetched data, subprocess output or token.
+        # Setup reports the exception type and the failing line so a CI failure
+        # is diagnosable; the hook path stays silent.
         print("GitHub source authentication setup/hook failed", file=sys.stderr)
+        if len(sys.argv) > 1 and sys.argv[1] in ("setup", "cleanup"):
+            trace = error.__traceback__
+            while trace.tb_next is not None:
+                trace = trace.tb_next
+            print(
+                f"{type(error).__name__} at source-auth.py line {trace.tb_lineno}",
+                file=sys.stderr,
+            )
         raise SystemExit(1) from None
