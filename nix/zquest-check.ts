@@ -62,6 +62,7 @@ for (const contentPath of [
     program: recordArguments,
     contentPath,
     accountRoot: "/accounts/Player One '; $(exit 21)",
+    saveRoot: "/accounts/Player One '; $(exit 21)/saves/public-room",
     cacheRoot: "/cache",
     files: manifest.files,
     artifacts: {},
@@ -75,8 +76,8 @@ for (const contentPath of [
   const result = spawnSync(
     korridCli,
     [
-      "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(input),
-      JSON.stringify({ modifiers: [] }),
+      "plugin-run", join(packagePath, "plugin.ts"), JSON.stringify(input),
+      JSON.stringify({ modifiers: [] }), "fixture",
     ],
     { encoding: "utf8" },
   )
@@ -94,10 +95,10 @@ for (const contentPath of [
     const rejected = spawnSync(
       korridCli,
       [
-        "plugin-launch",
+        "plugin-run",
         join(packagePath, "plugin.ts"),
         JSON.stringify({ ...input, ...unsupported }),
-        JSON.stringify({ modifiers: [] }),
+        JSON.stringify({ modifiers: [] }), "fixture",
       ],
       { encoding: "utf8" },
     )

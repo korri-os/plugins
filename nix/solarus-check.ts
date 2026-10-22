@@ -57,6 +57,7 @@ try {
       program: recordArguments,
       contentPath,
       accountRoot,
+      saveRoot: join(accountRoot, "saves", "korri_plugin_test"),
       cacheRoot: join(work, "cache"),
       files: manifest.files,
       artifacts: {},
@@ -73,8 +74,8 @@ try {
       ...input, overrides: { settings: {} },
     }), expected)
     const launch = spawnSync(korridCli, [
-      "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(input),
-      JSON.stringify({ modifiers: [] }),
+      "plugin-run", join(packagePath, "plugin.ts"), JSON.stringify(input),
+      JSON.stringify({ modifiers: [] }), "fixture",
     ], { encoding: "utf8", timeout: 30_000 })
     assert.equal(launch.status, 0, launch.stderr)
     assert.equal(launch.stdout, `${contentPath}\0${accountRoot}\0${accountRoot}\0`)
@@ -94,8 +95,8 @@ try {
       const invalid = { ...input, ...unsupported }
       assert.throws(() => handlers["launch.prepare"](invalid))
       const rejected = spawnSync(korridCli, [
-        "plugin-launch", join(packagePath, "plugin.ts"), JSON.stringify(invalid),
-        JSON.stringify({ modifiers: [] }),
+        "plugin-run", join(packagePath, "plugin.ts"), JSON.stringify(invalid),
+        JSON.stringify({ modifiers: [] }), "fixture",
       ], { encoding: "utf8", timeout: 30_000 })
       assert.notEqual(rejected.status, 0)
       assert.equal(rejected.stdout, "")

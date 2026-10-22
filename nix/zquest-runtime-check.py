@@ -107,16 +107,18 @@ def command(quest, account):
         "program": str(launcher),
         "contentPath": str(quest),
         "accountRoot": str(account),
+        "saveRoot": str(account / "saves/public-room"),
         "cacheRoot": str(root / "cache"),
         "files": manifest["files"],
         "artifacts": {},
     }
     return [
         korrid,
-        "plugin-launch",
+        "plugin-run",
         str(package / "plugin.ts"),
         json.dumps(request),
         json.dumps({"modifiers": []}),
+        "fixture",
     ]
 
 

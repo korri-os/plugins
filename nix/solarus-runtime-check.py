@@ -79,6 +79,7 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
             "program": headless,
             "contentPath": str(content),
             "accountRoot": str(account),
+            "saveRoot": str(account / "saves/korri_plugin_test"),
             "cacheRoot": str(work / "cache"),
             "files": manifest["files"],
             "artifacts": {},
@@ -86,10 +87,11 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
         output = execute(
             [
                 korrid,
-                "plugin-launch",
+                "plugin-run",
                 str(package / "plugin.ts"),
                 json.dumps(request),
                 json.dumps({"modifiers": []}),
+                "fixture",
             ]
         )
         assert "Solarus 2.1.4" in output, output
@@ -136,6 +138,7 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
             "program": headless,
             "contentPath": str(bad),
             "accountRoot": str(first),
+            "saveRoot": str(first / "saves/korri_plugin_test"),
             "cacheRoot": str(work / "cache"),
             "files": manifest["files"],
             "artifacts": {},
@@ -143,10 +146,11 @@ with tempfile.TemporaryDirectory(prefix="solarus-runtime-") as temporary:
         output = execute(
             [
                 korrid,
-                "plugin-launch",
+                "plugin-run",
                 str(package / "plugin.ts"),
                 json.dumps(request),
                 json.dumps({"modifiers": []}),
+                "fixture",
             ]
         )
         assert "No quest was found" in output, output
