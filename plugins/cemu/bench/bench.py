@@ -66,6 +66,16 @@ class Rpc:
         return record(outcome.get("payload"))
 
 
+def require_idle(rpc: Rpc) -> None:
+    try:
+        status = rpc.call("app.session.status", {})
+        if status.get("active") or status.get("pendingLaunches"):
+            raise RuntimeError("Refusing to disturb an active or pending launch")
+    except RpcError as exc:
+        if exc.code not in ("SessionCompleted", "NoActiveSession"):
+            raise
+
+
 def command(*args: str) -> str:
     return subprocess.check_output(args, text=True, timeout=20).strip()
 
@@ -187,13 +197,7 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
     journal_since = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
     rows: list[Record] = []
     try:
-        try:
-            status = rpc.call("app.session.status", {})
-            if status.get("active") or status.get("pendingLaunches"):
-                raise RuntimeError("Refusing to disturb an active or pending launch")
-        except RpcError as exc:
-            if exc.code != "SessionCompleted":
-                raise
+        require_idle(rpc)
         if script:
             pad = Gamepad()
             time.sleep(2)  # allow normal udev/InputPlumber/inputd discovery
@@ -411,6 +415,8 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
         if not window:
             error = error or "No game Present completions during warmup"
         values = fps_bins(events, window, measurement_start, args.seconds)
+        if not sum(values):
+            error = error or "No game presentations in the measurement window"
         stats = summarize(values)
         write_json(
             folder / "fps.json",
@@ -454,7 +460,8 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
             "Launch settings: `settings.json`; actual command chain: `processes.json`, `unit.txt`.",
             f"Exact cgroup empty: {not remaining}; new game/Gamescope processes absent: {not new_wrappers}.",
             f"Cleanup error: {cleanup_error or 'none'}. System and boot unchanged: {cleanup['systemUnchanged']} / {cleanup['bootUnchanged']}.",
-            "No sysfs, system, library, emulator configuration or generation writes by the bench.",
+            "No sysfs, system, emulator configuration or generation writes by the bench.",
+            "A/B selects existing launch profiles through RPC and restores the original selection.",
             "Korri performs its normal play-log/save effects. uinput device is destroyed.",
             "",
             "## CPU / GPU and thermals",

@@ -3,6 +3,7 @@
  */
 #include <xcb/xcb.h>
 #include <xcb/present.h>
+#include <xcb/res.h>
 #include <errno.h>
 #include <poll.h>
 #include <signal.h>
@@ -28,6 +29,21 @@ static bool owned(xcb_window_t window, bool inherited) {
     if (reply && xcb_get_property_value_length(reply) == 4)
         result = *(uint32_t *)xcb_get_property_value(reply) == pid;
     free(reply);
+    /* RetroArch does not always publish _NET_WM_PID. XRes is server-owned
+     * client identity, so do not broaden selection to unrelated windows. */
+    xcb_res_client_id_spec_t spec = { .client = window,
+        .mask = XCB_RES_CLIENT_ID_MASK_LOCAL_CLIENT_PID };
+    xcb_res_query_client_ids_reply_t *clients = xcb_res_query_client_ids_reply(connection,
+        xcb_res_query_client_ids(connection, 1, &spec), NULL);
+    if (clients) {
+        xcb_res_client_id_value_iterator_t values = xcb_res_query_client_ids_ids_iterator(clients);
+        for (; values.rem; xcb_res_client_id_value_next(&values)) {
+            if ((values.data->spec.mask & XCB_RES_CLIENT_ID_MASK_LOCAL_CLIENT_PID) &&
+                xcb_res_client_id_value_value_length(values.data) == 1)
+                result = *xcb_res_client_id_value_value(values.data) == pid;
+        }
+    }
+    free(clients);
     return result;
 }
 
