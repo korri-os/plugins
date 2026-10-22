@@ -1,0 +1,157 @@
+What: capture_rt_priority=0 (default off) or 1..20 requests Linux FIFO for
+only the asynchronous capture thread, with SCHED_RESET_ON_FORK. Parse strict
+integers, disable on invalid input, and log/continue on EPERM or other errors.
+One operational policy line per capture thread; no timing probes/files.
+No service-wide RT policy, affinity change, wrapper TID guessing or SYS_NICE.
+Status: experimental opt-in scheduling policy, potentially upstreamable.
+Evidence: /tmp/h700-sun/convert.md scheduling section (2026-10-22): capture
+FIFO 15 delivered 600 new acquisitions in every one of 27 strict 10 s windows.
+CPU3 isolation was rejected. Lower-priority work can still be delayed.
+Removal: equivalent upstream capture policy, lost need, or responsiveness /
+starvation evidence. Native LimitRTPRIO is a separate explicit host approval.
+
+diff --git a/src/capture_scheduling.h b/src/capture_scheduling.h
+new file mode 100644
+index 0000000..a2f4987
+--- /dev/null
++++ b/src/capture_scheduling.h
+@@ -0,0 +1,40 @@
++// Capture-only scheduling policy. No service-wide or affinity change.
++#pragma once
++#include <charconv>
++#include <optional>
++#include <string_view>
++#ifdef __linux__
++  #include <cerrno>
++  #include <sched.h>
++#endif
++
++namespace video {
++  // Zero disables the request. Invalid values must not acquire RT authority.
++  inline std::optional<int> parse_capture_rt_priority(std::string_view value) {
++    int priority = 0;
++    auto result = std::from_chars(value.data(), value.data() + value.size(), priority);
++    if (result.ec != std::errc() || result.ptr != value.data() + value.size() || priority < 0 || priority > 20) {
++      return std::nullopt;
++    }
++    return priority;
++  }
++
++  inline int request_capture_scheduling(int priority) {
++#ifdef __linux__
++    if (priority == 0) {
++      return 0;
++    }
++    if (priority < 1 || priority > 20) {
++      return EINVAL;
++    }
++    sched_param param {};
++    param.sched_priority = priority;
++    // pid 0 names only the calling Linux thread, not its process or siblings.
++    // Reset-on-fork prevents a later child process from inheriting RT policy.
++    if (sched_setscheduler(0, SCHED_FIFO | SCHED_RESET_ON_FORK, &param) < 0) {
++      return errno;
++    }
++#endif
++    return 0;
++  }
++}  // namespace video
+diff --git a/src/config.cpp b/src/config.cpp
+index a7b7b5c..8211218 100644
+--- a/src/config.cpp
++++ b/src/config.cpp
+@@ -20,6 +20,7 @@
+ 
+ // local includes
+ #include "config.h"
++#include "capture_scheduling.h"
+ #include "entry_handler.h"
+ #include "file_handler.h"
+ #include "logging.h"
+@@ -440,6 +441,7 @@ namespace config {
+     0,  // hevc_mode
+     0,  // av1_mode
+ 
++    0,  // capture_rt_priority: no RT request without explicit configuration
+     2,  // min_threads
+     {
+       "superfast"s,  // preset
+@@ -1056,6 +1058,17 @@ namespace config {
+     int_f(vars, "qp", video.qp);
+     int_between_f(vars, "hevc_mode", video.hevc_mode, {0, 3});
+     int_between_f(vars, "av1_mode", video.av1_mode, {0, 3});
++    std::string capture_rt_priority;
++    string_f(vars, "capture_rt_priority", capture_rt_priority);
++    if (!capture_rt_priority.empty()) {
++      auto priority = ::video::parse_capture_rt_priority(capture_rt_priority);
++      if (priority) {
++        video.capture_rt_priority = *priority;
++      } else {
++        video.capture_rt_priority = 0;
++        BOOST_LOG(warning) << "Invalid capture_rt_priority; expected 0..20, disabling capture FIFO"sv;
++      }
++    }
+     int_f(vars, "min_threads", video.min_threads);
+     string_f(vars, "sw_preset", video.sw.sw_preset);
+     if (!video.sw.sw_preset.empty()) {
+diff --git a/src/config.h b/src/config.h
+index 7ba1bd2..96577ec 100644
+--- a/src/config.h
++++ b/src/config.h
+@@ -26,6 +26,8 @@ namespace config {
+     int hevc_mode;
+     int av1_mode;
+ 
++    int capture_rt_priority;  // Linux capture-only FIFO; 0 disables, 1..20 request RT
++
+     int min_threads;  // Minimum number of threads/slices for CPU encoding
+ 
+     struct {
+diff --git a/src/video.cpp b/src/video.cpp
+index 81794be..d9a4791 100644
+--- a/src/video.cpp
++++ b/src/video.cpp
+@@ -13,6 +13,8 @@
+ 
+ #ifdef __linux__
+ #include <va/va.h>
++#include <sys/syscall.h>
++#include <unistd.h>
+ #endif
+ 
+ extern "C" {
+@@ -27,6 +29,7 @@ extern "C" {
+ // local includes
+ #include "cbs.h"
+ #include "config.h"
++#include "capture_scheduling.h"
+ #include "display_device.h"
+ #include "globals.h"
+ #include "input.h"
+@@ -1689,6 +1692,26 @@ namespace video {
+ 
+     // Capture takes place on this thread
+     platf::adjust_thread_priority(platf::thread_priority_e::critical);
++#ifdef __linux__
++    const auto capture_tid = syscall(SYS_gettid);
++    if (int error = request_capture_scheduling(config::video.capture_rt_priority)) {
++      // EPERM (including a missing LimitRTPRIO) is not a capture failure.
++      BOOST_LOG(warning) << "Capture thread "sv << capture_tid << " cannot set FIFO priority "sv << config::video.capture_rt_priority << ": "sv << std::strerror(error) << "; continuing"sv;
++    }
++    const int capture_policy = sched_getscheduler(0);
++    sched_param capture_param {};
++    if (capture_policy >= 0 && sched_getparam(0, &capture_param) == 0) {
++      const int base_policy = capture_policy & ~SCHED_RESET_ON_FORK;
++      // One operational policy record per capture-thread lifetime. No timings,
++      // observer files or persistent thread identity are part of the package.
++      BOOST_LOG(info) << "Capture thread "sv << capture_tid << " policy "sv
++                      << (base_policy == SCHED_FIFO ? "SCHED_FIFO" : base_policy == SCHED_OTHER ? "SCHED_OTHER" : "other")
++                      << " priority "sv << capture_param.sched_priority
++                      << " reset-on-fork="sv << bool(capture_policy & SCHED_RESET_ON_FORK);
++    } else {
++      BOOST_LOG(warning) << "Capture thread "sv << capture_tid << " policy query failed: "sv << std::strerror(errno) << "; continuing"sv;
++    }
++#endif
+ 
+     while (capture_ctx_queue->running()) {
+       bool artificial_reinit = false;

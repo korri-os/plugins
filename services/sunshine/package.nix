@@ -6,6 +6,7 @@
   ffmpegRkmpp ? null,
   rockchipMpp ? null,
   libdrm ? null,
+  libyuv ? null,
 }:
 
 let
@@ -55,7 +56,7 @@ baseSunshine.overrideAttrs (
       else
         builtins.head matchingApprovedBaseDerivations;
     provenanceRelativePath = "share/korri/sunshine-korri/provenance";
-    # Only RKMPP appends Sunshine patches; every other profile ships the base set.
+    # The ARM profile appends RKMPP, KMS readback, conversion and pacing patches.
     approvedPatchDefinitions =
       approved.patches ++ (if rkmppSupport then approved.rkmppPatches else [ ]);
     expectedPatchSetSha256 =
@@ -136,15 +137,15 @@ baseSunshine.overrideAttrs (
   else if rkmppSupport && cudaSupport then
     throw "sunshine-korri RKMPP and CUDA profiles are mutually exclusive"
   else if
-    rkmppSupport
-    && v4l2m2mEnabled
-    && (ffmpegRkmpp.outPath or null) != (ffmpegV4l2m2m.outPath or null)
+    rkmppSupport && v4l2m2mEnabled && (ffmpegRkmpp.outPath or null) != (ffmpegV4l2m2m.outPath or null)
   then
     throw "sunshine-korri combined RKMPP and V4L2 M2M support requires one reviewed FFmpeg bundle"
   else if rkmppSupport && baseSunshine.stdenv.hostPlatform.system != "aarch64-linux" then
     throw "sunshine-korri RKMPP is approved only for aarch64-linux"
-  else if rkmppSupport && (ffmpegRkmpp == null || rockchipMpp == null || libdrm == null) then
-    throw "sunshine-korri RKMPP requires the reviewed FFmpeg bundle, Rockchip MPP, and libdrm"
+  else if
+    rkmppSupport && (ffmpegRkmpp == null || rockchipMpp == null || libdrm == null || libyuv == null)
+  then
+    throw "sunshine-korri RKMPP requires the reviewed FFmpeg bundle, Rockchip MPP, libdrm, and libyuv"
   else if v4l2m2mEnabled && cudaSupport then
     throw "sunshine-korri V4L2 M2M profile cannot include CUDA inputs"
   else if v4l2m2mEnabled && baseSunshine.stdenv.hostPlatform.system != "aarch64-linux" then
@@ -173,6 +174,11 @@ baseSunshine.overrideAttrs (
       disallowedReferences = (old.disallowedReferences or [ ]) ++ [ baseSunshine.src ];
 
       patches = map (record: record.path) approvedPatchDefinitions;
+      patchFlags = [
+        "-p1"
+        "--fuzz=0"
+        "--no-backup-if-mismatch"
+      ];
 
       cmakeFlags =
         (old.cmakeFlags or [ ])
@@ -181,9 +187,6 @@ baseSunshine.overrideAttrs (
             [
               "-DFFMPEG_PREPARED_BINARIES=${ffmpegRkmpp}"
               "-DFFMPEG_PLATFORM_LIBRARIES=numa;va;va-drm;va-x11;X11;rockchip_mpp;drm"
-              # Enables the accepted output-transform rotation (patch 0033)
-              # exactly as tested on the Mini V2.
-              "-DCMAKE_CXX_FLAGS=-DSUNSHINE_CAPTURE_ROTATION_PROBE"
             ]
           else if v4l2m2mEnabled then
             [ "-DFFMPEG_PREPARED_BINARIES=${ffmpegV4l2m2m}" ]
@@ -198,6 +201,7 @@ baseSunshine.overrideAttrs (
             [
               rockchipMpp
               libdrm
+              libyuv
             ]
           else
             [ ]

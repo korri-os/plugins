@@ -24,6 +24,8 @@ ExecStart=@runtime@
 Restart=on-failure
 RestartSec=5
 UMask=0077
+# Permit only the explicitly configured capture thread to request FIFO 15.
+LimitRTPRIO=15
 NoNewPrivileges=false
 CapabilityBoundingSet=CAP_SETPCAP CAP_SYS_ADMIN
 PrivateTmp=false

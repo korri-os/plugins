@@ -1,8 +1,10 @@
+Context refresh: preserve the carried implementation; apply without fuzz.
+
 diff --git a/src/video.cpp b/src/video.cpp
-index bbf05fb5..f77a326b 100644
+index f53057c..38cb739 100644
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -2108,7 +2108,7 @@ namespace video {
+@@ -2117,7 +2117,7 @@ namespace video {
      int &frame_nr,  // Store progress of the frame number
      safe::mail_t mail,
      img_event_t images,
@@ -11,15 +13,15 @@ index bbf05fb5..f77a326b 100644
      std::shared_ptr<platf::display_t> disp,
      std::unique_ptr<platf::encode_device_t> encode_device,
      safe::signal_t &reinit_event,
-@@ -2148,6 +2148,7 @@ namespace video {
+@@ -2157,6 +2157,7 @@ namespace video {
      auto runtime_bitrate_events = mail->queue<runtime_bitrate_request_t>(mail::runtime_bitrate);
      auto runtime_bitrate_ack_events = mail->queue<runtime_bitrate_ack_t>(mail::runtime_bitrate_ack);
      auto runtime_settings_supports_encoder_restart = mail->event<bool>(mail::runtime_settings_supports_encoder_restart);
 +    auto switch_display_events = mail->event<int>(mail::switch_display);
      auto touch_port_events = mail->event<input::touch_port_t>(mail::touch_port);
      auto invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
-     std::uint32_t runtime_fps = config.framerate;
-@@ -2284,6 +2285,12 @@ namespace video {
+     auto runtime_settings_supports_bitrate = mail->event<bool>(mail::runtime_settings_supports_bitrate);
+@@ -2301,6 +2302,12 @@ namespace video {
                      touch_port_events->raise(make_port(disp.get(), config));
                      runtime_resolution_idr_frames = 1800;
                      runtime_resolution_diag_frames = 0;

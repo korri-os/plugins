@@ -59,6 +59,7 @@ in
     program = "${sunshineOfflineRetirement}/bin/sunshine-retire-all-clients";
   };
   checks = {
+    sunshine-korri-capture = import ./capture-check.nix { inherit pkgs; };
     sunshine-offline-retirement = sunshineOfflineRetirement;
     sunshine-korri-package = pkgs.runCommand "sunshine-korri-package-check" { } ''
       test -f ${sunshinePackage}/bin/sunshine
@@ -81,7 +82,7 @@ in
       }
       test "${sunshinePackage.pname}" = sunshine-korri
       test "${sunshinePackage.version}" = "${pkgs.sunshine.version}-korri"
-      test "${toString (builtins.length sunshinePackage.korriPatchNames)}" = 16
+      test "${toString (builtins.length sunshinePackage.korriPatchNames)}" = 17
       test "${sunshinePackage.korriBaseSunshineVersion}" = "${sunshineApprovedPatches.baseSunshineVersion}"
       test "${sunshinePackage.korriApprovedBaseSunshineSourceHash}" = "${sunshineApprovedPatches.approvedBaseSourceHash}"
       test "${pkgs.sunshine.src.outputHash}" = "${sunshineApprovedPatches.approvedBaseSourceHash}"

@@ -1,0 +1,32 @@
+What: advance RAM KMS capture deadlines from their original phase with
+sleep_until, instead of resetting the deadline after a slow frame. Late
+frames still perform a real acquisition. No busy-wait or affinity change.
+Status: upstreamable pacing fix, carried downstream pending wider testing.
+Evidence: 6b81298/e1180ed; /tmp/h700-sun/convert.md (2026-10-22): combined
+row-pair/pacing/FIFO experiment delivered 600 acquisitions in all 27 windows.
+Removal: equivalent upstream pacing or evidence of unsafe catch-up load.
+Cost: a long stall causes immediate real catch-up acquisitions.
+
+diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
+index 84a3214..9300684 100644
+--- a/src/platform/linux/kmsgrab.cpp
++++ b/src/platform/linux/kmsgrab.cpp
+@@ -1254,15 +1254,14 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+           auto now = std::chrono::steady_clock::now();
+ 
+           if (next_frame > now) {
+-            std::this_thread::sleep_for(next_frame - now);
++            std::this_thread::sleep_until(next_frame);
+             sleep_overshoot_logger.first_point(next_frame);
+             sleep_overshoot_logger.second_point_now_and_log();
+           }
+ 
+           next_frame += delay;
+-          if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
+-            next_frame = now + delay;
+-          }
++          // Preserve phase after a slow capture. Start real catch-up captures
++          // immediately; never replace them with encoded repeats or spin waits.
+ 
+           std::shared_ptr<platf::img_t> img_out;
+           auto status = snapshot(pull_free_image_cb, img_out, 1000ms, *cursor);

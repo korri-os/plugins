@@ -1,0 +1,150 @@
+What: read explicitly LINEAR single-plane XRGB/ARGB8888 KMS dma-bufs into
+owned RGB RAM with checked DMA_BUF_IOCTL_SYNC READ START/END. Keep EGL for
+unsupported formats, modifiers, transforms, bounds and mapping/sync failures.
+Status: experimental downstream optimization; potentially upstreamable after
+wider driver/coherency testing. DMA-BUF sync does not lock compositor reuse.
+Evidence: RG35XX Pro readback experiment 4cc7af7; /tmp/h700-sun/readback.md
+and profile.md (2026-10-22): GL p50 72 ms, direct memcpy about 13 ms.
+Removal: upstream equivalent, unsafe coherency/lifetime evidence, or a faster
+accepted cached/engine path. See services/sunshine/README.md for limits.
+
+diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
+index d46cc5a..a495761 100644
+--- a/src/platform/linux/kmsgrab.cpp
++++ b/src/platform/linux/kmsgrab.cpp
+@@ -1386,6 +1386,62 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+         }
+       }
+ 
++      // Only byte-compatible BGR0 layouts with an explicit linear modifier.
++      // Unknown modifiers, transforms and other formats keep the EGL path.
++      bool copy_linear(const egl::surface_descriptor_t &sd, img_t &img) {
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        if (capture_rotate_90 || sd.modifier != DRM_FORMAT_MOD_LINEAR ||
++            (sd.fourcc != DRM_FORMAT_XRGB8888 && sd.fourcc != DRM_FORMAT_ARGB8888) ||
++            sd.fds[0] < 0 || sd.fds[1] >= 0 || sd.fds[2] >= 0 || sd.fds[3] >= 0 ||
++            width <= 0 || height <= 0 || img_offset_x < 0 || img_offset_y < 0 ||
++            std::uint64_t(img_offset_x) + width > sd.width ||
++            std::uint64_t(img_offset_y) + height > sd.height ||
++            sd.pitches[0] < std::uint64_t(sd.width) * 4 ||
++            img.pixel_pitch != 4 || img.row_pitch < std::uint64_t(width) * 4) {
++          return false;
++        }
++
++        const std::uint64_t bytes = std::uint64_t(sd.offsets[0]) + std::uint64_t(sd.pitches[0]) * sd.height;
++        auto size = lseek(sd.fds[0], 0, SEEK_END);
++        if (size < 0 || bytes > std::uint64_t(size) || bytes > SIZE_MAX) {
++          return false;
++        }
++        auto map = mmap(nullptr, bytes, PROT_READ, MAP_SHARED, sd.fds[0], 0);
++        if (map == MAP_FAILED) {
++          return false;
++        }
++        auto unmap = util::fail_guard([&]() {
++          munmap(map, bytes);
++        });
++        dma_buf_sync sync {};
++        sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
++        if (drmIoctl(sd.fds[0], DMA_BUF_IOCTL_SYNC, &sync) < 0) {
++          BOOST_LOG(warning) << "KMS direct readback START sync failed: "sv << strerror(errno);
++          return false;
++        }
++
++        const auto *src = static_cast<const std::uint8_t *>(map) + sd.offsets[0] +
++                          std::uint64_t(img_offset_y) * sd.pitches[0] + std::uint64_t(img_offset_x) * 4;
++        const size_t row_bytes = size_t(width) * 4;
++        // On H700 WC scanout, measured libc memcpy beats NEON LD1 blocks.
++        if (sd.pitches[0] == row_bytes && img.row_pitch == row_bytes) {
++          std::memcpy(img.data, src, row_bytes * height);
++        } else {
++          for (int y = 0; y < height; ++y) {
++            std::memcpy(img.data + size_t(y) * img.row_pitch, src + size_t(y) * sd.pitches[0], row_bytes);
++          }
++        }
++        sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
++        if (drmIoctl(sd.fds[0], DMA_BUF_IOCTL_SYNC, &sync) < 0) {
++          BOOST_LOG(warning) << "KMS direct readback END sync failed: "sv << strerror(errno);
++          return false;
++        }
++        return true;
++#else
++        return false;
++#endif
++      }
++
+       capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
+ #ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+         auto capture_start = std::chrono::steady_clock::now();
+@@ -1400,22 +1456,6 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+           return status;
+         }
+ 
+-        auto rgb_opt = egl::import_source(display.get(), sd);
+-
+-        if (!rgb_opt) {
+-          return capture_e::error;
+-        }
+-
+-        auto &rgb = *rgb_opt;
+-
+-        gl::ctx.BindTexture(GL_TEXTURE_2D, rgb->tex[0]);
+-
+-        // Don't remove these lines, see https://github.com/LizardByte/Sunshine/issues/453
+-        int w, h;
+-        gl::ctx.GetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+-        gl::ctx.GetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
+-        BOOST_LOG(debug) << "width and height: w "sv << w << " h "sv << h;
+-
+         if (!pull_free_image_cb(img_out)) {
+           return platf::capture_e::interrupted;
+         }
+@@ -1423,19 +1463,37 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+ #ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+         auto readback_start = std::chrono::steady_clock::now();
+ #endif
+-        if (capture_rotate_90) {
+-          gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, (*rotated_framebuffer)[0]);
+-          gl::ctx.Viewport(0, 0, width, height);
+-          gl::ctx.ActiveTexture(GL_TEXTURE0);
++        if (!copy_linear(sd, *img_out)) {
++          auto rgb_opt = egl::import_source(display.get(), sd);
++
++          if (!rgb_opt) {
++            return capture_e::error;
++          }
++
++          auto &rgb = *rgb_opt;
++
+           gl::ctx.BindTexture(GL_TEXTURE_2D, rgb->tex[0]);
+-          gl::ctx.UseProgram(rotated_program->handle());
+-          gl::ctx.DrawArrays(GL_TRIANGLES, 0, 3);
+-          gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, 0);
+-          // One GPU draw, then the same single readback the RAM path already uses.
+-          gl::ctx.GetTextureSubImage((*rotated_texture)[0], 0, 0, 0, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
+-        } else {
+-          // Do not route unrotated displays through the extra framebuffer.
+-          gl::ctx.GetTextureSubImage(rgb->tex[0], 0, img_offset_x, img_offset_y, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
++
++          // Don't remove these lines, see https://github.com/LizardByte/Sunshine/issues/453
++          int w, h;
++          gl::ctx.GetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
++          gl::ctx.GetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
++          BOOST_LOG(debug) << "width and height: w "sv << w << " h "sv << h;
++
++          if (capture_rotate_90) {
++            gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, (*rotated_framebuffer)[0]);
++            gl::ctx.Viewport(0, 0, width, height);
++            gl::ctx.ActiveTexture(GL_TEXTURE0);
++            gl::ctx.BindTexture(GL_TEXTURE_2D, rgb->tex[0]);
++            gl::ctx.UseProgram(rotated_program->handle());
++            gl::ctx.DrawArrays(GL_TRIANGLES, 0, 3);
++            gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, 0);
++            // One GPU draw, then the same single readback the RAM path already uses.
++            gl::ctx.GetTextureSubImage((*rotated_texture)[0], 0, 0, 0, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
++          } else {
++            // Do not route unrotated displays through the extra framebuffer.
++            gl::ctx.GetTextureSubImage(rgb->tex[0], 0, img_offset_x, img_offset_y, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
++          }
+         }
+ #ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+         auto readback_end = std::chrono::steady_clock::now();

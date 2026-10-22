@@ -1,0 +1,366 @@
+What: read each KMS BGR0 row once into reusable cached row-pair scratch,
+convert with libyuv to owned NV12, and copy to independent encoder frames.
+Only even unscaled/unpadded BT.601 limited 8-bit V4L2 H.264 consumers may
+request it. Visible cursors, mixed negotiation and unsupported cases retain
+RGB plus swscale. Remove inherited rotation timing probes and all observers.
+Status: experimental ARM optimization; libyuv supplies its NEON dispatch.
+Evidence: cec8d8a, 6b81298, e1180ed; /tmp/h700-sun/convert.md (2026-10-22).
+The row-pair-test.cpp compares exact pixels to whole-frame libyuv, padding,
+unaligned source and invalid geometry. libyuv differs slightly from swscale.
+Removal: equivalent upstream conversion, accepted hardware conversion, or
+unsafe colour/lifetime evidence. See services/sunshine/README.md.
+
+diff --git a/cmake/targets/common.cmake b/cmake/targets/common.cmake
+index ba378cb..9f9fc17 100644
+--- a/cmake/targets/common.cmake
++++ b/cmake/targets/common.cmake
+@@ -126,3 +126,6 @@ if("${BUILD_TYPE}" STREQUAL "XDEBUG")
+ else()
+     add_definitions(-DNDEBUG)
+ endif()
++
++# The row-pair converter is carried only by the ARM KMS profile.
++target_link_libraries(sunshine yuv)
+diff --git a/src/nv12.h b/src/nv12.h
+new file mode 100644
+index 0000000..8fca908
+--- /dev/null
++++ b/src/nv12.h
+@@ -0,0 +1,33 @@
++// Read each write-combined scanout row once into cached scratch RAM.
++#pragma once
++#include <cstdint>
++#include <cstring>
++#include <libyuv/convert_from_argb.h>
++#include <vector>
++
++namespace kms {
++  // Caller owns the read-only mapping and brackets access with DMA-BUF sync.
++  // Destinations and scratch are owned RAM, never the compositor's scanout.
++  inline int stage_nv12(const std::uint8_t *source, int source_pitch, int width, int height, std::uint8_t *y, int y_pitch, std::uint8_t *uv, int uv_pitch, std::vector<std::uint8_t> &scratch) {
++    if (!source || !y || !uv || width <= 0 || height <= 0 ||
++        (width & 1) || (height & 1) || width > INT32_MAX / 8 ||
++        source_pitch < width * 4 || y_pitch < width || uv_pitch < width) {
++      return -1;
++    }
++    const size_t row_bytes = size_t(width) * 4;
++    scratch.resize(row_bytes * 2);
++    for (int row = 0; row < height; row += 2) {
++      if (size_t(source_pitch) == row_bytes) {
++        std::memcpy(scratch.data(), source + size_t(row) * source_pitch, row_bytes * 2);
++      } else {
++        std::memcpy(scratch.data(), source + size_t(row) * source_pitch, row_bytes);
++        std::memcpy(scratch.data() + row_bytes, source + size_t(row + 1) * source_pitch, row_bytes);
++      }
++      int status = libyuv::ARGBToNV12(scratch.data(), int(row_bytes), y + size_t(row) * y_pitch, y_pitch, uv + size_t(row / 2) * uv_pitch, uv_pitch, width, 2);
++      if (status != 0) {
++        return status;
++      }
++    }
++    return 0;
++  }
++}  // namespace kms
+diff --git a/src/platform/common.h b/src/platform/common.h
+index a192560..8fb208f 100644
+--- a/src/platform/common.h
++++ b/src/platform/common.h
+@@ -10,6 +10,7 @@
+ #include <functional>
+ #include <mutex>
+ #include <string>
++#include <vector>
+ 
+ // lib includes
+ #include <boost/core/noncopyable.hpp>
+@@ -380,6 +381,12 @@ namespace platf {
+     std::int32_t pixel_pitch {};
+     std::int32_t row_pitch {};
+ 
++    // The request is set by the capture thread from every active
++    // consumer's negotiated config. nv12_valid means NV12, not BGR0.
++    bool nv12_requested {false};
++    bool nv12_valid {false};
++    std::vector<std::uint8_t> nv12_data;
++
+     std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
+ 
+     virtual ~img_t() = default;
+diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
+index a495761..84a3214 100644
+--- a/src/platform/linux/kmsgrab.cpp
++++ b/src/platform/linux/kmsgrab.cpp
+@@ -32,6 +32,7 @@ extern "C" {
+ #include "cuda.h"
+ #include "graphics.h"
+ #include "src/config.h"
++#include "src/nv12.h"
+ #include "src/logging.h"
+ #include "src/platform/common.h"
+ #include "src/round_robin.h"
+@@ -1171,11 +1172,6 @@ namespace platf {
+ 
+         ctx = std::move(*ctx_opt);
+ 
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-        capture_samples_ms.reserve(300);
+-        readback_samples_ms.reserve(300);
+-        frame_budget_ms = 1000.0 / config.framerate;
+-#endif
+ #if defined(SUNSHINE_BUILD_WAYLAND) && !defined(SUNSHINE_CAPTURE_ROTATION_FORCE_OFF)
+         // Use the same wl_output that KMS already correlates for touch. Never
+         // change the DMA-BUF/VAAPI/CUDA path or an untransformed RAM capture.
+@@ -1389,6 +1385,10 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+       // Only byte-compatible BGR0 layouts with an explicit linear modifier.
+       // Unknown modifiers, transforms and other formats keep the EGL path.
+       bool copy_linear(const egl::surface_descriptor_t &sd, img_t &img) {
++        // Keep the previous allocation at its full size while the payload is
++        // unavailable. clear()+resize() would zero 460,800 bytes every frame.
++        img.nv12_valid = false;
++        auto &nv12 = img.nv12_data;
+ #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+         if (capture_rotate_90 || sd.modifier != DRM_FORMAT_MOD_LINEAR ||
+             (sd.fourcc != DRM_FORMAT_XRGB8888 && sd.fourcc != DRM_FORMAT_ARGB8888) ||
+@@ -1406,6 +1406,12 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+         if (size < 0 || bytes > std::uint64_t(size) || bytes > SIZE_MAX) {
+           return false;
+         }
++        const bool stage = img.nv12_requested && !captured_cursor.visible &&
++                           (width % 2) == 0 && (height % 2) == 0;
++        if (stage) {
++          nv12.resize(size_t(width) * height * 3 / 2);
++          row_pair_scratch.resize(size_t(width) * 8);
++        }
+         auto map = mmap(nullptr, bytes, PROT_READ, MAP_SHARED, sd.fds[0], 0);
+         if (map == MAP_FAILED) {
+           return false;
+@@ -1423,8 +1429,10 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+         const auto *src = static_cast<const std::uint8_t *>(map) + sd.offsets[0] +
+                           std::uint64_t(img_offset_y) * sd.pitches[0] + std::uint64_t(img_offset_x) * 4;
+         const size_t row_bytes = size_t(width) * 4;
+-        // On H700 WC scanout, measured libc memcpy beats NEON LD1 blocks.
+-        if (sd.pitches[0] == row_bytes && img.row_pitch == row_bytes) {
++        bool converted = true;
++        if (stage) {
++          converted = ::kms::stage_nv12(src, sd.pitches[0], width, height, nv12.data(), width, nv12.data() + size_t(width) * height, width, row_pair_scratch) == 0;
++        } else if (sd.pitches[0] == row_bytes && img.row_pitch == row_bytes) {
+           std::memcpy(img.data, src, row_bytes * height);
+         } else {
+           for (int y = 0; y < height; ++y) {
+@@ -1436,6 +1444,12 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+           BOOST_LOG(warning) << "KMS direct readback END sync failed: "sv << strerror(errno);
+           return false;
+         }
++        if (!converted) {
++          return false;
++        }
++        if (stage) {
++          img.nv12_valid = true;
++        }
+         return true;
+ #else
+         return false;
+@@ -1443,9 +1457,6 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+       }
+ 
+       capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-        auto capture_start = std::chrono::steady_clock::now();
+-#endif
+         file_t fb_fd[4];
+ 
+         egl::surface_descriptor_t sd;
+@@ -1460,9 +1471,6 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+           return platf::capture_e::interrupted;
+         }
+ 
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-        auto readback_start = std::chrono::steady_clock::now();
+-#endif
+         if (!copy_linear(sd, *img_out)) {
+           auto rgb_opt = egl::import_source(display.get(), sd);
+ 
+@@ -1495,11 +1503,6 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+             gl::ctx.GetTextureSubImage(rgb->tex[0], 0, img_offset_x, img_offset_y, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
+           }
+         }
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-        auto readback_end = std::chrono::steady_clock::now();
+-        readback_samples_ms.push_back(std::chrono::duration<double, std::milli>(readback_end - readback_start).count());
+-        report_probe_samples(readback_samples_ms, "readback plus conditional draw");
+-#endif
+         img_out->frame_timestamp = frame_timestamp;
+ 
+         if (cursor && captured_cursor.visible) {
+@@ -1509,10 +1512,6 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+             blend_cursor(*img_out);
+           }
+         }
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-        capture_samples_ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - capture_start).count());
+-        report_probe_samples(capture_samples_ms, "capture (excludes FPS pacing)");
+-#endif
+         return capture_e::ok;
+       }
+ 
+@@ -1534,27 +1533,11 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+       gbm::gbm_t gbm;
+       egl::display_t display;
+       egl::ctx_t ctx;
++      std::vector<std::uint8_t> row_pair_scratch;
+       bool capture_rotate_90 {false};
+       std::optional<gl::tex_t> rotated_texture;
+       std::optional<gl::frame_buf_t> rotated_framebuffer;
+       std::optional<gl::program_t> rotated_program;
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-      double frame_budget_ms {0};
+-      std::vector<double> capture_samples_ms;
+-      std::vector<double> readback_samples_ms;
+-      void report_probe_samples(std::vector<double> &samples, const char *stage) {
+-        if (samples.size() < 300) {
+-          return;
+-        }
+-        auto overruns = std::count_if(samples.begin(), samples.end(), [this](double value) { return value > frame_budget_ms; });
+-        std::sort(samples.begin(), samples.end());
+-        BOOST_LOG(info) << "KMS rotation probe "sv << stage << " ms p50="sv << samples[150]
+-                        << " p95="sv << samples[285] << " p99="sv << samples[297]
+-                        << " max="sv << samples.back() << " budget-overruns="sv << overruns
+-                        << "/300 (not missed delivery deadlines) rotated="sv << capture_rotate_90;
+-        samples.clear();
+-      }
+-#endif
+     };
+ 
+     class rkmpp_vram_t: public avcodec_encode_device_t {
+diff --git a/src/video.cpp b/src/video.cpp
+index 27950ff..355f947 100644
+--- a/src/video.cpp
++++ b/src/video.cpp
+@@ -143,7 +143,36 @@ namespace video {
+       sws_input_frame->linesize[0] = img.row_pitch;
+ 
+       // Perform color conversion and scaling to the final size
+-      auto status = sws_scale_frame(sws.get(), requires_padding ? sws_output_frame.get() : sw_frame.get(), sws_input_frame.get());
++      // Capture can supply BT.601 limited NV12 for this exact negotiation.
++      // No scaling or padding is allowed for an NV12 capture payload.
++      // Other negotiated matrices/ranges/layouts retain the existing swscale path.
++      const bool use_nv12 = img.nv12_valid && !requires_padding && img.pixel_pitch == 4 &&
++                            img.width == sw_frame->width && img.height == sw_frame->height &&
++                            (img.width % 2) == 0 && (img.height % 2) == 0 &&
++                            sw_frame->format == AV_PIX_FMT_NV12 && colorspace.colorspace == colorspace_e::rec601 &&
++                            !colorspace.full_range && colorspace.bit_depth == 8;
++      int status;
++      if (use_nv12) {
++        if (img.nv12_data.size() != size_t(img.width) * img.height * 3 / 2) {
++          return -1;
++        }
++        status = av_frame_make_writable(sw_frame.get());
++        if (status >= 0) {
++          // Capture owns its image; repeats use an independent writable frame.
++          for (int plane = 0; plane < 2; ++plane) {
++            const auto *source = img.nv12_data.data() + (plane ? size_t(img.width) * img.height : 0);
++            for (int row = 0; row < (plane ? img.height / 2 : img.height); ++row) {
++              std::memcpy(sw_frame->data[plane] + size_t(row) * sw_frame->linesize[plane], source + size_t(row) * img.width, img.width);
++            }
++          }
++        }
++      } else {
++        // A runtime negotiation race must never reinterpret NV12 as stale RGB.
++        if (img.nv12_valid) {
++          return -1;
++        }
++        status = sws_scale_frame(sws.get(), requires_padding ? sws_output_frame.get() : sw_frame.get(), sws_input_frame.get());
++      }
+       if (status < 0) {
+         char string[AV_ERROR_MAX_STRING_SIZE];
+         BOOST_LOG(error) << "Couldn't scale frame: "sv << av_make_error_string(string, AV_ERROR_MAX_STRING_SIZE, status);
+@@ -283,6 +312,7 @@ namespace video {
+       return 0;
+     }
+ 
++
+     // Store ownership when frame is hw_frame
+     avcodec_frame_t hw_frame;
+ 
+@@ -1712,6 +1742,16 @@ namespace video {
+           // trim allocated but unused portion of the pool based on timeouts
+           trim_imgs();
+           img_out->frame_timestamp.reset();
++          img_out->nv12_valid = false;
++          // The pool callback runs on the capture thread. Only request NV12
++          // when every active consumer agrees; mixed/scaled streams keep RGB.
++          img_out->nv12_requested = encoder.name == "v4l2m2m" &&
++                                                 std::all_of(capture_ctxs.begin(), capture_ctxs.end(), [&](const auto &ctx) {
++                                                   auto color = colorspace_from_client_config(ctx.config, disp->is_hdr());
++                                                   return ctx.config.width == disp->width && ctx.config.height == disp->height &&
++                                                          ctx.config.videoFormat == 0 && ctx.config.chromaSamplingType == 0 &&
++                                                          color.colorspace == colorspace_e::rec601 && !color.full_range && color.bit_depth == 8;
++                                                 });
+           return true;
+         } else {
+           // sleep and retry if image pool is full
+@@ -2414,19 +2454,6 @@ namespace video {
+       }
+     }
+ 
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-    std::vector<double> conversion_ms;
+-    std::vector<double> encode_ms;
+-    conversion_ms.reserve(300);
+-    encode_ms.reserve(300);
+-    auto report_rotation_probe = [&](std::vector<double> &samples, const char *stage) {
+-      std::sort(samples.begin(), samples.end());
+-      BOOST_LOG(info) << "Rotation probe "sv << stage << " frame ms p50="sv << samples[samples.size() / 2]
+-                      << " p95="sv << samples[static_cast<std::size_t>(samples.size() * 0.95)]
+-                      << " max="sv << samples.back() << " count="sv << samples.size();
+-      samples.clear();
+-    };
+-#endif
+     while (true) {
+       // Break out of the encoding loop if any of the following are true:
+       // a) The stream is ending
+@@ -2631,9 +2658,6 @@ namespace video {
+       }
+ 
+       std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-      std::optional<double> converted_ms;
+-#endif
+ 
+       // The RKMPP encoder returns immediately in async mode, so without pacing
+       // the encode loop spins at the KMS capture rate and burns a full core on
+@@ -2678,13 +2702,7 @@ namespace video {
+               << " data="sv << static_cast<const void *>(img->data);
+           }
+           ++runtime_resolution_diag_frames;
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-          auto conversion_start = std::chrono::steady_clock::now();
+-#endif
+           auto conversion_failed = session->convert(*img);
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-          converted_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - conversion_start).count();
+-#endif
+           if (conversion_failed) {
+             BOOST_LOG(error) << "Could not convert image"sv;
+             return;
+@@ -2696,21 +2714,7 @@ namespace video {
+         }
+       }
+ 
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-      auto encode_start = std::chrono::steady_clock::now();
+-#endif
+       auto encode_failed = encode(frame_nr++, *session, packets, channel_data, frame_timestamp);
+-#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
+-      auto encoded_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - encode_start).count();
+-      if (converted_ms && frame_timestamp) {
+-        conversion_ms.push_back(*converted_ms);
+-        encode_ms.push_back(encoded_ms);
+-        if (conversion_ms.size() == 300) {
+-          report_rotation_probe(conversion_ms, "conversion");
+-          report_rotation_probe(encode_ms, "encode-call");
+-        }
+-      }
+-#endif
+       if (encode_failed) {
+         BOOST_LOG(error) << "Could not encode video packet"sv;
+         return;

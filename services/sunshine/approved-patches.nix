@@ -55,7 +55,7 @@ rec {
   v4l2m2mPatchSetSha256 = "e918232613be4264d0c7c55900ff030674cc66e3f8f37f4daa0c59f1051960a6";
   reviewedNvencApiMajor = 12;
   reviewedNvencApiMinor = 0;
-  patchSetSha256 = "05bf1fc0ce67f14fb1090fcf4ff5ec4226811db0a8869a70f75bb12a5bcfb110";
+  patchSetSha256 = "d98695540f7ec0056c5cde3701850d51f2363ec35c433e5a96e7a72d47163e3e";
   patches = [
     {
       name = "0001-add-runtime-settings-protocol-surface.patch";
@@ -70,12 +70,12 @@ rec {
     {
       name = "0003-apply-runtime-bitrate-and-fps-changes.patch";
       path = ./patches/0003-apply-runtime-bitrate-and-fps-changes.patch;
-      sha256 = "d7d89d4a8b4b06d2c473f4c2156a17ecfe369f805132e90a2d05197e69e7e01d";
+      sha256 = "a06fdd48f4b2203d2ad7e3a09c05de023d19bb071dbdb8cd4146dfae5cad6435";
     }
     {
       name = "0004-add-proof-gated-runtime-resolution-apply-path.patch";
       path = ./patches/0004-add-proof-gated-runtime-resolution-apply-path.patch;
-      sha256 = "599d3db14ea57e9712148e83fd7f0404dba96c5c40506c3209c5dbaa7778646e";
+      sha256 = "f092402f6c5526e92f1bf6c396fd6eb201ef58b006d8c4e3a1deea62ced64594";
     }
     {
       name = "0005-add-seamless-vaapi-runtime-bitrate-path.patch";
@@ -90,22 +90,22 @@ rec {
     {
       name = "0012-persist-runtime-config-and-reinit-capture-after-resolution.patch";
       path = ./patches/0012-persist-runtime-config-and-reinit-capture-after-resolution.patch;
-      sha256 = "2ac28eb76da2d02aa97812e9708094480cc1b7c4b897cf123772c24f16c493c6";
+      sha256 = "345f1ca11757cd39b6c8d261ce27f6618b82c74ad376965cabdaea2e7be11def";
     }
     {
       name = "0013-request-async-capture-reinit-after-runtime-resolution.patch";
       path = ./patches/0013-request-async-capture-reinit-after-runtime-resolution.patch;
-      sha256 = "0831530081f9551173ff1a74a5ca2771942e9c519ec476c27548a1d3cbea3fa2";
+      sha256 = "9087a31dbc446a44c3409962da7246a76280b03e703f8ed9dfeba94449daac8c";
     }
     {
       name = "0014-skip-runtime-vaapi-destructor-flush.patch";
       path = ./patches/0014-skip-runtime-vaapi-destructor-flush.patch;
-      sha256 = "59eedaf576f99223bd807205c45b12b1ac5f9850225614530b4ab925e3204e50";
+      sha256 = "83eb005960cf05ae129be921075156e63aeb9f515f8e0a04687e641aabc9638b";
     }
     {
       name = "0015-add-korri-input-seat-event-mirror.patch";
       path = ./patches/0015-add-korri-input-seat-event-mirror.patch;
-      sha256 = "389f1cc385e3e0374fa6822f301ac0b263ee81cbcd6bc6f326262d95a4ce7e09";
+      sha256 = "f7fe0901a3735e09d08c8dc58c17ff51b687755649579512879467a5fb2a4793";
     }
     {
       name = "0016-add-seamless-nvenc-runtime-path.patch";
@@ -136,6 +136,11 @@ rec {
       name = "0021-add-v4l2m2m-encoder.patch";
       path = ./patches/0021-add-v4l2m2m-encoder.patch;
       sha256 = "64e51b7085e2678d2abb04aafb5d9a4c8d961a2f2b6ced7c7636f85ec67a66b3";
+    }
+    {
+      name = "0038-configure-linux-capture-fifo.patch";
+      path = ./patches/0038-configure-linux-capture-fifo.patch;
+      sha256 = "3945cdc30aad168be9f9daccef16b25eeacb60d9fe7d0149d3dce6687d838f0e";
     }
   ];
 
@@ -224,8 +229,8 @@ rec {
 
   # Accepted from the Mini V2 rotation trial as tested on the device (signed
   # clockwise and SPS-crop candidates, 2026-09-29): rotate KMS capture to the
-  # output transform and crop the encoded SPS to the visible size. The probe
-  # build flag stays on, exactly as tested. Devices whose output has no
+  # output transform and crop the encoded SPS to the visible size. Patch 0036
+  # removes the timing-only probes, not rotation. Devices whose output has no
   # transform take the unrotated path. See rotation-probe.md.
   rotationPatch = {
     name = "0033-rotate-kms-capture-to-output-transform.patch";
@@ -236,6 +241,24 @@ rec {
     name = "0034-crop-encoded-sps-to-visible-size.patch";
     path = ./patches/0034-crop-encoded-sps-to-visible-size.patch;
     sha256 = "dd2ef90eba90c1628e418e540502b42aea4c85339c70114ca7a806aa257cbe7f";
+  };
+
+  kmsLinearPatch = {
+    name = "0035-read-linear-kms-dmabuf.patch";
+    path = ./patches/0035-read-linear-kms-dmabuf.patch;
+    sha256 = "049202bf0baa783b5936a1d9be4fa17adf63cfb1cbc75d984c904fa1bce5de7a";
+  };
+
+  kmsNv12Patch = {
+    name = "0036-convert-kms-row-pairs-to-nv12.patch";
+    path = ./patches/0036-convert-kms-row-pairs-to-nv12.patch;
+    sha256 = "053b020244d4e431650c7da3e7572f585485267dd6ef5b448688e4984fc62070";
+  };
+
+  kmsPacingPatch = {
+    name = "0037-preserve-kms-capture-phase.patch";
+    path = ./patches/0037-preserve-kms-capture-phase.patch;
+    sha256 = "498ebfc609c941d6ec77864429f2d9b660fa5099719c319c728dd7b736bd7896";
   };
 
   rkmppPatches = [
@@ -250,9 +273,12 @@ rec {
     rkmppEncodeSchedulePatch
     rotationPatch
     rotationCropPatch
+    kmsLinearPatch
+    kmsNv12Patch
+    kmsPacingPatch
   ];
 
   # Ordered digest of patches ++ rkmppPatches. Bump only after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "cb138307fe1554a26a1f546ce8de46e45afce2b271440dfa064d29064e4724a7";
+  rkmppPatchSetSha256 = "ce1401fbebd0f189f26c5557c0442511c3b8e6ab02bf6af0c875ccb3a5570bfa";
 }

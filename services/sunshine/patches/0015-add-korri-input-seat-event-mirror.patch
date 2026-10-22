@@ -1,3 +1,7 @@
+Context refresh: preserve the carried implementation; apply without fuzz.
+
+diff --git a/src/input.cpp b/src/input.cpp
+index 768ddec..a6cbb78 100644
 --- a/src/input.cpp
 +++ b/src/input.cpp
 @@ -3,21 +3,37 @@
@@ -38,11 +42,10 @@
  
  // local includes
  #include "config.h"
-@@ -56,6 +72,460 @@
-     DOWN,  ///< Button is down
+@@ -57,6 +73,460 @@ namespace input {
      UP  ///< Button is up
    };
-+
+ 
 +  constexpr std::size_t KORRI_INPUT_SEAT_MAX_FRAME_BYTES = 2048;
 +  constexpr std::size_t KORRI_INPUT_SEAT_MAX_SIDECAR_BYTES = 4096;
 +  constexpr std::size_t KORRI_INPUT_SEAT_MAX_LAUNCH_ID_BYTES = 128;
@@ -496,14 +499,14 @@
 +    }
 +  }
 +#endif
- 
++
    template<std::size_t N>
    int alloc_id(std::bitset<N> &gamepad_mask) {
-@@ -174,6 +644,14 @@
-         accumulated_vscroll_delta {},
+     for (int x = 0; x < gamepad_mask.size(); ++x) {
+@@ -175,6 +645,14 @@ namespace input {
          accumulated_hscroll_delta {} {
      }
-+
+ 
 +#ifdef __linux__
 +    std::shared_ptr<korri_input_seat_stream_t> mirror {std::make_shared<korri_input_seat_stream_t>()};
 +
@@ -511,10 +514,11 @@
 +      korri_input_seat_stop(mirror);
 +    }
 +#endif
- 
++
      // Keep track of alt+ctrl+shift key combo
      int shortcutFlags;
-@@ -844,7 +1322,19 @@
+ 
+@@ -844,7 +1322,19 @@ namespace input {
        return;
      }
  
@@ -535,11 +539,10 @@
        BOOST_LOG(warning) << "ControllerNumber already allocated ["sv << packet->controllerNumber << ']';
        return;
      }
-@@ -1090,6 +1580,19 @@
-     }
+@@ -1091,6 +1581,19 @@ namespace input {
  
      auto &gamepad = input->gamepads[packet->controllerNumber];
-+
+ 
 +#ifdef __linux__
 +    // Configuration selects the receiver even when authority or transport is
 +    // unavailable. Sunshine does not create a second gamepad as a fallback.
@@ -552,10 +555,11 @@
 +      return;
 +    }
 +#endif
- 
++
      // If this is an event for a new gamepad, create the gamepad now. Ideally, the client would
      // send a controller arrival instead of this but it's still supported for legacy clients.
-@@ -1584,7 +2087,16 @@
+     if ((packet->activeGamepadMask & (1 << packet->controllerNumber)) && gamepad.id < 0) {
+@@ -1584,7 +2087,16 @@ namespace input {
      task_pool.push(passthrough_next_message, input);
    }
  
@@ -572,9 +576,11 @@
      task_pool.cancel(key_press_repeat_id);
      task_pool.cancel(input->mouse_left_button_timeout);
  
+diff --git a/src/input.h b/src/input.h
+index 96b2f45..c736537 100644
 --- a/src/input.h
 +++ b/src/input.h
-@@ -15,6 +15,8 @@
+@@ -15,6 +15,8 @@ namespace input {
    struct input_t;
  
    void print(void *input);
@@ -583,9 +589,11 @@
    void reset(std::shared_ptr<input_t> &input);
    void passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data);
  
+diff --git a/src/stream.cpp b/src/stream.cpp
+index 2d687a8..773edb7 100644
 --- a/src/stream.cpp
 +++ b/src/stream.cpp
-@@ -1160,6 +1160,7 @@
+@@ -1533,6 +1533,7 @@ namespace stream {
          }
        }
  
@@ -593,10 +601,11 @@
        session->shutdown_event->raise(true);
        session->controlEnd.raise(true);
      }
-@@ -1892,5 +1893,6 @@
+@@ -2265,6 +2266,7 @@ namespace stream {
          return;
        }
  
 +      input::stop(session.input);
        session.shutdown_event->raise(true);
      }
+ 

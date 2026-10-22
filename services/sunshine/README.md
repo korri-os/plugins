@@ -217,3 +217,64 @@ Remove or replace a carried patch when one of these becomes true:
 2. Korri no longer needs the behavior.
 3. A cleaner patch supersedes the current one.
 4. The evidence shows the approach is unsafe or too narrow for continued carrying.
+
+## RG35XX Pro linear KMS 60 fps candidate
+
+This is a candidate, not a published release. The common patch set has 17
+patches. The combined ARM profile has 31. The four new patches replace the
+layered `exp/kms-direct-readback` experiment without its observers or timing
+output. Capture emits one operational policy record per thread lifetime, with
+the Linux TID, actual policy/priority and reset-on-fork flag. It writes no
+observer file and logs no timing samples. The existing rotation operation remains; its timing probes are removed.
+The six older runtime patches that needed fuzzy application have context-only
+refreshes. Package and capture checks now require `--fuzz=0` and disable backup
+creation. Ordered hashes are SHA-256 of `name + " " + sha256 + "\n"` for each
+record, in application order. Individual hashes cover the complete patch bytes.
+
+| Patch | Scope and status | Evidence and removal condition |
+| --- | --- | --- |
+| `0035-read-linear-kms-dmabuf.patch` | Experimental ARM KMS RAM path. Explicit linear, single-plane little-endian XRGB/ARGB8888 uses read-only PRIME mmap with checked READ START/END sync. Other layouts, transforms, map/sync failures keep EGL. | Experiment `4cc7af7`: about 13 ms direct copy versus 72 ms GL p50 on Pro. Remove for an upstream equivalent, accepted faster path, or unsafe coherency/lifetime evidence. |
+| `0036-convert-kms-row-pairs-to-nv12.patch` | Experimental ARM capture optimization. Copy each WC row once to reusable cached row-pair scratch, then libyuv NEON dispatch to owned NV12. All active consumers must agree on even, native-size, unpadded 8-bit BT.601 limited V4L2 H.264. Cursor-visible frames keep RGB and swscale. Other matrices, ranges, sizes, formats and mixed streams keep swscale. Encoder frames never alias the capture pool. | Experiments `cec8d8a`, `6b81298`, `e1180ed`; exact whole-frame libyuv comparison in `row-pair-test.cpp`. libyuv is not bit-identical to swscale. Remove for accepted upstream/hardware conversion or unsafe colour/lifetime evidence. |
+| `0037-preserve-kms-capture-phase.patch` | Upstreamable RAM KMS pacing fix. `sleep_until` and phase-preserving deadlines; late slots still acquire a real image. No busy-wait or CPU affinity rule. | Experiment `6b81298`; combined candidate reached 600 new acquisitions in all 27 strict 10 s windows. Remove for equivalent upstream pacing or unsafe catch-up load. |
+| `0038-configure-linux-capture-fifo.patch` | Experimental opt-in Linux asynchronous capture-only FIFO, with reset-on-fork. `capture_rt_priority` is a strict decimal integer, 0 (default off) or 1..20. Invalid values disable the request. Scheduling failure, including EPERM, logs a warning and capture continues. No service-wide RT scheduling. | Floating-affinity capture FIFO 15 passed 3 × 90 s in the experiment; CPU3 isolation failed and is not carried. Remove for equivalent upstream policy, lost need, or latency/starvation evidence. |
+
+The publisher still ships one aarch64 release with both RKMPP and V4L2 M2M.
+Only that ARM profile links libyuv. The x86_64 CUDA recipe adds no libyuv input.
+The new configuration key is consumed on Linux only. The synchronous
+capture/encode loop and other encoder/packet/input threads are not promoted.
+
+Evidence before this candidate: Core's
+[frame profile](https://github.com/korri-os/korri/blob/d001d08c2ef8ca17e12acc687004800a22068a2b/docs/acceptance/sunshine-korri-rg35xxpro-frame-profile-2026-10-22.md)
+and [encoder acceptance](https://github.com/korri-os/korri/blob/d001d08c2ef8ca17e12acc687004800a22068a2b/docs/acceptance/sunshine-korri-rg35xxpro-v4l2m2m-2026-10-22.md).
+The experiment's local `/tmp/h700-sun/readback.md`, `convert.md` (including
+scheduling), and `profile.md` retain raw measurement references. These are
+experiment evidence, not a pass for the new package. Fresh package/device
+results and remaining publication steps are recorded in `/tmp/h700-sun/ship.md`.
+Acquisitions and changed decoded content are different measurements. Fresh
+acceptance records the client stream, decodes every frame, ignores a fixed
+10-second warm-up from the first received frame, then requires exactly 600
+changed-content frames in each of nine fixed 10-second windows per run.
+The warm-up count is reported separately. It is never moved to obtain a pass.
+
+### Explicit native permission change — approval required
+
+`plugins/sunshine/korri-sunshine.service` now requests **`LimitRTPRIO=15`**.
+Its native `runtime.sh` sets Sunshine's `capture_rt_priority=15` override.
+The limit allows this service's threads to request FIFO/RR up to 15; Sunshine
+chooses only the asynchronous capture thread. It does not prove other code in
+the service cannot use the allowance. It adds no `CAP_SYS_NICE`, affinity or
+service-wide `CPUSchedulingPolicy`. Existing KMS capabilities are unchanged.
+FIFO can delay lower-priority input, compositor, audio and network work. The
+Pro's unchanged RT runtime budget does not guarantee per-frame latency or
+starvation safety. Recheck responsiveness under moving content before release.
+
+The locked Core currently rejects `LimitRTPRIO`. The separate Core
+`ceca5b06630bc9a8798b39a3bdef56b6952a4c75`
+(`feat/plugin-host-limit-rtprio`) admits only scalar 1..20, exposes it in
+the native authority warning and approval digest, and derives
+`RestrictRealtime=no` for only the requesting unit. Units without the request
+keep their current filter and approval. **Do not publish this candidate until
+that Core change is reviewed, reachable, pinned here and deployed to its
+consuming host.** The Core pin is deliberately unchanged in this branch.
+An upgrade requires new exact-build inspection/approval. `plugin.ts` remains
+thin; no permission or systemd configuration moved into TypeScript.
