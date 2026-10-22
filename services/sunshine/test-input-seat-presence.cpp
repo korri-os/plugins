@@ -47,6 +47,10 @@ static int listener = -1;
 static std::vector<received_t> received;
 static std::string launch(32, 'a'), token(64, 'b');
 static std::uint64_t generation = 1;
+// Core inputd STALE_SOURCE_TIMEOUT_MS: the receiver expires a source after this
+// long without a frame. Refresh gaps are bounded by this contract, not by the
+// producer's 200 ms period, which guest scheduling delay stretches.
+constexpr auto receiver_expiry = 1250ms;
 
 static void barrier() { task_pool.push([] {}).get(); }
 static void sidecar() {
@@ -154,11 +158,16 @@ int main() {
   ctx = stream();
   state(ctx);
   collect(1600ms);
+  // Wait for refresh frames, not a fixed tick budget on a loaded VM.
+  const auto refresh_deadline = clock_type::now() + 10s;
+  while (count("source-state") < 8 && clock_type::now() < refresh_deadline) {
+    collect(25ms);
+  }
   assert(count("source-connected") == 1);
   assert(count("source-state") >= 8);
   auto last = received.front().time;
   for (const auto &r : received) {
-    assert(r.time - last < 250ms);
+    assert(r.time - last < receiver_expiry);
     last = r.time;
     assert(r.envelope["mirrorToken"] == token);
     assert(r.envelope["frame"]["launchId"] == launch);
