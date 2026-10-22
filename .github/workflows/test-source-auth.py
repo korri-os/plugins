@@ -143,7 +143,11 @@ class SourceAuthTests(unittest.TestCase):
         "requires trusted local Nix daemon, Git and setfacl",
     )
     def test_real_fetchgit_authenticates_without_changing_or_leaking_outputs(self):
-        with tempfile.TemporaryDirectory(prefix="source-auth-fod-") as temporary:
+        # Build sandbox setup stats bind-mount sources as the build user, so
+        # every ancestor must be traversable. The runner's TMPDIR sits under
+        # /home/runner, which build users cannot enter (run 39734604977);
+        # /tmp is world-traversable on every Linux host.
+        with tempfile.TemporaryDirectory(prefix="source-auth-fod-", dir="/tmp") as temporary:
             work = Path(temporary)
             repository = work / "http/repository.git"
             checkout = work / "checkout"
