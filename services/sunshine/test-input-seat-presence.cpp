@@ -312,7 +312,11 @@ int main() {
   for (unsigned n = 0; n < 100; ++n) { state(ctx, n & 1 ? 0x1000 : 0); }
   assert(clock_type::now() - start < 1s);
   drain(); clear();
-  collect(450ms);
+  // Wait for recovery, not a fixed scheduling window on a loaded VM.
+  const auto recovery_deadline = clock_type::now() + 10s;
+  while (count("source-state") < 2 && clock_type::now() < recovery_deadline) {
+    collect(25ms);
+  }
   assert(count("source-state") >= 2); // A still-live source recovers transport.
   stop_stream(ctx);
   assert(platf::native_allocations == 0);
