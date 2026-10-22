@@ -58,7 +58,8 @@ pkgs.llvmPackages.stdenv.mkDerivation {
     wxwidgets_3_3
     unzip
     llvmPackages.llvm
-    llvmPackages.lld
+    # Wrapped ld.lld preserves Nix RUNPATHs; the raw lld package does not.
+    llvmPackages.bintools
   ];
   buildInputs = with pkgs; [
     sdl3

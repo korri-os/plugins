@@ -39,7 +39,10 @@ which SDL documents as available since 3.4.0. The local SDL 3.4.18 pin fixes
 the dependency instead of deleting controller support or adding a source patch.
 That SDL update retains nixpkgs' Zenity path substitutions at the new native
 source location and adds its new XTEST dependency (`libXtst`).
-The executable links with lld. There is no `-no-pie` override or hardening
+The executable links with **Nix-wrapped lld** (`llvmPackages.bintools`).
+A raw lld build linked but failed real `cemu --help` with missing Boost;
+the wrapped linker retains the Nix runtime search paths. A separate Boost
+link-and-execute probe confirmed this fix before rebuilding Cemu. There is no `-no-pie` override or hardening
 removal. No CPU affinity, device profile, driver workaround or game-specific
 performance setting is introduced.
 
