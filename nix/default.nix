@@ -170,6 +170,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = pluginSourceOnly ../plugins/eden;
       plugin = _: import ../plugins/eden/plugin.nix { inherit edenPackage; };
     };
+    bitsyboxPackage = import ../plugins/bitsybox/package.nix { inherit pkgs; };
+    bitsyboxPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = pluginSourceOnly ../plugins/bitsybox;
+      plugin = _: import ../plugins/bitsybox/plugin.nix { inherit bitsyboxPackage; };
+    };
     solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
     solarusPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -267,6 +273,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-sunshine = sunshinePlugin;
       korri-plugin-moonlight = moonlightPlugin;
       moonlight-embedded-korri = moonlightPackage;
+      korri-plugin-bitsybox = bitsyboxPlugin;
+      bitsybox = bitsyboxPackage;
       korri-plugin-solarus = solarusPlugin;
       solarus = solarusPackage;
       cemu = cemuPackage;
@@ -421,6 +429,13 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-cemu-admission = import ./cemu-admission.nix {
           pkgs = heldPkgs;
           package = cemuPlugin;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+          korridPackage = korri.packages.${system}.korrid;
+        };
+        korri-bitsybox-plugin = import ../plugins/bitsybox/check.nix {
+          inherit pkgs;
+          package = bitsyboxPlugin;
+          contract = korri.lib.${system}.pluginContract;
           hostPackage = korri.packages.${system}.korri-plugin-host;
           korridPackage = korri.packages.${system}.korrid;
         };

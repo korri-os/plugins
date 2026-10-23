@@ -24,6 +24,8 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-plugin-solarus` | `@korri:solarus` | `plugins/solarus/` |
 | `korri-plugin-eden` | `@korri:eden` | `plugins/eden/` |
 | `eden` | Standalone Eden 0.2.1 launcher | `plugins/eden/` |
+| `korri-plugin-bitsybox` | `@korri:bitsybox` (restricted license; publication blocked) | `plugins/bitsybox/` |
+| `bitsybox` | Standalone native Bitsybox 0.2-8.12, single-file CLI | `plugins/bitsybox/` |
 | `solarus` | Standalone Solarus 2.1.4 engine | `plugins/solarus/` |
 | `korri-plugin-cemu` | `@korri:cemu` (Wii U) | `plugins/cemu/` |
 | `cemu` | Standalone Cemu main with offline Github989 graphic packs | `plugins/cemu/` |
@@ -92,6 +94,16 @@ native x86_64 and ARM64 build runners without signing or publishing a cache.
 It validates original content bytes, the three-root approval graph and bounded
 headless startup. Display, sound, physical controls and full gameplay remain
 separate acceptance checks.
+
+## Bitsybox
+
+`@korri:bitsybox` contributes the native `bitsy` system (`.bitsy` data) and
+`@korri:bitsybox/bitsybox` runner. It runs exactly the selected file without a
+chooser, game copies, browser execution, or bundled games. Bitsybox's
+Anti-Capitalist Software License v1.4 restricts eligible users and organizations;
+it is not unrestricted OSS. **Publication remains blocked pending separate
+eligibility and redistribution approval.** Acquisition remains separate.
+See [native behavior, exact notices and focused checks](plugins/bitsybox/README.md).
 
 ## Cemu
 

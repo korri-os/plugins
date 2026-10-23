@@ -1,0 +1,343 @@
+--- a/src/bitsybox/main.c
++++ b/src/bitsybox/main.c
+@@ -1,9 +1,10 @@
+ #include <stdio.h>
+ #include <math.h>
+ #include <string.h>
+-#include <unistd.h> // for getcwd, chdir
+-#include <limits.h> // for PATH_MAX
+-#include <dirent.h>
++#include <unistd.h> // for close
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <stdint.h>
+ #include "duktape/duktape.h"
+ #include "SDL.h"
+ 
+@@ -12,8 +13,6 @@
+ #ifndef BUILD_DEBUG
+ #include "engine.h"
+ #include "font.h"
+-#include "boot.h"
+-#include "tune.h"
+ #endif
+ 
+ /* # TEST SETTINGS */
+@@ -240,8 +239,43 @@
+ 
+ /* # FILE LOADING */
+ 
+-char gameFilePath[256];
+-int gameCount = 0;
++/* Korri single-file entry point: retain the selected bytes, never a bounded path. */
++static char* gameData;
++static size_t gameDataLength;
++
++static int readSelectedGame(const char* path) {
++	/* Nonblocking open prevents a FIFO from hanging before fstat refuses it. */
++	int fd = open(path, O_RDONLY | O_NONBLOCK);
++	struct stat info;
++	if (fd < 0) {
++		perror("Cannot open Bitsy file");
++		return 0;
++	}
++	if (fstat(fd, &info) != 0 || !S_ISREG(info.st_mode) ||
++		info.st_size <= 0 || (uintmax_t) info.st_size > SIZE_MAX - 1) {
++		fprintf(stderr, "Bitsy file must be a nonempty regular file\n");
++		close(fd);
++		return 0;
++	}
++	FILE* file = fdopen(fd, "rb");
++	if (!file) {
++		close(fd);
++		return 0;
++	}
++	gameDataLength = (size_t) info.st_size;
++	gameData = malloc(gameDataLength + 1);
++	int valid = gameData && fread(gameData, 1, gameDataLength, file) == gameDataLength &&
++		!ferror(file) && !memchr(gameData, '\0', gameDataLength);
++	fclose(file);
++	if (!valid) {
++		fprintf(stderr, "Cannot read Bitsy text file\n");
++		free(gameData);
++		gameData = NULL;
++		return 0;
++	}
++	gameData[gameDataLength] = '\0';
++	return 1;
++}
+ 
+ int loadScript(duk_context* ctx, char* filepath) {
+ 	int success = 0;
+@@ -1510,104 +1544,26 @@
+ 
+ /* # BITSYBOX MODES */
+ 
+-int shouldStartTuneDemo = 0;
+-
+-void bootMenu() {
+-	SDL_SetWindowTitle(window, "BITSYBOX");
+-
+-	duk_context* ctx = duk_create_heap_default();
+-
+-	// load game files
+-	duk_peval_string(ctx, "__bitsybox_game_files__ = []");
+-	duk_pop(ctx);
+-	struct dirent* files;
+-	DIR* dir = opendir("./games");
+-
+-	if (dir != NULL ) {
+-		while ((files = readdir(dir)) != NULL) {
+-			duk_push_string(ctx, files->d_name);
+-			duk_put_global_string(ctx, "__bitsybox_filename__");
+-			duk_peval_string(
+-				ctx,
+-				"var fileSplit = __bitsybox_filename__.split('.');"
+-				"if (fileSplit[fileSplit.length - 1] === 'bitsy') { __bitsybox_game_files__.push(__bitsybox_filename__); }");
+-			duk_pop(ctx);
+-		}
+-
+-		closedir(dir);
+-	}
++void gameLoop() {
++	duk_context* ctx = duk_create_heap(NULL, NULL, NULL, NULL, fatalError);
+ 
+ 	// loop time
+ 	int prevTime = SDL_GetTicks();
+ 	int deltaTime = 0;
+ 
+-	int isBootFinished = 0;
++	int isGameOver = 0;
+ 
+ 	initSystem(ctx);
+ 
+-	// load boot menu
+-#ifdef BUILD_DEBUG
+-	shouldContinue = shouldContinue && loadScript(ctx, "boot/boot.js");
+-	shouldContinue = shouldContinue && loadFile(ctx, "boot/boot.bitsy", "__bitsybox_game_data__");
+-#else
+-	shouldContinue = shouldContinue && loadEmbeddedScript(ctx, boot_js);
+-	shouldContinue = shouldContinue && loadEmbeddedFile(ctx, boot_bitsy, "__bitsybox_game_data__");
+-#endif
+-
+-	while (shouldContinue && !isBootFinished) {
+-		// update time
+-		deltaTime = SDL_GetTicks() - prevTime;
+-		prevTime = SDL_GetTicks();
+-
+-		updateSystem(ctx, deltaTime);
+-
+-		duk_peval_string(ctx, "__bitsybox_is_boot_finished__");
+-		isBootFinished = duk_get_boolean(ctx, -1);
+-		duk_pop(ctx);
+-	}
+-
+-	if (isBootFinished) {
+-		duk_peval_string(ctx, "__bitsybox_selected_game_name__");
+-		SDL_SetWindowTitle(window, duk_get_string(ctx, -1));
+-		duk_pop(ctx);
+-
+-		duk_peval_string(ctx, "__bitsybox_selected_game__");
+-		sprintf(gameFilePath, "./games/%s", duk_get_string(ctx, -1));
+-		duk_pop(ctx);
+-
+-		duk_peval_string(ctx, "__bitsybox_game_files__.length");
+-		gameCount = duk_get_int(ctx, -1);
+-		duk_pop(ctx);
+-
+-		duk_peval_string(ctx, "__bitsybox_should_start_tune_demo__");
+-		shouldStartTuneDemo = duk_get_boolean(ctx, -1);
+-		duk_pop(ctx);
+-	}
+-
+-	duk_destroy_heap(ctx);
+-}
+-
+-void gameLoop() {
+-	duk_context* ctx = duk_create_heap(NULL, NULL, NULL, NULL, fatalError);
+-
+-	// loop time
+-	int prevTime = SDL_GetTicks();
+-	int deltaTime = 0;
+-
+-	int isGameOver = 0;
+-
+-	initSystem(ctx);
+-
+-	shouldContinue = shouldContinue && loadFile(ctx, gameFilePath, "__bitsybox_game_data__");
++	duk_push_lstring(ctx, gameData, gameDataLength);
++	duk_put_global_string(ctx, "__bitsybox_game_data__");
+ 
+ 	duk_peval_string(ctx, "var __bitsybox_is_game_over__ = false;");
+ 	duk_pop(ctx);
+ 
+-	if (gameCount > 1) {
+-		// hack to return to main menu on game end if there's more than one
+-		duk_peval_string(ctx, "reset_cur_game = function() { __bitsybox_is_game_over__ = true; };");
+-		duk_pop(ctx);
+-	}
++	// The native menu controls now end this selected-file session.
++	duk_peval_string(ctx, "reset_cur_game = function() { __bitsybox_is_game_over__ = true; };");
++	duk_pop(ctx);
+ 
+ 	while (shouldContinue && !isGameOver) {
+ 		// keep track of time
+@@ -1632,100 +1588,35 @@
+ 	duk_destroy_heap(ctx);
+ }
+ 
+-void demoLoop() {
+-	SDL_SetWindowTitle(window, "DEMO");
+-
+-	duk_context* ctx = duk_create_heap_default();
+-
+-	// loop time
+-	int prevTime = SDL_GetTicks();
+-	int deltaTime = 0;
+-
+-	int isTestFinished = 0;
+-
+-	initSystem(ctx);
+-
+-	// load demo program
+-#ifdef BUILD_DEBUG
+-	shouldContinue = shouldContinue && loadScript(ctx, "test/demo.js");
+-#else
+-	// not currently embedding the demo program since it's just for test purposes
+-	shouldContinue = 0;
+-#endif
+-
+-	while (shouldContinue && !isTestFinished) {
+-		// update time
+-		deltaTime = SDL_GetTicks() - prevTime;
+-		prevTime = SDL_GetTicks();
+-
+-		updateSystem(ctx, deltaTime);
+-	}
+-
+-	duk_destroy_heap(ctx);
+-}
+-
+-void tuneTool() {
+-	SDL_SetWindowTitle(window, "TUNE DEMO");
+-
+-	duk_context* ctx = duk_create_heap_default();
+-
+-	// loop time
+-	int prevTime = SDL_GetTicks();
+-	int deltaTime = 0;
+-
+-	initSystem(ctx);
+-
+-	// load tune tool program
+-#ifdef BUILD_DEBUG
+-	shouldContinue = shouldContinue && loadScript(ctx, "tune/dialog_demo.js");
+-	shouldContinue = shouldContinue && loadScript(ctx, "tune/tool_demo.js");
+-	shouldContinue = shouldContinue && loadScript(ctx, "tune/tune.js");
+-	shouldContinue = shouldContinue && loadFile(ctx, "tune/tune.bitsy", "__bitsybox_game_data__");
+-#else
+-	shouldContinue = shouldContinue && loadEmbeddedScript(ctx, dialog_demo_js);
+-	shouldContinue = shouldContinue && loadEmbeddedScript(ctx, tool_demo_js);
+-	shouldContinue = shouldContinue && loadEmbeddedScript(ctx, tune_js);
+-	shouldContinue = shouldContinue && loadEmbeddedFile(ctx, tune_bitsy, "__bitsybox_game_data__");
+-#endif
+-
+-	int shouldQuitToolDemo = 0;
+-
+-	while (shouldContinue && !shouldQuitToolDemo) {
+-		// update time
+-		deltaTime = SDL_GetTicks() - prevTime;
+-		prevTime = SDL_GetTicks();
+-
+-		// update mouse state
+-		int isMouseOnScreen = (mouseX >= 0 && mouseX < BITSY_VIDEO_SIZE && mouseY >= 0 && mouseY < BITSY_VIDEO_SIZE);
+-		duk_push_boolean(ctx, isLeftMouseDown && isMouseOnScreen);
+-		duk_put_global_string(ctx, "__bitsybox_mouse_down__");
+-
+-		duk_push_int(ctx, mouseX);
+-		duk_put_global_string(ctx, "__bitsybox_mouse_x__");
+-
+-		duk_push_int(ctx, mouseY);
+-		duk_put_global_string(ctx, "__bitsybox_mouse_y__");
+-
+-		duk_push_boolean(ctx, (isButtonLAlt || isButtonRAlt));
+-		duk_put_global_string(ctx, "__bitsybox_mouse_alt__");
+-
+-		duk_push_boolean(ctx, isMouseOnScreen);
+-		duk_put_global_string(ctx, "__bitsybox_mouse_hover__");
+-
+-		updateSystem(ctx, deltaTime);
+-
+-		// check if it's time to quit
+-		duk_peval_string(ctx, "__bitsybox_should_quit_tool_demo__");
+-		shouldQuitToolDemo = duk_get_boolean(ctx, -1);
+-		duk_pop(ctx);
+-	}
+-
+-	duk_destroy_heap(ctx);
+-}
+-
+ /* # BITSYBOX MAIN */
+ 
+ int main(int argc, char* argv[]) {
++	if (argc != 2 || argv[1][0] != '/') {
++		fprintf(stderr, "Usage: bitsybox /absolute/path/to/game.bitsy\n");
++		return 1;
++	}
++	if (!readSelectedGame(argv[1])) {
++		return 1;
++	}
++
++	/* Use the embedded upstream parser before SDL, not a second data format. */
++	duk_context* validation = duk_create_heap(NULL, NULL, NULL, NULL, fatalError);
++	initBitsyInterface(validation);
++	duk_push_lstring(validation, gameData, gameDataLength);
++	duk_put_global_string(validation, "selectedGameData");
++	int valid = loadEmbeddedScript(validation, world_js) &&
++		loadEmbeddedScript(validation, script_js) &&
++		duk_peval_string(validation,
++			"var scriptUtils = new Script().CreateUtils();"
++			"var selectedWorld = parseWorld(selectedGameData);"
++			"!!(selectedWorld.sprite.A && selectedWorld.room[selectedWorld.sprite.A.room]);") == 0 &&
++		duk_get_boolean(validation, -1);
++	duk_destroy_heap(validation);
++	if (!valid) {
++		fprintf(stderr, "Invalid Bitsy game data\n");
++		free(gameData);
++		return 1;
++	}
+ 	printf("~*~*~ bitsybox ~*~*~\n");
+ 	printf("[duktape version 2.6.0]\n");
+ 
+@@ -1786,29 +1677,8 @@
+ 	// create renderer
+ 	renderer = SDL_CreateRenderer(window, -1, 0);
+ 
+-	// set the working directory to the directory containing the executable
+-	chdir(SDL_GetBasePath());
+-
+-#if defined(DEMO_MODE)
+-	while (shouldContinue) {
+-		demoLoop();
+-	}
+-#elif defined(TUNE_TOOL_MODE)
+-	while (shouldContinue) {
+-		tuneTool();
+-	}
+-#else
+-	while (shouldContinue) {
+-		bootMenu();
+-
+-		if (shouldStartTuneDemo) {
+-			tuneTool();
+-		}
+-		else {
+-			gameLoop();
+-		}
+-	}
+-#endif
++	gameLoop();
++	free(gameData);
+ 
+ 	SDL_Quit();
+ 
