@@ -134,12 +134,12 @@ pkgs.llvmPackages.stdenv.mkDerivation {
     substitute ${./wrapper.sh} "$out/bin/cemu" \
       --subst-var-by shell ${pkgs.runtimeShell} \
       --subst-var-by coreutils ${pkgs.coreutils} \
-      --subst-var-by turnipDriver ${
-        lib.escapeShellArg (lib.optionalString pkgs.stdenv.hostPlatform.isAarch64 ''
+      --subst-var-by turnipDriver ${lib.escapeShellArg (
+        lib.optionalString pkgs.stdenv.hostPlatform.isAarch64 ''
           export VK_DRIVER_FILES="${pkgs.mesa}/share/vulkan/icd.d/freedreno_icd.aarch64.json"
           export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
-        '')
-      } \
+        ''
+      )} \
       --subst-var-by libraries ${
         lib.makeLibraryPath [
           pkgs.vulkan-loader
