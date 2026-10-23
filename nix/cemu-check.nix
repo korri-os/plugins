@@ -33,6 +33,7 @@ pkgs.runCommand "korri-cemu-package-check"
     bun plugins/cemu/plugin.test.ts
     shellcheck ${cemuPackage}/bin/cemu
     python3 ${../plugins/cemu/turnip-check.py} ${cemuPackage} ${pkgs.stdenv.hostPlatform.parsed.cpu.name}
+    python3 ${../plugins/cemu/graphic-packs-check.py} ${cemuPackage}
     ${pkgs.xvfb-run}/bin/xvfb-run -a python3 ${../plugins/cemu/runtime-check.py} ${cemuPackage} "$out/runtime"
     mkdir -p "$out"
     cp -R ${cemuPackage}/nix-support/cemu-build "$out/"

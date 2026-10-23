@@ -127,6 +127,9 @@ pkgs.llvmPackages.stdenv.mkDerivation {
     install -m644 ${./settings.xml} "$out/share/Cemu/settings.xml"
     mkdir -p "$out/share/Cemu/graphicPacks/downloadedGraphicPacks"
     unzip -q ${graphicPacks} -d "$out/share/Cemu/graphicPacks/downloadedGraphicPacks"
+    # Optional native-aspect presets follow Github989's 4:3/5:4 pattern (README).
+    patch --batch --fuzz=0 -p1 -d "$out/share/Cemu/graphicPacks/downloadedGraphicPacks" \
+      < ${./graphic-packs-native-aspect.patch}
     printf '%s' 'graphicPacks989.zip' > "$out/share/Cemu/graphicPacks/downloadedGraphicPacks/version.txt"
     substitute ${./wrapper.sh} "$out/bin/cemu" \
       --subst-var-by shell ${pkgs.runtimeShell} \

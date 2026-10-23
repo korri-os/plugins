@@ -1,0 +1,60 @@
+--- a/BreathOfTheWild/Graphics/rules.txt
++++ b/BreathOfTheWild/Graphics/rules.txt
+@@ -96,6 +96,13 @@
+ $aspectRatioHeight = 2
+ $showSquareHUDOption:int = 1
+ 
++[Preset]
++name = 31:27 (1240x1080 handheld)
++category = Aspect Ratio
++$aspectRatioWidth = 31
++$aspectRatioHeight = 27
++$showSquareHUDOption:int = 1
++
+ # 16:9 Resolutions
+ 
+ [Preset]
+@@ -483,6 +490,43 @@
+ condition = ((($aspectRatioWidth - 3) == 0) + (($aspectRatioHeight - 2) == 0)) == 2
+ $width = 3240
+ $height = 2160
++
++# 31:27 Resolutions
++
++[Preset]
++name = 1240x1080
++category = Resolution
++condition = ((($aspectRatioWidth - 31) == 0) + (($aspectRatioHeight - 27) == 0)) == 2
++$width = 1240
++$height = 1080
++
++[Preset]
++name = 1028x896
++category = Resolution
++condition = ((($aspectRatioWidth - 31) == 0) + (($aspectRatioHeight - 27) == 0)) == 2
++$width = 1028
++$height = 896
++
++[Preset]
++name = 827x720
++category = Resolution
++condition = ((($aspectRatioWidth - 31) == 0) + (($aspectRatioHeight - 27) == 0)) == 2
++$width = 827
++$height = 720
++
++[Preset]
++name = 620x540
++category = Resolution
++condition = ((($aspectRatioWidth - 31) == 0) + (($aspectRatioHeight - 27) == 0)) == 2
++$width = 620
++$height = 540
++
++[Preset]
++name = 413x360
++category = Resolution
++condition = ((($aspectRatioWidth - 31) == 0) + (($aspectRatioHeight - 27) == 0)) == 2
++$width = 413
++$height = 360
+ 
+ # Ultrawide Mode Options
+ 

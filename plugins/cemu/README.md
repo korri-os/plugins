@@ -136,6 +136,23 @@ The package bundles `Github989/graphicPacks989.zip` (CC0-1.0), release commit
 is installed separately because the release ZIP omits it. No pack is enabled
 or tuned on the person's behalf.
 
+`graphic-packs-native-aspect.patch` adds the optional Aspect Ratio preset
+**31:27 (1240x1080 handheld)** and matching 1240x1080, 1028x896, 827x720,
+620x540 and 413x360 Resolution presets to BotW's native `Graphics/rules.txt`.
+The build applies the patch without fuzz. The pattern comes from that file's
+4:3 and 5:4 aspect presets and aspect-gated Resolution presets in
+[Github989 source](https://github.com/cemu-project/cemu_graphic_packs/blob/975f3759d7837da5a374150347d3202360b13ca3/src/BreathOfTheWild/Graphics/rules.txt).
+Like those presets, it retains `$gameWidth=1280` / `$gameHeight=720` (the
+original game texture dimensions) and exposes Square HUD Mode through
+`$showSquareHUDOption=1`. It does not select the experimental square-HUD
+fix or change any default. The pack stays 16:9 by default; the player selects
+aspect, resolution and HUD mode through Cemu's own graphic-pack preset entries
+in `settings.xml`. The patched data retains upstream's CC0-1.0 license.
+A package check verifies all five resolutions, their aspect conditions, and
+unchanged defaults. Existing account-local pack trees are still never
+silently replaced: an operator must explicitly update a previously seeded
+copy before these additional choices appear.
+
 `GraphicPack2.cpp:96-111` scans `GetUserDataPath("graphicPacks")` recursively.
 On first launch the wrapper copies the bundle to that native directory,
 including `downloadedGraphicPacks/version.txt`. It does not symlink into the
