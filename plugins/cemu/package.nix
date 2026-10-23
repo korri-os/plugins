@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, turnip }:
 let
   inherit (pkgs) lib;
   cemuCommit = "29f2f1fae4631e2317977debd9eacd55cc28dd7d";
@@ -54,8 +54,6 @@ let
       ;
   };
 in
-# Temporary Cemu-only Turnip pin. Replace with patched 26.2.x; see README.
-assert !pkgs.stdenv.hostPlatform.isAarch64 || pkgs.mesa.version == "25.3.2";
 pkgs.llvmPackages.stdenv.mkDerivation {
   pname = "cemu";
   outputs = [
@@ -154,7 +152,7 @@ pkgs.llvmPackages.stdenv.mkDerivation {
       --subst-var-by coreutils ${pkgs.coreutils} \
       --subst-var-by turnipDriver ${lib.escapeShellArg (
         lib.optionalString pkgs.stdenv.hostPlatform.isAarch64 ''
-          export VK_DRIVER_FILES="${pkgs.mesa}/share/vulkan/icd.d/freedreno_icd.aarch64.json"
+          export VK_DRIVER_FILES="${turnip}/share/vulkan/icd.d/freedreno_icd.aarch64.json"
           export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
         ''
       )} \
@@ -204,6 +202,7 @@ pkgs.llvmPackages.stdenv.mkDerivation {
   '';
   passthru = {
     inherit
+      turnip
       cemuCommit
       graphicPacks
       licenses

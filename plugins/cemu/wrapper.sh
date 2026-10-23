@@ -2,7 +2,7 @@
 set -eu
 export PATH="@coreutils@/bin:$PATH"
 export LD_LIBRARY_PATH="@libraries@${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-# Temporary aarch64-only Turnip 25.3.2 pin: 26.2.x crashes on fmadz (README).
+# Cemu-only patched Turnip: finish IR3 fmadz lowering (README).
 @turnipDriver@
 # wxStandardPaths also derives this from /proc/self/exe's /bin/ prefix.
 # Pin its supported override so an inherited host override cannot hide assets.

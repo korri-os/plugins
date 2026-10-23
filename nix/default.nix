@@ -151,7 +151,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         contract = korri.lib.${system}.pluginContract;
         hostPackage = korri.packages.${system}.korri-plugin-host;
       };
-    cemuPackage = import ../plugins/cemu/package.nix { pkgs = heldPkgs; };
+    cemuTurnip = import ../plugins/cemu/turnip.nix { pkgs = heldPkgs; };
+    cemuPackage = import ../plugins/cemu/package.nix {
+      pkgs = heldPkgs;
+      turnip = cemuTurnip;
+    };
     cemuPlugin = heldMkPlugin {
       publisher.namespace = "@korri";
       source = pluginSourceOnly ../plugins/cemu;

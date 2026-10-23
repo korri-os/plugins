@@ -35,7 +35,7 @@ pkgs.runCommand "korri-cemu-package-check"
     python3 ${../plugins/cemu/build-evidence-check.py} ${cemuPackage} ${cemuPackage.evidence}
     shellcheck ${cemuPackage}/bin/cemu
     python3 ${../plugins/cemu/license-check.py} ${cemuPackage} ${cemuPackage.licenses}
-    python3 ${../plugins/cemu/turnip-check.py} ${cemuPackage} ${pkgs.stdenv.hostPlatform.parsed.cpu.name}
+    python3 ${../plugins/cemu/turnip-check.py} ${cemuPackage} ${pkgs.stdenv.hostPlatform.parsed.cpu.name} ${../plugins/cemu/patches/mesa-26.2-ir3-fmadz.patch}
     python3 ${../plugins/cemu/graphic-packs-check.py} ${cemuPackage}
     ${pkgs.xvfb-run}/bin/xvfb-run -a python3 ${../plugins/cemu/runtime-check.py} ${cemuPackage} "$out/runtime"
     mkdir -p "$out"

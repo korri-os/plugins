@@ -46,36 +46,42 @@ link-and-execute probe confirmed this fix before rebuilding Cemu. There is no `-
 removal. No CPU affinity, device profile or game-specific performance setting
 is introduced. The temporary aarch64 Turnip pin is described below.
 
-## Temporary Turnip pin
+## Cemu-scoped patched Turnip
 
 On aarch64 only, `bin/cemu` sets `VK_DRIVER_FILES` and the older loader alias
-`VK_ICD_FILENAMES` to the freedreno ICD from this flake's locked nixpkgs Mesa
-**25.3.2**. The package asserts that version so a lock update cannot silently
-replace this deliberate temporary pin. Other architectures keep normal ICD
-selection. This follows legacy `9c2d9e2b6`'s process-scoped Vulkan selection;
-it does not change system Mesa, Gamescope, OpenGL, or other plugins.
+`VK_ICD_FILENAMES` to the freedreno ICD from the plugin's **Mesa 26.2.5** build
+in `turnip.nix`. This replaces the temporary 25.3.2 pin. The build enables only
+Turnip with the Linux MSM kernel driver and X11/Wayland presentation. It disables
+Gallium, OpenGL, EGL, GBM, LLVM, OpenCL, video codecs, layers and optional tools.
+Other architectures keep normal ICD selection. No system Mesa overlay,
+Gamescope change, OpenGL selection change, or other plugin change is involved.
+The aarch64 Vulkan path still requires an Adreno GPU with the MSM driver.
 
-Mesa 26.2.0+ IR3 has no `nir_op_fmadz` emitter case in the checked source.
-Odin's Mesa 26.2.3 crashes while compiling a 32-bit vertex `fmadz`, then faults
-in `ir3_context_error` → `ralloc_free` (`ir3_compiler_nir.c:1143`). Fresh and
-cached compilation share pipeline BLAKE3
-`026211ce39d10e5e02021680ebff7da347ac4ee27a5064daeacd045d15efb127`.
-See [the first-light report](bench/devices/odin2portal-first-light-2026-10-22.md),
-private evidence `/tmp/cemu-odin-evidence/core-{fresh,repeat}-detail.txt`, and
-`/var/lib/korri/cemu-bench-staging/diagnose-*/` on Odin.
+[The patch](patches/mesa-26.2-ir3-fmadz.patch) makes the final late-algebraic
+cleanup in `ir3_context_init` run to a fixed point. That cleanup follows
+`ir3_nir_lower_imul` and normal algebraic, which can recover `fmulz` from its
+abs-min lowering. One late pass can re-fuse it to `fmadz`; a further pass must
+lower that replacement before instruction selection. The main variant loop
+already iterates, but this later call did not.
 
-**Replace this pin with a patched 26.2.x Turnip.** It covers Turnip/Vulkan
-only; it does not establish audio, save persistence, thermal safety, or FPS.
-It adds the older Mesa runtime closure and exposes only freedreno, so this
-temporary aarch64 Vulkan path requires an Adreno GPU. The package check requires
-an existing 25.3.x freedreno ICD/library on aarch64 and no override elsewhere.
-The [25.3.2 Odin attempt](bench/devices/odin2portal-turnip2532-2026-10-23.md)
-verified driver isolation but hit a different Cemu draw-path SIGTRAP while
-loading the save. The [async-off follow-up](bench/devices/odin2portal-async-off-2026-10-23.md)
-runs gameplay with the same package and native `AsyncCompile=false`; its complete
-720p baseline is median 39, p10 38 FPS, below the median target of 40. Audio was
-physically confirmed; a new manual save remains unproven. The native seed now disables async compilation as described below. This pin
-alone is not a qualified gameplay fix.
+Odin's unpatched Mesa 26.2.3 rejects a 32-bit vertex `fmadz`, then faults in
+`ir3_context_error` → `ralloc_free`. Fresh and cached failures share pipeline
+BLAKE3 `026211ce39d10e5e02021680ebff7da347ac4ee27a5064daeacd045d15efb127`.
+The patch reuses the existing NIR abs-min select; it does not fix the separate
+compiler-error cleanup crash. It is **not submitted upstream**. See
+[the upstream draft](patches/mesa-26.2-ir3-fmadz.upstream.md) and
+[the patched-driver campaign](bench/devices/odin2portal-turnip262-patched-2026-10-23.md)
+for validation and limits. Existing IR3 disassembly/delay tests run on the builder.
+The Cemu package check verifies the exact patched ICD, its actual library, and
+byte-identical installed patch evidence, not merely a Mesa version string.
+
+The gameplay-gated 25.3.2 [baseline](bench/devices/odin2portal-gameplay-gate-2026-10-23.md)
+measured 37 / 37 / 36 FPS with native `AsyncCompile=false`. The older ungated
+baseline and soak are not comparable to gameplay-gated measurements.
+Async on hit Cemu's separate `activeVertexDS` assertion. Fresh accounts now seed
+`Graphic/AsyncCompile=false` in Cemu's own settings file; existing settings remain
+untouched. Its cost is synchronous compilation stalls. This driver patch alone
+is not proof of performance, audio, new-save persistence or thermal safety.
 
 ## Native files, not another configuration schema
 

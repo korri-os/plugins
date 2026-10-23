@@ -1,0 +1,41 @@
+From: Korri Cemu investigation
+Subject: [PATCH] ir3: finish late algebraic lowering after lowering imul
+
+Problem: normal algebraic after ir3_nir_lower_imul recovers fmulz from
+its abs-min lowering. A single late pass fuses fmulz + fadd to fmadz,
+but does not revisit the replacement for abs-min lowering. Instruction
+selection cannot emit fmadz. Iterate this final late pass to a fixed point,
+just as ir3_nir_lower_variant already does.
+
+Evidence: BotW vertex shader, Adreno 740, Mesa 26.2.3; pipeline BLAKE3
+026211ce39d10e5e02021680ebff7da347ac4ee27a5064daeacd045d15efb127.
+The unhandled 32-bit nir_op_fmadz enters ir3_context_error, then crashes
+in ralloc_free. The single final late pass is the only late-algebraic
+call in ir3 that does not run to a fixed point.
+
+Upstream-status: Not submitted; local candidate for Mesa 26.2.x and main.
+See mesa-26.2-ir3-fmadz.upstream.md for reproduction and validation status.
+---
+--- a/src/freedreno/ir3/ir3_context.c
++++ b/src/freedreno/ir3/ir3_context.c
+@@ -93,10 +93,17 @@
+       needs_late_alg = true;
+    }
+ 
+-   /* nir_opt_algebraic() above would have unfused our ffmas, re-fuse them. */
++   /* nir_opt_algebraic() above would have unfused our multiply-adds and
++    * recovered fmulz from its abs-min lowering.  Iterate to a fixed point:
++    * re-fusing fmulz + fadd can create fmadz, which needs another late pass
++    * to lower it before instruction selection.
++    */
+    if (needs_late_alg) {
+-      NIR_PASS(progress, ctx->s, nir_opt_algebraic_late);
+-      NIR_PASS(progress, ctx->s, nir_opt_dce);
++      do {
++         progress = false;
++         NIR_PASS(progress, ctx->s, nir_opt_algebraic_late);
++         NIR_PASS(_, ctx->s, nir_opt_dce);
++      } while (progress);
+    }
+ 
+    /* This must run after the last nir_opt_algebraic or it gets undone. */
