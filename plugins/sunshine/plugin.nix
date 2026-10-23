@@ -9,6 +9,12 @@ let
     lib.replaceStrings (builtins.attrNames replacements) (builtins.attrValues replacements) (
       builtins.readFile path
     );
+  appsPackage = pkgs.writeTextFile {
+    name = "korri-sunshine-apps";
+    destination = "/share/korri-sunshine/apps.json";
+    text = builtins.readFile ./apps.json;
+  };
+  appsFile = "${appsPackage}/share/korri-sunshine/apps.json";
   runtimePackage = pkgs.writeShellScriptBin "korri-sunshine-run" (
     substitute ./runtime.sh {
       "@coreutils@" = toString pkgs.coreutils;
@@ -17,7 +23,7 @@ let
       "@pipewire@" = toString pkgs.pipewire;
       "@sunshine@" = toString sunshinePackage;
       "@sway@" = toString pkgs.sway;
-      "@apps@" = toString ./apps.json;
+      "@apps@" = appsFile;
     }
   );
   rulesPackage = pkgs.writeTextFile {
@@ -54,7 +60,7 @@ in
   };
   files = {
     sunshine = "${sunshinePackage}/bin/sunshine";
-    apps = toString ./apps.json;
+    apps = appsFile;
     runtime = "${runtimePackage}/bin/korri-sunshine-run";
     setup = "${setupPackage}/bin/korri-sunshine-input-seat-setup";
     input-rules = rulesFile;
