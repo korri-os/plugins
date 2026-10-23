@@ -33,6 +33,11 @@ with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
     packs = root / ".local/share/Cemu/graphicPacks/downloadedGraphicPacks"
     mlc = root / "saves/mlc01"
     for attempt in range(2):
+        if attempt == 1:
+            # Gamescope 3.16.18 sets this even with --expose-wayland. The
+            # wrapper must select X11 over an inherited Wayland preference.
+            env["GAMESCOPE_WAYLAND_DISPLAY"] = "cemu-runtime-check"
+            env["GDK_BACKEND"] = "wayland"
         trace = root / f"startup-{attempt}.trace"
         log = root / f"startup-{attempt}.log"
         with log.open("w") as output:

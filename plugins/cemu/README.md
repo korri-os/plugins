@@ -79,6 +79,12 @@ output. Omitting the TV device means disabled audio in Cemu, not the default
 output: the first Odin title launch had no PipeWire audio stream despite
 `Cubeb: available`. Existing native settings remain untouched.
 
+When Gamescope sets its native `GAMESCOPE_WAYLAND_DISPLAY`, the wrapper selects
+`GDK_BACKEND=x11`. Cemu's `VulkanCanvas` crashed in `wl_proxy_marshal_flags`
+before renderer initialization against Gamescope 3.16.18's exposed Wayland
+server on Odin. The nested path must use Gamescope's Xwayland; a direct launch
+keeps Cemu's normal backend selection. This is not a Vulkan device-loss fix.
+
 Upstream's Linux data path is wxWidgets `GetDataDir()`. wxWidgets 3.3.1's
 `src/unix/stdpaths.cpp` derives the prefix from `/proc/self/exe`'s `/bin/`
 component and appends `/share/Cemu`. The real executable stays in `$out/bin`.

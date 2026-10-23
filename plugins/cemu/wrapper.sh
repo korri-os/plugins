@@ -5,6 +5,11 @@ export LD_LIBRARY_PATH="@libraries@${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 # wxStandardPaths also derives this from /proc/self/exe's /bin/ prefix.
 # Pin its supported override so an inherited host override cannot hide assets.
 export WX_CEMU_DATA_DIR="@out@/share/Cemu"
+# Cemu's Wayland VulkanCanvas crashes against Gamescope's exposed Wayland
+# server. Use its Xwayland instead; direct Wayland launches stay native.
+if [ -n "${GAMESCOPE_WAYLAND_DISPLAY:-}" ]; then
+  export GDK_BACKEND=x11
+fi
 
 # Native files, seeded once; never generate XML in the plugin declaration.
 # --help/--version are read-only probes and must not create account state.
