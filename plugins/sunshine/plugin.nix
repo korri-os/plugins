@@ -17,6 +17,7 @@ let
       "@pipewire@" = toString pkgs.pipewire;
       "@sunshine@" = toString sunshinePackage;
       "@sway@" = toString pkgs.sway;
+      "@apps@" = toString ./apps.json;
     }
   );
   rulesPackage = pkgs.writeTextFile {
@@ -53,6 +54,7 @@ in
   };
   files = {
     sunshine = "${sunshinePackage}/bin/sunshine";
+    apps = toString ./apps.json;
     runtime = "${runtimePackage}/bin/korri-sunshine-run";
     setup = "${setupPackage}/bin/korri-sunshine-input-seat-setup";
     input-rules = rulesFile;
