@@ -12,13 +12,14 @@
     "Preserve upstream home and /etc/ssh/authorized_keys.d account paths; no enrollment or key provisioning.";
   "services.openssh.extraConfig" =
     "Preserve generated native configuration, with the native key-only policy first.";
-  "services.openssh.moduliFile" = "Reference immutable package moduli directly, not /etc/ssh/moduli.";
   "services.openssh.settings" =
-    "Preserve upstream defaults after the native key-only policy; suppress password defaults owned by that file.";
+    "Preserve upstream defaults after the native key-only policy; suppress password defaults owned by that file. ModuliFile defaults to immutable package moduli, not /etc/ssh/moduli.";
   "services.openssh.sftpServerExecutable" = "Preserve immutable upstream sftp-server path.";
   "system.checks" = "Run the pinned prebuilt build-platform sshd configuration validator.";
   "systemd.services" =
     "Replace boot units with one native optional service and ExecStartPre per-device keygen; keep host control-group stop semantics and runtime/state directories. Host NSS supplies existing device accounts.";
+  "systemd.generatorPath" =
+    "Do not extract. It puts the sshd package on the PATH of the host's systemd generators; this plugin installs no generator or boot unit.";
   "systemd.sockets" = "No socket activation; startWhenNeeded is false.";
   "systemd.tmpfiles.settings" =
     "Do not extract root credential provisioning; no owner key or credential is available. Host StateDirectory/RuntimeDirectory replace daemon directory effects.";

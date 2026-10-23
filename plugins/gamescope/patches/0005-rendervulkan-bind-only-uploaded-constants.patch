@@ -18,10 +18,10 @@ Korri-local; not upstream.
  2 files changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
-index 28c4dfc..f3d9b43 100644
+index 5112073b..6a9ff302 100644
 --- a/src/rendervulkan.cpp
 +++ b/src/rendervulkan.cpp
-@@ -1705,10 +1705,13 @@ void CVulkanCmdBuffer::clearState()
+@@ -1781,10 +1781,13 @@ void CVulkanCmdBuffer::clearState()
  template<class PushData, class... Args>
  void CVulkanCmdBuffer::uploadConstants(Args&&... args)
  {
@@ -35,7 +35,7 @@ index 28c4dfc..f3d9b43 100644
  	memcpy(ptr, &data, sizeof(data));
  }
  
-@@ -1810,7 +1813,10 @@ void CVulkanCmdBuffer::dispatch(uint32_t x, uint32_t y, uint32_t z)
+@@ -1886,7 +1889,10 @@ void CVulkanCmdBuffer::dispatch(uint32_t x, uint32_t y, uint32_t z)
  
  	scratchDescriptor.buffer = m_device->m_uploadBuffer;
  	scratchDescriptor.offset = m_renderBufferOffset;
@@ -48,10 +48,10 @@ index 28c4dfc..f3d9b43 100644
  	for (uint32_t i = 0; i < VKR_SAMPLER_SLOTS; i++)
  	{
 diff --git a/src/rendervulkan.hpp b/src/rendervulkan.hpp
-index 7f00308..3f0bf73 100644
+index f8c39c34..4fb0092b 100644
 --- a/src/rendervulkan.hpp
 +++ b/src/rendervulkan.hpp
-@@ -992,6 +992,7 @@ private:
+@@ -1062,6 +1062,7 @@ private:
  	std::vector<VulkanTimelinePoint_t> m_ExternalSignals;
  
  	uint32_t m_renderBufferOffset = 0;

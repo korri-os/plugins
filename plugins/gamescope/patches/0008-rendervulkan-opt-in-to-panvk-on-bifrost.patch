@@ -27,10 +27,10 @@ Korri-local; not upstream.
  2 files changed, 110 insertions(+), 17 deletions(-)
 
 diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
-index 343de75..5d7ad44 100644
+index 87a83596..bbf0d32d 100644
 --- a/src/rendervulkan.cpp
 +++ b/src/rendervulkan.cpp
-@@ -320,7 +320,79 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
+@@ -333,7 +333,79 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
  
  extern bool env_to_bool(const char *env);
  
@@ -110,7 +110,7 @@ index 343de75..5d7ad44 100644
  {
  	uint32_t deviceCount = 0;
  	vk.EnumeratePhysicalDevices(instance(), &deviceCount, nullptr);
-@@ -338,10 +410,15 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+@@ -351,10 +423,15 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
  		bTryComputeOnly = false;
  	}
  
@@ -126,7 +126,7 @@ index 343de75..5d7ad44 100644
  
  		if (deviceProperties.apiVersion < VK_API_VERSION_1_2)
  			continue;
-@@ -363,9 +440,10 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+@@ -376,9 +453,10 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
  
  		if (generalIndex != ~0u || computeOnlyIndex != ~0u)
  		{
@@ -140,7 +140,7 @@ index 343de75..5d7ad44 100644
  			{
  				// if we have a surface, check that the queue family can actually present on it
  				if (surface) {
-@@ -390,6 +468,8 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+@@ -403,6 +481,8 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
  				m_queueFamily = computeOnlyIndex == ~0u ? generalIndex : computeOnlyIndex;
  				m_generalQueueFamily = generalIndex;
  				m_physDev = cphysDev;
@@ -149,7 +149,7 @@ index 343de75..5d7ad44 100644
  
  				/* When Intel uses compute-only queue for Gamescope composition, some games
  				 * experience performance loss. Using the general queue alleviates the issue
-@@ -409,17 +489,7 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
+@@ -422,17 +502,7 @@ bool CVulkanDevice::selectPhysDev(VkSurfaceKHR surface)
  		}
  	}
  
@@ -168,7 +168,7 @@ index 343de75..5d7ad44 100644
  }
  
  bool CVulkanDevice::createDevice()
-@@ -3601,9 +3671,9 @@ static bool init_nis_data()
+@@ -3730,9 +3800,9 @@ static bool init_nis_data()
  	return true;
  }
  
@@ -180,7 +180,7 @@ index 343de75..5d7ad44 100644
  	{
  		VkResult result = VK_ERROR_INITIALIZATION_FAILED;
  
-@@ -3639,11 +3709,33 @@ VkInstance vulkan_get_instance( void )
+@@ -3768,11 +3838,33 @@ VkInstance vulkan_get_instance( void )
  		}
  
  		return instance;
@@ -216,10 +216,10 @@ index 343de75..5d7ad44 100644
  {
  	static bool s_bInitted = false;
 diff --git a/src/rendervulkan.hpp b/src/rendervulkan.hpp
-index 3f0bf73..337523b 100644
+index 4fb0092b..3c5bf7b0 100644
 --- a/src/rendervulkan.hpp
 +++ b/src/rendervulkan.hpp
-@@ -838,6 +838,7 @@ protected:
+@@ -900,6 +900,7 @@ protected:
  	friend class CVulkanCmdBuffer;
  
  	bool selectPhysDev(VkSurfaceKHR surface);

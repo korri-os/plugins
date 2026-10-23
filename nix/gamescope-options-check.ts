@@ -15,8 +15,8 @@ const table = new Map<string, string>()
 for (const [, name, arity] of source.slice(start, end).matchAll(/\{ "([^"]+)", (no_argument|required_argument)/g)) {
   table.set(name, arity)
 }
-// Gamescope 3.16.18 declares 82 options; a different count means a different table.
-if (table.size !== 82) throw new Error(`expected 82 Gamescope options, found ${table.size}`)
+// Gamescope 3.16.31 declares 84 options; a different count means a different table.
+if (table.size !== 84) throw new Error(`expected 84 Gamescope options, found ${table.size}`)
 
 function samples(rule: SettingRule): string[] {
   switch (rule.kind) {

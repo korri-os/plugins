@@ -17,10 +17,10 @@ class ComposeError extends Error {
 // README.md records why it is on (RG353M frame pacing).
 const forceCompositionDefault = true
 
-// Limits come from the parsers in Gamescope 3.16.18. parse_integer
-// (src/main.cpp:445) is std::from_chars into int; parse_float (main.cpp:459)
+// Limits come from the parsers in Gamescope 3.16.31. parse_integer
+// (src/main.cpp:455) is std::from_chars into int; parse_float (main.cpp:469)
 // is std::from_chars into float and refuses values that underflow. atoi/atof
-// options (src/steamcompmgr.cpp:8103 loop) never fail, so Korri bounds them.
+// options (src/steamcompmgr.cpp:9814 loop) never fail, so Korri bounds them.
 const intMax = 2_147_483_647
 const floatMin = 1.1754943508222875e-38 // FLT_MIN
 const floatMax = 3.4028234663852886e38 // FLT_MAX

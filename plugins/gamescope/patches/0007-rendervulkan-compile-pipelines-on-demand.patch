@@ -11,21 +11,27 @@ about 100% for over a minute after start.
 Do not start the thread.
 
 Korri-local; not upstream.
+
+Rebased onto 3.16.31: the thread is now a std::jthread member with a
+stop token (389e7e2c). Leave m_pipelineThread default-constructed. It
+is not joinable, so its stop and join at exit do nothing. This also
+skips the new SGSR type; pipeline() compiles it on first use, as it
+does EASU and NIS.
 ---
- src/rendervulkan.cpp | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ src/rendervulkan.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
-index 81910de..343de75 100644
+index 11ce4e88..87a83596 100644
 --- a/src/rendervulkan.cpp
 +++ b/src/rendervulkan.cpp
-@@ -311,8 +311,7 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
+@@ -323,7 +323,8 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
  
  	m_bInitialized = true;
  
--	std::thread piplelineThread([this](){compileAllPipelines();});
--	piplelineThread.detach();
+-	m_pipelineThread = std::jthread([this](std::stop_token st){compileAllPipelines(st);});
 +	// No compileAllPipelines(): its keys miss runtime keys, pipeline() compiles on demand, and it costs a full core for over a minute on slow GPUs.
++	// m_pipelineThread stays default-constructed (not joinable), so its stop/join at exit does nothing.
  
  	g_reshadeManager.init(this);
  

@@ -1,0 +1,45 @@
+From 56861b7cbe324e0593f41dfb3c374815050de68c Mon Sep 17 00:00:00 2001
+From: Vitali Vinahradski <vitali@vinahradski.de>
+Date: Sun, 11 Oct 2026 09:53:09 +0200
+Subject: [PATCH] Revert "steamcompmgr: Fix always considering pointer is
+ relative in nested mode when pointer constraint exists but is not active"
+
+This reverts commit d12ec394a9818465d12cf6672314f677a2ffbfe6.
+
+This causes chaotic camera movements and lost mouse lock in games like
+Hitman and World of Warcraft.
+
+Closes: https://github.com/ValveSoftware/gamescope/issues/2476
+
+Backport of upstream commit 56861b7cbe324e0593f41dfb3c374815050de68c
+(ValveSoftware/gamescope master, 2026-10-11). No tag contains it as of
+master aa289ea5 (2026-10-20). d12ec394 shipped in 3.16.29 to 3.16.31.
+Applies unchanged to 3.16.31.
+Upstream: https://github.com/ValveSoftware/gamescope/commit/56861b7cbe324e0593f41dfb3c374815050de68c
+---
+ src/steamcompmgr.cpp | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/src/steamcompmgr.cpp b/src/steamcompmgr.cpp
+index 13b28fc4..f5ee5680 100644
+--- a/src/steamcompmgr.cpp
++++ b/src/steamcompmgr.cpp
+@@ -2027,17 +2027,14 @@ void MouseCursor::UpdatePosition()
+ {
+ 	wlserver_lock();
+ 	struct wlr_pointer_constraint_v1 *pConstraint = wlserver.GetCursorConstraint();
++	m_bConstrained = !!pConstraint;
+ 	if ( pConstraint && pConstraint->current.cursor_hint.enabled )
+ 	{
+-		m_bConstrained = true;
+-
+ 		m_x = pConstraint->current.cursor_hint.x;
+ 		m_y = pConstraint->current.cursor_hint.y;
+ 	}
+ 	else
+ 	{
+-		m_bConstrained = false;
+-
+ 		m_x = wlserver.mouse_surface_cursorx;
+ 		m_y = wlserver.mouse_surface_cursory;
+ 	}

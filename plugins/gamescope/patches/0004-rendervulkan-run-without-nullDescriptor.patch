@@ -1,6 +1,5 @@
 From: Korri contributors
-Subject: [PATCH] rendervulkan: run without VK_EXT_robustness2
- nullDescriptor
+Subject: [PATCH] rendervulkan: run without VK_EXT_robustness2 nullDescriptor
 
 Mesa panvk before Valhall (v6/v7, e.g. Mali-G52) does not expose
 VK_EXT_robustness2's nullDescriptor. Gamescope enabled it
@@ -12,17 +11,24 @@ layouts dispatch() writes, and make the shader treat a shaper LUT of
 size 1 like a null LUT (textureQueryLevels() of a real view is 1, not 0).
 
 Korri-local; not upstream.
+
+Rebased onto 3.16.31: createDevice() now loops over m_supportedExts
+(462ee69a), so the robustness2 check moves into that loop. k_nMaxLayers
+is 8 (8f212644). The fallback fills every one of the 16
+VKR_SAMPLER_SLOTS sampler and YCbCr slots, which hold the 8 layers, the
+blur slot and both NIS coefficient slots. The descriptor set layout
+(bindings 0-6) is unchanged.
 ---
- src/rendervulkan.cpp    | 120 +++++++++++++++++++++++++++++++++++++++-
+ src/rendervulkan.cpp    | 119 +++++++++++++++++++++++++++++++++++++++-
  src/rendervulkan.hpp    |   9 +++
  src/shaders/composite.h |   3 +-
- 3 files changed, 129 insertions(+), 3 deletions(-)
+ 3 files changed, 128 insertions(+), 3 deletions(-)
 
 diff --git a/src/rendervulkan.cpp b/src/rendervulkan.cpp
-index df01314..28c4dfc 100644
+index 54e4efc3..5112073b 100644
 --- a/src/rendervulkan.cpp
 +++ b/src/rendervulkan.cpp
-@@ -306,6 +306,8 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
+@@ -318,6 +318,8 @@ bool CVulkanDevice::BInit(VkInstance instance, VkSurfaceKHR surface)
  		return false;
  	if (!createScratchResources())
  		return false;
@@ -31,26 +37,25 @@ index df01314..28c4dfc 100644
  
  	m_bInitialized = true;
  
-@@ -434,6 +436,7 @@ bool CVulkanDevice::createDevice()
- 	bool hasDrmProps = false;
+@@ -450,6 +452,7 @@ bool CVulkanDevice::createDevice()
+ 	bool hasDrmProps = vulkan_has_drm_props();
  	bool supportsForeignQueue = false;
  	bool supportsHDRMetadata = false;
 +	bool supportsRobustness2 = false;
- 	for ( uint32_t i = 0; i < supportedExtensionCount; ++i )
- 	{
- 		if ( strcmp(supportedExts[i].extensionName,
-@@ -451,6 +454,10 @@ bool CVulkanDevice::createDevice()
- 		if ( strcmp(supportedExts[i].extensionName,
- 			 VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0 )
- 			 supportsHDRMetadata = true;
+ 	for (const auto& ext : m_supportedExts) {
+ 		if ( strcmp(ext.extensionName, VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME) == 0 )
+ 			m_bSupportsModifiers = true;
+@@ -459,6 +462,9 @@ bool CVulkanDevice::createDevice()
+ 
+ 		if ( strcmp(ext.extensionName, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0 )
+ 			supportsHDRMetadata = true;
 +
-+		if ( strcmp(supportedExts[i].extensionName,
-+			 VK_EXT_ROBUSTNESS_2_EXTENSION_NAME) == 0 )
-+			 supportsRobustness2 = true;
++		if ( strcmp(ext.extensionName, VK_EXT_ROBUSTNESS_2_EXTENSION_NAME) == 0 )
++			supportsRobustness2 = true;
  	}
  
  	vk_log.infof( "physical device %s DRM format modifiers", m_bSupportsModifiers ? "supports" : "does not support" );
-@@ -519,13 +526,21 @@ bool CVulkanDevice::createDevice()
+@@ -522,13 +528,21 @@ bool CVulkanDevice::createDevice()
  		VkPhysicalDeviceVulkan12Features vulkan12Features = {
  			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
  		};
@@ -71,8 +76,8 @@ index df01314..28c4dfc 100644
 +			vk_log.infof( "physical device does not support nullDescriptor, using dummy descriptors" );
  	}
  
- 	float queuePriorities = 1.0f;
-@@ -576,7 +591,8 @@ bool CVulkanDevice::createDevice()
+ 	{
+@@ -588,7 +602,8 @@ bool CVulkanDevice::createDevice()
  
  	enabledExtensions.push_back( VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME );
  
@@ -82,7 +87,7 @@ index df01314..28c4dfc 100644
  #if 0
  	enabledExtensions.push_back( VK_KHR_MAINTENANCE_5_EXTENSION_NAME );
  #endif
-@@ -647,9 +663,10 @@ bool CVulkanDevice::createDevice()
+@@ -677,9 +692,10 @@ bool CVulkanDevice::createDevice()
  
  	VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features = {
  		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT,
@@ -94,7 +99,7 @@ index df01314..28c4dfc 100644
  
  	VkResult res = vk.CreateDevice(physDev(), &deviceCreateInfo, nullptr, &m_device);
  	if ( res == VK_ERROR_NOT_PERMITTED_KHR && gamescope::Process::HasCapSysNice() )
-@@ -1241,6 +1258,88 @@ int32_t CVulkanDevice::findMemoryType( VkMemoryPropertyFlags properties, uint32_
+@@ -1282,6 +1298,88 @@ int32_t CVulkanDevice::findMemoryType( VkMemoryPropertyFlags properties, uint32_
  	return -1;
  }
  
@@ -183,7 +188,7 @@ index df01314..28c4dfc 100644
  std::unique_ptr<CVulkanCmdBuffer> CVulkanDevice::commandBuffer()
  {
  	std::unique_ptr<CVulkanCmdBuffer> cmdBuffer;
-@@ -1749,10 +1848,27 @@ void CVulkanCmdBuffer::dispatch(uint32_t x, uint32_t y, uint32_t z)
+@@ -1826,10 +1924,27 @@ void CVulkanCmdBuffer::dispatch(uint32_t x, uint32_t y, uint32_t z)
  		lut3DDescriptor[i].imageView = m_lut3D[i] ? m_lut3D[i]->srgbView() : VK_NULL_HANDLE;
  	}
  
@@ -212,30 +217,30 @@ index df01314..28c4dfc 100644
  	else
  	{
 diff --git a/src/rendervulkan.hpp b/src/rendervulkan.hpp
-index 63cc602..7f00308 100644
+index fa519db6..f8c39c34 100644
 --- a/src/rendervulkan.hpp
 +++ b/src/rendervulkan.hpp
-@@ -804,6 +804,7 @@ public:
- 	inline bool hasDrmPrimaryDevId() {return m_bHasDrmPrimaryDevId;}
+@@ -866,6 +866,7 @@ public:
  	inline dev_t primaryDevId() {return m_drmPrimaryDevId;}
  	inline bool supportsFp16() {return m_bSupportsFp16;}
+ 	inline std::vector<VkExtensionProperties>& supportedExtensions() {return m_supportedExts;}
 +	inline bool supportsNullDescriptor() {return m_bSupportsNullDescriptor;}
  
  	inline std::pair<void *, uint32_t> uploadBufferData(uint32_t size)
  	{
-@@ -842,6 +843,8 @@ protected:
+@@ -904,6 +905,8 @@ protected:
  	bool createPools();
  	bool createShaders();
  	bool createScratchResources();
 +	bool createNullImage( VkImageType type, VkFormat format, uint32_t width, uint32_t height, VkImageUsageFlags usage, VkImageLayout layout, const void *pViewNext, VkImageView *pView );
 +	bool createNullDescriptorFallbacks();
  	VkPipeline compilePipeline(uint32_t layerCount, uint32_t ycbcrMask, ShaderType type, uint32_t blur_layer_count, uint32_t composite_debug, uint32_t colorspace_mask, uint32_t output_eotf, bool itm_enable);
- 	void compileAllPipelines();
+ 	void compileAllPipelines(std::stop_token st);
  
-@@ -865,6 +868,12 @@ protected:
- 	dev_t m_drmPrimaryDevId = 0;
+@@ -928,6 +931,12 @@ protected:
  
  	bool m_bSupportsFp16 = false;
+ 	uint32_t m_uVendorID = 0;
 +	bool m_bSupportsNullDescriptor = false;
 +	std::vector<VkImageMemoryBarrier> m_nullImageBarriers;
 +	VkImageView m_nullView2D = VK_NULL_HANDLE;
@@ -246,10 +251,10 @@ index 63cc602..7f00308 100644
  	bool m_bSupportsModifiers = false;
  	bool m_bInitialized = false;
 diff --git a/src/shaders/composite.h b/src/shaders/composite.h
-index 961379b..cb7c9e1 100644
+index a62324e4..a787006e 100644
 --- a/src/shaders/composite.h
 +++ b/src/shaders/composite.h
-@@ -104,7 +104,8 @@ vec3 apply_layer_color_mgmt(vec3 color, uint layer, uint colorspace) {
+@@ -121,7 +121,8 @@ vec3 apply_layer_color_mgmt(vec3 color, uint layer, uint colorspace) {
      //
      // We also need to do degamma here for non-linear views to blend in linear space.
      // ie. PQ -> PQ would need us to manually do bilinear here.

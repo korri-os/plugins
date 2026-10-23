@@ -26,7 +26,7 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-plugin-cemu` | `@korri:cemu` (Wii U) | `plugins/cemu/` |
 | `cemu` | Standalone Cemu main with offline Github989 graphic packs | `plugins/cemu/` |
 | `korri-plugin-gamescope` | `@korri:gamescope` | `plugins/gamescope/` |
-| `gamescope` | Standalone Gamescope 3.16.18 with nested Wayland touch | `plugins/gamescope/` |
+| `gamescope` | Standalone Gamescope 3.16.31 with nested Wayland touch | `plugins/gamescope/` |
 | `korri-plugin-starter-pack` | `@korri:starter-pack` | `plugins/starter-pack/` |
 | `korri-plugin-pico8` | `@korri:pico8` (PICO-8 BBS search provider; declared host `www.lexaloffle.com`) | `plugins/pico8/` |
 | `korri-plugin-homebrewhub` | `@korri:homebrewhub` (declared games with pinned artifacts) | `plugins/homebrewhub/` |

@@ -1,17 +1,25 @@
-From: Korri contributors
-Subject: [PATCH] WaylandBackend: acquire only attached framebuffers
+From: kapdon <94782486+kapdon@users.noreply.github.com>
+Date: Mon, 5 Oct 2026 01:11:35 -0700
+Subject: [PATCH] WaylandBackend: acquire framebuffers only when attached
 
-A fully clipped plane now presents no buffer. Acquiring its framebuffer
-before ClipPlane would retain a reference forever: the compositor cannot
-release a buffer it never received. Move acquisition to the attach site.
+Acquire at the shared attach site so frames skipped by the configure
+gate or clipping do not wait for a wl_buffer.release that cannot arrive.
+This also covers the black backing buffer.
 
-Backport of ROCKNIX 0024-WaylandBackend-acquire-only-attached-buffers.patch
-to 3.16.18 (Unwrap rather than the later EnsureImported API).
-Source: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/packages/apps/gamescope/patches/0024-WaylandBackend-acquire-only-attached-buffers.patch
+Unchanged copy of ROCKNIX
+0024-WaylandBackend-acquire-only-attached-buffers.patch, which targets
+Gamescope 3.16.31 (ROCKNIX PKG_VERSION 6867f509).
+ROCKNIX/distribution commit: d209b09cbf2eebe74442ca9a4d50d59a468501d2 (2026-10-06)
+Source: https://github.com/ROCKNIX/distribution/blob/d209b09cbf2eebe74442ca9a4d50d59a468501d2/projects/ROCKNIX/packages/apps/gamescope/patches/0024-WaylandBackend-acquire-only-attached-buffers.patch
+---
+ src/Backends/WaylandBackend.cpp | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
 
+diff --git a/src/Backends/WaylandBackend.cpp b/src/Backends/WaylandBackend.cpp
+index 6a8fb51d..400171db 100644
 --- a/src/Backends/WaylandBackend.cpp
 +++ b/src/Backends/WaylandBackend.cpp
-@@ -132,7 +132,7 @@
+@@ -132,7 +132,7 @@ namespace gamescope
  
      struct WaylandPlaneState
      {
@@ -20,7 +28,7 @@ Source: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/packa
          int32_t nDestX;
          int32_t nDestY;
          double flSrcX;
-@@ -1114,13 +1114,11 @@
+@@ -1126,13 +1126,11 @@ namespace gamescope
                  uint32_t uCurrentPlane = 0;
                  if ( bNeedsBacking )
                  {
@@ -35,7 +43,7 @@ Source: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/packa
                              .flSrcWidth  = 1.0,
                              .flSrcHeight = 1.0,
                              .nDstWidth   = int32_t( g_nOutputWidth ),
-@@ -1469,7 +1467,7 @@
+@@ -1481,7 +1479,7 @@ namespace gamescope
  
          if ( oState )
          {
@@ -44,27 +52,27 @@ Source: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/packa
  
              if ( m_pFrame )
              {
-@@ -1608,7 +1606,8 @@
-             }
-             // The x/y here does nothing? Why? What is it for...
-             // Use the subsurface set_position thing instead.
+@@ -1627,7 +1625,8 @@ namespace gamescope
+ 
+             m_bHasAttachedBuffer = true;
+ 
 -            wl_surface_attach( m_pSurface, oState->pBuffer, 0, 0 );
 +            oState->pFb->OnCompositorAcquire();
 +            wl_surface_attach( m_pSurface, oState->pFb->GetHostBuffer(), 0, 0 );
              wl_surface_damage( m_pSurface, 0, 0, INT32_MAX, INT32_MAX );
              wl_surface_set_opaque_region( m_pSurface, oState->bOpaque ? m_pBackend->GetFullRegion() : nullptr );
              wl_surface_set_buffer_scale( m_pSurface, 1 );
-@@ -1652,16 +1651,13 @@
+@@ -1677,16 +1676,13 @@ namespace gamescope
      void CWaylandPlane::Present( const FrameInfo_t::Layer_t *pLayer )
      {
-         CWaylandFb *pWaylandFb = pLayer && pLayer->tex != nullptr ? static_cast<CWaylandFb*>( pLayer->tex->GetBackendFb()->Unwrap() ) : nullptr;
+         CWaylandFb *pWaylandFb = pLayer && pLayer->tex != nullptr ? static_cast<CWaylandFb*>( pLayer->tex->GetBackendFb()->EnsureImported() ) : nullptr;
 -        wl_buffer *pBuffer = pWaylandFb ? pWaylandFb->GetHostBuffer() : nullptr;
--
+ 
 -        if ( pBuffer )
 +        if ( pWaylandFb && pWaylandFb->GetHostBuffer() )
          {
 -            pWaylandFb->OnCompositorAcquire();
- 
+-
              Present(
                  ClipPlane( WaylandPlaneState
                  {

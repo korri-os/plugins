@@ -23,9 +23,9 @@ let
           settings = {
             # The native sshd_config owns these settings. Suppress the module's
             # password defaults; its PAM account/session support remains.
+            # ModuliFile keeps the module default: this package's immutable moduli.
             PasswordAuthentication = null;
             KbdInteractiveAuthentication = null;
-            ModuliFile = cfg.services.openssh.moduliFile;
           };
         };
       }
