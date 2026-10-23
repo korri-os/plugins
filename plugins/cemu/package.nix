@@ -64,10 +64,15 @@ pkgs.llvmPackages.stdenv.mkDerivation {
   ];
   version = "0-unstable-2026-10-22-${builtins.substring 0 7 cemuCommit}";
   src = cemuSource;
+  patches = [ ./filecache-shutdown.patch ];
+  postPatch = ''
+    python3 ${./filecache-shutdown-check.py} . "$CXX"
+  '';
   nativeBuildInputs = with pkgs; [
     cmake
     ninja
     pkg-config
+    python3
     nasm
     wayland-scanner
     wxwidgets_3_3

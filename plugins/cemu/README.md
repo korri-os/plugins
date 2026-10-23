@@ -181,6 +181,17 @@ The only updater entry points are button callbacks in
 no automatic pack download/check at launch. Explicit user-initiated downloads
 remain available, as agreed with the supervisor. No updater patch is needed.
 
+## File-cache shutdown fix
+
+`filecache-shutdown.patch` fixes an upstream lost wakeup in the file-cache
+writer. A fast `--help` exit could send the shutdown notification before the
+worker waited, then block forever joining that worker. The patch changes the
+shutdown flag under the queue mutex and uses a shutdown-aware wait predicate.
+The build compiles the actual writer with a gated worker to force that ordering;
+the package check also runs 20 real `--help` exits with the existing 15-second
+limit. This source fix has no device qualification; earlier hardware results
+predate it. The local source delta is the patch file beside `package.nix`.
+
 ## Checks and installation boundary
 
 ```sh

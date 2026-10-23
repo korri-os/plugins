@@ -36,15 +36,17 @@ with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
         XDG_CACHE_HOME=str(root / ".cache"),
     )
     env.pop("APPIMAGE", None)
-    help_run = subprocess.run(
-        [package / "bin/cemu", "--help"],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
-    assert help_run.returncode == 0, help_run.stderr
-    assert "--mlc" in help_run.stdout, help_run.stdout
+    # Fast exits expose the upstream file-cache writer's lost-wakeup race.
+    for _ in range(20):
+        help_run = subprocess.run(
+            [package / "bin/cemu", "--help"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert help_run.returncode == 0, help_run.stderr
+        assert "--mlc" in help_run.stdout, help_run.stdout
     assert not (root / ".config").exists(), "help changed account state"
     config = root / ".config/Cemu/settings.xml"
     packs = root / ".local/share/Cemu/graphicPacks/downloadedGraphicPacks"

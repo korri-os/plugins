@@ -1,0 +1,32 @@
+--- a/src/Cemu/FileCache/FileCache.cpp
++++ b/src/Cemu/FileCache/FileCache.cpp
+@@ -26,7 +26,10 @@
+ 	{
+ 		if (m_isRunning.load())
+ 		{
+-			m_isRunning.store(false);
++			{
++				std::lock_guard lock(m_fileCacheMutex);
++				m_isRunning.store(false);
++			}
+ 			m_fileCacheCondVar.notify_one();
+ 			m_fileCacheThread.join();
+ 		}
+@@ -54,12 +57,11 @@
+ 		while (true)
+ 		{
+ 			std::unique_lock lock(m_fileCacheMutex);
+-			while (m_writeRequests.empty())
+-			{
+-				m_fileCacheCondVar.wait(lock);
+-				if (!m_isRunning.load(std::memory_order::relaxed))
+-					return;
+-			}
++			m_fileCacheCondVar.wait(lock, [this] {
++				return !m_isRunning.load(std::memory_order::relaxed) || !m_writeRequests.empty();
++			});
++			if (!m_isRunning.load(std::memory_order::relaxed))
++				return;
+ 
+ 			std::vector<FileCacheAsyncJob> requestsCopy;
+ 			requestsCopy.swap(m_writeRequests); // fast copy & clear
