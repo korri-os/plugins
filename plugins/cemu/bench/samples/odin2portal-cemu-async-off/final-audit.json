@@ -1,0 +1,36 @@
+{
+  "session": {
+    "terminalCode": "SessionCompleted"
+  },
+  "nativeIdle": true,
+  "remainingTestProcesses": [],
+  "benchPadAbsent": true,
+  "hostSessionDirectoryEmpty": true,
+  "bootId": "00ca24e7-8663-470c-90d9-339f2ec4bb10",
+  "system": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "gameUnits": "",
+  "failedUnits": "",
+  "cpu": {
+    "policy0": {
+      "scaling_min_freq": "307200",
+      "scaling_max_freq": "2016000",
+      "scaling_governor": "schedutil"
+    },
+    "policy7": {
+      "scaling_min_freq": "595200",
+      "scaling_max_freq": "2956800",
+      "scaling_governor": "schedutil"
+    },
+    "policy3": {
+      "scaling_min_freq": "499200",
+      "scaling_max_freq": "2803200",
+      "scaling_governor": "schedutil"
+    }
+  },
+  "gpu": {
+    "min_freq": "220000000",
+    "max_freq": "680000000",
+    "governor": "simple_ondemand"
+  },
+  "inputPlumberTree": "\u2514\u2500 /org\n  \u2514\u2500 /org/shadowblip\n    \u2514\u2500 /org/shadowblip/InputPlumber\n      \u251c\u2500 /org/shadowblip/InputPlumber/CompositeDevice0\n      \u251c\u2500 /org/shadowblip/InputPlumber/Manager\n      \u2514\u2500 /org/shadowblip/InputPlumber/devices\n        \u251c\u2500 /org/shadowblip/InputPlumber/devices/source\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event0\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event10\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event11\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event12\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event13\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event14\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event15\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event5\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event6\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event7\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event8\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/event9\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/input1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/input2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/input3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/input4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/input5\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/input6\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/input7\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/js0\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/js1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/js2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/js3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/js4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/js5\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/js6\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_b1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_b2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_b3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_b4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_g1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_g2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_g3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_g4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_r1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_r2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_r3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/l_r4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/mmc0__\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/power_led\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_b1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_b2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_b3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_b4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_g1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_g2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_g3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_g4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_r1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_r2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_r3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/r_r4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_l1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_l2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_l3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_l4\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_r1\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_r2\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_r3\n        \u2502 \u251c\u2500 /org/shadowblip/InputPlumber/devices/source/rgb_r4\n        \u2502 \u2514\u2500 /org/shadowblip/InputPlumber/devices/source/ttyS0\n        \u2514\u2500 /org/shadowblip/InputPlumber/devices/target\n          \u251c\u2500 /org/shadowblip/InputPlumber/devices/target/dbus0\n          \u2514\u2500 /org/shadowblip/InputPlumber/devices/target/gamepad0\n"
+}

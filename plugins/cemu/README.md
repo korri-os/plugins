@@ -71,7 +71,11 @@ temporary aarch64 Vulkan path requires an Adreno GPU. The package check requires
 an existing 25.3.x freedreno ICD/library on aarch64 and no override elsewhere.
 The [25.3.2 Odin attempt](bench/devices/odin2portal-turnip2532-2026-10-23.md)
 verified driver isolation but hit a different Cemu draw-path SIGTRAP while
-loading the save. This pin is not a qualified gameplay fix.
+loading the save. The [async-off follow-up](bench/devices/odin2portal-async-off-2026-10-23.md)
+runs gameplay with the same package and native `AsyncCompile=false`; its complete
+720p baseline is median 39, p10 38 FPS, below the median target of 40. Audio was
+physically confirmed; a new manual save remains unproven. No native workaround
+is shipped or left enabled. This pin is not a qualified gameplay fix.
 
 ## Native files, not another configuration schema
 

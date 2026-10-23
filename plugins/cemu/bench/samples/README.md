@@ -1,5 +1,9 @@
 # Hardware proofs — 2026-10-22 campaign
 
+The later [BotW async-off campaign](../devices/odin2portal-async-off-2026-10-23.md)
+has separate [Cemu samples](odin2portal-cemu-async-off/README.md). Its full 720p
+baseline measured **39 / 38 / 36 FPS**, not the 60 FPS WL4 validation below.
+
 **Verified:** both updated devices completed the default 100-second warmup and
 180-second measurement through korrid. These are WL4/mGBA validation runs,
 **not BotW performance results**.

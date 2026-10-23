@@ -1,0 +1,30 @@
+{
+  "utc": "2026-10-23T05:18:33Z",
+  "bootId": "00ca24e7-8663-470c-90d9-339f2ec4bb10",
+  "librarySha256": "8aa9f6be1c4a3ad1d5dbf7528365ccfab464a70414b9a00cbd4cf617c0f92806",
+  "libraryExactOriginal": true,
+  "modifierExactBytesRestoredBeforeRpcUnsets": true,
+  "resolvedLaunchSettingsMatchOriginal": true,
+  "nativeSha256": "aef6d70d3d2e83027e5638f0ea772fe247a67463323bf43644292bf70f4573c8",
+  "nativeExactOriginal": true,
+  "profileSha256": "738dffbb744252cd1a089411cc54640626e7157984fa263db3e7b697610ba25a",
+  "caches": [
+    {
+      "path": "/var/lib/korri/users/<account>/.cache/Cemu/shaderCache/transferable/00050000101c9400_vkpipeline.bin",
+      "sha256": "1189616bd80d4bc583bbf71d79e3a25cfe3cd6841d9270dc898c152076b3ba74",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o660"
+    },
+    {
+      "path": "/var/lib/korri/users/<account>/.cache/Cemu/shaderCache/driver/vk/00050000101c9400.bin",
+      "sha256": "2d9cf17192e6f39b2d945ed90dbdec1757b7905dbc9fa7d0fd1a968a7e7a5b0a",
+      "uid": 1000,
+      "gid": 1000,
+      "mode": "0o660"
+    }
+  ],
+  "speakerBefore": "Volume: 0.40 [MUTED]\n",
+  "speakerAfter": "Volume: 0.40 [MUTED]\n",
+  "speakerPolicy": "Owner requires current volume retained, muted; do not raise to original 0.95"
+}

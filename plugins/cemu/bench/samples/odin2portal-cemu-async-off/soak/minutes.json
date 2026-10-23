@@ -1,0 +1,167 @@
+[
+  {
+    "minute": 1,
+    "fps": {
+      "samples": 60,
+      "median": 38.0,
+      "p10": 38,
+      "p1": 38,
+      "min": 38
+    },
+    "peakTemperatureC": 95.9
+  },
+  {
+    "minute": 2,
+    "fps": {
+      "samples": 60,
+      "median": 39.0,
+      "p10": 38,
+      "p1": 37,
+      "min": 37
+    },
+    "peakTemperatureC": 97.5
+  },
+  {
+    "minute": 3,
+    "fps": {
+      "samples": 60,
+      "median": 39.0,
+      "p10": 38,
+      "p1": 38,
+      "min": 38
+    },
+    "peakTemperatureC": 95.9
+  },
+  {
+    "minute": 4,
+    "fps": {
+      "samples": 60,
+      "median": 39.0,
+      "p10": 39,
+      "p1": 36,
+      "min": 36
+    },
+    "peakTemperatureC": 95.5
+  },
+  {
+    "minute": 5,
+    "fps": {
+      "samples": 60,
+      "median": 40.0,
+      "p10": 39,
+      "p1": 39,
+      "min": 39
+    },
+    "peakTemperatureC": 95.9
+  },
+  {
+    "minute": 6,
+    "fps": {
+      "samples": 60,
+      "median": 41.0,
+      "p10": 40,
+      "p1": 34,
+      "min": 34
+    },
+    "peakTemperatureC": 95.5
+  },
+  {
+    "minute": 7,
+    "fps": {
+      "samples": 60,
+      "median": 41.0,
+      "p10": 40,
+      "p1": 40,
+      "min": 40
+    },
+    "peakTemperatureC": 96.3
+  },
+  {
+    "minute": 8,
+    "fps": {
+      "samples": 60,
+      "median": 41.0,
+      "p10": 40,
+      "p1": 31,
+      "min": 31
+    },
+    "peakTemperatureC": 96.3
+  },
+  {
+    "minute": 9,
+    "fps": {
+      "samples": 60,
+      "median": 41.0,
+      "p10": 40,
+      "p1": 39,
+      "min": 39
+    },
+    "peakTemperatureC": 95.1
+  },
+  {
+    "minute": 10,
+    "fps": {
+      "samples": 60,
+      "median": 40.0,
+      "p10": 40,
+      "p1": 4,
+      "min": 4
+    },
+    "peakTemperatureC": 95.5
+  },
+  {
+    "minute": 11,
+    "fps": {
+      "samples": 60,
+      "median": 40.0,
+      "p10": 39,
+      "p1": 6,
+      "min": 6
+    },
+    "peakTemperatureC": 95.5
+  },
+  {
+    "minute": 12,
+    "fps": {
+      "samples": 60,
+      "median": 40.0,
+      "p10": 40,
+      "p1": 40,
+      "min": 40
+    },
+    "peakTemperatureC": 95.9
+  },
+  {
+    "minute": 13,
+    "fps": {
+      "samples": 60,
+      "median": 41.0,
+      "p10": 40,
+      "p1": 40,
+      "min": 40
+    },
+    "peakTemperatureC": 95.1
+  },
+  {
+    "minute": 14,
+    "fps": {
+      "samples": 60,
+      "median": 40.0,
+      "p10": 39,
+      "p1": 34,
+      "min": 34
+    },
+    "peakTemperatureC": 95.9
+  },
+  {
+    "minute": 15,
+    "fps": {
+      "samples": 60,
+      "median": 40.0,
+      "p10": 39,
+      "p1": 38,
+      "min": 38
+    },
+    "peakTemperatureC": 95.5
+  }
+]
