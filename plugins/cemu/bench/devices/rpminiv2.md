@@ -3,7 +3,25 @@
 Verified over USB SSH: `ssh -o BatchMode=yes -p 2222 root@<device-usb-ip>`.
 Port 22 did not answer. Tailscale initially did not provide a working route.
 
-## System and trust evidence
+## Current image after the separate worker's update
+
+| Fact | Verified value |
+|---|---|
+| System generation | 29 (reported by update worker) |
+| Booted/current/system-profile target | `/nix/store/hp7kgka5q3abwy25n48p0a511j6kxqjl-nixos-system-rpminiv2-sd-card-26.11.20260923.4975466` |
+| Running korrid | `/nix/store/nvs92ijqg09cranbzg1d0f2whybvvr32-korrid-0.0.0/bin/korrid` |
+| Kernel / Gamescope / Mesa | `7.2.0` / `3.16.18` / Turnip `26.2.3` |
+| korrid, portal, launch-limits | active |
+| ManageAllDevices | false; bench leaves it untouched |
+| Bubblewrap | not observed; core at `4e34b8a9e` does not implement ADR 0015 |
+
+The `mini-update` worker performed this system update/reboot. Bench did not
+activate a generation or write any boot file. The initial hardware inventory
+below remains the baseline; per-run settings, clocks and temperatures are in the
+sample artifacts. WUA digest was verified again after this update. Both devices'
+54 staged save files are checked against `botw-save.sha256`.
+
+## Initial system and trust evidence (before update)
 
 ```text
 CURRENT
@@ -191,3 +209,16 @@ existing source/storage pair is configured for this directory, and
 `app.discovery.rescan` admits it. No library schema or record was invented.
 A microSD path can be a source's storage root under that same contract; this
 worker did not create a mount or a source definition.
+
+## Exact existing catalog admission path
+
+`services/korrid/src/catalog_cli.rs` defines the operator command:
+`korrid catalog pair <directory> <system>`. Once an enabled Cemu plugin declares
+`wiiu`, run it as korrid for `/var/lib/korri/games/wiiu` and `wiiu`, with
+`KORRID_STORAGE_ROOT=/var/lib/korri` and
+`KORRID_PRIVATE_STATE_ROOT=/var/lib/korrid`. **The daemon must be stopped during
+this offline catalog change**, then started normally. This writer creates the
+existing storage/source records; do not hand-author a new schema. It rejects
+an unknown system. No pair command was run before Cemu was installed.
+A mounted microSD directory uses the same existing command; the actual mount
+and directory must first be established, not assumed or invented.

@@ -17,9 +17,11 @@ import time
 import urllib.error
 import urllib.request
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+from controller_profile import ControllerProfile
 from gamepad import Gamepad, gamepad_identity, read_script
 from input_observer import InputObserver
 from metrics import fps_bins, summarize
@@ -46,7 +48,7 @@ class Rpc:
         if not self.capability:
             raise ValueError("Empty capability")
 
-    def call(self, method: str, payload: Record) -> Record:
+    def call(self, method: str, payload: Record, timeout_s: float = 30) -> Record:
         request = urllib.request.Request(
             self.url,
             json.dumps({"_tag": method, "payload": payload}).encode(),
@@ -55,7 +57,7 @@ class Rpc:
                 "Authorization": f"Bearer {self.capability}",
             },
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=timeout_s) as response:
             result = record(json.load(response))
         if result.get("_tag") != method:
             raise ValueError("RPC response method mismatch")
@@ -73,8 +75,42 @@ def require_idle(rpc: Rpc) -> None:
         if status.get("active") or status.get("pendingLaunches"):
             raise RuntimeError("Refusing to disturb an active or pending launch")
     except RpcError as exc:
-        if exc.code not in ("SessionCompleted", "NoActiveSession"):
+        if exc.code == "HostLaunchFailed":
+            # status can retain the previous game's terminal exit failure.
+            # This code also covers observation errors, so never assume idle.
+            confirm_native_idle()
+        elif exc.code not in ("SessionCompleted", "NoActiveSession"):
             raise
+
+
+def confirm_native_idle() -> None:
+    units = subprocess.check_output(
+        [
+            "systemctl",
+            "list-units",
+            "--plain",
+            "--no-legend",
+            "--no-pager",
+            "--state=active,activating,deactivating,reloading",
+            "korri-game-*",
+        ],
+        text=True,
+        timeout=5,
+    )
+    populated = any(
+        path.read_text().strip()
+        for path in Path("/sys/fs/cgroup/korri.slice/korri-games.slice").glob(
+            "korri-game-*/**/cgroup.procs"
+        )
+    )
+    verify_native_idle(units, populated)
+
+
+def verify_native_idle(units: str, populated: bool) -> None:
+    if units.strip() or populated:
+        raise RuntimeError(
+            "Previous launch failed but game activity remains; refusing new bench"
+        )
 
 
 def command(*args: str) -> str:
@@ -156,16 +192,62 @@ def wrapping(tree: dict[int, Record]) -> str:
     return f"Gamescope observed: {gamescope}; bubblewrap observed: {bwrap}." + (
         ""
         if bwrap
-        else " bubblewrap absent: device image predates ADR 0015; strict ADR 0015 acceptance pending."
+        else " bubblewrap not observed; ADR 0015 implementation/acceptance is not proved by this run."
     )
 
 
-def stop_exact(rpc: Rpc, launch: str) -> None:
+def stop_exact(
+    rpc: Rpc,
+    launch: str,
+    native_guard: Callable[[], None] = confirm_native_idle,
+    recovery_seconds: float = 10,
+    poll_seconds: float = 0.5,
+) -> list[str]:
     for _ in range(20):
-        result = rpc.call("app.session.stop", {"expectedLaunchId": launch})
+        try:
+            result = rpc.call("app.session.stop", {"expectedLaunchId": launch})
+        except RpcError as exc:
+            if exc.code != "HostRecoveryBlocked":
+                raise
+            warning = str(exc)
+            deadline = time.monotonic() + recovery_seconds
+            while time.monotonic() < deadline:
+                unblocked = False
+                try:
+                    status = rpc.call(
+                        "app.session.status",
+                        {},
+                        timeout_s=max(0.1, deadline - time.monotonic()),
+                    )
+                    unblocked = not status.get("active") and not status.get(
+                        "pendingLaunches"
+                    )
+                except RpcError as observed:
+                    if observed.code in (
+                        "HostLaunchFailed",
+                        "SessionCompleted",
+                        "NoActiveSession",
+                    ):
+                        unblocked = True
+                    elif observed.code != "HostRecoveryBlocked":
+                        raise
+                if unblocked:
+                    try:
+                        native_guard()
+                    except RuntimeError:
+                        pass
+                    else:
+                        return [
+                            warning
+                            + "; resolved by korrid status recovery; systemd/cgroups idle"
+                        ]
+                time.sleep(poll_seconds)
+            raise RuntimeError(
+                "Exact stop recovery did not clear; no journal/reset/restart was attempted"
+            ) from exc
         if result.get("phase") == "stopped":
-            return
-        time.sleep(0.5)
+            return []
+        time.sleep(poll_seconds)
     raise RuntimeError("Exact-session stop did not finish")
 
 
@@ -190,21 +272,26 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
         "bootId": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
         "kernel": os.uname().release,
         "host": os.uname().nodename,
+        "korrid": os.readlink(
+            f"/proc/{command('systemctl', 'show', 'korrid', '-p', 'MainPID', '--value')}/exe"
+        ),
     }
     write_json(folder / "device.json", identity)
     launch = ""
     started = False
     pad: Gamepad | None = None
     input_observer: InputObserver | None = None
+    controller_profile: ControllerProfile | None = None
     observer: subprocess.Popen[str] | None = None
     frames_file = (folder / "present.csv").open("w")
     observer_log = (folder / "observer.log").open("w")
     error = ""
     cleanup_error = ""
+    stop_warnings: list[str] = []
     tree: dict[int, Record] = {}
     window = 0
     measurement_start = 0.0
-    journal_since = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    journal_since = f"@{time.time():.6f}"
     wall_start_ns = time.time_ns()
     cemu_evidence = "Not applicable: non-Cemu validation launch."
     rows: list[Record] = []
@@ -218,6 +305,11 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", launch):
             raise ValueError("Unsafe launch ID")
         write_json(folder / "reservation.json", reservation)
+        if args.controller_profile:
+            controller_profile = ControllerProfile(
+                args.controller_profile, args.controller_template, folder
+            )
+            controller_profile.apply()
         response = rpc.call(
             "app.session.start",
             {"gameId": args.game, "runnerId": args.runner, "expectedLaunchId": launch},
@@ -356,11 +448,11 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
         if launch:
             try:
                 if started:
-                    stop_exact(rpc, launch)
+                    stop_warnings.extend(stop_exact(rpc, launch))
                 else:
                     # A timed-out start may have succeeded. Stop only our exact identity.
                     try:
-                        stop_exact(rpc, launch)
+                        stop_warnings.extend(stop_exact(rpc, launch))
                     except RpcError:
                         rpc.call("app.session.cancel", {"expectedLaunchId": launch})
             except (
@@ -370,6 +462,19 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
                 subprocess.SubprocessError,
             ) as exc:
                 cleanup_error = str(exc)
+        if input_observer:
+            try:
+                # Capture ownership while our uinput source still exists, even
+                # when startup failed before the first telemetry sample.
+                input_observer.collect()
+            except (
+                OSError,
+                ValueError,
+                TypeError,
+                RuntimeError,
+                subprocess.SubprocessError,
+            ) as exc:
+                cleanup_error = cleanup_error or str(exc)
         if pad:
             try:
                 pad.close()
@@ -408,10 +513,20 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
                 for token in ("cemu", "gamescope", args.process_name.lower())
             )
         }
+        if controller_profile:
+            try:
+                if remaining:
+                    raise RuntimeError(
+                        "Game still active; defer controller-profile restore until exact session stops"
+                    )
+                controller_profile.restore()
+            except (OSError, ValueError, TypeError, RuntimeError) as exc:
+                cleanup_error = cleanup_error or str(exc)
         cleanup: Record = {
             "exactCgroupRemaining": remaining,
             "newGameOrWrapperProcesses": new_wrappers,
             "error": cleanup_error,
+            "stopWarnings": stop_warnings,
             "bootUnchanged": identity["bootId"]
             == Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
             "systemUnchanged": identity["system"]
@@ -504,6 +619,7 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
             "",
             f"Game: `{args.game}`; runner: `{args.runner}`; launch: `{launch}`.",
             f"System: `{identity['system']}`; kernel `{identity['kernel']}`.",
+            f"Running korrid: `{identity['korrid']}`.",
             f"Warmup: {args.warmup} s after input script; measured: {args.seconds} s.",
             f"Spot: {args.spot}. Script execution is not proof of visual position.",
             "",
@@ -525,7 +641,9 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
             "Launch settings: `settings.json`; actual command chain: `processes.json`, `unit.txt`.",
             f"Exact cgroup empty: {not remaining}; new game/Gamescope processes absent: {not new_wrappers}.",
             f"Cleanup error: {cleanup_error or 'none'}. System and boot unchanged: {cleanup['systemUnchanged']} / {cleanup['bootUnchanged']}.",
-            "No sysfs, system, emulator configuration or generation writes by the bench.",
+            f"Exact-stop warnings: {stop_warnings or 'none'}.",
+            "No sysfs, system or generation writes by the bench.",
+            f"Cemu-native controller profile: {controller_profile.state if controller_profile else 'not changed'}. See `controller-profile.json` when used.",
             "A/B selects existing launch profiles through RPC and restores the original selection.",
             "Korri performs its normal play-log/save effects. uinput device is destroyed.",
             f"InputPlumber runtime management: { {key: input_observer.state.get(key) for key in ('before', 'after', 'managementUnchanged', 'compositesRestored', 'builtinUnchanged', 'seatP1Unchanged')} if input_observer else 'not changed (no input script)' }. See `input-observer.json` and `seat-events.json`.",
@@ -545,6 +663,21 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
             f"| {key.removeprefix('temp/').removesuffix('/mC')} | {value / 1000:.3f} |"
             for key, value in sorted(peaks.items())
         ]
+        report += ["", "| clock | min | median | max |", "|---|---:|---:|---:|"]
+        for key in sorted(
+            {key for row in rows for key in row if key.startswith(("cpu/", "gpu/"))}
+        ):
+            clocks = [
+                value
+                for row in rows
+                if row["phase"] == "measurement"
+                for item, value in row.items()
+                if item == key and isinstance(value, int)
+            ]
+            if clocks:
+                report.append(
+                    f"| {key} | {min(clocks)} | {summarize(clocks)['median']} | {max(clocks)} |"
+                )
         report += [
             "",
             "## Cemu evidence",
@@ -586,6 +719,16 @@ def main() -> None:
     parser.add_argument("--input-delay", type=float, default=5)
     parser.add_argument("--spot", default="Unspecified; validation launch only")
     parser.add_argument("--cemu-log", type=Path)
+    parser.add_argument(
+        "--controller-profile",
+        type=Path,
+        help="Existing Cemu controllerProfiles/*.xml in the test account",
+    )
+    parser.add_argument(
+        "--controller-template",
+        type=Path,
+        help="Cemu-created bench profile selecting P2; copied for this run and restored",
+    )
     parser.add_argument("--variant", default="baseline")
     parser.add_argument(
         "--a", help="A/B NAME=existing-launch-profile-id (use '-' for no profile)"
@@ -604,6 +747,12 @@ def main() -> None:
         args.seconds = args.minutes * 60
     if not args.process_name or "/" in args.process_name:
         parser.error("process-name must be a nonempty basename fragment")
+    if bool(args.controller_profile) != bool(args.controller_template) or (
+        args.controller_profile and not args.cemu_log
+    ):
+        parser.error(
+            "Controller replacement requires both profile paths and --cemu-log"
+        )
     if args.input_script:
         read_script(args.input_script)  # validate before creating any device or session
     rpc = Rpc(args.port, args.capability_file)

@@ -9,12 +9,14 @@ pkgs.stdenv.mkDerivation {
     root = ./.;
     fileset = pkgs.lib.fileset.unions [
       ./bench.py
+      ./controller_profile.py
       ./gamepad.py
       ./input_observer.py
       ./metrics.py
       ./present-watch.c
       ./present-fixture.c
       ./test_metrics.py
+      ./test_controller_profile.py
       ./test_input_observer.py
       ./test_rpc.py
       ./wl4-title.events

@@ -87,9 +87,17 @@ source ownership and P1 identity/state; `seat-events.json` proves P2 admission.
 
 RetroArch reserves P1 for a single-player game. **P2 admission is not proof that
 Wario Land 4 or BotW reacted.** BotW must select P2 in a bench-only Cemu-native
-controller profile in the test account. That profile must be saved/restored and
-verified once the Cemu data path and a real profile exist; no profile format or
-default controller layout is invented here.
+controller profile in the test account. Supply `--controller-profile /actual/Cemu/controllerProfiles/controller0.xml`
+and `--controller-template /actual/bench-p2.xml` together with `--cemu-log`.
+Both files must already exist; the template must come from Cemu with P2 selected.
+The tool treats their XML bytes as opaque native configuration. It snapshots the
+original, atomically installs the template for the run, and restores exact bytes,
+mode, ownership, mtime and xattrs after the exact session stops. Symlinks, invalid
+XML, files over 1 MiB, and implicit profile creation are refused. If another writer
+changes the active profile, the bench fails and keeps the original for manual
+review rather than overwriting that edit. Real Cemu profile loading and visible
+BotW navigation remain unverified until the plugin and saveRoot exist; no Cemu
+field, profile format or default controller layout is invented here.
 
 For BotW, first load the staged in-game save through Cemu's eventual declared
 saveRoot. Record a native input script that reaches the chosen fixed spot and
@@ -136,7 +144,9 @@ reads are null, never zero. When `--cemu-log` is supplied, a stale/missing log o
 missing Vulkan/driver/CPU-mode evidence fails the run; matching lines are copied
 into the report and the complete log is retained.
 
-An existing active/pending session is refused. All stop/cancel operations name
+An existing active/pending session is refused. A retained `HostLaunchFailed`
+from a previous terminal game is accepted only after systemd and the actual game
+cgroups conclusively show no game activity; unknown native state still fails. All stop/cancel operations name
 **only this bench's launch ID**. No global kill is used. Cleanup records an empty
 exact cgroup, no newly surviving game/Cemu/Gamescope processes, and unchanged
 boot/system identity. RPC or cleanup failures fail the report rather than
@@ -144,9 +154,10 @@ claiming success. SIGKILL or loss of access can still require an administrator
 to stop the recorded exact session. Normal Korri play logs and game-save effects
 still occur; this is not a snapshot/rollback of the game's own progress.
 
-The observed chain is recorded on every run. An old image can correctly show
-Gamescope but no bubblewrap; that is **not ADR 0015 acceptance**. A later image
-will show its actual bubblewrap chain without changing the bench.
+The observed chain is recorded on every run. **Core at `4e34b8a9e` does not implement ADR 0015.** Both updated images
+can therefore show Gamescope but no bubblewrap. This is not an old-image-only
+problem and is **not ADR 0015 acceptance**. The bench records observed processes;
+it does not implement the missing core wrapper.
 
 ## Focused checks
 
