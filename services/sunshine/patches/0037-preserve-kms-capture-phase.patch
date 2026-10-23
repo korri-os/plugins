@@ -4,7 +4,10 @@ against physical refresh. Resynchronise missed refreshes; never drift or reuse a
 sequence. Late entry waits for a future refresh. Timing fallback skips overdue
 nominal deadlines. A call/sequence guard drops RT on missing pacing, re-reading or backwards sequence,
 keeping RESET_ON_FORK. Failed demotion sleeps every refresh without acquisition.
-No modesetting, affinity or scheduling authority is added.
+Only this guarded backend requests FIFO, after a valid lock; scope exit restores
+OTHER. Dedicated DRM EVENT requests use poll with one 100 ms deadline; timeout
+closes/cancels events, delivers stop and permanently falls back to nominal pacing.
+No modesetting, affinity or additional scheduling authority is added.
 Status: downstream ARM RAM KMS scheduling and safety correction.
 Evidence: 2026-10-22 source-ID hunt: 135/4/0/38 misses; bad phases 2..5 ms,
 clean 11..13 ms, nominal timer drift 2.27 ms/min; no scored CMA migrations.
@@ -303,19 +306,93 @@ new file mode 100644
 +    int failure_errno = 0;
 +  };
 +}  // namespace platf::kms
+diff --git a/src/kms_vblank_wait.h b/src/kms_vblank_wait.h
+new file mode 100644
+--- /dev/null
++++ b/src/kms_vblank_wait.h
+@@ -0,0 +1,65 @@
++#pragma once
++
++#include <array>
++#include <cerrno>
++#include <chrono>
++#include <cstdint>
++#include <cstring>
++#include <drm.h>
++#include <optional>
++#include <poll.h>
++#include <unistd.h>
++
++namespace platf::kms {
++  inline constexpr auto vblank_wait_timeout = std::chrono::milliseconds(100);
++
++  // A dedicated nonblocking DRM fd owns these events. Never consume a shared
++  // scanout/page-flip event queue or retain a pointer in kernel user_data.
++  inline std::optional<drm_event_vblank> wait_vblank_event(int fd, std::uint64_t cookie, std::chrono::steady_clock::time_point deadline) {
++    for (;;) {
++      auto remaining = std::chrono::ceil<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
++      if (remaining.count() <= 0) {
++        errno = ETIMEDOUT;
++        return std::nullopt;
++      }
++      pollfd descriptor {fd, POLLIN, 0};
++      int ready = poll(&descriptor, 1, int(remaining.count()));
++      if (ready < 0 && errno == EINTR) {
++        continue;  // The absolute deadline never restarts after a signal.
++      }
++      if (ready == 0) {
++        errno = ETIMEDOUT;
++        return std::nullopt;
++      }
++      if (ready < 0 || !(descriptor.revents & POLLIN) || (descriptor.revents & (POLLERR | POLLNVAL))) {
++        return std::nullopt;
++      }
++      std::array<std::uint8_t, 4096> buffer;
++      auto bytes = ::read(fd, buffer.data(), buffer.size());
++      if (bytes < 0 && (errno == EINTR || errno == EAGAIN)) {
++        continue;
++      }
++      if (bytes <= 0) {
++        return std::nullopt;
++      }
++      for (std::size_t offset = 0; offset < std::size_t(bytes);) {
++        drm_event header {};
++        if (std::size_t(bytes) - offset < sizeof(header)) {
++          return std::nullopt;
++        }
++        std::memcpy(&header, buffer.data() + offset, sizeof(header));
++        if (header.length < sizeof(header) || header.length > std::size_t(bytes) - offset) {
++          return std::nullopt;
++        }
++        if (header.type == DRM_EVENT_VBLANK && header.length == sizeof(drm_event_vblank)) {
++          drm_event_vblank event {};
++          std::memcpy(&event, buffer.data() + offset, sizeof(event));
++          if (event.user_data == cookie && event.tv_usec < 1000000) {
++            return event;
++          }
++        }
++        offset += header.length;
++      }
++    }
++  }
++}  // namespace platf::kms
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -32,6 +32,8 @@
+@@ -32,6 +32,12 @@
  #include "cuda.h"
  #include "graphics.h"
  #include "src/config.h"
++#include "src/capture_scheduling.h"
 +#include "src/kms_capture_pacing.h"
 +#include "src/kms_capture_rt_guard.h"
++#include "src/kms_vblank_wait.h"
++#include <cstdlib>
++#include <exception>
  #include "src/nv12.h"
  #include "src/logging.h"
  #include "src/platform/common.h"
-@@ -1138,6 +1140,165 @@
+@@ -1138,6 +1144,201 @@
        card_t card;
      };
  
@@ -331,6 +408,15 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +          offset {std::chrono::milliseconds(offset_ms)} {
 +      }
 +
++      ~vblank_pacer_t() {
++        if (event_fd >= 0) {
++          close(event_fd);
++        }
++      }
++
++      vblank_pacer_t(const vblank_pacer_t &) = delete;
++      vblank_pacer_t &operator=(const vblank_pacer_t &) = delete;
++
 +      unsigned wait_calls() const {
 +        return wait_call_count;
 +      }
@@ -341,6 +427,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +
 +      bool wait() {
 +        wait_call_count = 0;
++        event_deadline = std::chrono::steady_clock::now() + vblank_wait_timeout;
 +        if (disabled) {
 +          return false;
 +        }
@@ -406,14 +493,21 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +
 +      std::optional<vblank_t> read(bool absolute, std::uint32_t sequence) {
 +        drmVBlank event {};
-+        auto flags = absolute ? DRM_VBLANK_ABSOLUTE | DRM_VBLANK_NEXTONMISS : DRM_VBLANK_RELATIVE;
++        auto flags = (absolute ? DRM_VBLANK_ABSOLUTE | DRM_VBLANK_NEXTONMISS : DRM_VBLANK_RELATIVE) | DRM_VBLANK_EVENT;
 +        event.request.type = static_cast<drmVBlankSeqType>(flags | ((crtc_index << DRM_VBLANK_HIGH_CRTC_SHIFT) & DRM_VBLANK_HIGH_CRTC_MASK));
 +        event.request.sequence = sequence;
++        event.request.signal = ++cookie;
 +        ++wait_call_count;
-+        if (drmWaitVBlank(fd, &event) || event.reply.tval_sec < 0 || event.reply.tval_usec < 0 || event.reply.tval_usec >= 1000000) {
++        // EVENT queues the request without sleeping in drmWaitVBlank. Only
++        // poll sleeps, bounded across every request in this pacing iteration.
++        if (drmWaitVBlank(event_fd, &event)) {
 +          return std::nullopt;
 +        }
-+        return vblank_t {event.reply.sequence, std::int64_t(event.reply.tval_sec) * 1000000000 + event.reply.tval_usec * 1000};
++        auto completed = wait_vblank_event(event_fd, cookie, event_deadline);
++        if (!completed) {
++          return std::nullopt;
++        }
++        return vblank_t {completed->sequence, std::int64_t(completed->tv_sec) * 1000000000 + completed->tv_usec * 1000};
 +      }
 +
 +      bool initialize() {
@@ -421,6 +515,17 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +        if (crtc_index < 0 || crtc_index > (DRM_VBLANK_HIGH_CRTC_MASK >> DRM_VBLANK_HIGH_CRTC_SHIFT) ||
 +            drmGetCap(fd, DRM_CAP_TIMESTAMP_MONOTONIC, &monotonic) || !monotonic) {
 +          return fail("CRTC monotonic vblank timestamps unavailable");
++        }
++        // A separate open owns its event queue; dup() would share the display
++        // fd queue and could consume unrelated flip events.
++        auto device = drmGetDeviceNameFromFd2(fd);
++        if (!device) {
++          return fail("cannot identify CRTC DRM device");
++        }
++        event_fd = open(device, O_RDWR | O_NONBLOCK | O_CLOEXEC);
++        std::free(device);
++        if (event_fd < 0) {
++          return fail("cannot open dedicated CRTC event fd");
 +        }
 +        auto first = read(false, 0);
 +        auto second = first ? read(true, first->sequence + 1) : std::nullopt;
@@ -462,11 +567,19 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +
 +      bool fail(const char *reason) {
 +        disabled = true;
++        if (event_fd >= 0) {
++          close(event_fd);  // Cancels queued requests, including timed-out ones.
++          event_fd = -1;
++        }
 +        BOOST_LOG(warning) << "KMS RAM vblank pacing unavailable: "sv << reason
++                           << "; wait_errno="sv << errno
 +                           << "; falling back to nominal pacing; CRTC="sv << crtc_id;
 +        return false;
 +      }
 +
++      int event_fd = -1;
++      std::uint64_t cookie = 0;
++      std::chrono::steady_clock::time_point event_deadline;
 +      int fd;
 +      int crtc_index;
 +      int crtc_id;
@@ -481,7 +594,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
      class display_ram_t: public display_t {
      public:
        display_ram_t(mem_type_e mem_type):
-@@ -1145,6 +1306,7 @@
+@@ -1145,6 +1346,7 @@
        }
  
        int init(const std::string &display_name, const ::video::config_t &config) {
@@ -489,13 +602,26 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          if (!gbm::create_device) {
            BOOST_LOG(warning) << "libgbm not initialized"sv;
            return -1;
-@@ -1247,25 +1409,76 @@
+@@ -1247,25 +1449,116 @@
  
        capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
          auto next_frame = std::chrono::steady_clock::now();
 +        vblank_pacer_t vblank(card.fd.el, crtc_index, crtc_id, delay, config::video.capture_vblank_offset_ms);
 +        bool phase_locked = false;
-+        thread_local capture_rt_guard_t rt_guard;
++        std::optional<capture_rt_guard_t> rt_guard;
++        thread_local bool rt_disabled = false;
++        thread_local bool fifo_logged = false;
++        bool promoted = false;
++        auto restore_policy = util::fail_guard([&]() {
++          if (promoted) {
++            sched_param param {};
++            if (sched_setscheduler(0, SCHED_OTHER | SCHED_RESET_ON_FORK, &param)) {
++              // Never leak FIFO into a later, unguarded backend on this thread.
++              BOOST_LOG(fatal) << "KMS RAM cannot restore SCHED_OTHER on backend exit: "sv << std::strerror(errno);
++              std::terminate();
++            }
++          }
++        });
 +        bool sleep_only_logged = false;
  
          sleep_overshoot_logger.reset();
@@ -505,9 +631,16 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 -
 -          if (next_frame > now) {
 -            std::this_thread::sleep_for(next_frame - now);
-+          rt_guard.begin_pacing();
++          if (rt_guard) {
++            rt_guard->begin_pacing();
++          }
 +          unsigned pacing_calls = 0;
 +          if (!vblank.wait()) {
++            // A missing vblank must not prevent delivery of session stop.
++            std::shared_ptr<platf::img_t> no_image;
++            if (!push_captured_image_cb(std::move(no_image), false)) {
++              return platf::capture_e::ok;
++            }
 +            auto now = std::chrono::steady_clock::now();
 +            if (phase_locked) {
 +              next_frame = now;
@@ -528,18 +661,39 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +          } else {
 +            phase_locked = true;
            }
-+          pacing_calls += vblank.wait_calls();
- 
+-
 -          next_frame += delay;
 -          if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
 -            next_frame = now + delay;
-+          auto rt_safety = rt_guard.before_acquisition(delay, pacing_calls, phase_locked ? vblank.sequence() : std::nullopt);
++          pacing_calls += vblank.wait_calls();
++          if (!rt_guard) {
++            if (phase_locked && !rt_disabled) {
++              int error = ::video::request_capture_scheduling(config::video.capture_rt_priority, ::video::capture_backend::guarded_ram_kms, true);
++              if (error) {
++                BOOST_LOG(warning) << "Capture FIFO denied: backend=guarded RAM-KMS priority="sv << config::video.capture_rt_priority << " error="sv << std::strerror(error);
++              } else if (config::video.capture_rt_priority > 0) {
++                promoted = true;
++                if (!fifo_logged) {
++                  fifo_logged = true;
++                  BOOST_LOG(info) << "Capture FIFO granted: backend=guarded RAM-KMS priority="sv << config::video.capture_rt_priority << " reset-on-fork=true"sv;
++                }
++              }
++            }
++            // Inspect actual policy after promotion, never the preceding CFS policy.
++            rt_guard.emplace();
++            rt_guard->begin_pacing();
++          }
++
++          auto rt_safety = rt_guard->before_acquisition(delay, pacing_calls, phase_locked ? vblank.sequence() : std::nullopt);
++          if (rt_safety != capture_rt_guard_result::ready) {
++            rt_disabled = true;
++          }
 +          if (rt_safety == capture_rt_guard_result::sleep_only) {
 +            if (!sleep_only_logged) {
 +              sleep_only_logged = true;
-+              const auto &event = rt_guard.observation();
-+              BOOST_LOG(error) << "KMS RAM capture RT safety guard: cannot drop realtime policy: "sv << std::strerror(rt_guard.error())
-+                               << "; reason="sv << rt_guard.reason() << " acquisition_end_ns=["sv
++              const auto &event = rt_guard->observation();
++              BOOST_LOG(error) << "KMS RAM capture RT safety guard: cannot drop realtime policy: "sv << std::strerror(rt_guard->error())
++                               << "; reason="sv << rt_guard->reason() << " acquisition_end_ns=["sv
 +                               << event.acquisition_end_ns[0] << ',' << event.acquisition_end_ns[1] << ',' << event.acquisition_end_ns[2]
 +                               << "] next_acquisition_ns="sv << event.decision_ns << " pacing_calls="sv << event.pacing_calls
 +                               << " unpaced_acquisitions="sv << event.consecutive_unpaced << " repeated_sequence="sv << event.repeated_sequence
@@ -556,8 +710,8 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +            continue;
 +          }
 +          if (rt_safety == capture_rt_guard_result::degraded) {
-+            const auto &event = rt_guard.observation();
-+            BOOST_LOG(warning) << "KMS RAM capture RT safety guard: reason="sv << rt_guard.reason() << " acquisition_end_ns=["sv
++            const auto &event = rt_guard->observation();
++            BOOST_LOG(warning) << "KMS RAM capture RT safety guard: reason="sv << rt_guard->reason() << " acquisition_end_ns=["sv
 +                               << event.acquisition_end_ns[0] << ',' << event.acquisition_end_ns[1] << ',' << event.acquisition_end_ns[2]
 +                               << "] next_acquisition_ns="sv << event.decision_ns << " pacing_calls="sv << event.pacing_calls
 +                               << " unpaced_acquisitions="sv << event.consecutive_unpaced << " repeated_sequence="sv << event.repeated_sequence
@@ -570,7 +724,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 -
            std::shared_ptr<platf::img_t> img_out;
            auto status = snapshot(pull_free_image_cb, img_out, 1000ms, *cursor);
-+          rt_guard.acquisition_complete();
++          rt_guard->acquisition_complete();
            switch (status) {
              case platf::capture_e::reinit:
              case platf::capture_e::error:

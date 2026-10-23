@@ -223,9 +223,9 @@ Remove or replace a carried patch when one of these becomes true:
 This is a candidate, not a published release. The common patch set has 17
 patches. The combined ARM profile has 31. The four new patches replace the
 layered `exp/kms-direct-readback` experiment without its observers or timing
-output. Capture emits one operational policy record per thread lifetime, with
-the Linux TID, actual policy/priority and reset-on-fork flag. It writes no
-observer file and logs no timing samples. The existing rotation operation remains; its timing probes are removed.
+output. Only guarded RAM-KMS requests FIFO, after its first valid vblank lock.
+It logs the granted backend and priority once per thread lifetime. The generic
+async Linux loop never promotes other backends. It writes no observer file. The existing rotation operation remains; its timing probes are removed.
 The six older runtime patches that needed fuzzy application have context-only
 refreshes. Package and capture checks now require `--fuzz=0` and disable backup
 creation. Ordered hashes are SHA-256 of `name + " " + sha256 + "\n"` for each
@@ -257,9 +257,13 @@ must be shorter than the active CRTC mode refresh period. The mode refresh
 must also match negotiated capture FPS within 0.1%; otherwise this path
 uses nominal absolute pacing with overdue deadlines skipped.
 
-The capture thread uses `drmWaitVBlank` on the captured plane's CRTC index,
-checks monotonic timestamp support and sequence numbers, then sleeps to that
-refresh's offset. It never reuses a sequence or carries an overdue nominal
+The RAM capture thread queues `DRM_VBLANK_EVENT` requests on a separately opened,
+nonblocking fd for the captured plane's DRM card/CRTC. It never blocks waiting
+inside `drmWaitVBlank` or consumes another fd's flip events. Poll/read shares an
+absolute **100 ms deadline** across all requests in a pacing iteration; EINTR
+never extends it. An expired wait closes/cancels outstanding events, checks the
+session-stop callback and permanently falls back to nominal pacing. Timestamp
+and sequence checks precede sleeping to the selected refresh's offset. It never reuses a sequence or carries an overdue nominal
 deadline across refreshes. A used/expired refresh or entry after the requested
 phase waits for a future refresh. Ioctl and wakeup overshoot is allowed only
 when waiting began before the selected phase. The following deadline still
@@ -275,7 +279,11 @@ calls can return immediately when the next vblank already passed. Before
 capture, three consecutive acquisitions without a pacing call, three with
 the same vblank sequence, or a backwards sequence demote to SCHED_OTHER for
 the capture-thread lifetime. Forward skips and unsigned sequence wrap are
-valid. CPU share is not a trigger. Logs include the condition, acquisition
+valid. CPU share is not a trigger. FIFO is requested only after the first
+successful lock in this backend. Initial timing fallback never acquires FIFO.
+Backend exit restores SCHED_OTHER, retaining RESET_ON_FORK. If that restoration
+is denied, Sunshine terminates rather than leaking FIFO to an unguarded backend.
+The guard's degradation is sticky for the thread lifetime. Logs include the condition, acquisition
 end times, decision time, calls, sequences and diagnostic pacing timings.
 Demotion keeps SCHED_RESET_ON_FORK and priority zero. If it fails, the guard
 sleeps a full capture period on every iteration, takes no more snapshots
@@ -313,7 +321,7 @@ Report raw warm-up, source misses, phase, matched latency and compositor
 preemption. Never move the windows to obtain a pass. Diagnostic observers are
 not shipped in these patches.
 
-The owner approved the final package **as is** and stopped testing. The three
+The owner approved the pre-review package **as is** and stopped testing. The three
 90-second runs measured 59.98 fps with misses 2/1/2 and every window at least598.
 The interrupted short-session batch still had bad sessions (including596 and
 522/538 windows); it did not pass the597 floor. See the acceptance record for
@@ -324,20 +332,38 @@ all completed windows, the actual stop chronology and downstream classification.
 `plugins/sunshine/korri-sunshine.service` now requests **`LimitRTPRIO=5`**.
 Its native `runtime.sh` sets Sunshine's `capture_rt_priority=5` override.
 The limit allows this service's threads to request FIFO/RR up to 5; Sunshine
-chooses only the asynchronous capture thread. It does not prove other code in
+chooses only guarded RAM-KMS after lock establishment. It does not prove other code in
 the service cannot use the allowance. It adds no `CAP_SYS_NICE`, affinity or
 service-wide `CPUSchedulingPolicy`. Existing KMS capabilities are unchanged.
 FIFO can delay lower-priority input, compositor, audio and network work. The
 Pro's unchanged RT runtime budget does not guarantee per-frame latency or
-starvation safety. Recheck responsiveness under moving content before release.
+starvation safety. The owner explicitly waived further device acceptance for
+the review fixes; host checks do not establish physical-device performance.
 
-The locked Core currently rejects `LimitRTPRIO`. The separate Core
-`ceca5b06630bc9a8798b39a3bdef56b6952a4c75`
-(`feat/plugin-host-limit-rtprio`) admits only scalar 1..20, exposes it in
-the native authority warning and approval digest, and derives
-`RestrictRealtime=no` for only the requesting unit. Units without the request
-keep their current filter and approval. **Do not publish this candidate until
-that Core change is reviewed, reachable, pinned here and deployed to its
-consuming host.** The Core pin is deliberately unchanged in this branch.
-An upgrade requires new exact-build inspection/approval. `plugin.ts` remains
-thin; no permission or systemd configuration moved into TypeScript.
+The publisher now pins reviewed Core main
+`eab74c96134abed6453ff74c6c80bf4ebca5c52f` in both `flake.nix` and `flake.lock`.
+It admits canonical decimal 1..20 only, refuses leading-zero values, exposes
+the native authority in the warning and approval digest, and derives
+`RestrictRealtime=no` only for the requesting unit. Units without the request
+keep their previous filter and approval. Deploy a compatible consuming host
+before exact-build inspection/approval. `plugin.ts` remains unchanged.
+
+### Independent-review fixes: host-only verification
+
+The review fixes scope FIFO to guarded RAM-KMS, replace blocking vblank waits
+with bounded DRM events, and adopt the reviewed Core permission. Capture tests
+on both build architectures exercise the real scheduling gate (all positive
+priorities on other/unlocked backends do not request FIFO), real poll timeout
+under repeated signals, stale-event cookies, and successful event decoding.
+The capture check also refuses a FIFO request in generic `src/video.cpp`.
+Producer checks compile the actual backend; admission checks use the pinned
+Core, not a developer-path override. The ARM V4L2 check is retried explicitly.
+
+No device access or acceptance run is authorized for this revision. The
+[measurement record](kms-phase-lock-acceptance.md) and per-miss CSV describe the
+older exact package, not this new event-wait implementation. New output paths
+and host check results are recorded in `/tmp/h700-review/review.md` on zao.
+The NARs require a new pinned-source publication dry run per `PUBLICATION.md`.
+After actual publication, Core must update both architecture Sunshine entries
+in `published-plugins.nix` and append the actual batch/archive hashes at matching
+indices in `published-plugin-metadata.nix`; no unpublished image pin is invented.

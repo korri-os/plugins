@@ -1,13 +1,18 @@
-# RG35XX Pro vblank-lock measurements —2026-10-23
+# Historical RG35XX Pro vblank-lock measurements —2026-10-23
 
-Owner approved shipping the exact package as is and stopped testing. Bad sessions
+This is historical evidence for the exact pre-review package below. The later
+review-fix package restricts FIFO to locked RAM-KMS and uses bounded event waits.
+The owner requires host checks only; **these numbers are not new-package device
+acceptance**. Core is now pinned to reviewed main eab74c96134abed6453ff74c6c80bf4ebca5c52f.
+
+Owner approved shipping the exact package below as is and stopped testing. Bad sessions
 still occur. This record does not claim a passing six-session gate.
 
 Exact ARM root: `/nix/store/ah6lyx1jg7fmdc4sfdv4jj66h8kd97bp-korri-plugin`.
 Default offset0ms; capture-only FIFO5; native LimitRTPRIO5.
-No source/encoder probes ship. Core permission ceca5b066 and documentation5410f88
-must be reviewed onto Core main before a reachable publisher pin update and a
-compatible consuming host. No pin update, publication or candidate install ran.
+No source/encoder probes ship. At measurement time the Core pin was unchanged;
+the later review fix adopts Core main. A compatible consuming host is still
+required. No publication or candidate install ran.
 
 ## Final exact-package measurements
 

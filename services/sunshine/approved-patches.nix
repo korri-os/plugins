@@ -55,7 +55,7 @@ rec {
   v4l2m2mPatchSetSha256 = "e918232613be4264d0c7c55900ff030674cc66e3f8f37f4daa0c59f1051960a6";
   reviewedNvencApiMajor = 12;
   reviewedNvencApiMinor = 0;
-  patchSetSha256 = "0d311be01923b57bf241725cee4e17149576ecb13481a052a2ba1b3bf99b7b5d";
+  patchSetSha256 = "4c2a32a2036185ac593555deb78a32cf40975e71a16e235ca67abaceec850411";
   patches = [
     {
       name = "0001-add-runtime-settings-protocol-surface.patch";
@@ -140,7 +140,7 @@ rec {
     {
       name = "0038-configure-linux-capture-fifo.patch";
       path = ./patches/0038-configure-linux-capture-fifo.patch;
-      sha256 = "2f84bff5653f1f4a0c4c575fd7fb92e38216027d0a6757ce7ba066a2c80286d1";
+      sha256 = "314fd4d8bda3ecbe46e30aa394236d6527e558a280676e351e2bcf6508dc8eba";
     }
   ];
 
@@ -258,7 +258,7 @@ rec {
   kmsPacingPatch = {
     name = "0037-preserve-kms-capture-phase.patch";
     path = ./patches/0037-preserve-kms-capture-phase.patch;
-    sha256 = "2daec99a670cdc1b00469064923997a01fd5762a18515078a7d325e6e00996e9";
+    sha256 = "a568a1c9c9a1460dd4bc1893c3028bbaa63eb1b0c86e91055c8aa6a843d11d1c";
   };
 
   rkmppPatches = [
@@ -280,5 +280,5 @@ rec {
 
   # Ordered digest of patches ++ rkmppPatches. Bump only after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "1cb6199ef6d3197348e595212f27ab7cf3e8db1485288bffc9d93b1b820bc754";
+  rkmppPatchSetSha256 = "7d6d17d1c388e85dc15fb3f9a7342a0dca55acad090307f021382c28417b9241";
 }
