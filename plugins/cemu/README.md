@@ -66,8 +66,12 @@ private evidence `/tmp/cemu-odin-evidence/core-{fresh,repeat}-detail.txt`, and
 
 **Replace this pin with a patched 26.2.x Turnip.** It covers Turnip/Vulkan
 only; it does not establish audio, save persistence, thermal safety, or FPS.
-It adds the older Mesa runtime closure. The package check requires an existing
-25.3.x freedreno ICD/library on aarch64 and no driver override elsewhere.
+It adds the older Mesa runtime closure and exposes only freedreno, so this
+temporary aarch64 Vulkan path requires an Adreno GPU. The package check requires
+an existing 25.3.x freedreno ICD/library on aarch64 and no override elsewhere.
+The [25.3.2 Odin attempt](bench/devices/odin2portal-turnip2532-2026-10-23.md)
+verified driver isolation but hit a different Cemu draw-path SIGTRAP while
+loading the save. This pin is not a qualified gameplay fix.
 
 ## Native files, not another configuration schema
 
