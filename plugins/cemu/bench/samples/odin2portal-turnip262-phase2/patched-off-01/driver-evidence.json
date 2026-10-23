@@ -1,0 +1,19 @@
+{
+  "mappedLibraries": [
+    "/nix/store/1skk344pqh26i0k4d8ndllaa78nb883x-cemu-0-unstable-2026-10-22-29f2f1f/bin/Cemu",
+    "/nix/store/53bbslxqirqx59ic6762nm2449jc2s60-libdrm-2.4.128/lib/libdrm.so.2.128.0",
+    "/nix/store/89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66/lib/libc.so.6",
+    "/nix/store/g33aq3b8mljbiay5ls6nin7kkwxi3xbq-mesa-turnip-cemu-fmadz-26.2.5/lib/libvulkan_freedreno.so"
+  ],
+  "privateMapFileHashes": [
+    {
+      "sha256": "32bffa733eeefedf91d44aa383c0c45dd2fa4f6734b094ac727add908f0466c9"
+    }
+  ],
+  "cemuLogLines": [
+    "[21:19:45.019] Using GPU: Turnip Adreno (TM) 740",
+    "[21:19:45.019] Driver version: Mesa 25.3.2",
+    "[21:19:48.478] Async compile: false"
+  ],
+  "note": "First rejected patched attempt retains a stale 25.3.2 log, not fresh driver evidence."
+}

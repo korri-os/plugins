@@ -1,0 +1,9 @@
+{
+  "phase": "title",
+  "timings": {
+    "titleAt": null,
+    "loadingAt": null,
+    "gameplayAt": null,
+    "endGameplayAt": null
+  }
+}

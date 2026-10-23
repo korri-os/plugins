@@ -1,0 +1,121 @@
+[
+  {
+    "run": "patched-off-01",
+    "gate": {
+      "titleAt": null,
+      "loadingAt": null,
+      "gameplayAt": null,
+      "endGameplayAt": null
+    },
+    "fps": null,
+    "peakC": null
+  },
+  {
+    "run": "patched-off-02",
+    "gate": {
+      "titleAt": 9.272286393001195,
+      "loadingAt": 45.063635637001425,
+      "gameplayAt": 65.07476300900089,
+      "endGameplayAt": 347.1426896310004
+    },
+    "fps": {
+      "seconds": 180,
+      "samples": 180,
+      "median": 40.0,
+      "p10": 40,
+      "p1": 39,
+      "min": 39
+    },
+    "peakC": 97.1
+  },
+  {
+    "run": "patched-off-03",
+    "gate": {
+      "titleAt": 9.479720014000122,
+      "loadingAt": 47.2950281049998,
+      "gameplayAt": 66.45617506100098,
+      "endGameplayAt": 348.628956337001
+    },
+    "fps": {
+      "seconds": 180,
+      "samples": 180,
+      "median": 40.0,
+      "p10": 40,
+      "p1": 39,
+      "min": 39
+    },
+    "peakC": 96.3
+  },
+  {
+    "run": "patched-off-04",
+    "gate": {
+      "titleAt": 9.66190277700116,
+      "loadingAt": 48.22574889600037,
+      "gameplayAt": 70.0836240510016,
+      "endGameplayAt": 352.3187621980014
+    },
+    "fps": {
+      "seconds": 180,
+      "samples": 180,
+      "median": 40.0,
+      "p10": 39,
+      "p1": 39,
+      "min": 39
+    },
+    "peakC": 95.9
+  },
+  {
+    "run": "patched-on-01",
+    "gate": {
+      "titleAt": 9.029331478999666,
+      "loadingAt": 48.61646822699913,
+      "gameplayAt": 69.37564966099853,
+      "endGameplayAt": 351.63169321199894
+    },
+    "fps": {
+      "seconds": 180,
+      "samples": 180,
+      "median": 39.0,
+      "p10": 39,
+      "p1": 38,
+      "min": 37
+    },
+    "peakC": 96.7
+  },
+  {
+    "run": "patched-on-02",
+    "gate": {
+      "titleAt": 9.711683425999581,
+      "loadingAt": 48.993012237000585,
+      "gameplayAt": 69.44791873000031,
+      "endGameplayAt": 351.79812814400066
+    },
+    "fps": {
+      "seconds": 180,
+      "samples": 180,
+      "median": 39.0,
+      "p10": 39,
+      "p1": 38,
+      "min": 38
+    },
+    "peakC": 95.9
+  },
+  {
+    "run": "shipped-01",
+    "gate": {
+      "titleAt": 8.564841887000512,
+      "loadingAt": 26.249767235000036,
+      "gameplayAt": 44.69280510200042,
+      "endGameplayAt": 326.85345973600033
+    },
+    "fps": {
+      "seconds": 180,
+      "samples": 180,
+      "median": 37.0,
+      "p10": 37,
+      "p1": 36,
+      "min": 36
+    },
+    "peakC": 95.9
+  }
+]

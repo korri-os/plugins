@@ -2,7 +2,7 @@
 
 **Not submitted.** This is a local Mesa 26.2.5 patch, not an upstream fix claim.
 Hardware validation status is recorded in
-[the Odin report](../bench/devices/odin2portal-turnip262-patched-2026-10-23.md).
+[the gameplay-gated Odin report](../bench/devices/odin2portal-turnip262-phase2-2026-10-23.md).
 
 ## Issue
 

@@ -1,0 +1,19 @@
+{
+  "mappedLibraries": [
+    "/nix/store/1skk344pqh26i0k4d8ndllaa78nb883x-cemu-0-unstable-2026-10-22-29f2f1f/bin/Cemu",
+    "/nix/store/53bbslxqirqx59ic6762nm2449jc2s60-libdrm-2.4.128/lib/libdrm.so.2.128.0",
+    "/nix/store/89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66/lib/libc.so.6",
+    "/nix/store/g33aq3b8mljbiay5ls6nin7kkwxi3xbq-mesa-turnip-cemu-fmadz-26.2.5/lib/libvulkan_freedreno.so"
+  ],
+  "privateMapFileHashes": [
+    {
+      "sha256": "c31b9edcf1355ff11d32d8a809e10a50dffda8d74dbe9678a788184d02078d05"
+    }
+  ],
+  "cemuLogLines": [
+    "[21:57:31.858] Using GPU: Turnip Adreno (TM) 740",
+    "[21:57:31.858] Driver version: Mesa 26.2.5",
+    "[21:57:35.291] Async compile: false"
+  ],
+  "note": "Fresh Cemu log plus actual mapped libraries."
+}

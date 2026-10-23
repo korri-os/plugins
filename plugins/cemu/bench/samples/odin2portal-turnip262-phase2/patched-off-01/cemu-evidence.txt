@@ -1,0 +1,8 @@
+[21:19:45.012] Recompiler initialized
+[21:19:45.013] ------- Init Vulkan graphics backend -------
+[21:19:45.016] Vulkan instance version: 1.4
+[21:19:45.019] Driver version: Mesa 25.3.2
+[21:19:45.019] Vulkan: present_wait extension: supported
+[21:19:45.019] VulkanLimits: UBAlignment 64 nonCoherentAtomSize 64
+[21:19:45.022] Vulkan device memory info:
+[21:19:48.478] CPU-Mode: Multi-core recompiler

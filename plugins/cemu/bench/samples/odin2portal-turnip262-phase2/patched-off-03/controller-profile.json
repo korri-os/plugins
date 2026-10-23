@@ -1,0 +1,8 @@
+{
+  "path": "/var/lib/korri/users/<account>/.config/Cemu/controllerProfiles/controller0.xml",
+  "originalSha256": "738dffbb744252cd1a089411cc54640626e7157984fa263db3e7b697610ba25a",
+  "templateSha256": "195356532834db07bc63fcf5907d61742ee4079d3afe1efac277eff6e36c5686",
+  "restored": true,
+  "applied": true,
+  "afterSha256": "195356532834db07bc63fcf5907d61742ee4079d3afe1efac277eff6e36c5686"
+}

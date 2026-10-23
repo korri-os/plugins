@@ -1,0 +1,9 @@
+[
+  {
+    "case": "normal",
+    "exit": 1,
+    "elapsed": 17.526170406001256,
+    "stop": "Unexpected Mesa driver",
+    "speaker": "Volume: 0.55 [MUTED]"
+  }
+]

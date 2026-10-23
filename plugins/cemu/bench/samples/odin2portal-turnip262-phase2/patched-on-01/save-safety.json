@@ -1,0 +1,15 @@
+{
+  "status": "restored and verified",
+  "originalHead": "sha256:2cd3a4443e53379fbf2af89f6da3385ab77315365eb33976a790ca090af427c4",
+  "filesVerified": 54,
+  "privateBackup": "<private-save-backup>",
+  "additionalSnapshotsBeforeRestore": 1,
+  "additionalSnapshotIds": [
+    "sha256:1ceef9232bd81c0c4ec835834360b172160a4b68e4014ab46cf746bdbc575b45"
+  ],
+  "restoredHead": "sha256:fedec97a13f4cd6a68031bcb49c425a44fe6f3e2b6eaafeef8dd452f995e9c9a",
+  "restoredFilesVerified": 54,
+  "identicalPayload": true,
+  "originalInAncestry": true,
+  "restoreSnapshots": 1
+}

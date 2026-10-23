@@ -1,0 +1,5 @@
+# BotW advance: Wii U A is SDL b / BTN_EAST.
+# Use --repeat-input-until-loading. Each cycle is 2 seconds; stop on observed loading.
+E: 0.000000 0001 0131 1
+E: 0.150000 0001 0131 0
+E: 2.000000 0000 0000 0

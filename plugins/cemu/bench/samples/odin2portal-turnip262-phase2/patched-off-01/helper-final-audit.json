@@ -1,0 +1,17 @@
+{
+  "originalHead": "sha256:53793eb625da9187392b8d2f944fba6d4e5b9a8af3a234cdac9b6b8acf64ec58",
+  "finalHead": "sha256:906b66b921e67640e7372b1115f948b885bd72f2ed552ededddc19c8470e29fd",
+  "payloadEqual": true,
+  "originalInAncestry": true,
+  "filesVerified": 54,
+  "wl4Unchanged": true,
+  "librarySha256": "ccc3e6ac80527fbc6387f658a059a95fc30b9187587db82a3640c8972938b3d9",
+  "libraryMatchesFullOriginal": true,
+  "nativeSha256": "a1d81eaf2d81e0a51a06268ea038661b008eb1c73adf77d64218983046efe5ae",
+  "nativeMatchesOriginal": true,
+  "p1Sha256": "738dffbb744252cd1a089411cc54640626e7157984fa263db3e7b697610ba25a",
+  "p1MatchesOriginal": true,
+  "speaker": "Volume: 0.55 [MUTED]",
+  "noGameUnitsOrForeignRenderer": true,
+  "boot": "28218e4c-6645-4cbd-bae8-119b91fe2f1c"
+}

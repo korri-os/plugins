@@ -1,0 +1,170 @@
+{
+  "managementPolicyWritten": false,
+  "before": false,
+  "devicesBefore": [
+    {
+      "event": "event0",
+      "name": "pmic_pwrkey",
+      "phys": "pmic_pwrkey/input0",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/c400000.spmi/spmi-0/0-00/c400000.spmi:pmic@0:pon@1300/c400000.spmi:pmic@0:pon@1300:pwrkey/input/input1"
+    },
+    {
+      "event": "event1",
+      "name": "pmic_resin",
+      "phys": "pmic_resin/input0",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/c400000.spmi/spmi-0/0-00/c400000.spmi:pmic@0:pon@1300/c400000.spmi:pmic@0:pon@1300:resin/input/input2"
+    },
+    {
+      "event": "event10",
+      "name": "Microsoft X-Box 360 pad",
+      "phys": "",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input11"
+    },
+    {
+      "event": "event11",
+      "name": "Mouse passthrough",
+      "phys": "",
+      "gamepad": false,
+      "sysfs": "/sys/devices/virtual/input/input12"
+    },
+    {
+      "event": "event12",
+      "name": "Mouse passthrough (absolute)",
+      "phys": "",
+      "gamepad": false,
+      "sysfs": "/sys/devices/virtual/input/input13"
+    },
+    {
+      "event": "event13",
+      "name": "Keyboard passthrough",
+      "phys": "",
+      "gamepad": false,
+      "sysfs": "/sys/devices/virtual/input/input14"
+    },
+    {
+      "event": "event14",
+      "name": "AYN-Odin2 Headset Jack",
+      "phys": "ALSA",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/sound/sound/card0/input20"
+    },
+    {
+      "event": "event15",
+      "name": "AYN-Odin2 DP0 Jack",
+      "phys": "ALSA",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/sound/sound/card0/input21"
+    },
+    {
+      "event": "event2",
+      "name": "qcom-hv-haptics",
+      "phys": "",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/c400000.spmi/spmi-0/0-07/c400000.spmi:pmic@7:qcom,hv-haptics@f000/input/input3"
+    },
+    {
+      "event": "event3",
+      "name": "AYN Odin2 Gamepad",
+      "phys": "rsinput-gamepad/input0",
+      "gamepad": true,
+      "sysfs": "/sys/devices/platform/soc@0/8c0000.geniqup/89c000.serial/89c000.serial:0/89c000.serial:0.0/serial1/serial1-0/input/input4"
+    },
+    {
+      "event": "event4",
+      "name": "generic ft5x06 (44)",
+      "phys": "",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/ac0000.geniqup/a90000.i2c/i2c-3/3-0038/input/input5"
+    },
+    {
+      "event": "event5",
+      "name": "gpio-keys",
+      "phys": "gpio-keys/input0",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/gpio-keys/input/input6"
+    },
+    {
+      "event": "event6",
+      "name": "Korri Seat P1",
+      "phys": "korri/input-seat/p1",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input7"
+    },
+    {
+      "event": "event7",
+      "name": "Korri Seat P2",
+      "phys": "korri/input-seat/p2",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input8"
+    },
+    {
+      "event": "event8",
+      "name": "Korri Seat P3",
+      "phys": "korri/input-seat/p3",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input9"
+    },
+    {
+      "event": "event9",
+      "name": "Korri Seat P4",
+      "phys": "korri/input-seat/p4",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input10"
+    }
+  ],
+  "builtinSourcesBefore": [
+    "/dev/input/event5",
+    "/dev/input/event3",
+    "/dev/input/event1"
+  ],
+  "compositesBefore": [
+    "/org/shadowblip/InputPlumber/CompositeDevice0"
+  ],
+  "seatP1Before": {
+    "deviceNumber": 3398,
+    "keys": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "axes": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "16": 0,
+      "17": 0
+    }
+  },
+  "probeComposites": [
+    "/org/shadowblip/InputPlumber/CompositeDevice1"
+  ],
+  "after": false,
+  "managementUnchanged": true,
+  "compositesAfter": [
+    "/org/shadowblip/InputPlumber/CompositeDevice0"
+  ],
+  "compositesRestored": true,
+  "builtinSourcesAfter": [
+    "/dev/input/event5",
+    "/dev/input/event3",
+    "/dev/input/event1"
+  ],
+  "seatP1After": {
+    "deviceNumber": 3398,
+    "keys": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "axes": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "16": 0,
+      "17": 0
+    }
+  },
+  "builtinUnchanged": true,
+  "seatP1Unchanged": true
+}

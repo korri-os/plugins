@@ -1,0 +1,37 @@
+{
+  "originalHead": "sha256:989fc95bcaf0d9aae12b549f50b3fafdefd394640724f6448032ca7e06eb3d21",
+  "finalHead": "sha256:659722c172a10b0069dd01e802fff0190d54a964e2697f9759d7577dee0e5508",
+  "payloadEqual": true,
+  "originalInAncestry": true,
+  "filesVerified": 54,
+  "additionalHistoryRecords": 14,
+  "wl4Unchanged": true,
+  "libraryItemBytesRestored": true,
+  "libraryMatchesFullOriginal": true,
+  "librarySha256": "8aa9f6be1c4a3ad1d5dbf7528365ccfab464a70414b9a00cbd4cf617c0f92806",
+  "nativeMatchesOriginal": true,
+  "nativeSha256": "a1d81eaf2d81e0a51a06268ea038661b008eb1c73adf77d64218983046efe5ae",
+  "async": "false",
+  "p1MatchesOriginal": true,
+  "p1Sha256": "738dffbb744252cd1a089411cc54640626e7157984fa263db3e7b697610ba25a",
+  "launchSettingsRestored": true,
+  "pluginPackage": "/nix/store/g7adybv05pxjyi1klapk19xrjbm7b0ql-korri-plugin",
+  "pluginApproval": "99fa60a3a1ed11cec9e68b522cb5b8ffa3727cf83b3cdc0a99d88ac2d46f8ac7",
+  "pluginEnabled": true,
+  "pluginPrevious": {
+    "package": "/nix/store/si3mvb24vnw6hmlcia0wa4ll7wyma6li-korri-plugin",
+    "provenance": {
+      "kind": "RawCache",
+      "cache_url": "file:///var/lib/korri-private-cache/cache"
+    },
+    "approval": "5230c425546e5d6f783e35dca45bf3f6d8a6533b9b3ed76273c0353cf49a690d"
+  },
+  "speaker": "Volume: 0.55 [MUTED]",
+  "noGameUnitsOrRendererOrBenchPad": true,
+  "boot": "28218e4c-6645-4cbd-bae8-119b91fe2f1c",
+  "system": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "cacheFilesVerified": 3772,
+  "cacheManifestUnchanged": true,
+  "cacheBeforeAfterManifestSha256": "fb6692806889d2bccbb20c9f43a71029f5c24f06b5a1f0c5f3e1c709ff1e0ab1",
+  "noObserverHelperOrOtherTestProcess": true
+}

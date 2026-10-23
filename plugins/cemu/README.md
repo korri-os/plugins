@@ -44,13 +44,16 @@ A raw lld build linked but failed real `cemu --help` with missing Boost;
 the wrapped linker retains the Nix runtime search paths. A separate Boost
 link-and-execute probe confirmed this fix before rebuilding Cemu. There is no `-no-pie` override or hardening
 removal. No CPU affinity, device profile or game-specific performance setting
-is introduced. The temporary aarch64 Turnip pin is described below.
+is introduced. The Cemu-scoped aarch64 Turnip build is described below.
 
 ## Cemu-scoped patched Turnip
 
 On aarch64 only, `bin/cemu` sets `VK_DRIVER_FILES` and the older loader alias
 `VK_ICD_FILENAMES` to the freedreno ICD from the plugin's **Mesa 26.2.5** build
-in `turnip.nix`. This replaces the temporary 25.3.2 pin. The build enables only
+in `turnip.nix`. This replaces the temporary 25.3.2 pin on this experimental
+branch. Cemu and the selected driver retain the held package set to isolate the
+driver change. A separate current-pin build checks build compatibility only.
+The build enables only
 Turnip with the Linux MSM kernel driver and X11/Wayland presentation. It disables
 Gallium, OpenGL, EGL, GBM, LLVM, OpenCL, video codecs, layers and optional tools.
 Other architectures keep normal ICD selection. No system Mesa overlay,
@@ -70,7 +73,7 @@ BLAKE3 `026211ce39d10e5e02021680ebff7da347ac4ee27a5064daeacd045d15efb127`.
 The patch reuses the existing NIR abs-min select; it does not fix the separate
 compiler-error cleanup crash. It is **not submitted upstream**. See
 [the upstream draft](patches/mesa-26.2-ir3-fmadz.upstream.md) and
-[the patched-driver campaign](bench/devices/odin2portal-turnip262-patched-2026-10-23.md)
+[the gameplay-gated phase-2 campaign](bench/devices/odin2portal-turnip262-phase2-2026-10-23.md)
 for validation and limits. Existing IR3 disassembly/delay tests run on the builder.
 The Cemu package check verifies the exact patched ICD, its actual library, and
 byte-identical installed patch evidence, not merely a Mesa version string.
@@ -82,6 +85,13 @@ Async on hit Cemu's separate `activeVertexDS` assertion. Fresh accounts now seed
 `Graphic/AsyncCompile=false` in Cemu's own settings file; existing settings remain
 untouched. Its cost is synchronous compilation stalls. This driver patch alone
 is not proof of performance, audio, new-save persistence or thermal safety.
+
+Phase 2 completed three gated async-off samples at median 40 FPS versus 37 FPS
+for the same-session shipped build. Two async-on samples reached 39 FPS with no
+draw-state assertion. The owner stopped before the third async-on sample and
+the soak. **Keep 25.3.2 with async off as the published default until soak
+qualification; this branch remains experimental.** The Odin is restored to the
+shipped test build. The upstream regression unit test and MR remain pending.
 
 ## Native files, not another configuration schema
 

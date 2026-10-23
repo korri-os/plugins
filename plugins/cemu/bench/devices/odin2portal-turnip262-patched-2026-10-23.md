@@ -1,5 +1,9 @@
 # Odin Cemu — patched Mesa 26.2.5 Turnip, 2026-10-23 UTC
 
+> Historical, ungated campaign. Its performance numbers are not comparable to
+> the gameplay-gated phase-2 results. Use [phase 2](odin2portal-turnip262-phase2-2026-10-23.md)
+> for the current plugin decision.
+
 **The patched 26.2.5 Turnip loads the staged BotW save and runs gameplay. No
 `Unhandled ALU op`, crash or device loss occurred in 7 launches. The one valid
 720p baseline is 42 / 41 / 41 FPS (median / p10 / p1), against 39 / 38 / 36 on
