@@ -1,0 +1,9 @@
+{
+  "phase": "verified",
+  "timings": {
+    "titleAt": 11.043257317000098,
+    "loadingAt": 36.603752433999944,
+    "gameplayAt": 68.79587877099948,
+    "endGameplayAt": 350.87413226099943
+  }
+}

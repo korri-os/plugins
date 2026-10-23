@@ -1,6 +1,6 @@
 { pkgs }:
 let
-  python = pkgs.python3;
+  python = pkgs.python3.withPackages (ps: [ ps.pillow ]);
 in
 pkgs.stdenv.mkDerivation {
   pname = "korri-cemu-bench";
@@ -12,7 +12,18 @@ pkgs.stdenv.mkDerivation {
       ./controller_profile.py
       ./gamepad.py
       ./input_observer.py
+      ./input_replay.py
+      ./test_input_replay.py
       ./metrics.py
+      ./gameplay_gate.py
+      ./frame_reference.py
+      ./reporting.py
+      ./save_safety.py
+      ./save_proof.py
+      ./references
+      ./test_gameplay_gate.py
+      ./test_save_safety.py
+      ./test_save_proof.py
       ./present-watch.c
       ./present-fixture.c
       ./test_metrics.py
@@ -20,6 +31,7 @@ pkgs.stdenv.mkDerivation {
       ./test_input_observer.py
       ./test_rpc.py
       ./wl4-title.events
+      ./botw-load.events
     ];
   };
   nativeBuildInputs = [
@@ -52,7 +64,17 @@ pkgs.stdenv.mkDerivation {
     fixture=$!
     ./present-watch "$fixture" >present.csv 2>observer.log &
     observer=$!
-    sleep 3
+    ${python}/bin/python3 - <<'PYWAIT'
+    import csv, time
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        with open("present.csv") as source:
+            if len(list(csv.DictReader(source))) > 30:
+                break
+        time.sleep(0.1)
+    else:
+        raise RuntimeError("Present fixture did not produce enough events within 30 seconds")
+    PYWAIT
     kill "$observer"
     wait "$observer"
     ${python}/bin/python3 -c 'import csv; r=list(csv.DictReader(open("present.csv"))); assert len(r)>30, r; assert all(int(x["ust_us"])>0 for x in r); assert len({x["window"] for x in r})==1'
@@ -62,15 +84,26 @@ pkgs.stdenv.mkDerivation {
     trap - EXIT
   '';
   installPhase = ''
-    mkdir -p "$out/bin" "$out/lib/cemu-bench"
+    mkdir -p "$out/bin" "$out/lib/cemu-bench" "$out/share/cemu-bench"
     cp *.py "$out/lib/cemu-bench/"
     cp present-watch "$out/bin/"
+    cp -r references "$out/share/cemu-bench/"
+    makeWrapper ${python}/bin/python3 "$out/bin/korri-cemu-bench-reference" \
+      --add-flags "$out/lib/cemu-bench/frame_reference.py" \
+      --prefix PATH : ${
+        pkgs.lib.makeBinPath [
+          pkgs.grim
+          pkgs.util-linux
+        ]
+      }
+    install -Dm444 botw-load.events "$out/share/cemu-bench/botw-load.events"
     install -Dm444 wl4-title.events "$out/share/cemu-bench/wl4-title.events"
     makeWrapper ${python}/bin/python3 "$out/bin/korri-cemu-bench" \
       --add-flags "$out/lib/cemu-bench/bench.py" \
       --set KORRI_BENCH_PRESENT_WATCH "$out/bin/present-watch" \
       --prefix PATH : ${
         pkgs.lib.makeBinPath [
+          pkgs.grim
           pkgs.systemd
           pkgs.util-linux
           pkgs.vulkan-tools

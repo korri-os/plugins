@@ -1,5 +1,11 @@
 # Hardware proofs — 2026-10-22 campaign
 
+The [2026-10-23 gameplay-gated proof](odin2portal-gameplay-gate/README.md) uses
+observed title/loading/gameplay gates and verifies the original save payload
+before/after. Its normal Odin run is **37 / 37 / 36 FPS**; the no-input run is
+**not measured**, without an FPS file. The two new manual-save attempts remain
+unproven. The older samples below do not acquire these new guarantees retroactively.
+
 The later [BotW async-off campaign](../devices/odin2portal-async-off-2026-10-23.md)
 has separate [Cemu samples](odin2portal-cemu-async-off/README.md). Its full 720p
 baseline measured **39 / 38 / 36 FPS**, not the 60 FPS WL4 validation below.

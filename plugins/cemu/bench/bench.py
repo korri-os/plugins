@@ -23,8 +23,13 @@ from typing import cast
 
 from controller_profile import ControllerProfile
 from gamepad import Gamepad, gamepad_identity, read_script
+from gameplay_gate import FrameCapture, GameplayGate, Reference
 from input_observer import InputObserver
+from input_replay import replay_script
 from metrics import fps_bins, summarize
+from reporting import fps_section, gate_section, not_measured_report
+from save_proof import SaveProof, SaveReadWatch
+from save_safety import SaveSafety
 
 Record = dict[str, object]
 
@@ -120,6 +125,17 @@ def command(*args: str) -> str:
 
 def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n")
+
+
+def aggregate_gate_sections(folder: Path) -> list[str]:
+    lines = []
+    for path in sorted(folder.glob("*/gate.json")):
+        timings = record(json.loads(path.read_text())).get("timings", {})
+        lines += [
+            f"Run: {path.parent.name}",
+            *gate_section(cast(dict[str, float | None], timings)),
+        ]
+    return lines or gate_section({})
 
 
 def processes() -> dict[int, Record]:
@@ -255,6 +271,42 @@ def stop_exact(
 def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
     folder.mkdir(parents=True, exist_ok=False)
     os.chmod(folder, 0o700)
+    try:
+        reference = Reference.load(args.reference)
+        if reference.game != args.game:
+            raise ValueError("Reference belongs to a different game")
+        _run(rpc, args, folder, name, reference)
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        RuntimeError,
+        subprocess.SubprocessError,
+        KeyboardInterrupt,
+    ) as exc:
+        if (folder / "fps.json").exists():
+            (folder / "fps.json").unlink()
+        if not (folder / "report.md").exists():
+            timings = (
+                record(json.loads((folder / "gate.json").read_text())).get(
+                    "timings", {}
+                )
+                if (folder / "gate.json").exists()
+                else {}
+            )
+            (folder / "report.md").write_text(
+                not_measured_report(
+                    str(exc) or type(exc).__name__,
+                    cast(dict[str, float | None], timings),
+                    "See save-safety.json and cleanup.json if present; no safety claim without verification.",
+                )
+            )
+        raise
+
+
+def _run(
+    rpc: Rpc, args: argparse.Namespace, folder: Path, name: str, reference: Reference
+) -> None:
     script = read_script(args.input_script) if args.input_script else []
     if args.input_script:
         (folder / "input.events").write_bytes(args.input_script.read_bytes())
@@ -284,6 +336,7 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
     input_observer: InputObserver | None = None
     controller_profile: ControllerProfile | None = None
     observer: subprocess.Popen[str] | None = None
+    save_watch: SaveReadWatch | None = None
     frames_file = (folder / "present.csv").open("w")
     observer_log = (folder / "observer.log").open("w")
     error = ""
@@ -296,11 +349,31 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
     wall_start_ns = time.time_ns()
     cemu_evidence = "Not applicable: non-Cemu validation launch."
     rows: list[Record] = []
+    gate = GameplayGate(reference, started=time.monotonic(), timeout=args.gate_timeout)
+    capture = FrameCapture(
+        reference, args.capture_user, args.runtime_dir, args.wayland_display
+    )
+    safety = SaveSafety(rpc, args.game, args.runner, args.save_objects, folder)
     try:
         require_idle(rpc)
+        confirm_native_idle()
+        foreign = [
+            item
+            for item in before.values()
+            if any(
+                token in Path(str(item["exe"])).name.lower()
+                for token in ("eden", "gamescope", "cemu")
+            )
+        ]
+        if foreign:
+            raise RuntimeError(
+                "Foreign Eden/Gamescope/Cemu process exists; refusing bench"
+            )
+        safety.preflight()
         if script:
             input_observer = InputObserver(folder)
             input_observer.begin()
+        safety.verify_before_launch()
         reservation = rpc.call("app.session.reserve", {"gameId": args.game})
         launch = str(reservation["launchId"])
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", launch):
@@ -311,6 +384,9 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
                 args.controller_profile, args.controller_template, folder
             )
             controller_profile.apply()
+        gate = GameplayGate(
+            reference, started=time.monotonic(), timeout=args.gate_timeout
+        )
         response = rpc.call(
             "app.session.start",
             {"gameId": args.game, "runnerId": args.runner, "expectedLaunchId": launch},
@@ -384,26 +460,73 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
             stderr=observer_log,
             text=True,
         )
-        time.sleep(args.input_delay)
-        script_start = time.monotonic()
-        with (folder / "input-replay.jsonl").open("w") as replay:
-            for event in script:
-                time.sleep(max(0, script_start + event[0] - time.monotonic()))
-                if pad:
-                    pad.send(event)
-                replay.write(
+
+        def observe() -> None:
+            if observer is None or observer.poll() is not None or not members(unit):
+                raise RuntimeError("Game/observer exited during gameplay gate")
+            statistics = capture.capture()
+            now = time.monotonic()
+            label = gate.observe(statistics, now)
+            write_json(
+                folder / "gate.json", {"phase": gate.phase, "timings": gate.timings}
+            )
+            with (folder / "frames.jsonl").open("a") as frames:
+                frames.write(
                     json.dumps(
                         {
-                            "scheduled_s": event[0],
-                            "sent_s": time.monotonic() - script_start,
-                            "type": event[1],
-                            "code": event[2],
-                            "value": event[3],
+                            "at": now - gate.started,
+                            "label": label,
+                            "statistics": statistics,
                         }
                     )
                     + "\n"
                 )
-                replay.flush()
+
+        while not gate.title_ready:
+            observe()
+            if not gate.title_ready:
+                time.sleep(args.gate_poll)
+        if getattr(args, "before_input", None):
+            args.before_input(tree)
+        if args.require_save_read:
+            SaveProof(args.save_root, folder).verify_declaration(tree)
+            save_watch = SaveReadWatch(
+                args.save_root,
+                {
+                    pid
+                    for pid, item in tree.items()
+                    if Path(str(item["exe"])).name == "Cemu"
+                },
+            )
+        gate.begin_input(time.monotonic())
+        with (folder / "input-replay.jsonl").open("w") as replay:
+            replay_script(
+                script,
+                pad.send if pad else lambda _: None,
+                observe,
+                lambda: gate.timings["loadingAt"] is not None,
+                lambda: gate.check_timeout(time.monotonic()),
+                replay,
+                repeat_until_loading=args.repeat_input_until_loading,
+                poll_seconds=args.gate_poll,
+            )
+        while not gate.ready:
+            observe()
+            if not gate.ready:
+                time.sleep(args.gate_poll)
+        if save_watch:
+            reads = save_watch.collect()
+            write_json(folder / "save-read.json", reads)
+            save_watch.close()
+            save_watch = None
+            if str(args.require_save_read) not in reads:
+                raise RuntimeError(
+                    "Required actual Cemu game_data.sav read was not observed"
+                )
+        if getattr(args, "save_action", None):
+            args.save_action(pad, capture, tree)
+        if reference.classify(capture.capture()) != "gameplay":
+            raise RuntimeError("Gameplay no longer matches before warmup starts")
         warmup_start = time.monotonic()
         measurement_start = warmup_start + args.warmup
         end = measurement_start + args.seconds
@@ -427,6 +550,8 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
                 output.flush()
                 next_sample += 1
                 time.sleep(max(0, min(end, next_sample) - time.monotonic()))
+        gate.finish(capture.capture(), time.monotonic())
+        write_json(folder / "gate.json", {"phase": gate.phase, "timings": gate.timings})
     except (
         OSError,
         ValueError,
@@ -437,6 +562,8 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
     ) as exc:
         error = str(exc) or type(exc).__name__
     finally:
+        if save_watch:
+            save_watch.close()
         if observer:
             observer.terminate()
             try:
@@ -523,6 +650,31 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
                 controller_profile.restore()
             except (OSError, ValueError, TypeError, RuntimeError) as exc:
                 cleanup_error = cleanup_error or str(exc)
+        if (
+            launch
+            and not remaining
+            and not new_wrappers
+            and not cleanup_error
+            and not getattr(args, "defer_save_restore", False)
+        ):
+            try:
+                require_idle(rpc)
+                confirm_native_idle()
+                safety.restore()
+            except (
+                OSError,
+                ValueError,
+                TypeError,
+                RuntimeError,
+                subprocess.SubprocessError,
+            ) as exc:
+                cleanup_error = str(exc)
+        elif launch and (remaining or new_wrappers or cleanup_error):
+            cleanup_error = (
+                cleanup_error
+                or "Save restore deferred: exact session is not conclusively stopped"
+            )
+        write_json(folder / "gate.json", {"phase": gate.phase, "timings": gate.timings})
         cleanup: Record = {
             "exactCgroupRemaining": remaining,
             "newGameOrWrapperProcesses": new_wrappers,
@@ -598,16 +750,17 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
         if not sum(values):
             error = error or "No game presentations in the measurement window"
         stats = summarize(values)
-        write_json(
-            folder / "fps.json",
-            {
-                "window": window,
-                "measurementStart": measurement_start,
-                "seconds": args.seconds,
-                "fps": values,
-                **stats,
-            },
-        )
+        if not error:
+            write_json(
+                folder / "fps.json",
+                {
+                    "window": window,
+                    "measurementStart": measurement_start,
+                    "seconds": args.seconds,
+                    "fps": values,
+                    **stats,
+                },
+            )
         peaks: dict[str, int] = {}
         for row in rows:
             for key, value in row.items():
@@ -616,26 +769,20 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
         report = [
             f"# {identity['host']}: {name}",
             "",
-            f"Status: {'FAILED: ' + error if error else 'PASS'}",
+            f"Status: {'not measured: ' + error if error else 'PASS'}",
             "",
             f"Game: `{args.game}`; runner: `{args.runner}`; launch: `{launch}`.",
             f"System: `{identity['system']}`; kernel `{identity['kernel']}`.",
             f"Running korrid: `{identity['korrid']}`.",
-            f"Warmup: {args.warmup} s after input script; measured: {args.seconds} s.",
+            f"Warmup: {args.warmup} s after verified gameplay and input completion; requested sample: {args.seconds} s.",
             f"Spot: {args.spot}. Script execution is not proof of visual position.",
             "",
-            "## FPS",
+            *gate_section(gate.timings),
+            "## Save safety",
             "",
-            "Source: X11 Present CompleteNotify, kind Pixmap, Skip excluded, one game window.",
-            "Counts game presentations to Gamescope's Xwayland, not repeated compositor refreshes.",
-            "Bins use X Present's monotonic UST completion timestamps, not observer wakeup time.",
-            "This does not prove physical panel scanout or emulated game simulation rate.",
-            f"Window: {window}; one-second FPS bins; p10/p1 use nearest rank; zero bins included.",
+            safety.summary(),
             "",
-            "| median | p10 | p1 | min |",
-            "|---:|---:|---:|---:|",
-            f"| {stats['median']:.2f} | {stats['p10']:.2f} | {stats['p1']:.2f} | {stats['min']:.2f} |",
-            "",
+            *fps_section(error, stats),
             "## Launch and cleanup",
             "",
             wrapping(tree),
@@ -686,15 +833,81 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
             cemu_evidence,
             "",
         ]
-        (folder / "report.md").write_text("\n".join(report))
+        (folder / "report.md").write_text(
+            not_measured_report(error, gate.timings, safety.summary())
+            if error
+            else "\n".join(report)
+        )
     if error:
         raise RuntimeError(f"{error}; report: {folder / 'report.md'}")
     print(folder / "report.md", flush=True)
 
 
+def run_ab(rpc: Rpc, args: argparse.Namespace) -> None:
+    require_idle(rpc)
+    original = rpc.call("app.launch-settings.snapshot", {"gameId": args.game})
+    selected = original.get("selectedProfile")
+    args.output.mkdir(parents=True, exist_ok=False)
+    os.chmod(args.output, 0o700)
+    write_json(args.output / "profiles-before.json", original)
+    expected_revision = record(original["revisions"])["games"]
+    try:
+        for index, variant in enumerate((args.a, args.b), 1):
+            name, profile = variant.split("=", 1)
+            if not name or not profile:
+                raise ValueError("A/B name and profile must be nonempty")
+            snapshot = rpc.call("app.launch-settings.snapshot", {"gameId": args.game})
+            if record(snapshot["revisions"])["games"] != expected_revision:
+                raise RuntimeError(
+                    "Concurrent library edit: refusing to overwrite profile selection"
+                )
+            payload: Record = {
+                "gameId": args.game,
+                "expectedRevision": expected_revision,
+            }
+            if profile != "-":
+                payload["profileId"] = profile
+            changed = rpc.call("app.launch-settings.profile.select", payload)
+            expected_revision = changed["games"]
+            run(rpc, args, args.output / str(index), name)
+    finally:
+        snapshot = rpc.call("app.launch-settings.snapshot", {"gameId": args.game})
+        write_json(args.output / "profiles-before-restore.json", snapshot)
+        if record(snapshot["revisions"])["games"] != expected_revision:
+            raise RuntimeError(
+                "Concurrent library edit: profile restore needs administrator review"
+            )
+        payload = {
+            "gameId": args.game,
+            "expectedRevision": expected_revision,
+        }
+        if selected is not None:
+            payload["profileId"] = selected
+        rpc.call("app.launch-settings.profile.select", payload)
+        restored = rpc.call("app.launch-settings.snapshot", {"gameId": args.game})
+        write_json(args.output / "profiles-restored.json", restored)
+        if restored.get("selectedProfile") != selected:
+            raise RuntimeError("Original profile selection was not restored")
+    summary = [
+        "# A/B",
+        "",
+        "Original launch profile restored; see `profiles-restored.json`.",
+        "",
+        "| variant | median | p10 | p1 | min | report |",
+        "|---|---:|---:|---:|---:|---|",
+    ]
+    for index, variant in enumerate((args.a, args.b), 1):
+        stats = record(json.loads((args.output / str(index) / "fps.json").read_text()))
+        summary.append(
+            f"| {variant.split('=', 1)[0]} | {stats['median']} | {stats['p10']} | {stats['p1']} | {stats['min']} | [{index}]({index}/report.md) |"
+        )
+    summary += ["", *aggregate_gate_sections(args.output)]
+    (args.output / "report.md").write_text("\n".join(summary) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=["run", "soak", "ab"])
+    parser.add_argument("mode", choices=["run", "soak", "ab", "save-proof"])
     parser.add_argument("--game", required=True)
     parser.add_argument("--runner", required=True)
     parser.add_argument(
@@ -717,9 +930,32 @@ def main() -> None:
     parser.add_argument(
         "--input-script", type=Path, help="Native evemu event text; gamepad events only"
     )
-    parser.add_argument("--input-delay", type=float, default=5)
+    parser.add_argument(
+        "--reference",
+        type=Path,
+        required=True,
+        help="Per-game numeric title/loading/gameplay reference",
+    )
+    parser.add_argument(
+        "--gate-timeout",
+        type=float,
+        default=120,
+        help="Deadline for each game-state gate in seconds",
+    )
+    parser.add_argument("--gate-poll", type=float, default=1)
+    parser.add_argument("--capture-user", default="korri")
+    parser.add_argument("--runtime-dir", type=Path, default=Path("/run/user/1000"))
+    parser.add_argument("--wayland-display", default="korri-wayland")
+    parser.add_argument(
+        "--save-objects", type=Path, default=Path("/var/lib/korrid/saves/objects")
+    )
     parser.add_argument("--spot", default="Unspecified; validation launch only")
     parser.add_argument("--cemu-log", type=Path)
+    parser.add_argument(
+        "--save-root",
+        type=Path,
+        help="Exact saveRoot from real launch declaration, for save proof/read verification",
+    )
     parser.add_argument(
         "--controller-profile",
         type=Path,
@@ -729,6 +965,16 @@ def main() -> None:
         "--controller-template",
         type=Path,
         help="Cemu-created bench profile selecting P2; copied for this run and restored",
+    )
+    parser.add_argument(
+        "--repeat-input-until-loading",
+        action="store_true",
+        help="Repeat the native advance script until loading is observed, at most 60 seconds",
+    )
+    parser.add_argument(
+        "--require-save-read",
+        type=Path,
+        help="Require actual Cemu read of this path relative to --save-root before warmup",
     )
     parser.add_argument("--variant", default="baseline")
     parser.add_argument(
@@ -741,7 +987,8 @@ def main() -> None:
         or not 1 <= args.seconds <= 86400
         or not 1 <= args.minutes <= 1440
         or not 1 <= args.warmup <= 3600
-        or not 0 <= args.input_delay <= 3600
+        or not 5 <= args.gate_timeout <= 600
+        or not 0.2 <= args.gate_poll <= 5
     ):
         parser.error("Invalid port or duration")
     if args.mode == "soak":
@@ -754,79 +1001,133 @@ def main() -> None:
         parser.error(
             "Controller replacement requires both profile paths and --cemu-log"
         )
+    if args.repeat_input_until_loading and not args.input_script:
+        parser.error("--repeat-input-until-loading requires --input-script")
+    if args.require_save_read and (
+        not args.save_root
+        or args.require_save_read.is_absolute()
+        or ".." in args.require_save_read.parts
+    ):
+        parser.error(
+            "--require-save-read needs --save-root and a safe relative file path"
+        )
     if args.input_script:
         read_script(args.input_script)  # validate before creating any device or session
     rpc = Rpc(args.port, args.capability_file)
     # One bench per device. The lock file contains no capability or runtime state.
     with Path("/run/korri-cemu-bench.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.mode == "save-proof":
+            if not args.save_root or not args.input_script:
+                parser.error("save-proof requires --save-root and --input-script")
+            require_idle(rpc)
+            confirm_native_idle()
+            args.output.mkdir(parents=True, exist_ok=False)
+            os.chmod(args.output, 0o700)
+            safety = SaveSafety(
+                rpc, args.game, args.runner, args.save_objects, args.output
+            )
+            proof = SaveProof(args.save_root, args.output)
+            failure = ""
+            try:
+                safety.preflight()
+                args.defer_save_restore = True
+                args.warmup, args.seconds = 1, 1
+                args.save_action = proof.save
+                run(rpc, args, args.output / "write", "save route")
+                args.save_action = proof.verify_loaded
+                args.before_input = proof.watch_reads
+                run(rpc, args, args.output / "reload", "load newly written save")
+            except (
+                OSError,
+                ValueError,
+                TypeError,
+                RuntimeError,
+                subprocess.SubprocessError,
+                KeyboardInterrupt,
+            ) as exc:
+                failure = str(exc) or type(exc).__name__
+            finally:
+                if proof.watch:
+                    proof.watch.close()
+                try:
+                    require_idle(rpc)
+                    confirm_native_idle()
+                    safety.restore()
+                except (
+                    OSError,
+                    ValueError,
+                    TypeError,
+                    RuntimeError,
+                    subprocess.SubprocessError,
+                ) as exc:
+                    failure = failure or str(exc)
+                (args.output / "report.md").write_text(
+                    "\n".join(
+                        [
+                            "# In-game save proof",
+                            "",
+                            "Status: "
+                            + (
+                                "unproven: " + failure
+                                if failure
+                                else "PASS: new game_data.sav written, read by Cemu after relaunch, and gameplay gated"
+                            ),
+                            "",
+                            safety.summary(),
+                            "",
+                            *aggregate_gate_sections(args.output),
+                        ]
+                    )
+                )
+                if failure:
+                    for result in args.output.rglob("fps.json"):
+                        result.unlink()
+                    for result in args.output.glob("*/report.md"):
+                        timing_file = result.parent / "gate.json"
+                        timings = (
+                            record(json.loads(timing_file.read_text())).get(
+                                "timings", {}
+                            )
+                            if timing_file.exists()
+                            else {}
+                        )
+                        result.write_text(
+                            not_measured_report(
+                                failure,
+                                cast(dict[str, float | None], timings),
+                                safety.summary(),
+                            )
+                        )
+            if failure:
+                raise RuntimeError(failure)
+            print(args.output / "report.md", flush=True)
+            return
         if args.mode != "ab":
             run(rpc, args, args.output, args.variant)
             return
         if not args.a or not args.b or "=" not in args.a or "=" not in args.b:
             parser.error("ab requires --a NAME=PROFILE --b NAME=PROFILE")
-        require_idle(rpc)
-        original = rpc.call("app.launch-settings.snapshot", {"gameId": args.game})
-        selected = original.get("selectedProfile")
-        args.output.mkdir(parents=True, exist_ok=False)
-        os.chmod(args.output, 0o700)
-        write_json(args.output / "profiles-before.json", original)
-        expected_revision = record(original["revisions"])["games"]
         try:
-            for index, variant in enumerate((args.a, args.b), 1):
-                name, profile = variant.split("=", 1)
-                if not name or not profile:
-                    raise ValueError("A/B name and profile must be nonempty")
-                snapshot = rpc.call(
-                    "app.launch-settings.snapshot", {"gameId": args.game}
-                )
-                if record(snapshot["revisions"])["games"] != expected_revision:
-                    raise RuntimeError(
-                        "Concurrent library edit: refusing to overwrite profile selection"
+            run_ab(rpc, args)
+        except (
+            OSError,
+            ValueError,
+            TypeError,
+            RuntimeError,
+            subprocess.SubprocessError,
+            KeyboardInterrupt,
+        ) as exc:
+            if args.output.is_dir():
+                (args.output / "report.md").write_text(
+                    not_measured_report(
+                        str(exc) or type(exc).__name__,
+                        {},
+                        "See per-run save-safety.json and profiles-before-restore.json; profile restoration must be verified.",
                     )
-                payload: Record = {
-                    "gameId": args.game,
-                    "expectedRevision": expected_revision,
-                }
-                if profile != "-":
-                    payload["profileId"] = profile
-                changed = rpc.call("app.launch-settings.profile.select", payload)
-                expected_revision = changed["games"]
-                run(rpc, args, args.output / str(index), name)
-        finally:
-            snapshot = rpc.call("app.launch-settings.snapshot", {"gameId": args.game})
-            write_json(args.output / "profiles-before-restore.json", snapshot)
-            if record(snapshot["revisions"])["games"] != expected_revision:
-                raise RuntimeError(
-                    "Concurrent library edit: profile restore needs administrator review"
+                    + "\n".join(aggregate_gate_sections(args.output))
                 )
-            payload = {
-                "gameId": args.game,
-                "expectedRevision": expected_revision,
-            }
-            if selected is not None:
-                payload["profileId"] = selected
-            rpc.call("app.launch-settings.profile.select", payload)
-            restored = rpc.call("app.launch-settings.snapshot", {"gameId": args.game})
-            write_json(args.output / "profiles-restored.json", restored)
-            if restored.get("selectedProfile") != selected:
-                raise RuntimeError("Original profile selection was not restored")
-        summary = [
-            "# A/B",
-            "",
-            "Original launch profile restored; see `profiles-restored.json`.",
-            "",
-            "| variant | median | p10 | p1 | min | report |",
-            "|---|---:|---:|---:|---:|---|",
-        ]
-        for index, variant in enumerate((args.a, args.b), 1):
-            stats = record(
-                json.loads((args.output / str(index) / "fps.json").read_text())
-            )
-            summary.append(
-                f"| {variant.split('=', 1)[0]} | {stats['median']} | {stats['p10']} | {stats['p1']} | {stats['min']} | [{index}]({index}/report.md) |"
-            )
-        (args.output / "report.md").write_text("\n".join(summary) + "\n")
+            raise
 
 
 if __name__ == "__main__":

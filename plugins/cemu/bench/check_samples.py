@@ -6,8 +6,8 @@ import gzip
 import hashlib
 import io
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
 from metrics import fps_bins, summarize
 
@@ -37,7 +37,7 @@ def check_privacy(root: Path) -> int:
     count = 0
     files = [
         path
-        for area in (root / "samples", root / "devices")
+        for area in (root / "samples", root / "devices", root / "references")
         for path in area.rglob("*")
     ]
     for readme in (root / "README.md", root.parent / "README.md"):

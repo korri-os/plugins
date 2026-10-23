@@ -1,0 +1,24 @@
+{
+  "originalHead": "sha256:466882dd8033a57f3454e1c7dffa4804d3ace969ce77bda4fc0e7025a43c3b1e",
+  "finalHead": "sha256:989fc95bcaf0d9aae12b549f50b3fafdefd394640724f6448032ca7e06eb3d21",
+  "payloadEqual": true,
+  "originalInAncestry": true,
+  "filesVerified": 54,
+  "wl4Head": "sha256:c1cf7c188794f9a8ea19e65062fc696b193aeabe0fbfa91d407a2b7a096de7b5",
+  "wl4Records": 69,
+  "wl4Unchanged": true,
+  "launchSettingsRestored": true,
+  "libraryBytesRestored": true,
+  "nativeBytesRestored": true,
+  "async": "false",
+  "p1BytesRestored": true,
+  "noRendererBenchPadOrObserver": true,
+  "boot": "28218e4c-6645-4cbd-bae8-119b91fe2f1c",
+  "system": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "caches": {
+    ".cache/Cemu/shaderCache/transferable/00050000101c9400_vkpipeline.bin": "2cf89f22f6de35ade628193c70018bc1601028a814fe20d8730a65d086115215",
+    ".cache/Cemu/shaderCache/transferable/00050000101c9400_shaders.bin": "5fe1d8bc5c1dffa9debd90d64d889678d93d15c6fdf4559eaf39745f659edc20",
+    ".cache/Cemu/shaderCache/precompiled/00050000101c9400_spirv.bin": "7cccfd5a483ea41cb977547d1d3e08f5051873e6bdd6b48a4b59901d40905d12",
+    ".cache/Cemu/shaderCache/driver/vk/00050000101c9400.bin": "793f82f4d941c0e01a91fd5d2433d4b1b42d24c9f35aed95a9141f260cd1082c"
+  }
+}

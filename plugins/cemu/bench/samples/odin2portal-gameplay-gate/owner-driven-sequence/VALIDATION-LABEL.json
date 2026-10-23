@@ -1,0 +1,6 @@
+{
+  "label": "owner-driven-sequence",
+  "validAutomatedProofCase": false,
+  "reason": "Owner physically advanced and played during intended no-input run. Do not use its one-second sample as a benchmark. Keep numeric fingerprints as sequence evidence only.",
+  "fingerprints": "broken/frames.jsonl"
+}

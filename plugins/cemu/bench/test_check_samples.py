@@ -1,3 +1,5 @@
+# ruff: noqa: FLY002
+# Keep private-pattern test strings assembled; the public privacy scan must not flag its own fixtures.
 import tempfile
 import unittest
 from pathlib import Path
