@@ -93,14 +93,15 @@ def confirm_native_idle() -> None:
             "--no-pager",
             "--state=active,activating,deactivating,reloading",
             "korri-game-*",
+            "korri-acquire-*",
         ],
         text=True,
         timeout=5,
     )
     populated = any(
         path.read_text().strip()
-        for path in Path("/sys/fs/cgroup/korri.slice/korri-games.slice").glob(
-            "korri-game-*/**/cgroup.procs"
+        for path in Path("/sys/fs/cgroup/korri.slice/korri-games.slice").rglob(
+            "cgroup.procs"
         )
     )
     verify_native_idle(units, populated)
@@ -243,7 +244,7 @@ def stop_exact(
                         ]
                 time.sleep(poll_seconds)
             raise RuntimeError(
-                "Exact stop recovery did not clear; no journal/reset/restart was attempted"
+                f"{warning}; exact stop recovery did not clear; no journal/reset/restart was attempted"
             ) from exc
         if result.get("phase") == "stopped":
             return []
