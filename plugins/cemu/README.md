@@ -43,8 +43,31 @@ The executable links with **Nix-wrapped lld** (`llvmPackages.bintools`).
 A raw lld build linked but failed real `cemu --help` with missing Boost;
 the wrapped linker retains the Nix runtime search paths. A separate Boost
 link-and-execute probe confirmed this fix before rebuilding Cemu. There is no `-no-pie` override or hardening
-removal. No CPU affinity, device profile, driver workaround or game-specific
-performance setting is introduced.
+removal. No CPU affinity, device profile or game-specific performance setting
+is introduced. The temporary aarch64 Turnip pin is described below.
+
+## Temporary Turnip pin
+
+On aarch64 only, `bin/cemu` sets `VK_DRIVER_FILES` and the older loader alias
+`VK_ICD_FILENAMES` to the freedreno ICD from this flake's locked nixpkgs Mesa
+**25.3.2**. The package asserts that version so a lock update cannot silently
+replace this deliberate temporary pin. Other architectures keep normal ICD
+selection. This follows legacy `9c2d9e2b6`'s process-scoped Vulkan selection;
+it does not change system Mesa, Gamescope, OpenGL, or other plugins.
+
+Mesa 26.2.0+ IR3 has no `nir_op_fmadz` emitter case in the checked source.
+Odin's Mesa 26.2.3 crashes while compiling a 32-bit vertex `fmadz`, then faults
+in `ir3_context_error` → `ralloc_free` (`ir3_compiler_nir.c:1143`). Fresh and
+cached compilation share pipeline BLAKE3
+`026211ce39d10e5e02021680ebff7da347ac4ee27a5064daeacd045d15efb127`.
+See [the first-light report](bench/devices/odin2portal-first-light-2026-10-22.md),
+private evidence `/tmp/cemu-odin-evidence/core-{fresh,repeat}-detail.txt`, and
+`/var/lib/korri/cemu-bench-staging/diagnose-*/` on Odin.
+
+**Replace this pin with a patched 26.2.x Turnip.** It covers Turnip/Vulkan
+only; it does not establish audio, save persistence, thermal safety, or FPS.
+It adds the older Mesa runtime closure. The package check requires an existing
+25.3.x freedreno ICD/library on aarch64 and no driver override elsewhere.
 
 ## Native files, not another configuration schema
 

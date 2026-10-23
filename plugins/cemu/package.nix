@@ -39,6 +39,8 @@ let
     hash = "sha256-crRwikdqgQmQo+4QJu/Cp7HBM9TkZ+uNjrwjxDagPLs=";
   };
 in
+# Temporary Cemu-only Turnip pin. Replace with patched 26.2.x; see README.
+assert !pkgs.stdenv.hostPlatform.isAarch64 || pkgs.mesa.version == "25.3.2";
 pkgs.llvmPackages.stdenv.mkDerivation {
   pname = "cemu";
   version = "0-unstable-2026-10-22-${builtins.substring 0 7 cemuCommit}";
@@ -129,6 +131,12 @@ pkgs.llvmPackages.stdenv.mkDerivation {
     substitute ${./wrapper.sh} "$out/bin/cemu" \
       --subst-var-by shell ${pkgs.runtimeShell} \
       --subst-var-by coreutils ${pkgs.coreutils} \
+      --subst-var-by turnipDriver ${
+        lib.escapeShellArg (lib.optionalString pkgs.stdenv.hostPlatform.isAarch64 ''
+          export VK_DRIVER_FILES="${pkgs.mesa}/share/vulkan/icd.d/freedreno_icd.aarch64.json"
+          export VK_ICD_FILENAMES="$VK_DRIVER_FILES"
+        '')
+      } \
       --subst-var-by libraries ${
         lib.makeLibraryPath [
           pkgs.vulkan-loader
