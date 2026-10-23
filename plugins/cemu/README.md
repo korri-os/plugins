@@ -197,12 +197,24 @@ The admission check uses Core's actual declaration evaluator and sandbox
 executor with two supplied account roots. Its `seed` call is a sandboxed
 admission test, not a device installation route.
 
-Build evidence lives under `$out/nix-support/cemu-build/`: compiled audio
-objects, ELF linkage/type, installed asset lists, IPO commands and compiler.
-Store hashes in compile diagnostics are redacted so they do not retain a
-build-toolchain closure on the device; the build log retains exact commands.
-Source is available as `.#cemu.src`. Cemu carries MPL-2.0; graphic packs
-carry CC0-1.0. Bundled upstream dependencies retain their own licenses.
+Short build proofs remain under `$out/nix-support/cemu-build/`: compiled audio
+objects, ELF linkage/type, asset counts, resource assertions and compiler version.
+Full asset lists, `compile_commands.json` and `ipo.txt` live under
+`$evidence/nix-support/cemu-build/` in the separate optional `evidence` output.
+The default runtime output does not retain that output or the bulky diagnostics.
+Retrieve diagnostics on the build host, not on a device:
+
+```sh
+# Use aarch64-linux instead for ARM build evidence.
+evidence=$(nix build --no-link --print-out-paths \
+  .#packages.x86_64-linux.cemu.evidence)
+ls "$evidence/nix-support/cemu-build/"
+```
+
+Store hashes in those diagnostics are redacted to avoid a build-toolchain closure;
+the build log retains exact commands. Source is available as `.#cemu.src`.
+Cemu carries MPL-2.0; graphic packs carry CC0-1.0. Bundled upstream dependencies
+retain their own licenses, installed under `share/licenses/cemu/`.
 
 These tests do not prove gameplay, Vulkan on Adreno, audible sound, controller
 mapping or device performance. No signature trust, permissions or installation
