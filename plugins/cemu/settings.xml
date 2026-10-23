@@ -5,6 +5,7 @@
   <fullscreen>true</fullscreen>
   <Graphic>
     <api>1</api>
+    <AsyncCompile>false</AsyncCompile>
   </Graphic>
   <Audio>
     <api>3</api>

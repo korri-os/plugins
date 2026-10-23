@@ -11,6 +11,7 @@ import time
 import xml.etree.ElementTree as ET
 
 package = Path(sys.argv[1])
+assert ET.parse(package / "share/Cemu/settings.xml").getroot().findtext("Graphic/AsyncCompile") == "false"
 evidence = Path(sys.argv[2])
 evidence.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
@@ -83,14 +84,18 @@ with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
             settings = ET.parse(config).getroot()
             assert settings.findtext("gp_download") == "false"
             assert settings.findtext("Graphic/api") == "1"
+            assert settings.findtext("Graphic/AsyncCompile") == "false"
             assert settings.findtext("fullscreen") == "true"
             assert settings.findtext("Audio/api") == "3"
             assert settings.findtext("Audio/TVDevice") == "default"
             # The next launch must preserve a person's edits to both native files.
-            config.write_text(config.read_text().replace("<fullscreen>true</fullscreen>", "<fullscreen>false</fullscreen>"))
+            config.write_text(config.read_text()
+                              .replace("<fullscreen>true</fullscreen>", "<fullscreen>false</fullscreen>")
+                              .replace("<AsyncCompile>false</AsyncCompile>", "<AsyncCompile>true</AsyncCompile>"))
             (packs / "user-note.txt").write_text("preserve me")
         else:
             assert ET.parse(config).getroot().findtext("fullscreen") == "false"
+            assert ET.parse(config).getroot().findtext("Graphic/AsyncCompile") == "true"
             assert (packs / "user-note.txt").read_text() == "preserve me"
     assert not list(package.glob("bin/portable"))
 print("Cemu real CLI, offline pack loading, native configuration and seed preservation passed")

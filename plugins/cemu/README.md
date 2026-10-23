@@ -74,8 +74,8 @@ verified driver isolation but hit a different Cemu draw-path SIGTRAP while
 loading the save. The [async-off follow-up](bench/devices/odin2portal-async-off-2026-10-23.md)
 runs gameplay with the same package and native `AsyncCompile=false`; its complete
 720p baseline is median 39, p10 38 FPS, below the median target of 40. Audio was
-physically confirmed; a new manual save remains unproven. No native workaround
-is shipped or left enabled. This pin is not a qualified gameplay fix.
+physically confirmed; a new manual save remains unproven. The native seed now disables async compilation as described below. This pin
+alone is not a qualified gameplay fix.
 
 ## Native files, not another configuration schema
 
@@ -101,8 +101,14 @@ emulator cores and unsupported Korri overrides fail rather than being ignored.
 CPU/GPU launch limits remain Core's responsibility (ADRs 0018–0020).
 
 The wrapper seeds the shipped native `settings.xml` only when absent, with
-Vulkan (`Graphic/api=1`), fullscreen and update checks disabled. It never
-rewrites existing settings. `-f` remains the requested launch behavior even
+Vulkan (`Graphic/api=1`), fullscreen and update checks disabled. It also seeds
+`Graphic/AsyncCompile=false` as a temporary workaround for Cemu 29f2f1f's
+`VulkanRenderer::draw_execute` null `activeVertexDS` assertion during BotW
+save loading with async compilation enabled. The Odin async-off campaign above
+verified gameplay with this workaround. Its cost is synchronous shader/pipeline
+compilation stalls; isolated soak hitches reached 4 FPS. Remove the workaround
+when the draw-state race is fixed and verified. It never rewrites existing
+settings, including an existing person's async-compilation choice. `-f` remains the requested launch behavior even
 if a person changes the native fullscreen preference. The wrapper exposes
 Vulkan, Pulse and ALSA libraries through `LD_LIBRARY_PATH`, then execs Cemu.
 The fresh native seed selects Cubeb (`Audio/api=3`) and its `default` TV
