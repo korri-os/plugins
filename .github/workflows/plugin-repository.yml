@@ -118,6 +118,8 @@ jobs:
             ".#ci.checks.$SYSTEM.korri-fake08-package"
             ".#ci.checks.$SYSTEM.korri-fake08-admission"
             ".#ci.checks.$SYSTEM.korri-solarus-plugin"
+            ".#ci.checks.$SYSTEM.korri-cemu-package"
+            ".#ci.checks.$SYSTEM.korri-cemu-admission"
             ".#ci.checks.$SYSTEM.korri-gamescope-plugin"
             ".#ci.checks.$SYSTEM.korri-starter-pack-package"
             ".#ci.checks.$SYSTEM.korri-starter-pack-admission"

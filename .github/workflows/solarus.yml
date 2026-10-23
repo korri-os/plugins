@@ -1,9 +1,11 @@
-name: Check Solarus and starter pack
+name: Check Solarus, Cemu and starter pack
 
 on:
   push:
     branches: [main]
     paths:
+      - plugins/cemu/**
+      - nix/cemu-*.nix
       - plugins/solarus/**
       - plugins/starter-pack/**
       - plugins/zquest-classic/**
@@ -17,6 +19,8 @@ on:
       - .github/workflows/solarus.yml
   pull_request:
     paths:
+      - plugins/cemu/**
+      - nix/cemu-*.nix
       - plugins/solarus/**
       - plugins/starter-pack/**
       - plugins/zquest-classic/**
@@ -61,6 +65,8 @@ jobs:
         run: |
           nix build --no-link --print-build-logs \
             ".#checks.$SYSTEM.korri-solarus-plugin" \
+            ".#checks.$SYSTEM.korri-cemu-package" \
+            ".#checks.$SYSTEM.korri-cemu-admission" \
             ".#checks.$SYSTEM.korri-starter-pack-package" \
             ".#checks.$SYSTEM.korri-starter-pack-admission" \
             ".#checks.$SYSTEM.korri-starter-pack-solarus-runtime"
