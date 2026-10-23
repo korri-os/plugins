@@ -95,18 +95,28 @@ original, atomically installs the template for the run, and restores exact bytes
 mode, ownership, mtime and xattrs after the exact session stops. Symlinks, invalid
 XML, files over 1 MiB, and implicit profile creation are refused. If another writer
 changes the active profile, the bench fails and keeps the original for manual
-review rather than overwriting that edit. Real Cemu profile loading and visible
-BotW navigation remain unverified until the plugin and saveRoot exist; no Cemu
-field, profile format or default controller layout is invented here.
+review rather than overwriting that edit.
 
-For BotW, first load the staged in-game save through Cemu's eventual declared
-saveRoot. Record a native input script that reaches the chosen fixed spot and
-supply `--spot 'description of verified position' --cemu-log /actual/Cemu/log.txt`.
-Restore the same save before each comparison. **A script running successfully is
-not proof that the scene is correct.** The supplied save preview shows Link in a
-shrine, but no BotW input route or actual save load has been verified while the
-Cemu plugin is unfinished. No final save layout or speculative BotW sequence is
-shipped. Save hashes and exact staging paths are in `devices/`.
+Real Cemu-generated P2 profile loading, staged-save loading and gameplay are now
+proved in the [Odin async-off report](devices/odin2portal-async-off-2026-10-23.md)
+and [Mini V2 ladder](devices/rpminiv2-ladder-2026-10-23.md). See those reports for
+exact builds, settings, save-read traces and measurement limits. This does not
+prove a new manual in-game save. No Mini V2 configuration passed a soak, and a
+Mini V2 owner-session save payload loss is under investigation. The exact owner
+payload could not be restored; the report records the approved older fallback.
+
+For BotW, restore the same verified-complete snapshot through Cemu's declared
+saveRoot before each comparison. Record a native input script for the chosen
+fixed spot and supply `--spot 'description of verified position'` and `--cemu-log`.
+**A completed script or capped title-screen FPS is not gameplay proof.** Verify
+actual save reads and gameplay frames before accepting a sample. The Mini report
+records a bench-only title-frame gate because startup timing varies. The scene's
+shrine/Zora identity and visual HUD/menu correctness were not established.
+
+Committed samples use consistent account, address and storage placeholders.
+Raw private evidence stays outside Git. Run `python3 check_samples.py` here to
+check privacy, all sample checksums and FPS reproduction from the retained
+Present events. Checksums describe the redacted public copies.
 
 ## FPS source and limits
 
