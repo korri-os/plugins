@@ -1,6 +1,7 @@
 """Exercise the packaged wrapper and real Cemu startup; no ROM or device needed."""
 import os
 from pathlib import Path
+import re
 import signal
 import shutil
 import subprocess
@@ -14,6 +15,12 @@ evidence = Path(sys.argv[2])
 evidence.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
     root = Path(work)
+    # Core's account scaffold inherits setgid. Its game unit denies chmod with
+    # setid bits (RestrictSUIDSGID), even when chmod only retains inherited bits.
+    # Nix's own build sandbox also rejects setting these bits. Exercise this
+    # additional case outside that sandbox with --setgid-account.
+    if "--setgid-account" in sys.argv[3:]:
+        root.chmod(0o2770)
     env = dict(os.environ, HOME=str(root), XDG_CONFIG_HOME=str(root / ".config"),
                XDG_DATA_HOME=str(root / ".local/share"), XDG_CACHE_HOME=str(root / ".cache"))
     env.pop("APPIMAGE", None)
@@ -30,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
         log = root / f"startup-{attempt}.log"
         with log.open("w") as output:
             child = subprocess.Popen([
-                "strace", "-f", "-e", "trace=file", "-o", str(trace),
+                "strace", "-f", "-e", "trace=file,fchmod", "-o", str(trace),
                 str(package / "bin/cemu"), "--verbose", "--mlc", str(mlc),
             ], env=env, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
             try:
@@ -54,6 +61,11 @@ with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
                 child.wait(timeout=10)
         shutil.copyfile(log, evidence / log.name)
         shutil.copyfile(trace, evidence / trace.name)
+        for line in trace.read_text().splitlines():
+            mode = re.search(r"(?:chmod|fchmod|fchmodat)\(.*?, (0[0-7]+)(?:, [^)]*)?\)", line)
+            assert mode is None or not int(mode[1], 8) & 0o6000, (
+                "startup requests setid permissions denied by the game unit: " + line
+            )
         assert config.is_file()
         assert packs.is_dir() and not packs.is_symlink()
         assert (packs / "version.txt").read_text() == "graphicPacks989.zip"

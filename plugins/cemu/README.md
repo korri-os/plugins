@@ -97,6 +97,14 @@ pack trees are left unchanged, including on future package upgrades. This
 costs one writable copy per account and requires an explicit update to move
 an already-seeded account to a newer pack release.
 
+Core's account directories inherit setgid. Before seeding packs, the wrapper
+clears that bit on its private staging directory and copies without preserving
+store modes. Otherwise GNU cp requests setgid permissions and the game unit's
+`RestrictSUIDSGID` rejects startup with `cp: setting permissions: Operation not
+permitted`. Access ACLs inherited from the account remain intact. The runtime
+check also accepts `--setgid-account` outside Nix's build sandbox (which itself
+forbids setting that bit); it checks actual chmod syscalls and native pack reads.
+
 **Correction to the May assumption:** `gp_download=false` does not prevent
 manual downloads. At this pin `wxCemuConfig.h:102` says this field is unused;
 it formerly tracked the Getting Started dialog. We ship the harmless false

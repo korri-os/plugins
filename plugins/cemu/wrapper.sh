@@ -23,8 +23,12 @@ fi
 if [ ! -e "$data/graphicPacks" ]; then
   stage=$(mktemp -d "$data/.graphicPacks.XXXXXX")
   trap 'rm -rf "$stage"' EXIT
-  cp -R "@out@/share/Cemu/graphicPacks/." "$stage/"
-  chmod -R u+w "$stage"
+  # Account directories inherit setgid. Clear it before creating children:
+  # even cp --no-preserve=mode otherwise retains it in chmod, which Core's
+  # RestrictSUIDSGID rejects. Keep the account's inherited access ACLs.
+  chmod a-s "$stage"
+  cp -R --no-preserve=mode "@out@/share/Cemu/graphicPacks/." "$stage/"
+  chmod -R a-s,u+w "$stage"
   mv -T --no-clobber "$stage" "$data/graphicPacks"
   rm -rf "$stage"
   trap - EXIT
