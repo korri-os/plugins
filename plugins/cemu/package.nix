@@ -46,6 +46,7 @@ let
     hash = "sha256-crRwikdqgQmQo+4QJu/Cp7HBM9TkZ+uNjrwjxDagPLs=";
   };
   licenses = import ./licenses.nix {
+    mesaSource = if pkgs.stdenv.hostPlatform.isAarch64 then turnip.src else pkgs.mesa.src;
     inherit
       pkgs
       cemuSource
