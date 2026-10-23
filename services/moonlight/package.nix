@@ -48,6 +48,8 @@ stdenv.mkDerivation rec {
     ./patches/0013-add-auto-window-resize-flag.patch
     ./patches/0014-disable-gamepad-quit-combo.patch
     ./patches/0015-crop-coded-alignment-padding-on-present.patch
+    # New Korri security patch, not a legacy harvest: pin the broker's certificate.
+    ./patches/0020-pin-broker-authorized-server-certificate.patch
   ];
 
   nativeBuildInputs = [

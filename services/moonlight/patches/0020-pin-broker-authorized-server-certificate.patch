@@ -1,0 +1,79 @@
+Korri security patch: pin the broker-authorized Sunshine certificate.
+Origin: new Korri code; not harvested from legacy or nix-on-rocks.
+Set KORRI_MOONLIGHT_SERVER_CERTIFICATE to the file written from the authenticated
+provision broker response. Verify the TLS chain and pin its public key. Invalid
+pins fail closed even though upstream gs_init ignores http_init failures.
+
+--- a/libgamestream/http.c
++++ b/libgamestream/http.c
+@@ -23,10 +23,51 @@
+ #include <stdbool.h>
+ #include <string.h>
+ #include <curl/curl.h>
++#include <openssl/pem.h>
++#include <openssl/sha.h>
+ 
+ static CURL *curl;
+ 
+ static bool debug;
++static bool server_pin_failed;
++
++/* Korri security patch, not a legacy harvest. The authenticated korrid broker
++ * supplies this exact certificate. Keep VERIFYHOST off because Sunshine's
++ * self-signed certificate names are not DNS identities. Verify both its trust
++ * anchor and its SPKI instead; no public CA can authorize a different key. */
++static bool configure_server_pin(void) {
++  const char *path = getenv("KORRI_MOONLIGHT_SERVER_CERTIFICATE");
++  if (!path)
++    return true; /* Stock callers; Korri's viewer always supplies the pin. */
++  FILE *file = fopen(path, "r");
++  if (!file)
++    return false;
++  X509 *certificate = PEM_read_X509(file, NULL, NULL, NULL);
++  fclose(file);
++  if (!certificate)
++    return false;
++  EVP_PKEY *key = X509_get_pubkey(certificate);
++  X509_free(certificate);
++  if (!key)
++    return false;
++  unsigned char *der = NULL;
++  int size = i2d_PUBKEY(key, &der);
++  EVP_PKEY_free(key);
++  if (size <= 0) {
++    OPENSSL_free(der);
++    return false;
++  }
++  unsigned char digest[SHA256_DIGEST_LENGTH];
++  SHA256(der, size, digest);
++  OPENSSL_free(der);
++  unsigned char encoded[45];
++  EVP_EncodeBlock(encoded, digest, sizeof(digest));
++  char pin[64];
++  snprintf(pin, sizeof(pin), "sha256//%s", encoded);
++  return curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L) == CURLE_OK &&
++         curl_easy_setopt(curl, CURLOPT_CAINFO, path) == CURLE_OK &&
++         curl_easy_setopt(curl, CURLOPT_PINNEDPUBLICKEY, pin) == CURLE_OK;
++}
+ 
+ static size_t _write_curl(void *contents, size_t size, size_t nmemb, void *userp)
+ {
+@@ -67,10 +108,17 @@
+   curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+   curl_easy_setopt(curl, CURLOPT_SSL_SESSIONID_CACHE, 0L);
+ 
+-  return GS_OK;
++  server_pin_failed = !configure_server_pin();
++  return server_pin_failed ? GS_FAILED : GS_OK;
+ }
+ 
+ int http_request(char* url, PHTTP_DATA data) {
++  /* gs_init historically ignores http_init's result. Never let that turn a
++   * missing, malformed or unsupported pin into an unverified request. */
++  if (server_pin_failed) {
++    gs_error = "Korri server certificate pin could not be configured";
++    return GS_FAILED;
++  }
+   curl_easy_setopt(curl, CURLOPT_WRITEDATA, data);
+   curl_easy_setopt(curl, CURLOPT_URL, url);
+ #ifdef __FreeBSD__

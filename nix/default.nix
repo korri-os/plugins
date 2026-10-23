@@ -337,6 +337,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         };
         korri-plugin-builder = korri.lib.${system}.pluginBuilderCheck { inherit pkgs; };
         korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
+        korri-moonlight-server-pin = import ../services/moonlight/server-pin-check.nix {
+          inherit pkgs moonlightPackage;
+        };
         korri-moonlight-plugin-native = import ../plugins/moonlight/native-check.nix {
           inherit pkgs;
           plugin = moonlightDefinition;
