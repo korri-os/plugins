@@ -55,17 +55,16 @@ gate. No Cookie or Authorization support is requested.
 
 ## Checks and limits
 
-Run focused offline package/admission/type/handler checks with the candidate
-Core that provides request-turn form POSTs:
+Run focused offline package/admission/type/handler checks:
 
 ```sh
-nix build --no-link \
-  --override-input korri git+file:///absolute/path/to/candidate-core \
-  .#checks.x86_64-linux.korri-itchio-plugin
+nix build --no-link .#checks.x86_64-linux.korri-itchio-plugin \
+  .#checks.aarch64-linux.korri-itchio-plugin
 ```
 
-The checked-in Core pin is deliberately unchanged until the reviewed contract
-is reachable and selected. Do not commit a developer-path override. Tests use
+The publisher pins Core `1e5f6b8b432d3970b9814884769503827d0c8629`, which
+provides request-turn form POSTs. This is a consumed contract change, not an
+unrelated dependency update. No developer-path override is needed. Tests use
 static fixtures and synthetic artifact URLs, not live signed links.
 
 Core also carries the ignored live test
@@ -80,8 +79,11 @@ manifest hosts, uses production public-DNS acquisition without retries, checks
 imported byte identity and cache routing, then runs the existing native test.
 Its library is disposable. It does not install packages or change trust.
 
-The coordinator separately downloaded the author's actual 30,267-byte file
-without cookies and verified it through the packaged native runner. That is
-not yet proof of search/acquire/import through the combined Core/provider.
-Offline tests do not grant publication, trust, installation, or device
+The coordinator ran that live test against the pinned Core revision and the
+actual packaged provider and runner. Search, details, acquire, import, cache
+routing, byte identity, native startup and exit passed. The acquired file was
+30,267 bytes, SHA-256
+`dafd29ad1638425c743efda2af273a29376989904502193d216164235e8f3ace`.
+No cookies were used. This is not full-game, audible-audio or physical-control
+acceptance. Tests do not grant publication, trust, installation, or device
 acceptance. No deployment or publication belongs to this slice.
