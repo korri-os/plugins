@@ -1,0 +1,234 @@
+{
+  "routeLayers": {
+    "_tag": "Present"
+  },
+  "layers": [
+    {
+      "scope": {
+        "_tag": "Device"
+      },
+      "title": "Device",
+      "cpu": {},
+      "gpu": {}
+    },
+    {
+      "scope": {
+        "_tag": "System",
+        "id": "switch"
+      },
+      "title": "Nintendo Switch",
+      "cpu": {},
+      "gpu": {}
+    },
+    {
+      "scope": {
+        "_tag": "Runner",
+        "id": "@<publisher>:eden/eden"
+      },
+      "title": "@<publisher>:eden/eden",
+      "cpu": {},
+      "gpu": {}
+    },
+    {
+      "scope": {
+        "_tag": "Game",
+        "id": "super-mario-odyssey-0100000000010000-v0"
+      },
+      "title": "Super Mario Odyssey [0100000000010000][v0]",
+      "cpu": {},
+      "gpu": {}
+    },
+    {
+      "scope": {
+        "_tag": "Release",
+        "id": {
+          "gameId": "super-mario-odyssey-0100000000010000-v0",
+          "releaseId": "switch"
+        }
+      },
+      "title": "switch",
+      "cpu": {},
+      "gpu": {}
+    }
+  ],
+  "resolved": {
+    "cpu": {
+      "min": {
+        "value": 0,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      },
+      "max": {
+        "value": 100,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      }
+    },
+    "gpu": {
+      "min": {
+        "value": 0,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      },
+      "max": {
+        "value": 100,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      }
+    },
+    "governor": "schedutil"
+  },
+  "profiles": [],
+  "deviceFacts": {
+    "defaults": {
+      "cpu": {
+        "min": 0,
+        "max": 100
+      },
+      "gpu": {
+        "min": 0,
+        "max": 100
+      },
+      "governor": "schedutil"
+    },
+    "cpuPolicies": [
+      {
+        "name": "policy0",
+        "cpus": [
+          0,
+          1,
+          2
+        ],
+        "cpuinfoMaxFreq": 2016000,
+        "availableFrequencies": [
+          307200,
+          441600,
+          556800,
+          672000,
+          787200,
+          902400,
+          1017600,
+          1113600,
+          1228800,
+          1344000,
+          1459200,
+          1555200,
+          1670400,
+          1785600,
+          1900800,
+          2016000
+        ],
+        "availableGovernors": [
+          "ondemand",
+          "powersave",
+          "performance",
+          "schedutil"
+        ]
+      },
+      {
+        "name": "policy3",
+        "cpus": [
+          3,
+          4,
+          5,
+          6
+        ],
+        "cpuinfoMaxFreq": 2803200,
+        "availableFrequencies": [
+          499200,
+          614400,
+          729600,
+          844800,
+          940800,
+          1056000,
+          1171200,
+          1286400,
+          1401600,
+          1536000,
+          1651200,
+          1785600,
+          1920000,
+          2054400,
+          2188800,
+          2323200,
+          2457600,
+          2592000,
+          2707200,
+          2803200
+        ],
+        "availableGovernors": [
+          "ondemand",
+          "powersave",
+          "performance",
+          "schedutil"
+        ]
+      },
+      {
+        "name": "policy7",
+        "cpus": [
+          7
+        ],
+        "cpuinfoMaxFreq": 2956800,
+        "availableFrequencies": [
+          595200,
+          729600,
+          864000,
+          998400,
+          1132800,
+          1248000,
+          1363200,
+          1478400,
+          1593600,
+          1708800,
+          1843200,
+          1977600,
+          2092800,
+          2227200,
+          2342400,
+          2476800,
+          2592000,
+          2726400,
+          2841600,
+          2956800
+        ],
+        "availableGovernors": [
+          "ondemand",
+          "powersave",
+          "performance",
+          "schedutil"
+        ]
+      }
+    ],
+    "gpuDevfreq": [
+      {
+        "name": "3d00000.gpu",
+        "availableFrequencies": [
+          220000000,
+          295000000,
+          348000000,
+          401000000,
+          475000000,
+          550000000,
+          615000000,
+          680000000
+        ]
+      }
+    ]
+  },
+  "revisions": {
+    "device": "2b434f34095f630806ee3554a9120f378740b749ab8e4dbf5e702e20381bb5fe",
+    "games": "8aa9f6be1c4a3ad1d5dbf7528365ccfab464a70414b9a00cbd4cf617c0f92806"
+  }
+}

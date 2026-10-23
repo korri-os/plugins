@@ -2,6 +2,7 @@
   korri,
   nixpkgs,
   nixpkgs-held,
+  nixpkgs-eden,
   flake-utils,
   gitConfigFile ? null,
 }:
@@ -149,6 +150,15 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = pluginSourceOnly ../plugins/cemu;
       plugin = _: import ../plugins/cemu/plugin.nix { inherit cemuPackage; };
     };
+    # Isolate Eden's newer dependencies from Sunshine's approved base derivation.
+    edenPkgs = import nixpkgs-eden { inherit system; };
+    edenPackage = import ../plugins/eden/package.nix { pkgs = edenPkgs; };
+    edenBench = import ../plugins/eden/bench { inherit pkgs; };
+    edenPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = pluginSourceOnly ../plugins/eden;
+      plugin = _: import ../plugins/eden/plugin.nix { inherit edenPackage; };
+    };
     solarusPackage = import ../plugins/solarus/package.nix { inherit pkgs; };
     solarusPlugin = mkPlugin {
       publisher.namespace = "@korri";
@@ -247,6 +257,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       solarus = solarusPackage;
       cemu = cemuPackage;
       korri-plugin-cemu = cemuPlugin;
+      eden = edenPackage;
+      eden-bench = edenBench;
+      korri-plugin-eden = edenPlugin;
       korri-plugin-zquest-classic = zquestPlugin;
       zquest-classic = zquestLauncher;
       zquest-classic-source = import ./zquest-source-release.nix {
@@ -280,6 +293,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         type = "app";
         program = "${cemuBench}/bin/korri-cemu-bench";
       };
+      eden-bench = {
+        type = "app";
+        program = "${edenBench}/bin/korri-eden-bench";
+      };
       korri-cache = {
         type = "app";
         program = "${cacheTool}/bin/korri-cache";
@@ -297,6 +314,18 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       sunshine.checks
       // integration.checks
       // {
+        korri-eden-bench = edenBench;
+        korri-eden-package = import ./eden-check.nix {
+          inherit pkgs edenPackage;
+          package = edenPlugin;
+          contract = korri.lib.${system}.pluginContract;
+        };
+        korri-eden-admission = import ./eden-admission.nix {
+          inherit pkgs;
+          package = edenPlugin;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+          korridPackage = korri.packages.${system}.korrid;
+        };
         korri-plugin-builder = korri.lib.${system}.pluginBuilderCheck { inherit pkgs; };
         korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
         korri-sunshine-plugin-native = import ../plugins/sunshine/native-check.nix {

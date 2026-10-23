@@ -1,0 +1,13 @@
+{
+  "before": {
+    "path": "/nix/store/y1vrxl47w3arr32py7vkga91p69376ys-eden-korri-0.2.1",
+    "paths": 373,
+    "narBytes": 2115473024
+  },
+  "after": {
+    "path": "/nix/store/sb5n610yvbk59qg66sfk8pyj9w3hc163-eden-korri-0.2.1",
+    "paths": 374,
+    "narBytes": 2117769192
+  },
+  "increaseNarBytes": 2296168
+}

@@ -22,6 +22,8 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-plugin-retroarch` | `@korri:retroarch` | `plugins/retroarch/` |
 | `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
 | `korri-plugin-solarus` | `@korri:solarus` | `plugins/solarus/` |
+| `korri-plugin-eden` | `@korri:eden` | `plugins/eden/` |
+| `eden` | Standalone Eden 0.2.1 launcher | `plugins/eden/` |
 | `solarus` | Standalone Solarus 2.1.4 engine | `plugins/solarus/` |
 | `korri-plugin-cemu` | `@korri:cemu` (Wii U) | `plugins/cemu/` |
 | `cemu` | Standalone Cemu main with offline Github989 graphic packs | `plugins/cemu/` |
@@ -97,6 +99,22 @@ separate acceptance checks.
 Cubeb and offline graphic packs. It uses account-local native configuration
 and per-game MLC saves. See [its instructions](plugins/cemu/README.md) for
 source/CI provenance, native path grounding, checks and acceptance limits.
+
+## Eden
+
+`@korri:eden` is the official Nintendo Switch `.nsp`/`.xci` runner, packaged
+from nixpkgs Eden 0.2.1 for aarch64 and x86_64 Linux. A plugin-only unstable
+input (`nixpkgs-eden`) pins the exact Eden build that was tested on devices;
+the upstream emulator is reused from cache.nixos.org. Native configuration and
+keys stay account-local; the native save NAND uses korrid's save root. On the
+AYN Odin 2 Portal, Super Mario Odyssey held 60 FPS on Turnip with NCE (the
+shipped default) and with Dynarmic, at a labelled static view. On the Retroid
+Pocket Mini V2, Eden ran out of memory within 5.4 GiB without swap; no FPS
+result exists there. Device tests used a personally signed build of the same
+source; official `@korri` publication is separate. See
+[the Eden instructions](plugins/eden/README.md) and
+[bench status](plugins/eden/bench/STATUS.md) for evidence and limits. Nothing
+is bundled for proprietary content.
 
 ## Gamescope
 

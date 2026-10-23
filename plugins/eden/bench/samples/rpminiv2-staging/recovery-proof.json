@@ -1,0 +1,10 @@
+{
+  "launchId": "2ed49314b125906f46c450f4a39627d6",
+  "recordSha256Before": "e5a0c180a415ff14b1e8ac03eb1be24b620b42b3573e39d2b5b6b8ff1bb7d104",
+  "exactCgroupEmpty": true,
+  "activeGameAcquireUnitsEmpty": true,
+  "reason": "native journal directs restart after input coordination fenced; no session/history file is edited",
+  "rpcIdleAfterRestart": true,
+  "activeRecordExistsAfterRestart": false,
+  "restoredIniSha256": "a2459bd8025e0d50e92f36cae7a38b904639212a98b8a7c6f042f19c20bbcba8"
+}

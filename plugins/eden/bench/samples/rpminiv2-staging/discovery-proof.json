@@ -1,0 +1,12 @@
+{
+  "gameId": "super-mario-odyssey-0100000000010000-v0",
+  "releaseId": "sha256:f03f0f998d8f67abc8801ebd7fee977bafaa7449cfa758727a67fec1e57e2097",
+  "existingLibraryRecords": 76,
+  "existingRecordsEqual": true,
+  "onlySwitchSmoAdditions": true,
+  "newSmoLocationFirstSeenAt": "2026-10-23T15:56:26Z",
+  "firstSeenProducer": "config/mod.rs:733-734; discovery/reconcile/change.rs:692",
+  "secondRescanSemanticallyIdempotent": true,
+  "daemonPidDuringBothOfflineOperations": 0,
+  "controlSocketStoppedForBoth": true
+}

@@ -1,0 +1,8 @@
+{
+  "runtimeUid": 1000,
+  "realSeatDiscovery": true,
+  "nativeA": "\"engine:sdl,port:0,guid:030000005e0400008e02000014010000,button:1\"",
+  "bindingsWritten": 26,
+  "userConfigurationUnchanged": true,
+  "stderr": "Eden P1: native defaults assigned to Korri Seat P1"
+}

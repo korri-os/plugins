@@ -1,0 +1,20 @@
+{
+  "stoppedAtUtc": "2026-10-23T18:56:29Z",
+  "reason": "parent 45-minute unreachable recovery cutoff",
+  "quietSshAttempts": 5,
+  "quietSshAttemptsSucceeded": 0,
+  "lastQuietSshAttemptEndedAtUtc": "2026-10-23T18:52:02.821552Z",
+  "ownedLaunchId": "1fdb894c480392ffb90c1d63df2cea0a",
+  "ownedCgroupEmptyAfterFinalAttempt": "unverified",
+  "nativeIniRestoredAfterFinalAttempt": "unverified",
+  "nativeBaselineSha256": "a2459bd8025e0d50e92f36cae7a38b904639212a98b8a7c6f042f19c20bbcba8",
+  "directRpcAttempted": false,
+  "directRpcUnavailableReason": "kiosk credential remained only on unreachable Mini; no host copy or unauthenticated substitute",
+  "remoteRebootAttempted": false,
+  "userOnlyRecovery": "physical power-button reset if Mini remains unresponsive; then exact-owned stop/hash restoration and collect missing evidence",
+  "acceptedGameplayWindows": 0,
+  "acceptedFpsStatistics": null,
+  "soakSecondsAccepted": 0,
+  "miniShippingDefaultChanged": false,
+  "furtherDeviceActionsQueued": false
+}

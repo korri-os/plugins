@@ -1,0 +1,9 @@
+{
+  "snapshotId": "sha256:c2fc9137ff42198e277a1948a6ca379c773b35a21b57b38174933180294c2ca0",
+  "headCount": 1,
+  "nativeProfileFolder": "<eden-profile-4>",
+  "bothImportedFilesInNormalCompletionSnapshot": true,
+  "interrupted": false,
+  "endedAt": "2026-10-23T16:13:48.000Z",
+  "existingFederatedHistoryPreserved": true
+}

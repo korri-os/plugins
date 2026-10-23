@@ -1,0 +1,22 @@
+{
+  "runnerId": "@<publisher>:eden/eden",
+  "program": "/nix/store/y1vrxl47w3arr32py7vkga91p69376ys-eden-korri-0.2.1/bin/eden",
+  "accountRoot": "/var/lib/korri/users/<account>",
+  "saveRoot": "/var/lib/korri/users/<account>/saves/super-mario-odyssey-0100000000010000-v0",
+  "modifiers": [
+    "@korri:gamescope/gamescope"
+  ],
+  "display": {
+    "width": 1920,
+    "height": 1080
+  },
+  "command": "/nix/store/iw35i62ccjdirpd5z99837rpx08rnhf9-gamescope-3.16.18/bin/gamescope",
+  "saveLocations": [
+    {
+      "key": "saves",
+      "kind": "save",
+      "path": "/var/lib/korri/users/<account>/saves/super-mario-odyssey-0100000000010000-v0/nand/user/save"
+    }
+  ],
+  "bubblewrap": "absent \u2014 core gap #184"
+}

@@ -1,0 +1,23 @@
+{
+  "firmware": {
+    "directories": 214,
+    "files": 167,
+    "bytes": 246074368
+  },
+  "firmwareAllBytesAndDirectoryLayoutMatch": true,
+  "game": {
+    "bytes": 5611009601,
+    "matchesReadOnlySourceThroughHostCopy": true
+  },
+  "keys": {
+    "prod.keys": {
+      "path": "/var/lib/korri/users/<account>/.local/share/eden/keys/prod.keys",
+      "bytes": 14612
+    },
+    "title.keys": {
+      "path": "/var/lib/korri/users/<account>/.local/share/eden/keys/title.keys",
+      "bytes": 1292
+    }
+  },
+  "keyPrivatePermissionsVerified": true
+}

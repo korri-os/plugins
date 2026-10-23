@@ -1,0 +1,24 @@
+{
+  "purpose": "normal session-end import of the user save; not a benchmark",
+  "launchId": "7b886da582bcb235eabf52b4e6a5536e",
+  "unit": "korri-game-7b886da582bcb235eabf52b4e6a5536e.service",
+  "rendererPid": 23034,
+  "accountRoot": "/var/lib/korri/users/<account>",
+  "saveRoot": "/var/lib/korri/users/<account>/saves/super-mario-odyssey-0100000000010000-v0",
+  "nativeProfileFolder": "<eden-profile-4>",
+  "nativeProfileBytes": 1616,
+  "activeIndex": 0,
+  "importedFiles": {
+    "Common.bin": {
+      "bytes": 1036,
+      "sha256": "def8bd226daedd2b08808e277e68ed3224be8f606609acaa44ecf99169101fac"
+    },
+    "File1.bin": {
+      "bytes": 2097164,
+      "sha256": "f3b0a2f4e5af014ccc0da95198161904a0ae7073cff2ea88a8936ea091c240f5"
+    }
+  },
+  "destination": "/var/lib/korri/users/<account>/saves/super-mario-odyssey-0100000000010000-v0/nand/user/save/0000000000000000/<eden-profile-4>/0100000000010000",
+  "copyVerified": true,
+  "remainingCgroup": {}
+}

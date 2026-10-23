@@ -1,0 +1,14 @@
+{
+  "samples": 132,
+  "minimumMemAvailable_kB": 36248,
+  "peakSummedSessionRss_kB": 5215624,
+  "peakSessionSwap_kB": 0,
+  "peakThermal_mC": 64000,
+  "peakGlobalMemoryFullPsiAvg10Percent": 30.63,
+  "peakGlobalMemorySomePsiAvg10Percent": 38.35,
+  "cgroupOomObserved": false,
+  "cgroupOomKillObserved": false,
+  "acceptedFpsBins": 0,
+  "nativeShmemPeak": "not sampled separately in this run; no value inferred from maps",
+  "navigationAccepted": false
+}

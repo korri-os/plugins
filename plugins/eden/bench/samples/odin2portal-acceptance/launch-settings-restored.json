@@ -1,0 +1,67 @@
+{
+  "changes": [
+    {
+      "setting": "cpu.min",
+      "restored": null
+    },
+    {
+      "setting": "gpu.min",
+      "restored": null
+    },
+    {
+      "modifier": "@korri:gamescope/gamescope",
+      "enabledRestored": null,
+      "unrelatedDocumentStatePreserved": true
+    }
+  ],
+  "librarySha256": "8aa9f6be1c4a3ad1d5dbf7528365ccfab464a70414b9a00cbd4cf617c0f92806",
+  "originalLibrarySha256": "8aa9f6be1c4a3ad1d5dbf7528365ccfab464a70414b9a00cbd4cf617c0f92806",
+  "gameLayer": {
+    "scope": {
+      "_tag": "Game",
+      "id": "super-mario-odyssey-0100000000010000-v0"
+    },
+    "title": "Super Mario Odyssey [0100000000010000][v0]",
+    "cpu": {},
+    "gpu": {}
+  },
+  "resolved": {
+    "cpu": {
+      "min": {
+        "value": 0,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      },
+      "max": {
+        "value": 100,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      }
+    },
+    "gpu": {
+      "min": {
+        "value": 0,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      },
+      "max": {
+        "value": 100,
+        "source": {
+          "_tag": "Device"
+        },
+        "deviceDefault": true,
+        "adjusted": false
+      }
+    },
+    "governor": "schedutil"
+  }
+}

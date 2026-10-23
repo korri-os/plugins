@@ -1,0 +1,9 @@
+{
+  "reference": "reference.jpg",
+  "originalSha256": "c76f25a1f29f01ebf0c38b23e4cb0fe16ac888c7f0c0734ea0322b64986bd153",
+  "derivativeSha256": "6d674b1a8d38b343f1581ef57c4f3b91b1bff96e59206421e3a750ac723f8fc4",
+  "encoder": "Pillow 12.0.0",
+  "settings": "JPEG quality=85, optimize=True, full resolution, RGB",
+  "bytes": 126569,
+  "description": "encoded derivative of c76f25a1f29f01ebf0c38b23e4cb0fe16ac888c7f0c0734ea0322b64986bd153"
+}

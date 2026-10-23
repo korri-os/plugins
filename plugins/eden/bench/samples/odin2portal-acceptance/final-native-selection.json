@@ -1,0 +1,12 @@
+{
+  "p1A": "engine:sdl,port:0,guid:030000005e0400008e02000014010000,button:1",
+  "p1ADefault": false,
+  "vulkanDevice": 1,
+  "vulkanDeviceDefault": false,
+  "cpuBackend": 1,
+  "cpuBackendDefault": true,
+  "rpcIdleVerified": true,
+  "status": {
+    "code": "SessionCompleted"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "r1-nce-diagnosed",
+  "backendRequested": "Nce",
+  "mode": "run",
+  "temporaryNativeSettings": "handheld; guest P1 to Seat P2; selected CPU backend",
+  "shippedP1": "Seat P1",
+  "baselineIniSha256": "a2459bd8025e0d50e92f36cae7a38b904639212a98b8a7c6f042f19c20bbcba8",
+  "baselineIniMode": 432,
+  "restorePending": false,
+  "temporaryP1Seat": {
+    "name": "Korri Seat P2",
+    "guid": "030000005e0400008e02000014010000",
+    "port": 1
+  },
+  "nativeP1FieldsChanged": 23,
+  "overrideIniSha256": "d53fcc3e78cbf2bd1a500f134c80ec104112fa30b0e037f1781808bbf74de496",
+  "collectorPid": 29856,
+  "unit": "korri-game-06ce618a9471d5c33e468ac9236797de.service",
+  "launchId": "06ce618a9471d5c33e468ac9236797de",
+  "rendererPid": 29920,
+  "ignoredReadOnlyCemuProbes": [
+    {
+      "pid": 30763,
+      "exe": "/nix/store/rivsjh5plkn9y7fs4b3wbyi720727nxd-procps-4.0.7/bin/pgrep",
+      "startTicks": "795213"
+    }
+  ],
+  "collectorExitCode": 1,
+  "remainingCgroup": {},
+  "restoredIniSha256": "a2459bd8025e0d50e92f36cae7a38b904639212a98b8a7c6f042f19c20bbcba8"
+}

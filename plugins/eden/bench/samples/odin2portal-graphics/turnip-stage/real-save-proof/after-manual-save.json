@@ -1,0 +1,12 @@
+{
+  "File1.bin": {
+    "bytes": 2097164,
+    "sha256": "b93eb755ab6ba71fe355d05492d650f203bb8404547cf1e2fbabc07969846509",
+    "mtimeNs": 1792738138321825639
+  },
+  "Common.bin": {
+    "bytes": 1036,
+    "sha256": "c96ccc89f10a2838545bfd2617b3a94855c544bc5841a4ddbca452a67efe3fc4",
+    "mtimeNs": 1792738138415866270
+  }
+}

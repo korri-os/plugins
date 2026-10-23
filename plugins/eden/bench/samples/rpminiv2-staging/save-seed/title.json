@@ -1,0 +1,9 @@
+{
+  "unit": "korri-game-7b886da582bcb235eabf52b4e6a5536e.service",
+  "rendererPid": 23034,
+  "namespacePid": 39,
+  "runtimeUid": 1000,
+  "window": 8388621,
+  "probeFrames": 88,
+  "method": "XRes-selected presenting Eden window; native xwd/XGetImage; not physical-panel scanout"
+}

@@ -1,0 +1,32 @@
+{
+  "nce": {
+    "measurementSamples": 176,
+    "peakTemperatureSensor": "thermal/thermal_zone14/cpu7-middle-thermal/mC",
+    "peakTemperatureMilliC": 72800,
+    "measurementRssFirstKb": 5995256,
+    "measurementRssLastKb": 5996100,
+    "measurementRssMinKb": 5995256,
+    "measurementRssPeakKb": 5996100,
+    "peakSwapKb": 0
+  },
+  "dynarmic": {
+    "measurementSamples": 177,
+    "peakTemperatureSensor": "thermal/thermal_zone14/cpu7-middle-thermal/mC",
+    "peakTemperatureMilliC": 78800,
+    "measurementRssFirstKb": 5864476,
+    "measurementRssLastKb": 5865780,
+    "measurementRssMinKb": 5864476,
+    "measurementRssPeakKb": 5865780,
+    "peakSwapKb": 0
+  },
+  "soak-nce": {
+    "measurementSamples": 883,
+    "peakTemperatureSensor": "thermal/thermal_zone14/cpu7-middle-thermal/mC",
+    "peakTemperatureMilliC": 83200,
+    "measurementRssFirstKb": 5998652,
+    "measurementRssLastKb": 5999420,
+    "measurementRssMinKb": 5998652,
+    "measurementRssPeakKb": 5999420,
+    "peakSwapKb": 0
+  }
+}

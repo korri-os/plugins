@@ -3,6 +3,7 @@
 
   inputs = {
     korri.url = "github:korri-os/korri/eab74c96134abed6453ff74c6c80bf4ebca5c52f";
+    nixpkgs-eden.url = "github:NixOS/nixpkgs/02c087f3fe673c9e317f206a627cb6b910336dbe";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # Temporary: the previous nixpkgs lock, held for the plugins that cannot
     # move yet. Every other plugin follows `nixpkgs`. Remove this input when
@@ -23,6 +24,7 @@
       korri,
       nixpkgs,
       nixpkgs-held,
+      nixpkgs-eden,
       flake-utils,
       ...
     }:
@@ -31,6 +33,7 @@
         korri
         nixpkgs
         nixpkgs-held
+        nixpkgs-eden
         flake-utils
         ;
     })
@@ -40,6 +43,7 @@
           korri
           nixpkgs
           nixpkgs-held
+          nixpkgs-eden
           flake-utils
           ;
         gitConfigFile = "/run/korri-github-source-auth/gitconfig";

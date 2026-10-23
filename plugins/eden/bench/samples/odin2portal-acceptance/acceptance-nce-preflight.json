@@ -1,0 +1,24 @@
+{
+  "intervalSeconds": 0.005,
+  "clock": "host monotonic_ns",
+  "processes": {
+    "korri-game-3a7d9c68382126a2660aafce3ee6a3b0.service:107107": {
+      "unit": "korri-game-3a7d9c68382126a2660aafce3ee6a3b0.service",
+      "pid": 107107,
+      "script": "vulkan_device.py",
+      "previousAbsentNs": 20323245649589,
+      "firstSeenNs": 20323251268254,
+      "lastSeenNs": 20323339320428,
+      "firstAbsentNs": 20323344830033
+    },
+    "korri-game-3a7d9c68382126a2660aafce3ee6a3b0.service:107131": {
+      "unit": "korri-game-3a7d9c68382126a2660aafce3ee6a3b0.service",
+      "pid": 107131,
+      "script": "p1_controls.py",
+      "previousAbsentNs": 20323344830033,
+      "firstSeenNs": 20323353686536,
+      "lastSeenNs": 20323391770502,
+      "firstAbsentNs": 20323397173859
+    }
+  }
+}

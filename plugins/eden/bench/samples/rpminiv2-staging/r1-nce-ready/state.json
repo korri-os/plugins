@@ -1,0 +1,24 @@
+{
+  "name": "r1-nce-ready",
+  "backendRequested": "Nce",
+  "mode": "run",
+  "temporaryNativeSettings": "handheld; guest P1 to Seat P2; selected CPU backend",
+  "shippedP1": "Seat P1",
+  "baselineIniSha256": "a2459bd8025e0d50e92f36cae7a38b904639212a98b8a7c6f042f19c20bbcba8",
+  "baselineIniMode": 432,
+  "restorePending": false,
+  "temporaryP1Seat": {
+    "name": "Korri Seat P2",
+    "guid": "030000005e0400008e02000014010000",
+    "port": 1
+  },
+  "nativeP1FieldsChanged": 23,
+  "overrideIniSha256": "d53fcc3e78cbf2bd1a500f134c80ec104112fa30b0e037f1781808bbf74de496",
+  "collectorPid": 24762,
+  "unit": "korri-game-2ed49314b125906f46c450f4a39627d6.service",
+  "launchId": "2ed49314b125906f46c450f4a39627d6",
+  "rendererPid": 24828,
+  "error": "Cemu appeared; exact owned stop and yield",
+  "remainingCgroup": {},
+  "restoredIniSha256": "a2459bd8025e0d50e92f36cae7a38b904639212a98b8a7c6f042f19c20bbcba8"
+}

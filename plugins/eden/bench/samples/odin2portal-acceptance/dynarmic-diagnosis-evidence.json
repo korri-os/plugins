@@ -1,0 +1,31 @@
+{
+  "status": {
+    "code": "HostLaunchFailed",
+    "message": "host launch 401b26192b3029520b01d9256945c487 failed: game unit failed with exit status 143"
+  },
+  "unitJournalExtract": [
+    "2026-10-23T10:29:00+00:00 odin2portal systemd[1]: korri-game-401b26192b3029520b01d9256945c487.service: Main process exited, code=exited, status=143/n/a",
+    "2026-10-23T10:29:00+00:00 odin2portal systemd[1]: korri-game-401b26192b3029520b01d9256945c487.service: Failed with result 'exit-code'.",
+    "2026-10-23T10:29:00+00:00 odin2portal systemd[1]: korri-game-401b26192b3029520b01d9256945c487.service: Consumed 303ms CPU time over 443ms wall clock time, 158.1M memory peak, 88.3M read from disk."
+  ],
+  "korridJournal": [
+    "2026-10-23T10:29:00+00:00 odin2portal korri-bundle-launch[1964]: korrid: session limits restore unavailable: limits helper refused request: {\"message\":\"unit does not name the active session\"}",
+    "2026-10-23T10:29:18+00:00 odin2portal korri-bundle-launch[1964]: korrid save push: SavePeerUnavailable"
+  ],
+  "latestAttemptCollectorTraceback": "Traceback (most recent call last):\n  File \"/nix/store/zd7jxck7icv2hizxr6zlx65ci4n89qnz-korri-eden-bench-0.2.2/lib/eden-bench/bench.py\", line 13, in <module>\n    from eden import evidence, map_signal, native_config, selected_backend\n  File \"/nix/store/zd7jxck7icv2hizxr6zlx65ci4n89qnz-korri-eden-bench-0.2.2/lib/eden-bench/eden.py\", line 8, in <module>\n    from rpc import Record\n  File \"<frozen importlib._bootstrap>\", line 1360, in _find_and_load\n  File \"<frozen importlib._bootstrap>\", line 1322, in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 1262, in _find_spec\n  File \"<frozen importlib._bootstrap_external>\", line 1560, in find_spec\n  File \"<frozen importlib._bootstrap_external>\", line 1534, in _get_spec\n  File \"<frozen importlib._bootstrap_external>\", line 1666, in find_spec\n  File \"<frozen importlib._bootstrap_external>\", line 166, in _path_isfile\n  File \"<frozen importlib._bootstrap_external>\", line 158, in _path_is_mode_type\n  File \"<frozen importlib._bootstrap_external>\", line 152, in _path_stat\nKeyboardInterrupt\n",
+  "latestAttemptOutputDirectoryExists": false,
+  "latestAttemptEdenLogExists": false,
+  "priorUnitProcesses": {
+    "112736": {
+      "exe": "/nix/store/nvs92ijqg09cranbzg1d0f2whybvvr32-korrid-0.0.0/bin/korrid",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-401b26192b3029520b01d9256945c487.service\n",
+      "start_ticks": "2126936"
+    },
+    "112745": {
+      "exe": "/nix/store/iw35i62ccjdirpd5z99837rpx08rnhf9-gamescope-3.16.18/bin/.gamescope-wrapped",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-401b26192b3029520b01d9256945c487.service\n",
+      "start_ticks": "2126938"
+    }
+  },
+  "earlierGameplayEffectiveRenderer": "M- Cpu.cpu_backend: Dynarmic\n[   1.094124] Render.Vulkan <Info> video_core/renderer_vulkan/renderer_vulkan.cpp:221:Report: Driver: turnip Mesa driver 26.2.3\n[   1.094127] Render.Vulkan <Info> video_core/renderer_vulkan/renderer_vulkan.cpp:222:Report: Device: Turnip Adreno (TM) 740\n[   1.094129] Render.Vulkan <Info> video_core/renderer_vulkan/renderer_vulkan.cpp:223:Report: Vulkan: 1.4.354\n[   1.094133] Render.Vulkan <Info> video_core/renderer_vulkan/renderer_vulkan.cpp:224:Report: Available VRAM: 4.00 GiB\n"
+}

@@ -1,0 +1,26 @@
+{
+  "launchId": "d72ddb318165f9c21b773299b7574332",
+  "gameId": "super-mario-odyssey-0100000000010000-v0",
+  "saveBase": "sha256:1c75fe9996b79516be26c5193e7623c7f86d7c243b10d90bbe7ae81604918b8f",
+  "retainedRecordSha256": "7739f9fa3a51f193f3f24d3564e393d5f47f68124d697954d0c0349c35943e1e",
+  "exactCgroupEmpty": true,
+  "activeGameAcquireUnitsEmpty": true,
+  "beforeStatus": {
+    "failure": {
+      "code": "HostRecoveryBlocked",
+      "message": "host recovery identity requires administrator resolution"
+    },
+    "pendingLaunchesAbsentForSharedPortalCaller": true,
+    "basis": "lib.rs:2340-2361 with_pending_launches projects any shared-portal reservations into Ok even when native status is blocked"
+  },
+  "recoveryAuthority": "parent approval; only systemctl restart korrid; native completion additions allowed per session_state.rs:816-935",
+  "rpcIdleAfterRestart": true,
+  "activeRecordExistsAfterRestart": false,
+  "existingCatalogueSemanticallyUnchanged": true,
+  "existingSnapshotRecordsUnchanged": 177,
+  "nativeAddedSnapshot": "sha256:479144091c8d6de337e7ec65cf17969bfd42e849de0a46a59effe1c1a6915468",
+  "nativeCompletionEndedAt": "2026-10-23T17:49:48.000Z",
+  "nativeCompletionDurationSeconds": 2036,
+  "onlyOwnPlayEntryAdded": true,
+  "snapshotSaveContentMatchesBeforeOom": true
+}

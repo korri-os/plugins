@@ -1,0 +1,17 @@
+{
+  "unit": "korri-game-218d953fd745d7dd0cd8f52592601c50.service",
+  "rendererPid": 117176,
+  "identity": {
+    "exe": "/nix/store/010847afgzfll903n5dbzqdajmm1m0n7-eden-0.2.1/bin/..eden-wrapped-wrapped",
+    "cgroup": "0::/korri.slice/korri-games.slice/korri-game-218d953fd745d7dd0cd8f52592601c50.service\n",
+    "start_ticks": "2223108"
+  },
+  "namespacePid": 39,
+  "window": "10485773",
+  "presentFrames": {
+    "10485773": 29
+  },
+  "keys": [],
+  "pngBytes": 1700049,
+  "monotonicNs": 22299849547474
+}

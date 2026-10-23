@@ -1,0 +1,8 @@
+# Normal admitted bench pad -> Korri Seat P2 -> Eden guest P1.
+# Requires the pictured real Bonneton save; no movement of Mario.
+E: 0.000000 0000 0000 0
+E: 45.000000 0001 0131 1
+E: 45.200000 0001 0131 0
+E: 60.000000 0003 0003 -32768
+E: 61.500000 0003 0003 0
+E: 62.000000 0000 0000 0

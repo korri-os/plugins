@@ -1,0 +1,17 @@
+{
+  "from": "/var/lib/korri/users/<account>/saves/super-mario-odyssey-0100000000010000-v0/nand/user/save/0000000000000000/<eden-profile>/0100000000010000",
+  "to": "/var/lib/korri/users/<account>/saves/super-mario-odyssey-0100000000010000-v0/nand/user/save/0000000000000000/<eden-profile-2>/0100000000010000",
+  "destinationBefore": {},
+  "copied": {
+    "File1.bin": {
+      "bytes": 2097164,
+      "sha256": "f3b0a2f4e5af014ccc0da95198161904a0ae7073cff2ea88a8936ea091c240f5"
+    },
+    "Common.bin": {
+      "bytes": 1036,
+      "sha256": "def8bd226daedd2b08808e277e68ed3224be8f606609acaa44ecf99169101fac"
+    }
+  },
+  "sourceLeftInPlace": true,
+  "backupRetained": true
+}

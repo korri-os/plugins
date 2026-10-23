@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "945e9d49ad13a55ae3e502b571f679c945539eab",
+  "publisherLiteralReplacementCount": 1,
+  "deployedPluginSha256": "bda1b5dfb6233fd7a97f91ca4b9508e04824fbddd2332424a35c677b3ae512b0",
+  "helpers": {
+    "p1_controls.py": {
+      "deployedPath": "/nix/store/77ndp24virwb0khxal8id2r46pi9w915-eden-korri-0.2.1/libexec/p1_controls.py",
+      "sha256": "f50fba2473246bfa37b4ec1ce7713e7317fdcdb1a2d49bbc5c550e1f5086537c",
+      "matchesSource": true
+    },
+    "p1-controls.ini": {
+      "deployedPath": "/nix/store/77ndp24virwb0khxal8id2r46pi9w915-eden-korri-0.2.1/libexec/p1-controls.ini",
+      "sha256": "6444307051acb55a52ce1ab7769ca04b072172dc0601963aa616ac48f6d06eda",
+      "matchesSource": true
+    },
+    "vulkan_device.py": {
+      "deployedPath": "/nix/store/77ndp24virwb0khxal8id2r46pi9w915-eden-korri-0.2.1/libexec/vulkan_device.py",
+      "sha256": "43d8dd3036d7808895f463e2ff1a9757e44b54537535cf163d782b19aa6dad83",
+      "matchesSource": true
+    }
+  }
+}

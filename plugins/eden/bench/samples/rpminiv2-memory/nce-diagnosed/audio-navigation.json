@@ -1,0 +1,36 @@
+{
+  "nodes": {
+    "63": {
+      "application.name": "Eden",
+      "application.process.binary": "..eden-wrapped-wrapped",
+      "media.class": "Stream/Output/Audio",
+      "node.name": "Eden"
+    }
+  },
+  "links": [
+    {
+      "id": 62,
+      "state": "active",
+      "outputNode": 63,
+      "inputNode": 50,
+      "sink": {
+        "media.class": "Audio/Sink",
+        "node.description": "Built-in Audio Speaker Playback",
+        "node.name": "alsa_output.platform-sound.HiFi__Speaker__sink"
+      }
+    },
+    {
+      "id": 66,
+      "state": "active",
+      "outputNode": 63,
+      "inputNode": 50,
+      "sink": {
+        "media.class": "Audio/Sink",
+        "node.description": "Built-in Audio Speaker Playback",
+        "node.name": "alsa_output.platform-sound.HiFi__Speaker__sink"
+      }
+    }
+  ],
+  "sinkVolume": "Volume: 0.00 [MUTED]",
+  "audible": "not verifiable at night, stream verified"
+}

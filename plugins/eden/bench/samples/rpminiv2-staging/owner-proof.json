@@ -1,0 +1,8 @@
+{
+  "statementId": "<owner-statement-mini>",
+  "ownerFingerprint": "<account>",
+  "kind": 30078,
+  "hashVerified": true,
+  "bip340Verified": true,
+  "status": "owned"
+}

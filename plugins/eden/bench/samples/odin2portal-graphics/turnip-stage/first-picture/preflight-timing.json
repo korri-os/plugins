@@ -1,0 +1,12 @@
+{
+  "intervalSeconds": 0.005,
+  "clock": "host monotonic_ns",
+  "processes": {
+    "36310": {
+      "previousAbsentNs": 5091655112993,
+      "firstSeenNs": 5091660382128,
+      "lastSeenNs": 5091879085731,
+      "firstAbsentNs": 5091885236719
+    }
+  }
+}

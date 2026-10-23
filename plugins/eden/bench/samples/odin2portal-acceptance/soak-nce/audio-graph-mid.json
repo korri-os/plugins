@@ -1,0 +1,53 @@
+{
+  "monotonicNs": 22859557995211,
+  "volumeBefore": "Volume: 0.50 [MUTED]",
+  "volumeAfter": "Volume: 0.50 [MUTED]",
+  "volumeChangedByWorkflow": false,
+  "sinkMuted": true,
+  "sinkZero": false,
+  "streams": [
+    {
+      "id": 61,
+      "state": "running",
+      "props": {
+        "application.name": "Eden",
+        "application.process.binary": "..eden-wrapped-wrapped",
+        "application.process.id": 39,
+        "media.class": "Stream/Output/Audio",
+        "node.name": "Eden"
+      }
+    }
+  ],
+  "sinks": [
+    {
+      "id": 53,
+      "state": "running",
+      "props": {
+        "audio.channels": 2,
+        "media.class": "Audio/Sink",
+        "node.description": "Built-in Audio Speaker playback",
+        "node.name": "alsa_output.platform-sound.HiFi__Speaker__sink"
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": 60,
+      "output-node-id": 61,
+      "output-port-id": 58,
+      "input-node-id": 53,
+      "input-port-id": 45,
+      "state": "active"
+    },
+    {
+      "id": 63,
+      "output-node-id": 61,
+      "output-port-id": 62,
+      "input-node-id": 53,
+      "input-port-id": 54,
+      "state": "active"
+    }
+  ],
+  "audible": "not verifiable at night, stream verified",
+  "monitorCapture": "not attempted: sink muted or zero; graph-only verification per night policy"
+}

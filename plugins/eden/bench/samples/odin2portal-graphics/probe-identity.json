@@ -1,0 +1,33 @@
+{
+  "namespacePid": 63,
+  "uid": 1000,
+  "gid": 1000,
+  "groups": [
+    17,
+    26,
+    303,
+    1000
+  ],
+  "cgroup": "0::/korri.slice/korri-games.slice/korri-game-0fa1444896386d6cdb7b6725ffb4aa3b.service\n",
+  "namespaces": {
+    "mnt": "mnt:[4026533478]",
+    "pid": "pid:[4026533477]",
+    "net": "net:[4026531833]",
+    "ipc": "ipc:[4026531839]",
+    "uts": "uts:[4026531838]",
+    "cgroup": "cgroup:[4026531835]"
+  },
+  "devices": {
+    "/dev/dri/renderD128": {
+      "mode": "0o666",
+      "uid": 0,
+      "gid": 303,
+      "readWriteOpen": true
+    }
+  },
+  "freedrenoIcdReadable": true,
+  "startedUtc": "2026-10-23T04:06:56.516732+00:00",
+  "vulkanInfoNamespacePid": 68,
+  "exitCode": 0,
+  "endedUtc": "2026-10-23T04:06:56.638578+00:00"
+}

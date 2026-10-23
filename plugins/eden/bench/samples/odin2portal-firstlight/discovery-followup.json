@@ -1,0 +1,43 @@
+{
+  "generation": "discovery-3",
+  "state": {
+    "_tag": "Problem",
+    "payload": {}
+  },
+  "sources": [
+    {
+      "id": "gba",
+      "label": "Game Boy Advance",
+      "system": "gba",
+      "status": {
+        "_tag": "Ready",
+        "payload": {}
+      }
+    },
+    {
+      "id": "switch",
+      "label": "Nintendo Switch",
+      "system": "switch",
+      "status": {
+        "_tag": "Ready",
+        "payload": {}
+      }
+    },
+    {
+      "id": "wiiu",
+      "label": "Wii U",
+      "system": "wiiu",
+      "status": {
+        "_tag": "Ready",
+        "payload": {}
+      }
+    }
+  ],
+  "attention": 0,
+  "diagnostics": [
+    {
+      "code": "DiscoveryConflict",
+      "message": "discovery configuration changed outside Korri; reload and try again"
+    }
+  ]
+}

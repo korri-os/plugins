@@ -1,0 +1,14 @@
+{
+  "acceptance-nce-preflight": {
+    "lowerMs": 140.5,
+    "upperMs": 151.52
+  },
+  "acceptance-dynarmic-preflight": {
+    "lowerMs": 165.08,
+    "upperMs": 176.02
+  },
+  "acceptance-soak-nce-preflight": {
+    "lowerMs": 267.39,
+    "upperMs": 278.51
+  }
+}

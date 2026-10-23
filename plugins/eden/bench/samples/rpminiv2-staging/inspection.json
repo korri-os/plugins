@@ -1,0 +1,60 @@
+{
+  "id": "@<publisher>:eden",
+  "package": "/nix/store/24yf1xbs5213vqx2if3qlqsz1cz6qqfz-korri-plugin",
+  "provenance": {
+    "kind": "RawCache",
+    "cache_url": "file:///var/lib/korri-private-cache.h6odJOu2/cache"
+  },
+  "approval": "e85353d0ac21a25374bdbfed84fd81e71a1002f5a8a1597c9932dc07bed9383a",
+  "policy": "policy-v4: exact named native service and socket sets; validated systemd directives; collision-safe runtime ownership; approved capabilities and device access; host hardening drop-ins; dynamic unprivileged services by default; host-owned IPv4/IPv6 ports; no install scripts; no host module loading",
+  "warning": "No native service is activated by this package. Approval covers the exact declaration and launch callback source. Game launch effects can access the runtime user's files and display; they must run in the existing runtime-user systemd sandbox, never as the administrator.",
+  "unit": null,
+  "state_directory": "/var/lib/korri-plugin-f233b5253f69691f9de0b15b5f6ec6e18b597469476a4eedbfd682bbeddbbd3c",
+  "runtime_directory": "/run/korri-plugin-f233b5253f69691f9de0b15b5f6ec6e18b597469476a4eedbfd682bbeddbbd3c",
+  "unit_configuration": "",
+  "declaration": {
+    "namespace": "@<publisher>",
+    "name": "eden",
+    "title": "Eden",
+    "description": "Runs Nintendo Switch games with account-local Eden data and game saves.",
+    "services": [],
+    "systems": {
+      "switch": {
+        "content": {
+          "extensions": [
+            "nsp",
+            "xci"
+          ]
+        },
+        "id": "switch",
+        "title": "Nintendo Switch"
+      }
+    },
+    "runners": {
+      "eden": {
+        "id": "@<publisher>:eden/eden",
+        "program": "eden",
+        "systems": [
+          "switch"
+        ]
+      }
+    }
+  },
+  "native_units": {},
+  "ports": {
+    "allowedTCPPorts": [],
+    "allowedUDPPorts": []
+  },
+  "hosts": [],
+  "packages": {
+    "eden": "/nix/store/77ndp24virwb0khxal8id2r46pi9w915-eden-korri-0.2.1"
+  },
+  "files": {
+    "eden": "/nix/store/77ndp24virwb0khxal8id2r46pi9w915-eden-korri-0.2.1/bin/eden"
+  },
+  "entry": "plugin.ts",
+  "sources": [
+    "plugin.ts"
+  ],
+  "requires": []
+}

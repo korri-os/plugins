@@ -1,0 +1,57 @@
+{
+  "supervisorPid": 53121,
+  "supervisorStartTicks": "757293",
+  "launchId": "cd787b52254148388fb2297bd0b36c93",
+  "unit": "korri-game-cd787b52254148388fb2297bd0b36c93.service",
+  "preflightSampling": {
+    "intervalSeconds": 0.005,
+    "clock": "host monotonic_ns",
+    "processes": {
+      "53231": {
+        "previousAbsentNs": 7574854268717,
+        "firstSeenNs": 7574859668588,
+        "lastSeenNs": 7574977138749,
+        "firstAbsentNs": 7574982503672
+      }
+    }
+  },
+  "observedMembers": {
+    "53173": {
+      "exe": "/nix/store/nvs92ijqg09cranbzg1d0f2whybvvr32-korrid-0.0.0/bin/korrid",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-cd787b52254148388fb2297bd0b36c93.service\n",
+      "start_ticks": "757415"
+    },
+    "53183": {
+      "exe": "/nix/store/iw35i62ccjdirpd5z99837rpx08rnhf9-gamescope-3.16.18/bin/.gamescope-wrapped",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-cd787b52254148388fb2297bd0b36c93.service\n",
+      "start_ticks": "757420"
+    },
+    "53207": {
+      "exe": "/nix/store/v5mydn1nzs1vigjwkrvpjy3wiv3hkbs8-xwayland-24.1.9/bin/Xwayland",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-cd787b52254148388fb2297bd0b36c93.service\n",
+      "start_ticks": "757457"
+    },
+    "53220": {
+      "exe": "/nix/store/fympfyg2xh5szsgk9gwlc834dxw8p55l-dbus-1.14.10-lib/bin/dbus-launch",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-cd787b52254148388fb2297bd0b36c93.service\n",
+      "start_ticks": "757469"
+    },
+    "53221": {
+      "exe": "/nix/store/kik5qyy1h61vkhamvi53l0iw18zfp4gh-dbus-1.16.2/bin/dbus-daemon",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-cd787b52254148388fb2297bd0b36c93.service\n",
+      "start_ticks": "757470"
+    },
+    "53225": {
+      "exe": "/nix/store/iw35i62ccjdirpd5z99837rpx08rnhf9-gamescope-3.16.18/bin/gamescopereaper",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-cd787b52254148388fb2297bd0b36c93.service\n",
+      "start_ticks": "757473"
+    },
+    "53227": {
+      "exe": "/nix/store/010847afgzfll903n5dbzqdajmm1m0n7-eden-0.2.1/bin/..eden-wrapped-wrapped",
+      "cgroup": "0::/korri.slice/korri-games.slice/korri-game-cd787b52254148388fb2297bd0b36c93.service\n",
+      "start_ticks": "757474"
+    }
+  },
+  "operatorStop": true,
+  "remainingMembers": {}
+}

@@ -1,0 +1,27 @@
+{
+  "stagingRemoved": true,
+  "sourceProfilePayloadPresent": true,
+  "profileRebound": false,
+  "inGameLoadVerified": false,
+  "nativePaths": {
+    "nand_directory": "/var/lib/korri/users/<account>/.local/share/eden/nand",
+    "save_directory": "/var/lib/korri/users/<account>/saves/super-mario-odyssey-0100000000010000-v0/nand"
+  },
+  "nativeBackend": {
+    "cpu_backend": "1",
+    "cpu_backend\\default": "true"
+  },
+  "nativeRenderer": {
+    "backend": "1",
+    "vulkan_device": "0",
+    "vulkan_device\\default": "true"
+  },
+  "exactCgroupsEmpty": true,
+  "session": {
+    "terminal": "SessionCompleted",
+    "message": "host launch 1cb224bebd3d2f9bc2c28bf9ede29eb7 completed"
+  },
+  "health": {
+    "version": "korrid-v0"
+  }
+}

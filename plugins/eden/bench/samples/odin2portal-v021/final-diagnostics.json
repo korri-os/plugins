@@ -1,0 +1,271 @@
+{
+  "observedUnix": 1792721319.9295173,
+  "deviceMtimeNs": 1792718609899211593,
+  "libraryMtimeNs": 1792720369689160409,
+  "gamescopeLayers": [
+    {
+      "scope": "device",
+      "recordPresent": false,
+      "enabled": null
+    },
+    {
+      "scope": "runner @korri:mgba/mgba",
+      "recordPresent": false,
+      "enabled": null
+    },
+    {
+      "scope": "system gba",
+      "recordPresent": false,
+      "enabled": null
+    },
+    {
+      "scope": "game wl4",
+      "recordPresent": false,
+      "enabled": null
+    }
+  ],
+  "sessionStatus": {
+    "_tag": "Err",
+    "payload": {
+      "code": "SessionCompleted",
+      "message": "host launch 9e0ad09294554e745129f0685dbecaaa completed"
+    }
+  },
+  "launchSettingsSnapshot": {
+    "_tag": "Ok",
+    "payload": {
+      "routeLayers": {
+        "_tag": "Present"
+      },
+      "layers": [
+        {
+          "scope": {
+            "_tag": "Device"
+          },
+          "title": "Device",
+          "cpu": {},
+          "gpu": {}
+        },
+        {
+          "scope": {
+            "_tag": "System",
+            "id": "gba"
+          },
+          "title": "Game Boy Advance",
+          "cpu": {},
+          "gpu": {}
+        },
+        {
+          "scope": {
+            "_tag": "Runner",
+            "id": "@korri:mgba/mgba"
+          },
+          "title": "@korri:mgba/mgba",
+          "cpu": {},
+          "gpu": {}
+        },
+        {
+          "scope": {
+            "_tag": "Game",
+            "id": "wl4"
+          },
+          "title": "wl4",
+          "cpu": {},
+          "gpu": {}
+        },
+        {
+          "scope": {
+            "_tag": "Release",
+            "id": {
+              "gameId": "wl4",
+              "releaseId": "gba"
+            }
+          },
+          "title": "gba",
+          "cpu": {},
+          "gpu": {}
+        }
+      ],
+      "resolved": {
+        "cpu": {
+          "min": {
+            "value": 0,
+            "source": {
+              "_tag": "Device"
+            },
+            "deviceDefault": true,
+            "adjusted": false
+          },
+          "max": {
+            "value": 100,
+            "source": {
+              "_tag": "Device"
+            },
+            "deviceDefault": true,
+            "adjusted": false
+          }
+        },
+        "gpu": {
+          "min": {
+            "value": 0,
+            "source": {
+              "_tag": "Device"
+            },
+            "deviceDefault": true,
+            "adjusted": false
+          },
+          "max": {
+            "value": 100,
+            "source": {
+              "_tag": "Device"
+            },
+            "deviceDefault": true,
+            "adjusted": false
+          }
+        },
+        "governor": "schedutil"
+      },
+      "profiles": [],
+      "deviceFacts": {
+        "defaults": {
+          "cpu": {
+            "min": 0,
+            "max": 100
+          },
+          "gpu": {
+            "min": 0,
+            "max": 100
+          },
+          "governor": "schedutil"
+        },
+        "cpuPolicies": [
+          {
+            "name": "policy0",
+            "cpus": [
+              0,
+              1,
+              2
+            ],
+            "cpuinfoMaxFreq": 2016000,
+            "availableFrequencies": [
+              307200,
+              441600,
+              556800,
+              672000,
+              787200,
+              902400,
+              1017600,
+              1113600,
+              1228800,
+              1344000,
+              1459200,
+              1555200,
+              1670400,
+              1785600,
+              1900800,
+              2016000
+            ],
+            "availableGovernors": [
+              "ondemand",
+              "powersave",
+              "performance",
+              "schedutil"
+            ]
+          },
+          {
+            "name": "policy3",
+            "cpus": [
+              3,
+              4,
+              5,
+              6
+            ],
+            "cpuinfoMaxFreq": 2803200,
+            "availableFrequencies": [
+              499200,
+              614400,
+              729600,
+              844800,
+              940800,
+              1056000,
+              1171200,
+              1286400,
+              1401600,
+              1536000,
+              1651200,
+              1785600,
+              1920000,
+              2054400,
+              2188800,
+              2323200,
+              2457600,
+              2592000,
+              2707200,
+              2803200
+            ],
+            "availableGovernors": [
+              "ondemand",
+              "powersave",
+              "performance",
+              "schedutil"
+            ]
+          },
+          {
+            "name": "policy7",
+            "cpus": [
+              7
+            ],
+            "cpuinfoMaxFreq": 2956800,
+            "availableFrequencies": [
+              595200,
+              729600,
+              864000,
+              998400,
+              1132800,
+              1248000,
+              1363200,
+              1478400,
+              1593600,
+              1708800,
+              1843200,
+              1977600,
+              2092800,
+              2227200,
+              2342400,
+              2476800,
+              2592000,
+              2726400,
+              2841600,
+              2956800
+            ],
+            "availableGovernors": [
+              "ondemand",
+              "powersave",
+              "performance",
+              "schedutil"
+            ]
+          }
+        ],
+        "gpuDevfreq": [
+          {
+            "name": "3d00000.gpu",
+            "availableFrequencies": [
+              220000000,
+              295000000,
+              348000000,
+              401000000,
+              475000000,
+              550000000,
+              615000000,
+              680000000
+            ]
+          }
+        ]
+      },
+      "revisions": {
+        "device": "416674e23f57df07733c914015bfb203495cdbea418cd97565352700e3779b82",
+        "games": "8d24635530406600e208fa0fa3a951eb2ddf6a6e4c95a9dd4827ab3c2a258239"
+      }
+    }
+  }
+}

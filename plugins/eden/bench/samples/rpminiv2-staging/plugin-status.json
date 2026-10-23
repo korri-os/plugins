@@ -1,0 +1,13 @@
+{
+  "id": "@<publisher>:eden",
+  "package": "/nix/store/24yf1xbs5213vqx2if3qlqsz1cz6qqfz-korri-plugin",
+  "provenance": {
+    "kind": "RawCache",
+    "cache_url": "file:///var/lib/korri-private-cache.h6odJOu2/cache"
+  },
+  "approval": "e85353d0ac21a25374bdbfed84fd81e71a1002f5a8a1597c9932dc07bed9383a",
+  "desired": {
+    "state": "Enabled"
+  },
+  "previous": null
+}

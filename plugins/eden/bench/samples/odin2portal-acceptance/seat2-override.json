@@ -1,0 +1,13 @@
+{
+  "active": false,
+  "configuration": "/var/lib/korri/users/<account>/.config/eden/qt-config.ini",
+  "backup": "/var/lib/korri/eden-bench-staging/odin-graphics-20261023/turnip-stage/seat1-before-bench.ini",
+  "baselineSha256": "85567c3ec16deff77cac4fa831c37130dab6b48f281cbc50beaf289f323d6a3c",
+  "guestP1Seat": 2,
+  "shippedDefaultSeat": 1,
+  "nativeFieldsChanged": 23,
+  "restoreExactFileAfterSoak": true,
+  "overrideSha256": "fcf1724b9c835995db0ffa0863e63a538210f04302077b1afd184e14f033dc6c",
+  "restoredSha256": "85567c3ec16deff77cac4fa831c37130dab6b48f281cbc50beaf289f323d6a3c",
+  "backupDeleted": true
+}

@@ -1,0 +1,16 @@
+{
+  "monotonicNs": 23370219261633,
+  "nativeIniSha256": "85567c3ec16deff77cac4fa831c37130dab6b48f281cbc50beaf289f323d6a3c",
+  "baselineSha256": "85567c3ec16deff77cac4fa831c37130dab6b48f281cbc50beaf289f323d6a3c",
+  "nativeIniExactRestore": true,
+  "temporaryIniBackupDeleted": true,
+  "librarySha256": "8aa9f6be1c4a3ad1d5dbf7528365ccfab464a70414b9a00cbd4cf617c0f92806",
+  "libraryExactRestore": true,
+  "remainingMembersByUnit": {
+    "korri-game-3a7d9c68382126a2660aafce3ee6a3b0.service": {},
+    "korri-game-81206bbff263531a9431c62b1166661c.service": {},
+    "korri-game-218d953fd745d7dd0cd8f52592601c50.service": {}
+  },
+  "edenProcessAbsent": true,
+  "volume": "Volume: 0.50 [MUTED]"
+}

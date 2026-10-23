@@ -1,0 +1,15 @@
+{
+  "request": {
+    "scope": {
+      "_tag": "Game",
+      "id": "super-mario-odyssey-0100000000010000-v0"
+    },
+    "setting": "cpu.min",
+    "value": 100,
+    "expectedRevision": "d64b04794af47c4b8a88da6da151ab52223ea3b435327ad46cfb956f89f5acb2"
+  },
+  "response": {
+    "device": "2b434f34095f630806ee3554a9120f378740b749ab8e4dbf5e702e20381bb5fe",
+    "games": "0ed72417883b50927e637b4bc49e8c6bee22d3ee0a7019fb93d7716f439827f7"
+  }
+}

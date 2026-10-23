@@ -1,0 +1,12 @@
+{
+  "reproduced": true,
+  "contenderWasReadOnlyProbe": true,
+  "exe": "/nix/store/k870vxfbxawhyx2726aygb5v5is4si4b-procps-4.0.6/bin/pgrep",
+  "argv": [
+    "pgrep",
+    "-a",
+    "-f",
+    "cemu|eden|bench"
+  ],
+  "test": "Pause only our owned real pgrep to make the scheduling overlap deterministic; old Cemu regex matches it"
+}
