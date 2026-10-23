@@ -55,7 +55,7 @@ rec {
   v4l2m2mPatchSetSha256 = "e918232613be4264d0c7c55900ff030674cc66e3f8f37f4daa0c59f1051960a6";
   reviewedNvencApiMajor = 12;
   reviewedNvencApiMinor = 0;
-  patchSetSha256 = "4c2a32a2036185ac593555deb78a32cf40975e71a16e235ca67abaceec850411";
+  patchSetSha256 = "03ad6db7e44cb4795c68b26910313efbb1af67f444d2f2c65ce4a934ce33cc25";
   patches = [
     {
       name = "0001-add-runtime-settings-protocol-surface.patch";
@@ -141,6 +141,11 @@ rec {
       name = "0038-configure-linux-capture-fifo.patch";
       path = ./patches/0038-configure-linux-capture-fifo.patch;
       sha256 = "314fd4d8bda3ecbe46e30aa394236d6527e558a280676e351e2bcf6508dc8eba";
+    }
+    {
+      name = "0039-bind-paired-client-input-identity.patch";
+      path = ./patches/0039-bind-paired-client-input-identity.patch;
+      sha256 = "3d8cb7be912b0bd7afa66aa49cd7f0a78be3702e4242fe7bb1bcb52fa161f943";
     }
   ];
 
@@ -280,5 +285,5 @@ rec {
 
   # Ordered digest of patches ++ rkmppPatches. Bump only after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "7d6d17d1c388e85dc15fb3f9a7342a0dca55acad090307f021382c28417b9241";
+  rkmppPatchSetSha256 = "0853f262e3d4705d9d94b0e05fa61e57743f9a7db73339643e0d2683a1e097a2";
 }

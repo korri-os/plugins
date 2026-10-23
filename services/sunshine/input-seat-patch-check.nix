@@ -25,7 +25,18 @@ let
       approved.rkmppPatchSetSha256
     else
       approved.patchSetSha256;
+  identityPatch = builtins.readFile ./patches/0039-bind-paired-client-input-identity.patch;
   checks = [
+    (check "paired UUID is authenticated, propagated and unbound input fails closed" (
+      contains "X509_cmp(paired.get(), x509.get()) == 0" identityPatch
+      && contains "return client.uuid" identityPatch
+      && contains "request->verified_client_uuid()" identityPatch
+      && contains "session->client_uuid = launch_session.client_uuid" identityPatch
+      && contains "input::alloc(session.mail, session.client_uuid)" identityPatch
+      && contains "other->client_id == client_id" identityPatch
+      && contains "clientId" identityPatch
+      && contains "refused stream without authenticated paired-client UUID" identityPatch
+    ))
     (check "the approved input-seat patch is exact and applied" (
       approvedPatch != null
       && patchSha256 == approvedPatch.sha256

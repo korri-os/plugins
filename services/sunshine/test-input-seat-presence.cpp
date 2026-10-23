@@ -97,7 +97,7 @@ static void clear() { barrier(); drain(); received.clear(); }
 static std::size_t count(std::string_view kind) {
   return std::count_if(received.begin(), received.end(), [&](const auto &r) { return r.envelope["frame"]["kind"] == kind; });
 }
-static auto stream() { return input::alloc(std::make_shared<safe::mail_raw_t>()); }
+static auto stream(std::string uuid = "11111111-1111-4111-8111-111111111111") { return input::alloc(std::make_shared<safe::mail_raw_t>(), std::move(uuid)); }
 template<class Packet>
 static void submit(std::shared_ptr<input::input_t> &ctx, const Packet &packet) {
   const auto *bytes = reinterpret_cast<const std::uint8_t *>(&packet);
@@ -297,7 +297,35 @@ int main() {
   stop_stream(ctx);
   clear();
 
-  // Existing launch+controllerNumber identity cannot merge two live streams.
+  // Every frame carries the bound paired-client UUID, including disconnects.
+  ctx = stream("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  auto distinct = stream("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  state(ctx, 0x1000);
+  state(distinct, 0x2000);
+  collect(450ms);
+  assert(count("source-state") >= 4);
+  assert(count("source-disconnected") == 0);
+  for (const auto &r : received) {
+    const auto &frame = r.envelope["frame"];
+    assert(frame["controllerNumber"] == 0 && frame["clientId"].is_string());
+    assert(frame["clientId"] == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" ||
+           frame["clientId"] == "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  }
+  stop_stream(ctx);
+  stop_stream(distinct);
+  for (const auto &r : received) { assert(r.envelope["frame"]["clientId"].is_string()); }
+  clear();
+
+  // Unbound streams fail closed and never allocate native fallback gamepads.
+  ctx = stream("");
+  arrival(ctx);
+  state(ctx, 0x1000);
+  collect(450ms);
+  assert(received.empty());
+  stop_stream(ctx);
+  clear();
+
+  // The same paired UUID+controllerNumber on two streams remains ambiguous.
   ctx = stream();
   auto collision = stream();
   state(ctx);
