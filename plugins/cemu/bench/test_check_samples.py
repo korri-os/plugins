@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -45,6 +46,17 @@ class PublicEvidenceTests(unittest.TestCase):
         ]:
             with self.subTest(text=text):
                 self.assertFalse(is_private(text))
+
+    def test_privacy_scan_includes_bench_and_product_readmes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "bench"
+            root.mkdir()
+            for readme in (root / "README.md", root.parent / "README.md"):
+                readme.write_text("private-user" + "@" + "fuji")
+                with self.assertRaises(ValueError):
+                    check_privacy(root)
+                readme.write_text("<builder-login>")
+            self.assertEqual(check_privacy(root), 2)
 
     def test_committed_evidence_is_redacted_and_all_fps_arrays_reproduce(self):
         root = Path(__file__).resolve().parent

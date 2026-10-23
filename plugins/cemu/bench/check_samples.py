@@ -40,9 +40,9 @@ def check_privacy(root: Path) -> int:
         for area in (root / "samples", root / "devices")
         for path in area.rglob("*")
     ]
-    product_readme = root.parent / "README.md"
-    if product_readme.is_file():
-        files.append(product_readme)
+    for readme in (root / "README.md", root.parent / "README.md"):
+        if readme.is_file():
+            files.append(readme)
     for path in sorted(files):
         if not path.is_file():
             continue
