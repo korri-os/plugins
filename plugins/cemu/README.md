@@ -151,7 +151,9 @@ in `settings.xml`. The patched data retains upstream's CC0-1.0 license.
 A package check verifies all five resolutions, their aspect conditions, and
 unchanged defaults. Existing account-local pack trees are still never
 silently replaced: an operator must explicitly update a previously seeded
-copy before these additional choices appear.
+copy before these additional choices appear. Cemu's manual pack updater can
+replace this patched file with upstream data and remove these local choices;
+retain the packaged revision or explicitly reapply the patch after an update.
 
 `GraphicPack2.cpp:96-111` scans `GetUserDataPath("graphicPacks")` recursively.
 On first launch the wrapper copies the bundle to that native directory,
