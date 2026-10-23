@@ -46,7 +46,14 @@ let
     hash = "sha256-crRwikdqgQmQo+4QJu/Cp7HBM9TkZ+uNjrwjxDagPLs=";
   };
   licenses = import ./licenses.nix {
-    mesaSource = if pkgs.stdenv.hostPlatform.isAarch64 then turnip.src else pkgs.mesa.src;
+    mesaSource =
+      if pkgs.stdenv.hostPlatform.isAarch64 then
+        pkgs.runCommand "cemu-turnip-license-source" { nativeBuildInputs = [ pkgs.xz ]; } ''
+          mkdir -p "$out"
+          tar -xJf ${turnip.src} --strip-components=1 -C "$out"
+        ''
+      else
+        pkgs.mesa.src;
     inherit
       pkgs
       cemuSource
