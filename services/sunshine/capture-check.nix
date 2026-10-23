@@ -15,6 +15,7 @@ in
 pkgs.stdenv.mkDerivation {
   name = "sunshine-korri-capture-check";
   dontUnpack = true;
+  nativeBuildInputs = [ pkgs.python3 ];
   buildInputs = [
     pkgs.libyuv
     pkgs.libdrm
@@ -33,6 +34,7 @@ pkgs.stdenv.mkDerivation {
   '';
   doCheck = true;
   checkPhase = ''
+    python3 ${./test-rkmpp-pacing.py} ${source}/src/video.cpp
     ./row-pair-test
     ./capture-scheduling-test
     ./kms-pacing-test
