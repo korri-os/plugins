@@ -1,21 +1,25 @@
 {
   korri,
   nixpkgs,
+  nixpkgs-held,
   flake-utils,
   gitConfigFile ? null,
 }:
 flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   system:
   let
-    canonicalPkgs = import nixpkgs {
-      inherit system;
-      config.allowUnfree = true;
-    };
-    pkgs =
+    packageSet =
+      source:
+      let
+        canonicalPkgs = import source {
+          inherit system;
+          config.allowUnfree = true;
+        };
+      in
       if gitConfigFile == null then
         canonicalPkgs
       else
-        import nixpkgs {
+        import source {
           inherit system;
           config = {
             allowUnfree = true;
@@ -25,18 +29,26 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           # output. Keep that guarded base intact; custom fetches still use CI.
           overlays = [ (_: _: { sunshine = canonicalPkgs.sunshine; }) ];
         };
+    pkgs = packageSet nixpkgs;
     mkPlugin = korri.lib.${system}.mkPlugin { inherit pkgs; };
-    sunshine = import ../services/sunshine { inherit pkgs system; };
+    # Temporary split (see flake.nix): every Sunshine and Cemu output builds
+    # from the held nixpkgs revision.
+    heldPkgs = packageSet nixpkgs-held;
+    heldMkPlugin = korri.lib.${system}.mkPlugin { pkgs = heldPkgs; };
+    sunshine = import ../services/sunshine {
+      inherit system;
+      pkgs = heldPkgs;
+    };
     sshPackage = mkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/ssh;
       plugin = ../plugins/ssh/plugin.nix;
     };
     sunshineDefinition = import ../plugins/sunshine/plugin.nix {
-      inherit pkgs;
+      pkgs = heldPkgs;
       sunshinePackage = sunshine.pluginPackage;
     };
-    sunshinePlugin = mkPlugin {
+    sunshinePlugin = heldMkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/sunshine;
       plugin = _: sunshineDefinition;
@@ -131,8 +143,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         contract = korri.lib.${system}.pluginContract;
         hostPackage = korri.packages.${system}.korri-plugin-host;
       };
-    cemuPackage = import ../plugins/cemu/package.nix { inherit pkgs; };
-    cemuPlugin = mkPlugin {
+    cemuPackage = import ../plugins/cemu/package.nix { pkgs = heldPkgs; };
+    cemuPlugin = heldMkPlugin {
       publisher.namespace = "@korri";
       source = pluginSourceOnly ../plugins/cemu;
       plugin = _: import ../plugins/cemu/plugin.nix { inherit cemuPackage; };
@@ -212,7 +224,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         exec python3 ${./plugin-churn-check.py} --publisher ${../.} --korri ${churnCore} "$@"
       '';
     };
-    cemuBench = import ../plugins/cemu/bench { inherit pkgs; };
+    cemuBench = import ../plugins/cemu/bench { pkgs = heldPkgs; };
     cacheTool = pkgs.writeShellApplication {
       name = "korri-cache";
       runtimeInputs = [
@@ -288,7 +300,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-plugin-builder = korri.lib.${system}.pluginBuilderCheck { inherit pkgs; };
         korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
         korri-sunshine-plugin-native = import ../plugins/sunshine/native-check.nix {
-          inherit pkgs;
+          pkgs = heldPkgs;
           plugin = sunshineDefinition;
         };
         korri-github-cache = import ./github-cache-check.nix { inherit pkgs; };
@@ -349,12 +361,13 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           contract = korri.lib.${system}.pluginContract;
         };
         korri-cemu-package = import ./cemu-check.nix {
-          inherit pkgs cemuPackage;
+          inherit cemuPackage;
+          pkgs = heldPkgs;
           package = cemuPlugin;
           contract = korri.lib.${system}.pluginContract;
         };
         korri-cemu-admission = import ./cemu-admission.nix {
-          inherit pkgs;
+          pkgs = heldPkgs;
           package = cemuPlugin;
           hostPackage = korri.packages.${system}.korri-plugin-host;
           korridPackage = korri.packages.${system}.korrid;
