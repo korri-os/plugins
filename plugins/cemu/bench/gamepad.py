@@ -27,7 +27,7 @@ VERSION = 0x0114
 PHYS = "korri-cemu-bench/input0"
 
 
-def identity() -> dict[str, int | str]:
+def gamepad_identity() -> dict[str, int | str]:
     return {
         "name": NAME,
         "bus": BUS,

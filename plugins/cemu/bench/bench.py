@@ -20,7 +20,7 @@ from collections import Counter
 from pathlib import Path
 from typing import cast
 
-from gamepad import Gamepad, read_script
+from gamepad import Gamepad, gamepad_identity, read_script
 from input_observer import InputObserver
 from metrics import fps_bins, summarize
 
@@ -529,7 +529,7 @@ def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
             "A/B selects existing launch profiles through RPC and restores the original selection.",
             "Korri performs its normal play-log/save effects. uinput device is destroyed.",
             f"InputPlumber runtime management: { {key: input_observer.state.get(key) for key in ('before', 'after', 'managementUnchanged', 'compositesRestored', 'builtinUnchanged', 'seatP1Unchanged')} if input_observer else 'not changed (no input script)' }. See `input-observer.json` and `seat-events.json`.",
-            f"Bench-only synthetic gamepad identity: `{identity()}`.",
+            f"Bench-only synthetic gamepad identity: `{gamepad_identity()}`.",
             "InputPlumber 0.75.2 src/input/manager.rs:1232-1267 admits virtual Bluetooth (bus 0005); installed 60-xbox_one_gamepad.yaml matches 045e:02d1 and sets auto_manage:true. This is a test route, not a product route.",
             "Seat P2 event admission does not prove game navigation; RetroArch normally reserves P1.",
             "",
