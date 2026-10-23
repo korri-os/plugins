@@ -13,10 +13,12 @@ from metrics import fps_bins, summarize
 
 PRIVATE_PATTERNS = (
     re.compile(r"/users/[a-f0-9]{64}\b"),
+    re.compile(r'"--autolaunch",\s*"[a-f0-9]{32}"'),
     re.compile(r"\b10\.42\.\d{1,3}\.\d{1,3}\b"),
     re.compile(r"\b192\.168\.\d{1,3}\.\d{1,3}\b"),
     re.compile(r"\b100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}\b"),
     re.compile(r"/srv/" r"lakes(?:/|\b)"),
+    re.compile(r"/var/lib/korri-private-cache\.[A-Za-z0-9]+"),
     re.compile(r"/home/" r"(?!korri(?:/|\b))[^/\s<>]+"),
 )
 

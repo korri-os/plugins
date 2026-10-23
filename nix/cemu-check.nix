@@ -31,6 +31,7 @@ pkgs.runCommand "korri-cemu-package-check"
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler plugins/cemu/plugin.ts
     bun plugins/cemu/plugin.test.ts
+    python3 ${../plugins/cemu/bench}/check_samples.py
     python3 ${../plugins/cemu/build-evidence-check.py} ${cemuPackage} ${cemuPackage.evidence}
     shellcheck ${cemuPackage}/bin/cemu
     python3 ${../plugins/cemu/license-check.py} ${cemuPackage} ${cemuPackage.licenses}
