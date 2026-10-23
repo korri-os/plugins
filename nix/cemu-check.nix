@@ -31,6 +31,7 @@ pkgs.runCommand "korri-cemu-package-check"
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler plugins/cemu/plugin.ts
     bun plugins/cemu/plugin.test.ts
+    python3 ${../plugins/cemu/build-evidence-check.py} ${cemuPackage} ${cemuPackage.evidence}
     shellcheck ${cemuPackage}/bin/cemu
     python3 ${../plugins/cemu/license-check.py} ${cemuPackage} ${cemuPackage.licenses}
     python3 ${../plugins/cemu/turnip-check.py} ${cemuPackage} ${pkgs.stdenv.hostPlatform.parsed.cpu.name}
@@ -38,4 +39,5 @@ pkgs.runCommand "korri-cemu-package-check"
     ${pkgs.xvfb-run}/bin/xvfb-run -a python3 ${../plugins/cemu/runtime-check.py} ${cemuPackage} "$out/runtime"
     mkdir -p "$out"
     cp -R ${cemuPackage}/nix-support/cemu-build "$out/"
+    cp -R ${cemuPackage.evidence}/nix-support/cemu-build "$out/diagnostics"
   ''

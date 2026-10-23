@@ -58,6 +58,10 @@ in
 assert !pkgs.stdenv.hostPlatform.isAarch64 || pkgs.mesa.version == "25.3.2";
 pkgs.llvmPackages.stdenv.mkDerivation {
   pname = "cemu";
+  outputs = [
+    "out"
+    "evidence"
+  ];
   version = "0-unstable-2026-10-22-${builtins.substring 0 7 cemuCommit}";
   src = cemuSource;
   nativeBuildInputs = with pkgs; [
@@ -131,7 +135,7 @@ pkgs.llvmPackages.stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
     install -Dm755 ../bin/Cemu_release "$out/bin/Cemu"
-    mkdir -p "$out/share/Cemu" "$out/nix-support/cemu-build"
+    mkdir -p "$out/share/Cemu" "$out/nix-support/cemu-build" "$evidence/nix-support/cemu-build"
     cp -R ../bin/gameProfiles ../bin/resources "$out/share/Cemu/"
     install -m644 ${./settings.xml} "$out/share/Cemu/settings.xml"
     mkdir -p "$out/share/Cemu/graphicPacks/downloadedGraphicPacks"
@@ -160,31 +164,34 @@ pkgs.llvmPackages.stdenv.mkDerivation {
     chmod +x "$out/bin/cemu"
 
     # Actual object files, not just planned Ninja commands, prove both backends.
-    evidence="$out/nix-support/cemu-build"
+    proof="$out/nix-support/cemu-build"
+    diagnostics="$evidence/nix-support/cemu-build"
     for backend in pulse alsa; do
       object=$(find dependencies/cubeb -name "cubeb_$backend.c.o" -type f -size +0c -print -quit)
       test -n "$object" || { echo "Cubeb $backend source was not compiled" >&2; exit 1; }
-      printf 'compiled=%s\n' "$object" >> "$evidence/cubeb.txt"
+      printf 'compiled=%s\n' "$object" >> "$proof/cubeb.txt"
     done
-    ${pkgs.binutils}/bin/readelf -h "$out/bin/Cemu" > "$evidence/elf-header.txt"
-    ${pkgs.binutils}/bin/readelf -d "$out/bin/Cemu" > "$evidence/elf-dynamic.txt"
-    if grep -q libcubeb "$evidence/elf-dynamic.txt"; then
+    ${pkgs.binutils}/bin/readelf -h "$out/bin/Cemu" > "$proof/elf-header.txt"
+    ${pkgs.binutils}/bin/readelf -d "$out/bin/Cemu" > "$proof/elf-dynamic.txt"
+    if grep -q libcubeb "$proof/elf-dynamic.txt"; then
       echo 'Cemu unexpectedly links dynamic Cubeb' >&2; exit 1
     fi
-    find "$out/share/Cemu/gameProfiles/default" -name '*.ini' -type f > "$evidence/gameProfiles.txt"
-    test -s "$evidence/gameProfiles.txt"
+    find "$out/share/Cemu/gameProfiles/default" -name '*.ini' -type f > "$diagnostics/gameProfiles.txt"
+    test -s "$diagnostics/gameProfiles.txt"
+    printf 'default profiles: %s\n' "$(wc -l < "$diagnostics/gameProfiles.txt")" > "$proof/gameProfiles.txt"
     test -s "$out/share/Cemu/resources/sharedFonts/CafeCn.ttf"
-    echo 'resources/sharedFonts/CafeCn.ttf present' > "$evidence/resources.txt"
-    find "$out/share/Cemu/graphicPacks" -name rules.txt -type f > "$evidence/graphicPacks.txt"
-    test -s "$evidence/graphicPacks.txt"
-    grep -q 'BreathOfTheWild' "$evidence/graphicPacks.txt"
-    # Diagnostics must not pull compiler and development closures onto devices.
+    echo 'resources/sharedFonts/CafeCn.ttf present' > "$proof/resources.txt"
+    find "$out/share/Cemu/graphicPacks" -name rules.txt -type f > "$diagnostics/graphicPacks.txt"
+    test -s "$diagnostics/graphicPacks.txt"
+    grep -q 'BreathOfTheWild' "$diagnostics/graphicPacks.txt"
+    printf 'rules: %s; BreathOfTheWild present\n' "$(wc -l < "$diagnostics/graphicPacks.txt")" > "$proof/graphicPacks.txt"
+    # Optional output only; keep development paths out of its closure as well.
     sed -E 's@/nix/store/[a-z0-9]{32}-@/nix/store/<hash>-@g' \
-      compile_commands.json > "$evidence/compile_commands.json"
+      compile_commands.json > "$diagnostics/compile_commands.json"
     grep -E 'flto|Cemu_release.*LINKER' build.ninja | \
-      sed -E 's@/nix/store/[a-z0-9]{32}-@/nix/store/<hash>-@g' > "$evidence/ipo.txt"
-    test -s "$evidence/ipo.txt"
-    $CXX --version | sed -n '1p' > "$evidence/compiler.txt"
+      sed -E 's@/nix/store/[a-z0-9]{32}-@/nix/store/<hash>-@g' > "$diagnostics/ipo.txt"
+    test -s "$diagnostics/ipo.txt"
+    $CXX --version | sed -n '1p' > "$proof/compiler.txt"
     install -Dm644 ${graphicPacksLicense} "$out/share/licenses/cemu-graphic-packs/LICENSE.md"
     mkdir -p "$out/share/licenses/cemu"
     cp -R ${licenses}/. "$out/share/licenses/cemu/"
@@ -213,6 +220,7 @@ pkgs.llvmPackages.stdenv.mkDerivation {
       lib.licenses.ofl
     ];
     mainProgram = "cemu";
+    outputsToInstall = [ "out" ];
     platforms = [
       "x86_64-linux"
       "aarch64-linux"
