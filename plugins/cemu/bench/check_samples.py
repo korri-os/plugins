@@ -13,9 +13,15 @@ from metrics import fps_bins, summarize
 
 PRIVATE_PATTERNS = (
     re.compile(r"/users/[a-f0-9]{64}\b"),
+    re.compile(
+        r"\b[A-Za-z_][\w.-]*@"
+        r"(?:unzen|zao|fuji|yari|nix-builder-(?:unzen|zao|fuji|yari))(?:\.[\w.-]+)?\b"
+    ),
+    re.compile(r"\b[\w.-]+:[A-Za-z0-9+/]{43}=(?![A-Za-z0-9+/=])"),
+    re.compile(r'"@(?!korri"\s*:)[A-Za-z0-9._-]+"\s*:\s*\{'),
     re.compile(r'"--autolaunch",\s*"[a-f0-9]{32}"'),
-    re.compile(r"\b10\.42\.\d{1,3}\.\d{1,3}\b"),
-    re.compile(r"\b192\.168\.\d{1,3}\.\d{1,3}\b"),
+    re.compile(r"\b10\.42\."),
+    re.compile(r"\b192\.168\."),
     re.compile(r"\b100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}\b"),
     re.compile(r"/srv/" r"lakes(?:/|\b)"),
     re.compile(r"/var/lib/korri-private-cache\.[A-Za-z0-9]+"),
@@ -29,22 +35,29 @@ def is_private(text: str) -> bool:
 
 def check_privacy(root: Path) -> int:
     count = 0
-    for area in (root / "samples", root / "devices"):
-        for path in sorted(area.rglob("*")):
-            if not path.is_file():
-                continue
-            data = path.read_bytes()
-            if path.suffix == ".gz":
-                data = gzip.decompress(data)
-            try:
-                text = data.decode("utf-8")
-            except UnicodeDecodeError:
-                continue  # PNGs are not displayed or treated as text.
-            if is_private(text):
-                raise ValueError(
-                    f"Private identifier or path in {path.relative_to(root)}"
-                )
-            count += 1
+    files = [
+        path
+        for area in (root / "samples", root / "devices")
+        for path in area.rglob("*")
+    ]
+    product_readme = root.parent / "README.md"
+    if product_readme.is_file():
+        files.append(product_readme)
+    for path in sorted(files):
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        if path.suffix == ".gz":
+            data = gzip.decompress(data)
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue  # PNGs are not displayed or treated as text.
+        if is_private(text):
+            raise ValueError(
+                f"Private identifier or path in {path.relative_to(root.parent)}"
+            )
+        count += 1
     return count
 
 

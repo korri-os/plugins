@@ -22,6 +22,30 @@ class PublicEvidenceTests(unittest.TestCase):
         self.assertFalse(is_private("/var/lib/korri/users/<account>/saves"))
         self.assertFalse(is_private("<device-usb-ip> <owner-storage> /home/korri"))
 
+    def test_rejects_partial_subnets_personal_logins_and_signing_keys(self):
+        examples = [
+            ".".join(["10", "42", ""]),
+            ".".join(["10", "42", "3", ""]),
+            ".".join(["10", "42", "3", "x"]),
+            ".".join(["192", "168", ""]),
+            "private-user" + "@" + "unzen",
+            "ssh-ng://private-user" + "@" + "nix-builder-fuji",
+            "signer-1:" + "A" * 43 + "=",
+            '{"@owner":{"publicKey":"redact-me"}}',
+        ]
+        for text in examples:
+            with self.subTest(text=text):
+                self.assertTrue(is_private(text))
+        for text in [
+            "<device-usb-ip> <owner-storage-login> <builder-login>",
+            '{"@<publisher>":{"publicKey":"<publisher-public-key>"}}',
+            '{"@korri":{}}',
+            "sha256:" + "a" * 64,
+            "fuji yari zao unzen",
+        ]:
+            with self.subTest(text=text):
+                self.assertFalse(is_private(text))
+
     def test_committed_evidence_is_redacted_and_all_fps_arrays_reproduce(self):
         root = Path(__file__).resolve().parent
         self.assertGreater(check_privacy(root), 0)
