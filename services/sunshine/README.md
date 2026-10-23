@@ -69,6 +69,10 @@ The automated Python backpressure fixture remains a Sunshine-source transport ch
 
 The mirror remains inert without configured protected paths. Missing authority at allocation permanently disables that stream's mirror. The mirror token must not appear in public status, network RPC, logs, or committed evidence. Physical device acceptance remains separate from the repository implementation.
 
+Current automated gate:
+
+- `nix build --no-link .#checks.$(nix eval --raw --impure --expr builtins.currentSystem).sunshine-korri-input-seat-patch` checks the input-seat source boundary, the approved patch hash, the patched Sunshine build, and a nonblocking transport model/source-invariant check under receiver backpressure. The model does not execute compiled Sunshine behavior.
+
 ## Korrid certificate control
 
 The separate [offline all-client retirement executable](OFFLINE-RETIREMENT.md)
@@ -88,6 +92,10 @@ The adapter does not replace TLS. It replaces only the manual GameStream pairing
 ## Rockchip RKMPP hardware encoding
 
 The `aarch64-linux-rkmpp` profile adds patches `0022` and `0023` after every base patch. Patch `0022` defines an `rkmpp` encoder that uses FFmpeg's `h264_rkmpp` (Rockchip MPP, RKVENC hardware) in CBR mode with a single slice and no intra refresh. The encoder advertises only H.264 because RKVENC-v1 on RK3566 has no HEVC or AV1 encoder. The patch also paces the encode loop to the negotiated frame rate. Without pacing, the asynchronous MPP encoder returns immediately and the loop spins at the KMS capture rate.
+
+The RKMPP pacer uses the negotiated `config.framerate`, not mutable session settings. Patch `0032` keeps the encode deadline absolute: advance by one interval, then resynchronise to the current time plus one interval only when the advanced deadline is more than one interval late. IDR requests bypass that sleep. Patch `0029` lets Wayland capture follow the compositor and skips conversion/encoding for early captures; it advances the session deadline until it is strictly after the capture time. Other encoders do not use either pacer.
+
+`sunshine-korri-capture` executes both pacing blocks extracted from the patched release source with a deterministic clock. It checks 1, 30, 60, 90 and 120 FPS, sleep overshoot, the strict stall threshold, early and stalled captures, and bypass conditions. This proves deadline arithmetic, not hardware throughput.
 
 Patch `0023` adds a KMS DRM_PRIME path for native-size streams. On the RG353M, Sway scans out a single-plane linear XRGB8888 framebuffer. Sunshine duplicates that dma-buf file descriptor into a ref-counted `AVDRMFrameDescriptor` and gives it directly to `h264_rkmpp`; RKVENC performs RGB-to-YUV conversion in hardware. This avoids the previous `GetTextureSubImage` readback, `sws_scale`, and CPU upload. Streams whose requested size does not exactly match the KMS framebuffer retain the RAM scaling and RKMPP upload fallback. The zero-copy path reduced total Sunshine CPU from about 135% to about 10% at 640x480@30.
 
