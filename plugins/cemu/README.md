@@ -50,9 +50,8 @@ is introduced. The Cemu-scoped aarch64 Turnip build is described below.
 
 On aarch64 only, `bin/cemu` sets `VK_DRIVER_FILES` and the older loader alias
 `VK_ICD_FILENAMES` to the freedreno ICD from the plugin's **Mesa 26.2.5** build
-in `turnip.nix`. This replaces the temporary 25.3.2 pin on this experimental
-branch. Cemu and the selected driver retain the held package set to isolate the
-driver change. A separate current-pin build checks build compatibility only.
+in `turnip.nix`. This replaces the earlier temporary 25.3.2 pin. Cemu and the
+selected driver retain the held package set to isolate the driver change. A separate current-pin build checks build compatibility only.
 The build enables only
 Turnip with the Linux MSM kernel driver and X11/Wayland presentation. It disables
 Gallium, OpenGL, EGL, GBM, LLVM, OpenCL, video codecs, layers and optional tools.
@@ -89,9 +88,11 @@ is not proof of performance, audio, new-save persistence or thermal safety.
 Phase 2 completed three gated async-off samples at median 40 FPS versus 37 FPS
 for the same-session shipped build. Two async-on samples reached 39 FPS with no
 draw-state assertion. The owner stopped before the third async-on sample and
-the soak. **Keep 25.3.2 with async off as the published default until soak
-qualification; this branch remains experimental.** The Odin is restored to the
-shipped test build. The upstream regression unit test and MR remain pending.
+the soak. **Owner decision (2026-10-23): ship the patched 26.2.5 Turnip with
+async off as the default, without a soak.** Long-session stability with this
+driver is therefore not qualified. Async on remains a per-account choice in
+Cemu's own settings. The upstream regression unit test and MR remain pending
+(korri-os/korri#211).
 
 ## Native files, not another configuration schema
 
