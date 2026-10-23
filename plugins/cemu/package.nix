@@ -2,6 +2,13 @@
 let
   inherit (pkgs) lib;
   cemuCommit = "29f2f1fae4631e2317977debd9eacd55cc28dd7d";
+  cemuSource = pkgs.fetchFromGitHub {
+    owner = "cemu-project";
+    repo = "Cemu";
+    rev = cemuCommit;
+    fetchSubmodules = true;
+    hash = "sha256-gNvSmQUWS4dYWsqA9URWNE3+8IK2101onTZ7CB+ouAI=";
+  };
   # Cemu uses SDL_HINT_JOYSTICK_HIDAPI_SWITCH2, introduced in SDL 3.4.
   # The publisher lock's SDL 3.2.26 fails to compile that controller provider.
   sdl3 = pkgs.sdl3.overrideAttrs (old: {
@@ -38,19 +45,21 @@ let
     url = "https://github.com/cemu-project/cemu_graphic_packs/releases/download/Github989/graphicPacks989.zip";
     hash = "sha256-crRwikdqgQmQo+4QJu/Cp7HBM9TkZ+uNjrwjxDagPLs=";
   };
+  licenses = import ./licenses.nix {
+    inherit
+      pkgs
+      cemuSource
+      sdl3
+      fmt
+      ;
+  };
 in
 # Temporary Cemu-only Turnip pin. Replace with patched 26.2.x; see README.
 assert !pkgs.stdenv.hostPlatform.isAarch64 || pkgs.mesa.version == "25.3.2";
 pkgs.llvmPackages.stdenv.mkDerivation {
   pname = "cemu";
   version = "0-unstable-2026-10-22-${builtins.substring 0 7 cemuCommit}";
-  src = pkgs.fetchFromGitHub {
-    owner = "cemu-project";
-    repo = "Cemu";
-    rev = cemuCommit;
-    fetchSubmodules = true;
-    hash = "sha256-gNvSmQUWS4dYWsqA9URWNE3+8IK2101onTZ7CB+ouAI=";
-  };
+  src = cemuSource;
   nativeBuildInputs = with pkgs; [
     cmake
     ninja
@@ -177,13 +186,15 @@ pkgs.llvmPackages.stdenv.mkDerivation {
     test -s "$evidence/ipo.txt"
     $CXX --version | sed -n '1p' > "$evidence/compiler.txt"
     install -Dm644 ${graphicPacksLicense} "$out/share/licenses/cemu-graphic-packs/LICENSE.md"
-    install -Dm644 ../LICENSE.txt "$out/share/licenses/cemu/LICENSE.txt"
+    mkdir -p "$out/share/licenses/cemu"
+    cp -R ${licenses}/. "$out/share/licenses/cemu/"
     runHook postInstall
   '';
   passthru = {
     inherit
       cemuCommit
       graphicPacks
+      licenses
       fmt
       sdl3
       ;
@@ -194,6 +205,12 @@ pkgs.llvmPackages.stdenv.mkDerivation {
     license = [
       lib.licenses.mpl20
       lib.licenses.cc0
+      lib.licenses.isc
+      lib.licenses.mit
+      lib.licenses.asl20
+      lib.licenses.bsd3
+      lib.licenses.zlib
+      lib.licenses.ofl
     ];
     mainProgram = "cemu";
     platforms = [
