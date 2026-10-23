@@ -36,26 +36,27 @@
          std::shared_ptr<platf::img_t> img_out;
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -3042,7 +3042,9 @@
-           if (ctx->runtime_fps == 0) {
-             ctx->runtime_fps = ctx->config.framerate;
-           }
--          if (frame_captured && ctx->runtime_fps > 0 && ctx->runtime_fps < (std::uint32_t) ctx->config.framerate) {
-+          const bool pace_rkmpp = encoder.name == "rkmpp";
-+          if (frame_captured && ctx->runtime_fps > 0 &&
-+              (pace_rkmpp || ctx->runtime_fps < (std::uint32_t) ctx->config.framerate)) {
-             auto now = std::chrono::steady_clock::now();
-             if (ctx->next_runtime_frame.time_since_epoch().count() == 0) {
-               ctx->next_runtime_frame = now;
-@@ -3051,7 +3053,10 @@
-               ++pos;
-               continue;
-             }
--            ctx->next_runtime_frame = now + runtime_fps_interval(ctx->runtime_fps);
-+            const auto interval = runtime_fps_interval(ctx->runtime_fps);
-+            do {
-+              ctx->next_runtime_frame += interval;
-+            } while (ctx->next_runtime_frame <= now);
+@@ -2277,6 +2277,23 @@
+             ctx->idr_events->pop();
            }
  
++          const std::uint32_t rkmpp_fps = ctx->config.framerate;
++          const bool pace_rkmpp = encoder.name == "rkmpp";
++          if (frame_captured && pace_rkmpp && rkmpp_fps > 0) {
++            auto now = std::chrono::steady_clock::now();
++            if (ctx->next_rkmpp_frame.time_since_epoch().count() == 0) {
++              ctx->next_rkmpp_frame = now;
++            }
++            if (now < ctx->next_rkmpp_frame) {
++              ++pos;
++              continue;
++            }
++            const auto interval = rkmpp_fps_interval(rkmpp_fps);
++            do {
++              ctx->next_rkmpp_frame += interval;
++            } while (ctx->next_rkmpp_frame <= now);
++          }
++
            if (frame_captured && pos->session->convert(*img)) {
+             BOOST_LOG(error) << "Could not convert image"sv;
+             ctx->shutdown_event->raise(true);

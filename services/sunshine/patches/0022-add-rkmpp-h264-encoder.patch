@@ -45,17 +45,52 @@
  #endif
  #ifdef __APPLE__
      &videotoolbox,
-@@ -2582,7 +2613,12 @@
+--- a/src/video.cpp
++++ b/src/video.cpp
+@@ -436,6 +436,7 @@
+     config_t config;
+     int frame_nr;
+     void *channel_data;
++    std::chrono::steady_clock::time_point next_rkmpp_frame;
+   };
+ 
+   struct sync_session_t {
+@@ -463,6 +464,10 @@
+   struct capture_thread_sync_ctx_t {
+     encode_session_ctx_queue_t encode_session_ctx_queue {30};
+   };
++
++  std::chrono::steady_clock::duration rkmpp_fps_interval(std::uint32_t fps) {
++    return std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double> {1.0 / fps});
++  }
+ 
+   int start_capture_sync(capture_thread_sync_ctx_t &ctx);
+   void end_capture_sync(capture_thread_sync_ctx_t &ctx);
+@@ -1972,6 +1977,8 @@
+     auto packets = mail::man->queue<packet_t>(mail::video_packets);
+     auto idr_events = mail->event<bool>(mail::idr);
+     auto invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
++    const std::uint32_t rkmpp_fps = config.framerate;
++    auto next_rkmpp_frame = std::chrono::steady_clock::now();
+ 
+     {
+       // Load a dummy image into the AVFrame to ensure we have something to encode
+@@ -2014,6 +2021,18 @@
+       }
  
        std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
- 
--      if (!requested_idr_frame && runtime_fps > 0 && runtime_fps < (std::uint32_t) config.framerate) {
++
 +      // The RKMPP encoder returns immediately in async mode, so without pacing
 +      // the encode loop spins at the KMS capture rate and burns a full core on
 +      // BGRA->NV12 conversion. Always pace it to the negotiated frame rate.
 +      const bool pace_rkmpp = encoder.name == "rkmpp";
-+      if (!requested_idr_frame && runtime_fps > 0 &&
-+          (pace_rkmpp || runtime_fps < (std::uint32_t) config.framerate)) {
-         auto now = std::chrono::steady_clock::now();
-         if (now < next_runtime_frame) {
-           std::this_thread::sleep_until(next_runtime_frame);
++      if (!requested_idr_frame && pace_rkmpp && rkmpp_fps > 0) {
++        auto now = std::chrono::steady_clock::now();
++        if (now < next_rkmpp_frame) {
++          std::this_thread::sleep_until(next_rkmpp_frame);
++        }
++        next_rkmpp_frame = std::chrono::steady_clock::now() + rkmpp_fps_interval(rkmpp_fps);
++      }
+ 
+       // Encode at a minimum FPS to avoid image quality issues with static content
+       if (!requested_idr_frame || images->peek()) {

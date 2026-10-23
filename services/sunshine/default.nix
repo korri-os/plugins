@@ -22,10 +22,6 @@ let
     else
       null;
   sunshineApprovedPatches = import ./approved-patches.nix;
-  sunshinePatchDefinitions =
-    sunshineApprovedPatches.patches
-    ++ (if sunshinePackage.korriRkmppEnabled then sunshineApprovedPatches.rkmppPatches else [ ]);
-  sunshinePatchPaths = map (record: record.path) sunshinePatchDefinitions;
   sunshineExpectedPatchSetSha256 =
     if sunshinePackage.korriRkmppEnabled then
       sunshineApprovedPatches.rkmppPatchSetSha256
@@ -82,7 +78,7 @@ in
       }
       test "${sunshinePackage.pname}" = sunshine-korri
       test "${sunshinePackage.version}" = "${pkgs.sunshine.version}-korri"
-      test "${toString (builtins.length sunshinePackage.korriPatchNames)}" = 17
+      test "${toString (builtins.length sunshinePackage.korriPatchNames)}" = 8
       test "${sunshinePackage.korriBaseSunshineVersion}" = "${sunshineApprovedPatches.baseSunshineVersion}"
       test "${sunshinePackage.korriApprovedBaseSunshineSourceHash}" = "${sunshineApprovedPatches.approvedBaseSourceHash}"
       test "${pkgs.sunshine.src.outputHash}" = "${sunshineApprovedPatches.approvedBaseSourceHash}"
@@ -125,13 +121,6 @@ in
       grep -Fx 'patch_set_sha256=${sunshinePackage.korriPatchSetSha256}' "$provenance" >/dev/null
       touch "$out"
     '';
-    sunshine-korri-runtime-settings = import ./runtime-settings-check.nix {
-      inherit pkgs sunshinePackage;
-      approvedPatchesPath = ./approved-patches.nix;
-      patchPaths = sunshinePatchPaths;
-      packagePath = ./package.nix;
-      readmePath = ./README.md;
-    };
     sunshine-korri-input-presence =
       (import ./input-seat-presence-check.nix {
         inherit pkgs;
