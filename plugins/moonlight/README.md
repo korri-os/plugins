@@ -19,10 +19,16 @@ auto-discovery; Qualcomm V4L2 M2M uses the same explicit seat paths.
 
 ## Server certificate pinning (new Korri security patch)
 
-Patch 0020 is new code, not a legacy harvest. korrid writes the authenticated
-broker's server certificate to `server-<exact launch id>.pem` in the private
-keydir, mode 0600. `KORRI_MOONLIGHT_SERVER_CERTIFICATE` makes Moonlight verify
-its TLS chain and pin its public key. The viewer always supplies it, including
-identity bootstrap; a missing pin refuses network requests. Each confirmed
-stop removes its pin. Startup and each stream start remove pins with no live
-launch unit. Live launch pins remain until confirmed stop.
+Patch 0020 is new code, not a legacy harvest. The private keydir holds only
+stock identity files: `client.pem`, `key.pem` and `uniqueid.dat`. It remains
+0700, with 0600 files. korrid never opens it. A bounded named viewer-sandbox
+bootstrap unit runs the declared `identity-bootstrap` helper as `korri`. The
+helper suppresses Moonlight output and emits exactly the public `client.pem`
+on stdout through `systemd-run --wait --pipe`. The private key never crosses
+that boundary. A deliberately invalid pin prevents bootstrap network access.
+
+The broker-authorized host certificate enters each viewer unit through a
+systemd credential. systemd expands the credential directory for
+`KORRI_MOONLIGHT_SERVER_CERTIFICATE`; Moonlight verifies its TLS chain and pins
+its public key. There are no per-launch pin files or stale-pin cleanup in the
+keydir. Game units still cannot read the identity directory.

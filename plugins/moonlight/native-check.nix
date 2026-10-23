@@ -1,9 +1,11 @@
 # Adapted from legacy:product/plugins/moonlight/removability.test.ts.
 { pkgs, plugin }:
-pkgs.runCommand "korri-moonlight-native-check" { nativeBuildInputs = [ pkgs.gnugrep ]; } ''
+pkgs.runCommand "korri-moonlight-native-check" { nativeBuildInputs = [ pkgs.gnugrep pkgs.python3 pkgs.openssl ]; } ''
   set -eu
   test -x ${plugin.files.moonlight}
   test -s ${plugin.files.mapping}
+  test -x ${plugin.files.identity-bootstrap}
+  python3 ${./test-identity-bootstrap.py} ${plugin.files.identity-bootstrap}
   unit=${plugin.services.korri-moonlight-setup}
   grep -Fx 'User=korri' "$unit"
   grep -Fx 'Type=oneshot' "$unit"
