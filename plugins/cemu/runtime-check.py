@@ -79,6 +79,8 @@ with tempfile.TemporaryDirectory(prefix="cemu-runtime-") as work:
             assert settings.findtext("gp_download") == "false"
             assert settings.findtext("Graphic/api") == "1"
             assert settings.findtext("fullscreen") == "true"
+            assert settings.findtext("Audio/api") == "3"
+            assert settings.findtext("Audio/TVDevice") == "default"
             # The next launch must preserve a person's edits to both native files.
             config.write_text(config.read_text().replace("<fullscreen>true</fullscreen>", "<fullscreen>false</fullscreen>"))
             (packs / "user-note.txt").write_text("preserve me")

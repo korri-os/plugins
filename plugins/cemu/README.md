@@ -74,6 +74,10 @@ Vulkan (`Graphic/api=1`), fullscreen and update checks disabled. It never
 rewrites existing settings. `-f` remains the requested launch behavior even
 if a person changes the native fullscreen preference. The wrapper exposes
 Vulkan, Pulse and ALSA libraries through `LD_LIBRARY_PATH`, then execs Cemu.
+The fresh native seed selects Cubeb (`Audio/api=3`) and its `default` TV
+output. Omitting the TV device means disabled audio in Cemu, not the default
+output: the first Odin title launch had no PipeWire audio stream despite
+`Cubeb: available`. Existing native settings remain untouched.
 
 Upstream's Linux data path is wxWidgets `GetDataDir()`. wxWidgets 3.3.1's
 `src/unix/stdpaths.cpp` derives the prefix from `/proc/self/exe`'s `/bin/`

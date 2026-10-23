@@ -6,4 +6,8 @@
   <Graphic>
     <api>1</api>
   </Graphic>
+  <Audio>
+    <api>3</api>
+    <TVDevice>default</TVDevice>
+  </Audio>
 </content>
