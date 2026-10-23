@@ -8,6 +8,7 @@ pkgs.runCommand "korri-sunshine-plugin-native-check"
   {
     nativeBuildInputs = [
       pkgs.gnugrep
+      pkgs.jq
       pkgs.systemd
     ];
   }
@@ -17,6 +18,12 @@ pkgs.runCommand "korri-sunshine-plugin-native-check"
     rules=${plugin.files.input-rules}
     sunshine_unit=${plugin.services.korri-sunshine}
     setup_unit=${plugin.services.korri-sunshine-input-setup}
+    runtime=${plugin.files.runtime}
+    apps=${plugin.files.apps}
+
+    # The installed runtime must use the same immutable, command-free app file.
+    jq -e '. == {"apps": [{"name": "Korri Stream", "cmd": "", "image-path": ""}], "env": {}}' "$apps"
+    grep -F " file_apps=$apps" "$runtime"
 
     # Every store tool the setup helper calls must exist in its closure.
     tools="$(grep -oE '/nix/store/[a-z0-9]{32}-[^/ ]+/bin/[A-Za-z0-9_.-]+' "$setup" | sort -u)"
