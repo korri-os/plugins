@@ -24,8 +24,8 @@ ExecStart=@runtime@
 Restart=on-failure
 RestartSec=5
 UMask=0077
-# Permit only the explicitly configured capture thread to request FIFO 15.
-LimitRTPRIO=15
+# Allow FIFO/RR up to 5; Sunshine requests it only on the capture thread.
+LimitRTPRIO=5
 NoNewPrivileges=false
 CapabilityBoundingSet=CAP_SETPCAP CAP_SYS_ADMIN
 PrivateTmp=false

@@ -258,7 +258,7 @@ rec {
   kmsPacingPatch = {
     name = "0037-preserve-kms-capture-phase.patch";
     path = ./patches/0037-preserve-kms-capture-phase.patch;
-    sha256 = "498ebfc609c941d6ec77864429f2d9b660fa5099719c319c728dd7b736bd7896";
+    sha256 = "2daec99a670cdc1b00469064923997a01fd5762a18515078a7d325e6e00996e9";
   };
 
   rkmppPatches = [
@@ -280,5 +280,5 @@ rec {
 
   # Ordered digest of patches ++ rkmppPatches. Bump only after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "a652d179523fedc43ef944884e7deadaa4e3f7447bf59af5375e49301d5e9501";
+  rkmppPatchSetSha256 = "1cb6199ef6d3197348e595212f27ab7cf3e8db1485288bffc9d93b1b820bc754";
 }

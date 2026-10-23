@@ -1,32 +1,624 @@
-What: advance RAM KMS capture deadlines from their original phase with
-sleep_until, instead of resetting the deadline after a slow frame. Late
-frames still perform a real acquisition. No busy-wait or affinity change.
-Status: upstreamable pacing fix, carried downstream pending wider testing.
-Evidence: 6b81298/e1180ed; /tmp/h700-sun/convert.md (2026-10-22): combined
-row-pair/pacing/FIFO experiment delivered 600 acquisitions in all 27 windows.
-Removal: equivalent upstream pacing or evidence of unsafe catch-up load.
-Cost: a long stall causes immediate real catch-up acquisitions.
+What: phase-lock RAM KMS capture to the captured plane's CRTC vblank sequence.
+Sample at capture_vblank_offset_ms (strict 0..1000 ms, default 0), validated
+against physical refresh. Resynchronise missed refreshes; never drift or reuse a
+sequence. Late entry waits for a future refresh. Timing fallback skips overdue
+nominal deadlines. A call/sequence guard drops RT on missing pacing, re-reading or backwards sequence,
+keeping RESET_ON_FORK. Failed demotion sleeps every refresh without acquisition.
+No modesetting, affinity or scheduling authority is added.
+Status: downstream ARM RAM KMS scheduling and safety correction.
+Evidence: 2026-10-22 source-ID hunt: 135/4/0/38 misses; bad phases 2..5 ms,
+clean 11..13 ms, nominal timer drift 2.27 ms/min; no scored CMA migrations.
+Cost: vblank ioctls and phase latency; bounded driver waits and source-starvation
+risk require real-device acceptance. Remove for equivalent upstream pacing.
 
+diff --git a/src/kms_capture_pacing.h b/src/kms_capture_pacing.h
+new file mode 100644
+--- /dev/null
++++ b/src/kms_capture_pacing.h
+@@ -0,0 +1,77 @@
++#pragma once
++
++#include <cstdint>
++#include <limits>
++#include <optional>
++#include <string_view>
++
++namespace platf::kms {
++  inline constexpr int default_vblank_offset_ms = 0;
++
++  // Linux RAM KMS only. Configuration is milliseconds, not a display mode.
++  inline std::optional<int> parse_vblank_offset_ms(std::string_view value) {
++    if (value.empty()) {
++      return std::nullopt;
++    }
++    int result = 0;
++    for (char c : value) {
++      if (c < '0' || c > '9' || result > 1000 / 10) {
++        return std::nullopt;
++      }
++      result = result * 10 + c - '0';
++      if (result > 1000) {
++        return std::nullopt;
++      }
++    }
++    return result;
++  }
++
++  // DRM mode.clock is kHz; totals are pixels/lines. The mode is an
++  // applicability check only. Vblank timestamps drive capture deadlines.
++  inline std::optional<std::int64_t> mode_period_ns(std::uint32_t clock_khz, std::uint16_t htotal, std::uint16_t vtotal, bool interlaced, bool doublescan, std::uint16_t vscan) {
++    if (!clock_khz || !htotal || !vtotal) {
++      return std::nullopt;
++    }
++    std::uint64_t numerator = std::uint64_t(htotal) * vtotal * 1000000;
++    std::uint64_t scan = std::uint64_t(doublescan ? 2 : 1) * (vscan > 1 ? vscan : 1);
++    if (numerator > std::uint64_t(std::numeric_limits<std::int64_t>::max()) / scan) {
++      return std::nullopt;
++    }
++    numerator *= scan;
++    std::uint64_t denominator = std::uint64_t(clock_khz) * (interlaced ? 2 : 1);
++    return static_cast<std::int64_t>(numerator / denominator);
++  }
++
++  inline bool compatible_vblank_period(std::int64_t period, std::int64_t requested, std::int64_t offset) {
++    if (period <= 0 || requested <= 0 || offset < 0 || offset >= period) {
++      return false;
++    }
++    auto difference = period > requested ? period - requested : requested - period;
++    // Preserve negotiated FPS on other displays; allow the measured panel's
++    // small difference from nominal 60 Hz, not a different refresh multiple.
++    return difference <= (period > requested ? period : requested) / 1000;
++  }
++
++  inline bool usable_vblank(std::uint32_t sequence, std::optional<std::uint32_t> last, std::int64_t timestamp, std::int64_t now, std::int64_t period, std::int64_t wait_began, std::int64_t offset) {
++    // Query/wakeup overshoot is allowed only if waiting began before the
++    // phase deadline. A late caller must not start FIFO catch-up work.
++    return timestamp > 0 && now >= timestamp && period > 0 && offset >= 0 && offset < period &&
++           timestamp <= std::numeric_limits<std::int64_t>::max() - offset && wait_began >= 0 &&
++           wait_began <= timestamp + offset && (!last || sequence != *last) && now - timestamp < period;
++  }
++
++  inline std::optional<std::int64_t> future_nominal_deadline_ns(std::int64_t previous, std::int64_t now, std::int64_t period) {
++    if (previous < 0 || now < 0 || period <= 0) {
++      return std::nullopt;
++    }
++    if (previous > now) {
++      return previous;
++    }
++    auto elapsed = (now - previous) / period;
++    auto capacity = (std::numeric_limits<std::int64_t>::max() - previous) / period;
++    if (elapsed >= capacity) {
++      return std::nullopt;
++    }
++    return previous + (elapsed + 1) * period;
++  }
++}  // namespace platf::kms
+diff --git a/src/kms_capture_rt_guard.h b/src/kms_capture_rt_guard.h
+new file mode 100644
+--- /dev/null
++++ b/src/kms_capture_rt_guard.h
+@@ -0,0 +1,205 @@
++#pragma once
++
++#include <array>
++#include <cerrno>
++#include <chrono>
++#include <cstdint>
++#include <optional>
++#include <sched.h>
++#include <sys/resource.h>
++#include <thread>
++#include <time.h>
++
++namespace platf::kms {
++  enum class capture_rt_guard_result {
++    ready,
++    degraded,
++    sleep_only
++  };
++  enum class capture_rt_guard_reason {
++    none,
++    no_pacing_calls,
++    repeated_sequence,
++    backwards_sequence,
++    policy_unknown
++  };
++
++  // Driver wait calls may legitimately return immediately at the next vblank.
++  // Neither CPU share nor sleep duration identifies that as a spin.
++  class capture_pacing_history_t {
++  public:
++    capture_rt_guard_reason observe(unsigned pacing_calls, std::optional<std::uint32_t> sequence) {
++      without_pacing = pacing_calls ? 0 : without_pacing + 1;
++      bool backwards = false;
++      if (sequence) {
++        if (previous_sequence) {
++          auto delta = std::uint32_t(*sequence - *previous_sequence);
++          backwards = delta >= (std::uint32_t(1) << 31);
++          repeated = delta == 0 ? repeated + 1 : 1;
++        } else {
++          repeated = 1;
++        }
++      } else {
++        repeated = 0;
++      }
++      previous_sequence = sequence;
++      if (backwards) {
++        return capture_rt_guard_reason::backwards_sequence;
++      }
++      if (repeated >= 3) {
++        return capture_rt_guard_reason::repeated_sequence;
++      }
++      if (without_pacing >= 3) {
++        return capture_rt_guard_reason::no_pacing_calls;
++      }
++      return capture_rt_guard_reason::none;
++    }
++
++    unsigned without_pacing = 0;
++    unsigned repeated = 0;
++    std::optional<std::uint32_t> previous_sequence;
++  };
++
++  struct capture_rt_guard_observation {
++    std::array<std::int64_t, 3> acquisition_end_ns {};
++    std::int64_t decision_ns = 0;
++    std::int64_t pacing_start_ns = 0;
++    std::int64_t cpu_ns = 0;
++    std::int64_t wall_ns = 0;
++    std::int64_t blocked_ns = 0;
++    unsigned pacing_calls = 0;
++    unsigned consecutive_unpaced = 0;
++    unsigned repeated_sequence = 0;
++    std::optional<std::uint32_t> sequence;
++    std::optional<std::uint32_t> previous_sequence;
++  };
++
++  class capture_rt_guard_t {
++  public:
++    capture_rt_guard_t() {
++      auto policy = sched_getscheduler(0);
++      auto base = policy & ~SCHED_RESET_ON_FORK;
++      if (policy < 0) {
++        state = state_t::unverified;
++      } else if (base == SCHED_OTHER || base == SCHED_BATCH || base == SCHED_IDLE) {
++        state = state_t::unrestricted;
++      } else {
++        state = state_t::realtime;
++      }
++    }
++
++    void begin_pacing() {
++      if (state == state_t::realtime || state == state_t::unverified) {
++        pacing_start = measure();
++      }
++    }
++
++    capture_rt_guard_result before_acquisition(std::chrono::nanoseconds period, unsigned pacing_calls, std::optional<std::uint32_t> sequence) {
++      if (state == state_t::sleep_only) {
++        std::this_thread::sleep_for(period);
++        return capture_rt_guard_result::sleep_only;
++      }
++      if (state == state_t::unrestricted) {
++        return capture_rt_guard_result::ready;
++      }
++      auto after = measure();
++      detail.decision_ns = after ? after->wall_ns : 0;
++      detail.pacing_start_ns = pacing_start ? pacing_start->wall_ns : 0;
++      detail.wall_ns = after && pacing_start ? after->wall_ns - pacing_start->wall_ns : 0;
++      detail.cpu_ns = after && pacing_start ? after->cpu_ns - pacing_start->cpu_ns : 0;
++      bool switched = after && pacing_start && after->voluntary_switches > pacing_start->voluntary_switches;
++      detail.blocked_ns = switched && detail.cpu_ns >= 0 && detail.wall_ns >= detail.cpu_ns ? detail.wall_ns - detail.cpu_ns : 0;
++      detail.pacing_calls = pacing_calls;
++      detail.sequence = sequence;
++      detail.previous_sequence = history.previous_sequence;
++      trigger = state == state_t::unverified ? capture_rt_guard_reason::policy_unknown : history.observe(pacing_calls, sequence);
++      detail.consecutive_unpaced = history.without_pacing;
++      detail.repeated_sequence = history.repeated;
++      if (trigger == capture_rt_guard_reason::none) {
++        return capture_rt_guard_result::ready;
++      }
++      sched_param param {};
++      // An unprivileged thread may add RESET_ON_FORK but cannot clear it.
++      if (sched_setscheduler(0, SCHED_OTHER | SCHED_RESET_ON_FORK, &param)) {
++        failure_errno = errno;
++        state = state_t::sleep_only;
++        std::this_thread::sleep_for(period);
++        return capture_rt_guard_result::sleep_only;
++      }
++      state = state_t::unrestricted;
++      return capture_rt_guard_result::degraded;
++    }
++
++    void acquisition_complete() {
++      if (state == state_t::realtime) {
++        detail.acquisition_end_ns[0] = detail.acquisition_end_ns[1];
++        detail.acquisition_end_ns[1] = detail.acquisition_end_ns[2];
++        detail.acquisition_end_ns[2] = clock_ns(CLOCK_MONOTONIC).value_or(0);
++      }
++    }
++
++    int error() const {
++      return failure_errno;
++    }
++
++    capture_rt_guard_reason reason_code() const {
++      return trigger;
++    }
++
++    const capture_rt_guard_observation &observation() const {
++      return detail;
++    }
++
++    const char *reason() const {
++      switch (trigger) {
++        case capture_rt_guard_reason::none:
++          return "none";
++        case capture_rt_guard_reason::no_pacing_calls:
++          return "three acquisitions without a pacing call";
++        case capture_rt_guard_reason::repeated_sequence:
++          return "three acquisitions with the same vblank sequence";
++        case capture_rt_guard_reason::backwards_sequence:
++          return "vblank sequence moved backwards";
++        case capture_rt_guard_reason::policy_unknown:
++          return "sched_getscheduler failed";
++      }
++      return "invalid guard reason";
++    }
++
++  private:
++    struct measurement {
++      std::int64_t wall_ns, cpu_ns;
++      long voluntary_switches;
++    };
++
++    static std::optional<std::int64_t> clock_ns(clockid_t clock) {
++      timespec value {};
++      if (clock_gettime(clock, &value)) {
++        return std::nullopt;
++      }
++      return std::int64_t(value.tv_sec) * 1000000000 + value.tv_nsec;
++    }
++
++    static std::optional<measurement> measure() {
++      auto wall = clock_ns(CLOCK_MONOTONIC);
++      auto cpu = clock_ns(CLOCK_THREAD_CPUTIME_ID);
++      rusage usage {};
++      if (!wall || !cpu || getrusage(RUSAGE_THREAD, &usage) || usage.ru_nvcsw < 0) {
++        return std::nullopt;
++      }
++      return measurement {*wall, *cpu, usage.ru_nvcsw};
++    }
++    enum class state_t {
++      unrestricted,
++      realtime,
++      unverified,
++      sleep_only
++    };
++    state_t state;
++    capture_pacing_history_t history;
++    std::optional<measurement> pacing_start;
++    capture_rt_guard_observation detail;
++    capture_rt_guard_reason trigger = capture_rt_guard_reason::none;
++    int failure_errno = 0;
++  };
++}  // namespace platf::kms
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
-index 84a3214..9300684 100644
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -1254,15 +1254,14 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
-           auto now = std::chrono::steady_clock::now();
+@@ -32,6 +32,8 @@
+ #include "cuda.h"
+ #include "graphics.h"
+ #include "src/config.h"
++#include "src/kms_capture_pacing.h"
++#include "src/kms_capture_rt_guard.h"
+ #include "src/nv12.h"
+ #include "src/logging.h"
+ #include "src/platform/common.h"
+@@ -1138,6 +1140,165 @@
+       card_t card;
+     };
  
-           if (next_frame > now) {
++    // Borrow the captured plane's DRM card and CRTC index. Never use a
++    // different monitor's vblank or infer refresh from wall-clock sleeps.
++    class vblank_pacer_t {
++    public:
++      vblank_pacer_t(int fd, int crtc_index, int crtc_id, std::chrono::nanoseconds requested, int offset_ms):
++          fd {fd},
++          crtc_index {crtc_index},
++          crtc_id {crtc_id},
++          requested {requested.count()},
++          offset {std::chrono::milliseconds(offset_ms)} {
++      }
++
++      unsigned wait_calls() const {
++        return wait_call_count;
++      }
++
++      std::optional<std::uint32_t> sequence() const {
++        return last_sequence;
++      }
++
++      bool wait() {
++        wait_call_count = 0;
++        if (disabled) {
++          return false;
++        }
++        if (!period && !initialize()) {
++          return false;
++        }
++        for (int attempt = 0; attempt < 3; ++attempt) {
++          auto wait_began = monotonic_ns();
++          auto current = read(false, 0);
++          auto now = monotonic_ns();
++          if (!wait_began || !current || !now) {
++            return fail("cannot query CRTC vblank");
++          }
++          if (!usable_vblank(current->sequence, last_sequence, current->timestamp, *now, *period, *wait_began, offset.count())) {
++            // NEXTONMISS also handles a refresh occurring between the query
++            // and this request. No synthetic frame or overdue catch-up read.
++            current = read(true, current->sequence + 1);
++            if (!current) {
++              return fail("cannot wait for next CRTC vblank");
++            }
++          }
++          now = monotonic_ns();
++          if (!now) {
++            return fail("cannot read monotonic clock");
++          }
++          auto deadline = current->timestamp + offset.count();
++          auto steady_now = std::chrono::steady_clock::now();
++          if (deadline > *now) {
++            std::this_thread::sleep_until(steady_now + std::chrono::nanoseconds(deadline - *now));
++          }
++          now = monotonic_ns();
++          if (!now) {
++            return fail("cannot read monotonic clock");
++          }
++          // Verify the hardware sequence after the sleep. An estimated
++          // refresh duration cannot prove that a late wake is still in the
++          // selected refresh, particularly across a display mode change.
++          auto observed = read(false, 0);
++          if (!observed) {
++            return fail("cannot verify CRTC vblank sequence");
++          }
++          if (observed->sequence == current->sequence) {
++            last_sequence = current->sequence;
++            return true;
++          }
++        }
++        return fail("repeatedly missed the CRTC phase window");
++      }
++
++    private:
++      struct vblank_t {
++        std::uint32_t sequence;
++        std::int64_t timestamp;
++      };
++
++      static std::optional<std::int64_t> monotonic_ns() {
++        timespec now {};
++        if (clock_gettime(CLOCK_MONOTONIC, &now)) {
++          return std::nullopt;
++        }
++        return std::int64_t(now.tv_sec) * 1000000000 + now.tv_nsec;
++      }
++
++      std::optional<vblank_t> read(bool absolute, std::uint32_t sequence) {
++        drmVBlank event {};
++        auto flags = absolute ? DRM_VBLANK_ABSOLUTE | DRM_VBLANK_NEXTONMISS : DRM_VBLANK_RELATIVE;
++        event.request.type = static_cast<drmVBlankSeqType>(flags | ((crtc_index << DRM_VBLANK_HIGH_CRTC_SHIFT) & DRM_VBLANK_HIGH_CRTC_MASK));
++        event.request.sequence = sequence;
++        ++wait_call_count;
++        if (drmWaitVBlank(fd, &event) || event.reply.tval_sec < 0 || event.reply.tval_usec < 0 || event.reply.tval_usec >= 1000000) {
++          return std::nullopt;
++        }
++        return vblank_t {event.reply.sequence, std::int64_t(event.reply.tval_sec) * 1000000000 + event.reply.tval_usec * 1000};
++      }
++
++      bool initialize() {
++        std::uint64_t monotonic = 0;
++        if (crtc_index < 0 || crtc_index > (DRM_VBLANK_HIGH_CRTC_MASK >> DRM_VBLANK_HIGH_CRTC_SHIFT) ||
++            drmGetCap(fd, DRM_CAP_TIMESTAMP_MONOTONIC, &monotonic) || !monotonic) {
++          return fail("CRTC monotonic vblank timestamps unavailable");
++        }
++        auto first = read(false, 0);
++        auto second = first ? read(true, first->sequence + 1) : std::nullopt;
++        if (!first || !second) {
++          return fail("CRTC vblank timing unavailable");
++        }
++        std::uint32_t elapsed = second->sequence - first->sequence;
++        if (!elapsed || elapsed > 120 || second->timestamp <= first->timestamp) {
++          return fail("invalid CRTC vblank sequence or timestamp");
++        }
++        crtc_t crtc = drmModeGetCrtc(fd, crtc_id);
++        if (!crtc || !crtc->mode_valid) {
++          return fail("active CRTC mode unavailable");
++        }
++        const auto &mode = crtc->mode;
++        auto mode_period = mode_period_ns(mode.clock, mode.htotal, mode.vtotal, mode.flags & DRM_MODE_FLAG_INTERLACE, mode.flags & DRM_MODE_FLAG_DBLSCAN, mode.vscan);
++        BOOST_LOG(info) << "KMS RAM timing inputs: CRTC="sv << crtc_id
++                        << " mode_clock_khz="sv << mode.clock << " htotal="sv << mode.htotal
++                        << " vtotal="sv << mode.vtotal << " requested_period_ns="sv << requested
++                        << " mode_period_ns="sv << mode_period.value_or(0)
++                        << " offset_ms="sv << offset.count() / 1000000;
++        if (!mode_period || *mode_period <= 0) {
++          return fail("invalid CRTC mode clock or totals");
++        }
++        if (offset.count() < 0 || offset.count() >= *mode_period) {
++          return fail("offset is outside the CRTC frame period");
++        }
++        if (!compatible_vblank_period(*mode_period, requested, offset.count())) {
++          return fail("negotiated FPS differs from CRTC mode by more than 0.1 percent");
++        }
++        period = *mode_period;
++        BOOST_LOG(info) << "KMS RAM vblank pacing enabled: CRTC="sv << crtc_id
++                        << " index="sv << crtc_index << " sequence="sv << second->sequence
++                        << " mode_period_ns="sv << *period
++                        << " startup_period_ns="sv << (second->timestamp - first->timestamp) / elapsed
++                        << " offset_ms="sv << offset.count() / 1000000;
++        return true;
++      }
++
++      bool fail(const char *reason) {
++        disabled = true;
++        BOOST_LOG(warning) << "KMS RAM vblank pacing unavailable: "sv << reason
++                           << "; falling back to nominal pacing; CRTC="sv << crtc_id;
++        return false;
++      }
++
++      int fd;
++      int crtc_index;
++      int crtc_id;
++      std::int64_t requested;
++      std::chrono::nanoseconds offset;
++      std::optional<std::int64_t> period;
++      std::optional<std::uint32_t> last_sequence;
++      bool disabled = false;
++      unsigned wait_call_count = 0;
++    };
++
+     class display_ram_t: public display_t {
+     public:
+       display_ram_t(mem_type_e mem_type):
+@@ -1145,6 +1306,7 @@
+       }
+ 
+       int init(const std::string &display_name, const ::video::config_t &config) {
++        BOOST_LOG(info) << "KMS RAM Moonlight requested_fps="sv << config.framerate;
+         if (!gbm::create_device) {
+           BOOST_LOG(warning) << "libgbm not initialized"sv;
+           return -1;
+@@ -1247,25 +1409,76 @@
+ 
+       capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
+         auto next_frame = std::chrono::steady_clock::now();
++        vblank_pacer_t vblank(card.fd.el, crtc_index, crtc_id, delay, config::video.capture_vblank_offset_ms);
++        bool phase_locked = false;
++        thread_local capture_rt_guard_t rt_guard;
++        bool sleep_only_logged = false;
+ 
+         sleep_overshoot_logger.reset();
+ 
+         while (true) {
+-          auto now = std::chrono::steady_clock::now();
+-
+-          if (next_frame > now) {
 -            std::this_thread::sleep_for(next_frame - now);
++          rt_guard.begin_pacing();
++          unsigned pacing_calls = 0;
++          if (!vblank.wait()) {
++            auto now = std::chrono::steady_clock::now();
++            if (phase_locked) {
++              next_frame = now;
++            }
++            auto scheduled = future_nominal_deadline_ns(
++              std::chrono::duration_cast<std::chrono::nanoseconds>(next_frame.time_since_epoch()).count(),
++              std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count(), delay.count());
++            if (!scheduled) {
++              BOOST_LOG(error) << "KMS RAM nominal pacing deadline overflow"sv;
++              return platf::capture_e::error;
++            }
++            next_frame = std::chrono::steady_clock::time_point(std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::nanoseconds(*scheduled)));
++            ++pacing_calls;
 +            std::this_thread::sleep_until(next_frame);
              sleep_overshoot_logger.first_point(next_frame);
              sleep_overshoot_logger.second_point_now_and_log();
++            phase_locked = false;
++          } else {
++            phase_locked = true;
            }
++          pacing_calls += vblank.wait_calls();
  
-           next_frame += delay;
+-          next_frame += delay;
 -          if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
 -            next_frame = now + delay;
--          }
-+          // Preserve phase after a slow capture. Start real catch-up captures
-+          // immediately; never replace them with encoded repeats or spin waits.
- 
++          auto rt_safety = rt_guard.before_acquisition(delay, pacing_calls, phase_locked ? vblank.sequence() : std::nullopt);
++          if (rt_safety == capture_rt_guard_result::sleep_only) {
++            if (!sleep_only_logged) {
++              sleep_only_logged = true;
++              const auto &event = rt_guard.observation();
++              BOOST_LOG(error) << "KMS RAM capture RT safety guard: cannot drop realtime policy: "sv << std::strerror(rt_guard.error())
++                               << "; reason="sv << rt_guard.reason() << " acquisition_end_ns=["sv
++                               << event.acquisition_end_ns[0] << ',' << event.acquisition_end_ns[1] << ',' << event.acquisition_end_ns[2]
++                               << "] next_acquisition_ns="sv << event.decision_ns << " pacing_calls="sv << event.pacing_calls
++                               << " unpaced_acquisitions="sv << event.consecutive_unpaced << " repeated_sequence="sv << event.repeated_sequence
++                               << " has_sequence="sv << bool(event.sequence) << " sequence="sv << event.sequence.value_or(0)
++                               << " previous_sequence="sv << event.previous_sequence.value_or(0)
++                               << " pacing_start_ns="sv << event.pacing_start_ns << " pacing_cpu_ns="sv << event.cpu_ns
++                               << " pacing_wall_ns="sv << event.wall_ns << " blocked_ns="sv << event.blocked_ns
++                               << "; capture suspended; sleeping one refresh every iteration and encoding repeats"sv;
++            }
++            std::shared_ptr<platf::img_t> no_image;
++            if (!push_captured_image_cb(std::move(no_image), false)) {
++              return platf::capture_e::ok;
++            }
++            continue;
++          }
++          if (rt_safety == capture_rt_guard_result::degraded) {
++            const auto &event = rt_guard.observation();
++            BOOST_LOG(warning) << "KMS RAM capture RT safety guard: reason="sv << rt_guard.reason() << " acquisition_end_ns=["sv
++                               << event.acquisition_end_ns[0] << ',' << event.acquisition_end_ns[1] << ',' << event.acquisition_end_ns[2]
++                               << "] next_acquisition_ns="sv << event.decision_ns << " pacing_calls="sv << event.pacing_calls
++                               << " unpaced_acquisitions="sv << event.consecutive_unpaced << " repeated_sequence="sv << event.repeated_sequence
++                               << " has_sequence="sv << bool(event.sequence) << " sequence="sv << event.sequence.value_or(0)
++                               << " previous_sequence="sv << event.previous_sequence.value_or(0)
++                               << " pacing_start_ns="sv << event.pacing_start_ns << " pacing_cpu_ns="sv << event.cpu_ns
++                               << " pacing_wall_ns="sv << event.wall_ns << " blocked_ns="sv << event.blocked_ns
++                               << "; using SCHED_OTHER for the rest of the session"sv;
+           }
+-
            std::shared_ptr<platf::img_t> img_out;
            auto status = snapshot(pull_free_image_cb, img_out, 1000ms, *cursor);
++          rt_guard.acquisition_complete();
+           switch (status) {
+             case platf::capture_e::reinit:
+             case platf::capture_e::error:
+diff --git a/src/config.h b/src/config.h
+--- a/src/config.h
++++ b/src/config.h
+@@ -27,6 +27,7 @@
+     int av1_mode;
+ 
+     int capture_rt_priority;  // Linux capture-only FIFO; 0 disables, 1..20 request RT
++    int capture_vblank_offset_ms;  // RAM KMS phase after CRTC vblank, default 0 ms
+ 
+     int min_threads;  // Minimum number of threads/slices for CPU encoding
+ 
+diff --git a/src/config.cpp b/src/config.cpp
+--- a/src/config.cpp
++++ b/src/config.cpp
+@@ -21,6 +21,7 @@
+ // local includes
+ #include "config.h"
+ #include "capture_scheduling.h"
++#include "kms_capture_pacing.h"
+ #include "entry_handler.h"
+ #include "file_handler.h"
+ #include "logging.h"
+@@ -442,6 +443,7 @@
+     0,  // av1_mode
+ 
+     0,  // capture_rt_priority: no RT request without explicit configuration
++    platf::kms::default_vblank_offset_ms,  // capture_vblank_offset_ms: CRTC vblank edge
+     2,  // min_threads
+     {
+       "superfast"s,  // preset
+@@ -1069,6 +1071,17 @@
+         BOOST_LOG(warning) << "Invalid capture_rt_priority; expected 0..20, disabling capture FIFO"sv;
+       }
+     }
++    std::string capture_vblank_offset_ms;
++    string_f(vars, "capture_vblank_offset_ms", capture_vblank_offset_ms);
++    if (!capture_vblank_offset_ms.empty()) {
++      auto offset = platf::kms::parse_vblank_offset_ms(capture_vblank_offset_ms);
++      if (offset) {
++        video.capture_vblank_offset_ms = *offset;
++      } else {
++        video.capture_vblank_offset_ms = platf::kms::default_vblank_offset_ms;
++        BOOST_LOG(warning) << "Invalid capture_vblank_offset_ms; expected 0..1000, using "sv << platf::kms::default_vblank_offset_ms << " ms"sv;
++      }
++    }
+     int_f(vars, "min_threads", video.min_threads);
+     string_f(vars, "sw_preset", video.sw.sw_preset);
+     if (!video.sw.sw_preset.empty()) {

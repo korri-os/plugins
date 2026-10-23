@@ -235,13 +235,59 @@ record, in application order. Individual hashes cover the complete patch bytes.
 | --- | --- | --- |
 | `0035-read-linear-kms-dmabuf.patch` | Experimental ARM KMS RAM path. Explicit linear, single-plane little-endian XRGB/ARGB8888 uses read-only PRIME mmap with checked READ START/END sync. Other layouts, transforms, map/sync failures keep EGL. | Experiment `4cc7af7`: about 13 ms direct copy versus 72 ms GL p50 on Pro. Remove for an upstream equivalent, accepted faster path, or unsafe coherency/lifetime evidence. |
 | `0036-convert-kms-row-pairs-to-nv12.patch` | Experimental ARM capture optimization. Copy each WC row once to reusable cached row-pair scratch, then libyuv NEON dispatch to owned NV12. All active consumers must agree on even, native-size, unpadded 8-bit BT.601 limited V4L2 H.264. Cursor-visible frames keep RGB and swscale. Other matrices, ranges, sizes, formats and mixed streams keep swscale. Encoder frames never alias the capture pool. | Experiments `cec8d8a`, `6b81298`, `e1180ed`; exact whole-frame libyuv comparison in `row-pair-test.cpp`. libyuv is not bit-identical to swscale. Remove for accepted upstream/hardware conversion or unsafe colour/lifetime evidence. |
-| `0037-preserve-kms-capture-phase.patch` | Upstreamable RAM KMS pacing fix. `sleep_until` and phase-preserving deadlines; late slots still acquire a real image. No busy-wait or CPU affinity rule. | Experiment `6b81298`; combined candidate reached 600 new acquisitions in all 27 strict 10 s windows. Remove for equivalent upstream pacing or unsafe catch-up load. |
-| `0038-configure-linux-capture-fifo.patch` | Experimental opt-in Linux asynchronous capture-only FIFO, with reset-on-fork. `capture_rt_priority` is a strict decimal integer, 0 (default off) or 1..20. Invalid values disable the request. Scheduling failure, including EPERM, logs a warning and capture continues. No service-wide RT scheduling. | Floating-affinity capture FIFO 15 passed 3 × 90 s in the experiment; CPU3 isolation failed and is not carried. Remove for equivalent upstream policy, lost need, or latency/starvation evidence. |
+| `0037-preserve-kms-capture-phase.patch` | ARM RAM KMS capture follows the captured plane's CRTC vblank sequence and samples at `capture_vblank_offset_ms` (default 0). Missed phases resynchronise to a real refresh; no synthetic catch-up acquisitions or affinity rule. Unsupported timing falls back once to absolute nominal pacing with overdue deadlines skipped. | Device-local source IDs linked high-miss sessions to the early-refresh region, not concurrent CMA migration. The independent timer drifted about 2.27 ms/min. Phase is an association, not an exclusive cause: isolated raw acquisition omissions occurred outside that band. Remove for equivalent upstream pacing or failed latency/source-starvation acceptance. |
+| `0038-configure-linux-capture-fifo.patch` | Experimental opt-in Linux asynchronous capture-only FIFO, with reset-on-fork. `capture_rt_priority` is a strict decimal integer, 0 (default off) or 1..20. Invalid values disable the request. Scheduling failure, including EPERM, logs a warning and capture continues. No service-wide RT scheduling. | The older FIFO 15 experiment measured acquisition rate, not this source-ID gate. Current guarded trials compare OTHER, nice −10 and FIFO 5/15; CPU isolation is not carried. Remove for equivalent upstream policy, lost need, or latency/starvation evidence. |
 
 The publisher still ships one aarch64 release with both RKMPP and V4L2 M2M.
 Only that ARM profile links libyuv. The x86_64 CUDA recipe adds no libyuv input.
-The new configuration key is consumed on Linux only. The synchronous
+`capture_rt_priority` is consumed on Linux only. The synchronous
 capture/encode loop and other encoder/packet/input threads are not promoted.
+
+### RAM KMS vblank offset
+
+The ARM KMS profile accepts `capture_vblank_offset_ms`, a scalar decimal
+integer from 0 to 1000 milliseconds. Its default is **0 ms**, the vblank edge.
+Zero selects edge capture; it does not disable the lock. Unset/empty keeps
+the default; malformed values warn and select the default. The initial
+12–13 ms trials read queued plane state ahead of physical presentation and
+still omitted rare presented IDs. Edge capture usually matches currently
+presented content, with rare ahead-of-presentation samples; the acceptance
+record reports exact counts. The value
+must be shorter than the active CRTC mode refresh period. The mode refresh
+must also match negotiated capture FPS within 0.1%; otherwise this path
+uses nominal absolute pacing with overdue deadlines skipped.
+
+The capture thread uses `drmWaitVBlank` on the captured plane's CRTC index,
+checks monotonic timestamp support and sequence numbers, then sleeps to that
+refresh's offset. It never reuses a sequence or carries an overdue nominal
+deadline across refreshes. A used/expired refresh or entry after the requested
+phase waits for a future refresh. Ioctl and wakeup overshoot is allowed only
+when waiting began before the selected phase. The following deadline still
+comes from its own vblank. Actual phase/lateness is measured in acceptance.
+Clock/driver/timing failures log once per capture instance and permanently
+fall back to nominal absolute pacing for that instance. Fallback skips overdue
+deadlines rather than running catch-up acquisitions continuously. No modesetting
+or additional capability is requested. VAAPI/CUDA/Wayland capture is unchanged.
+
+The RAM RT safety guard counts actual vblank-wait ioctl invocations and
+fallback/offset pacing sleep calls; their duration does not matter. These
+calls can return immediately when the next vblank already passed. Before
+capture, three consecutive acquisitions without a pacing call, three with
+the same vblank sequence, or a backwards sequence demote to SCHED_OTHER for
+the capture-thread lifetime. Forward skips and unsigned sequence wrap are
+valid. CPU share is not a trigger. Logs include the condition, acquisition
+end times, decision time, calls, sequences and diagnostic pacing timings.
+Demotion keeps SCHED_RESET_ON_FORK and priority zero. If it fails, the guard
+sleeps a full capture period on every iteration, takes no more snapshots
+and lets the encoder repeat. Final performance measurements reject policy
+degradation; explicit forced safety controls test session continuation.
+
+The offset controls scheduling after the chosen vblank, not an equal change
+to content-to-client latency: KMS plane state can already name a queued
+frame before that frame is presented. Acceptance reports both actual sample
+phase and matched source-presentation-to-client latency. FIFO can still
+preempt the compositor; source misses and the longest such preemption must
+be reported for every policy and acceptance run.
 
 Evidence before this candidate: Core's
 [frame profile](https://github.com/korri-os/korri/blob/d001d08c2ef8ca17e12acc687004800a22068a2b/docs/acceptance/sunshine-korri-rg35xxpro-frame-profile-2026-10-22.md)
@@ -250,17 +296,34 @@ The experiment's local `/tmp/h700-sun/readback.md`, `convert.md` (including
 scheduling), and `profile.md` retain raw measurement references. These are
 experiment evidence, not a pass for the new package. Fresh package/device
 results and remaining publication steps are recorded in `/tmp/h700-sun/ship.md`.
+The [refresh-phase acceptance record](kms-phase-lock-acceptance.md) distinguishes
+prototype failures from final guarded results.
 Acquisitions and changed decoded content are different measurements. Fresh
-acceptance records the client stream, decodes every frame, ignores a fixed
-10-second warm-up from the first received frame, then requires exactly 600
-changed-content frames in each of nine fixed 10-second windows per run.
-The warm-up count is reported separately. It is never moved to obtain a pass.
+acceptance uses a self-describing source frame ID and actual presentation
+feedback. A presented ID missing from the entire received stream is a
+capture-path miss; an external per-acquisition NV12 ID trace distinguishes
+acquisition omissions from encoder/delivery omissions. Source presentation
+sequence gaps are reported separately. Decode every frame, discard exactly
+10 seconds from first receive, then record every whole 10-second window in
+three fresh 90-second runs and six back-to-back 60-second runs. The owner
+selected the approximately 59.99 fps ship bar: no guard trip/spin, active lock,
+zero decode errors, about at most one capture/downstream miss per 90-second
+run and no window below 597 new frames. This is not a perfect-60 claim.
+Report raw warm-up, source misses, phase, matched latency and compositor
+preemption. Never move the windows to obtain a pass. Diagnostic observers are
+not shipped in these patches.
+
+The owner approved the final package **as is** and stopped testing. The three
+90-second runs measured 59.98 fps with misses 2/1/2 and every window at least598.
+The interrupted short-session batch still had bad sessions (including596 and
+522/538 windows); it did not pass the597 floor. See the acceptance record for
+all completed windows, the actual stop chronology and downstream classification.
 
 ### Explicit native permission change — approval required
 
-`plugins/sunshine/korri-sunshine.service` now requests **`LimitRTPRIO=15`**.
-Its native `runtime.sh` sets Sunshine's `capture_rt_priority=15` override.
-The limit allows this service's threads to request FIFO/RR up to 15; Sunshine
+`plugins/sunshine/korri-sunshine.service` now requests **`LimitRTPRIO=5`**.
+Its native `runtime.sh` sets Sunshine's `capture_rt_priority=5` override.
+The limit allows this service's threads to request FIFO/RR up to 5; Sunshine
 chooses only the asynchronous capture thread. It does not prove other code in
 the service cannot use the allowance. It adds no `CAP_SYS_NICE`, affinity or
 service-wide `CPUSchedulingPolicy`. Existing KMS capabilities are unchanged.

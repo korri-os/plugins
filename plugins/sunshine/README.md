@@ -14,11 +14,11 @@ The plugin uses globally unique systemd names. It does not replace a host `sunsh
 
 ## New real-time scheduling permission (candidate)
 
-The native service now requests **`LimitRTPRIO=15`**. `runtime.sh` sets the
-Sunshine config key `capture_rt_priority=15`. Only the asynchronous Linux
-capture thread requests FIFO 15, with reset-on-fork. EPERM logs and continues.
+The native service now requests **`LimitRTPRIO=5`**. `runtime.sh` sets the
+Sunshine config key `capture_rt_priority=5`. Only the asynchronous Linux
+capture thread requests FIFO 5, with reset-on-fork. EPERM logs and continues.
 No `CAP_SYS_NICE` or service-wide scheduling policy is requested. This limit
-still permits any thread in the service to request RT priority up to 15.
+still permits any thread in the service to request RT priority up to 5.
 Lower-priority input/compositor work can be delayed; measured responsiveness
 and exact-build re-approval are required, not implied by the limit.
 
