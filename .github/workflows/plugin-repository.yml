@@ -141,7 +141,6 @@ jobs:
             ".#ci.checks.$SYSTEM.korri-sunshine-plugin-admission"
             ".#ci.checks.$SYSTEM.korri-sunshine-plugin-native"
             ".#ci.checks.$SYSTEM.sunshine-korri-package"
-            ".#ci.checks.$SYSTEM.sunshine-korri-runtime-settings"
             ".#ci.checks.$SYSTEM.sunshine-korri-certificate-control"
             ".#ci.checks.$SYSTEM.sunshine-korri-v4l2m2m"
             ".#ci.checks.$SYSTEM.sunshine-offline-retirement"

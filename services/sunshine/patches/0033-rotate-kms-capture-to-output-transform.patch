@@ -280,7 +280,7 @@
 +#endif
  
 @@ -2606,3 +2624,10 @@
-           ++runtime_resolution_diag_frames;
+           frame_timestamp = img->frame_timestamp;
 -          if (session->convert(*img)) {
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +          auto conversion_start = std::chrono::steady_clock::now();

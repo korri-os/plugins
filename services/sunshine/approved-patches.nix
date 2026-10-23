@@ -55,62 +55,12 @@ rec {
   v4l2m2mPatchSetSha256 = "e918232613be4264d0c7c55900ff030674cc66e3f8f37f4daa0c59f1051960a6";
   reviewedNvencApiMajor = 12;
   reviewedNvencApiMinor = 0;
-  patchSetSha256 = "94e5059b5bfbcf1e94942333c7e20853f1ea3c1855c5d9271574903065c446e4";
+  patchSetSha256 = "64d07a531579a764b001497890eaaf4d635caf6589c6642e6a500c05dc1d2438";
   patches = [
-    {
-      name = "0001-add-runtime-settings-protocol-surface.patch";
-      path = ./patches/0001-add-runtime-settings-protocol-surface.patch;
-      sha256 = "8a9522e39de85cb4ea7c0558a806780ae39d588555c7a84c600a56b9fdbe3bd4";
-    }
-    {
-      name = "0002-wire-runtime-settings-control-plane.patch";
-      path = ./patches/0002-wire-runtime-settings-control-plane.patch;
-      sha256 = "dd9b7283dd2cbcb2476571bfcf61702b00dba428422d309e31e7b4c839db41be";
-    }
-    {
-      name = "0003-apply-runtime-bitrate-and-fps-changes.patch";
-      path = ./patches/0003-apply-runtime-bitrate-and-fps-changes.patch;
-      sha256 = "a06fdd48f4b2203d2ad7e3a09c05de023d19bb071dbdb8cd4146dfae5cad6435";
-    }
-    {
-      name = "0004-add-proof-gated-runtime-resolution-apply-path.patch";
-      path = ./patches/0004-add-proof-gated-runtime-resolution-apply-path.patch;
-      sha256 = "f092402f6c5526e92f1bf6c396fd6eb201ef58b006d8c4e3a1deea62ced64594";
-    }
-    {
-      name = "0005-add-seamless-vaapi-runtime-bitrate-path.patch";
-      path = ./patches/0005-add-seamless-vaapi-runtime-bitrate-path.patch;
-      sha256 = "a14ca9d556728ca1a4fcb14ae338a6275c9b28c52598a82a4e4f424956154d53";
-    }
-    {
-      name = "0010-extend-runtime-resolution-fresh-idr-window.patch";
-      path = ./patches/0010-extend-runtime-resolution-fresh-idr-window.patch;
-      sha256 = "86252208da87bff0b61623f7da86e50d9f35c19963910e5e30703b72b86a42eb";
-    }
-    {
-      name = "0012-persist-runtime-config-and-reinit-capture-after-resolution.patch";
-      path = ./patches/0012-persist-runtime-config-and-reinit-capture-after-resolution.patch;
-      sha256 = "345f1ca11757cd39b6c8d261ce27f6618b82c74ad376965cabdaea2e7be11def";
-    }
-    {
-      name = "0013-request-async-capture-reinit-after-runtime-resolution.patch";
-      path = ./patches/0013-request-async-capture-reinit-after-runtime-resolution.patch;
-      sha256 = "9087a31dbc446a44c3409962da7246a76280b03e703f8ed9dfeba94449daac8c";
-    }
-    {
-      name = "0014-skip-runtime-vaapi-destructor-flush.patch";
-      path = ./patches/0014-skip-runtime-vaapi-destructor-flush.patch;
-      sha256 = "83eb005960cf05ae129be921075156e63aeb9f515f8e0a04687e641aabc9638b";
-    }
     {
       name = "0015-add-korri-input-seat-event-mirror.patch";
       path = ./patches/0015-add-korri-input-seat-event-mirror.patch;
-      sha256 = "7712361497159be241819f1d929e87f8c058050b72f22d7b714503acd7b70e87";
-    }
-    {
-      name = "0016-add-seamless-nvenc-runtime-path.patch";
-      path = ./patches/0016-add-seamless-nvenc-runtime-path.patch;
-      sha256 = "686decb81379741e01e0b9b0e9105bbe23765a1bf728565767604383983a7074";
+      sha256 = "f7fe0901a3735e09d08c8dc58c17ff51b687755649579512879467a5fb2a4793";
     }
     {
       name = "0017-use-wayland-ram-capture-for-cuda.patch";
@@ -155,7 +105,7 @@ rec {
   rkmppPatch = {
     name = "0022-add-rkmpp-h264-encoder.patch";
     path = ./patches/0022-add-rkmpp-h264-encoder.patch;
-    sha256 = "36d8f96b01b68e9b4cbad4edc7f03d46b64eb5e291d116fe57470398d846b054";
+    sha256 = "ccaee940f2bfd8b28c2f9487931cfa8ceb1b707770a093df62096d17e6980003";
   };
 
   # Applied after the RKMPP encoder patch, only for the
@@ -201,7 +151,7 @@ rec {
   rkmppWaylandPacingPatch = {
     name = "0029-pace-rkmpp-after-wayland-capture.patch";
     path = ./patches/0029-pace-rkmpp-after-wayland-capture.patch;
-    sha256 = "93a50aa9fef89644648e63cd2bbbffe22e262ce4410e28c9a1a87b072cf66c1d";
+    sha256 = "902e5f87c1050a0db82aa9760485ef6ea2f0202d8c78fd681cae318f1ac3b0b7";
   };
 
   # Keep a bounded pool of linear GBM buffers instead of allocating and
@@ -229,7 +179,7 @@ rec {
   rkmppEncodeSchedulePatch = {
     name = "0032-keep-an-absolute-rkmpp-encode-schedule.patch";
     path = ./patches/0032-keep-an-absolute-rkmpp-encode-schedule.patch;
-    sha256 = "d1df5c2938b8fc2c2d550d294c7adadc7ec65e0d4706f1cbd1a1dfbe94de52e8";
+    sha256 = "e46d0639328923b43fa165ef9ad66bebc720532acf19140d68802a8f7aa43b18";
   };
 
   # Accepted from the Mini V2 rotation trial as tested on the device (signed
@@ -240,7 +190,7 @@ rec {
   rotationPatch = {
     name = "0033-rotate-kms-capture-to-output-transform.patch";
     path = ./patches/0033-rotate-kms-capture-to-output-transform.patch;
-    sha256 = "56d65c527b94657c937a710e12d2d487ebfa14d8988fbb96a778544c3aa20a1d";
+    sha256 = "0ef6edf82c50f8d700b5ab288f069b5801f404e33b0f2af3e229eee975b0fb1f";
   };
   rotationCropPatch = {
     name = "0034-crop-encoded-sps-to-visible-size.patch";
@@ -257,7 +207,7 @@ rec {
   kmsNv12Patch = {
     name = "0036-convert-kms-row-pairs-to-nv12.patch";
     path = ./patches/0036-convert-kms-row-pairs-to-nv12.patch;
-    sha256 = "053b020244d4e431650c7da3e7572f585485267dd6ef5b448688e4984fc62070";
+    sha256 = "d925d87bb009dbac48b013236ebf9efa98c494c8f128c923fd835247dbdd08a1";
   };
 
   kmsPacingPatch = {
@@ -283,7 +233,7 @@ rec {
     kmsPacingPatch
   ];
 
-  # Ordered digest of patches ++ rkmppPatches. Bump only after reviewing the
+  # Ordered digest of 8 base patches ++ 14 rkmppPatches. Bump after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "d70704a32e9a4334ca36412e5e68017d136c3293e364a428e3f49a11a9353daf";
+  rkmppPatchSetSha256 = "749776f23caf2536cf4fe3baa2f920cab05518c0f158f50ccd0e6e46f4891a5c";
 }

@@ -328,10 +328,8 @@ index 27950ff..355f947 100644
  
        // The RKMPP encoder returns immediately in async mode, so without pacing
        // the encode loop spins at the KMS capture rate and burns a full core on
-@@ -2678,13 +2702,7 @@ namespace video {
-               << " data="sv << static_cast<const void *>(img->data);
-           }
-           ++runtime_resolution_diag_frames;
+@@ -2678,11 +2702,5 @@ namespace video {
+           frame_timestamp = img->frame_timestamp;
 -#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 -          auto conversion_start = std::chrono::steady_clock::now();
 -#endif
