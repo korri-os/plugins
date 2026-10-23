@@ -1,0 +1,28 @@
+Adapted from legacy:product/plugins/moonlight/packages/moonlight-embedded-korri/patches/0014-disable-gamepad-quit-combo.patch.
+Re-cut against stock evdev; drop absoluteTouchBoundsLock context and the cached flag.
+Apply the same environment gate to SDL input so software decoding obeys Korri quit ownership.
+
+--- a/src/input/evdev.c
++++ b/src/input/evdev.c
+@@ -701,7 +701,8 @@
+     }
+   }
+ 
+-  if (gamepadModified && (dev->buttonFlags & QUIT_BUTTONS) == QUIT_BUTTONS) {
++  if (getenv("KORRI_MOONLIGHT_DISABLE_GAMEPAD_QUIT") == NULL &&
++      gamepadModified && (dev->buttonFlags & QUIT_BUTTONS) == QUIT_BUTTONS) {
+     LiSendMultiControllerEvent(dev->controllerId, assignedControllerIds, 0, 0, 0, 0, 0, 0, 0);
+     return false;
+   }
+--- a/src/input/sdl.c
++++ b/src/input/sdl.c
+@@ -586,7 +586,8 @@
+     else
+       gamepad->buttons &= ~SDL_TO_LI_BUTTON_MAP[event->cbutton.button];
+ 
+-    if ((gamepad->buttons & QUIT_BUTTONS) == QUIT_BUTTONS)
++    if (getenv("KORRI_MOONLIGHT_DISABLE_GAMEPAD_QUIT") == NULL &&
++        (gamepad->buttons & QUIT_BUTTONS) == QUIT_BUTTONS)
+       return SDL_QUIT_APPLICATION;
+ 
+     LiSendMultiControllerEvent(gamepad->id, activeGamepadMask, gamepad->buttons, gamepad->leftTrigger, gamepad->rightTrigger, gamepad->leftStickX, gamepad->leftStickY, gamepad->rightStickX, gamepad->rightStickY);

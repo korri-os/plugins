@@ -1,0 +1,74 @@
+Adapted from legacy:product/plugins/moonlight/packages/moonlight-embedded-korri/patches/0015-crop-coded-alignment-padding-on-present.patch.
+Drop all local_control.c hunks and runtime-applied-size externs/fallbacks.
+Use only launch width/height and decoder crop metadata. Crop the SDL NV12 source,
+not its coded texture allocation; keep hardware strides unchanged.
+
+--- a/src/video/v4l2m2m.c
++++ b/src/video/v4l2m2m.c
+@@ -1378,6 +1378,24 @@
+ static void draw_frame_nv12(AVFrame *frame);
+ static void draw_frame_direct_dmabuf(AVFrame *frame);
+ 
++static int stream_width, stream_height;
++
++static int visible_from_hint(int coded, int hint, int max_pad) {
++  return (hint > 0 && hint <= coded && coded - hint <= max_pad) ? hint : coded;
++}
++
++static int frame_visible_width(const AVFrame *frame) {
++  int cropped = frame->width - (int)frame->crop_left - (int)frame->crop_right;
++  return cropped > 0 && cropped != frame->width ? cropped :
++      visible_from_hint(frame->width, stream_width, 127);
++}
++
++static int frame_visible_height(const AVFrame *frame) {
++  int cropped = frame->height - (int)frame->crop_top - (int)frame->crop_bottom;
++  return cropped > 0 && cropped != frame->height ? cropped :
++      visible_from_hint(frame->height, stream_height, 31);
++}
++
+ static void draw_frame(AVFrame *frame) {
+   static int draw_count = 0;
+   if (++draw_count <= 3)
+@@ -1386,18 +1404,19 @@
+         av_get_pix_fmt_name(frame->format),
+         frame->linesize[0], frame->linesize[1],
+         frame->linesize[2], frame->linesize[3]);
++  int visible_w = frame_visible_width(frame), visible_h = frame_visible_height(frame);
+   pump_sdl_window_events();
+   /* Re-cut of legacy 0013: resize only when visible dimensions change.
+    * No runtime/presenter reset machinery from legacy 0011 is needed. */
+   static int previous_width, previous_height;
+   const char *auto_resize = getenv("MOONLIGHT_AUTO_WINDOW_RESIZE");
+   if (window && auto_resize && strcmp(auto_resize, "1") == 0 &&
+-      (previous_width != frame->width || previous_height != frame->height)) {
+-    previous_width = frame->width;
+-    previous_height = frame->height;
++      (previous_width != visible_w || previous_height != visible_h)) {
++    previous_width = visible_w;
++    previous_height = visible_h;
+     SDL_SetWindowSize(window, previous_width, previous_height);
+   }
+-  update_render_geometry(frame->width, frame->height);
++  update_render_geometry(visible_w, visible_h);
+   if (direct_dmabuf_present && direct_v4l2 && frame->format == AV_PIX_FMT_NV12) {
+     draw_frame_direct_dmabuf(frame);
+   } else if (frame->format == AV_PIX_FMT_DRM_PRIME) {
+@@ -1446,7 +1465,7 @@
+ 
+   SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
+   SDL_RenderClear(sdl_renderer);
+-  SDL_RenderCopy(sdl_renderer, sdl_nv12_texture, NULL, &sdl_dst_rect);
++  SDL_RenderCopy(sdl_renderer, sdl_nv12_texture, &(SDL_Rect){(int)frame->crop_left, (int)frame->crop_top, frame_visible_width(frame), frame_visible_height(frame)}, &sdl_dst_rect);
+   SDL_RenderPresent(sdl_renderer);
+ }
+ static void draw_frame_drm_prime(AVFrame *frame) {
+@@ -1557,6 +1576,8 @@
+ 
+ static int v4l2m2m_setup(int videoFormat, int width, int height,
+                          int redrawRate, void *context, int drFlags) {
++  stream_width = width;
++  stream_height = height;
+   (void) redrawRate; (void) context; (void) drFlags;
+ 
+   direct_v4l2 = getenv("MOONLIGHT_V4L2M2M_DIRECT") &&

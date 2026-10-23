@@ -1,0 +1,25 @@
+[Unit]
+Description=Moonlight client identity directory
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=korri
+Group=korri
+ExecStart=@coreutils@/bin/install -d -m 0700 /home/korri/.config/moonlight
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/korri/.config
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

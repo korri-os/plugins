@@ -40,6 +40,13 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       inherit system;
       pkgs = heldPkgs;
     };
+    moonlightPackage = pkgs.callPackage ../services/moonlight/package.nix { };
+    moonlightDefinition = import ../plugins/moonlight/plugin.nix { inherit pkgs moonlightPackage; };
+    moonlightPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = ../plugins/moonlight;
+      plugin = _: moonlightDefinition;
+    };
     sshPackage = mkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/ssh;
@@ -253,6 +260,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-retroarch = retroarchPackage;
       korri-plugin-ssh = sshPackage;
       korri-plugin-sunshine = sunshinePlugin;
+      korri-plugin-moonlight = moonlightPlugin;
+      moonlight-embedded-korri = moonlightPackage;
       korri-plugin-solarus = solarusPlugin;
       solarus = solarusPackage;
       cemu = cemuPackage;
@@ -328,6 +337,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         };
         korri-plugin-builder = korri.lib.${system}.pluginBuilderCheck { inherit pkgs; };
         korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
+        korri-moonlight-plugin-native = import ../plugins/moonlight/native-check.nix {
+          inherit pkgs;
+          plugin = moonlightDefinition;
+        };
         korri-sunshine-plugin-native = import ../plugins/sunshine/native-check.nix {
           pkgs = heldPkgs;
           plugin = sunshineDefinition;

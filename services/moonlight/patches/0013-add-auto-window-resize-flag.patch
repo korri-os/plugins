@@ -1,0 +1,97 @@
+Adapted from legacy:product/plugins/moonlight/packages/moonlight-embedded-korri/patches/0013-add-auto-window-resize-flag.patch.
+Dropped touch-context hunks (config c/h defaults, option neighbours and help).
+Dropped sdl_presenter_reset_requested dispatch, reset_sdl_renderer_after_resolution_change
+forward declaration, reset implementation, SDL flush/raise and reset logging hunks.
+Kept CLI/config/env semantics; replace reset dependency with dimension-change window sizing.
+No touch, runtime resolution control, or presenter reset code is imported.
+
+--- a/src/config.h
++++ b/src/config.h
+@@ -37,6 +37,7 @@
+   bool sops;
+   bool localaudio;
+   bool fullscreen;
++  bool auto_window_resize;
+   int rotate;
+   bool unsupported;
+   bool quitappafter;
+--- a/src/config.c
++++ b/src/config.c
+@@ -77,6 +77,8 @@
+   {"pin", required_argument, NULL, '5'},
+   {"port", required_argument, NULL, '6'},
+   {"hdr", no_argument, NULL, '7'},
++  {"autowindowresize", no_argument, NULL, 1001},
++  {"noautowindowresize", no_argument, NULL, 1002},
+   {0, 0, 0, 0},
+ };
+ 
+@@ -259,6 +261,12 @@
+     break;
+   case '7':
+     config->hdr = true;
++    break;
++  case 1001:
++    config->auto_window_resize = true;
++    break;
++  case 1002:
++    config->auto_window_resize = false;
+     break;
+   case 1:
+     if (config->action == NULL)
+@@ -329,6 +337,8 @@
+     write_config_bool(fd, "quitappafter", config->quitappafter);
+   if (config->viewonly)
+     write_config_bool(fd, "viewonly", config->viewonly);
++  if (config->auto_window_resize)
++    write_config_bool(fd, "autowindowresize", config->auto_window_resize);
+   if (config->rotate != 0)
+     write_config_int(fd, "rotate", config->rotate);
+ 
+@@ -373,6 +383,7 @@
+   config->sops = true;
+   config->localaudio = false;
+   config->fullscreen = true;
++  config->auto_window_resize = false;
+   config->unsupported = true;
+   config->quitappafter = false;
+   config->viewonly = false;
+--- a/src/main.c
++++ b/src/main.c
+@@ -217,6 +217,8 @@
+   printf("\t-nomouseemulation\t\tDisable gamepad mouse emulation support (long pressing Start button)\n");
+   #if defined(HAVE_SDL) || defined(HAVE_X11)
+   printf("\n WM options (SDL and X11 only)\n\n");
++  printf("\t-autowindowresize\tResize playback window to visible stream dimensions\n");
++  printf("\t-noautowindowresize\tKeep playback window size (default)\n");
+   printf("\t-windowed\t\tDisplay screen in a window\n");
+   #endif
+   #ifdef HAVE_EMBEDDED
+@@ -335,6 +337,8 @@
+       fprintf(stderr, "HDR streaming requires HEVC or AV1 codec\n");
+       exit(-1);
+     }
++
++    setenv("MOONLIGHT_AUTO_WINDOW_RESIZE", config.auto_window_resize ? "1" : "0", 1);
+ 
+     #ifdef HAVE_SDL
+     if (system == SDL)
+--- a/src/video/v4l2m2m.c
++++ b/src/video/v4l2m2m.c
+@@ -1387,6 +1387,16 @@
+         frame->linesize[0], frame->linesize[1],
+         frame->linesize[2], frame->linesize[3]);
+   pump_sdl_window_events();
++  /* Re-cut of legacy 0013: resize only when visible dimensions change.
++   * No runtime/presenter reset machinery from legacy 0011 is needed. */
++  static int previous_width, previous_height;
++  const char *auto_resize = getenv("MOONLIGHT_AUTO_WINDOW_RESIZE");
++  if (window && auto_resize && strcmp(auto_resize, "1") == 0 &&
++      (previous_width != frame->width || previous_height != frame->height)) {
++    previous_width = frame->width;
++    previous_height = frame->height;
++    SDL_SetWindowSize(window, previous_width, previous_height);
++  }
+   update_render_geometry(frame->width, frame->height);
+   if (direct_dmabuf_present && direct_v4l2 && frame->format == AV_PIX_FMT_NV12) {
+     draw_frame_direct_dmabuf(frame);
