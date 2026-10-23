@@ -57,6 +57,14 @@ def derivations(paths):
     return data
 
 
+def manifest_text(drv):
+    # writeText keeps `text` in structured attributes since nixpkgs 2026-10-20;
+    # the churn baseline can still be built from an older publisher package set.
+    if 'structuredAttrs' in drv:
+        return drv['structuredAttrs']['text']
+    return drv['env']['text']
+
+
 def declared_packages(packages):
     # Read the builder's real manifest construction, without building wrappers.
     wrappers = derivations(package['derivation'] for package in packages.values())
@@ -71,7 +79,7 @@ def declared_packages(packages):
     dependencies = derivations(path for drv in manifest_drvs.values() for path in drv['inputDrvs'])
     by_output = {output['path']: path for path, drv in dependencies.items()
                  for output in drv['outputs'].values() if 'path' in output}
-    manifest_data = {name: json.loads(manifest_drvs[path]['env']['text'])
+    manifest_data = {name: json.loads(manifest_text(manifest_drvs[path]))
                      for name, path in manifests.items()}
     declared = {
         f'{name}:{key}': {'output': output, 'derivation': by_output[output]}
