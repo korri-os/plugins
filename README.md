@@ -33,6 +33,7 @@ the reviewed, reachable Core revision that exports the new interface.
 | `gamescope` | Standalone Gamescope 3.16.31 with nested Wayland touch | `plugins/gamescope/` |
 | `korri-plugin-starter-pack` | `@korri:starter-pack` | `plugins/starter-pack/` |
 | `korri-plugin-pico8` | `@korri:pico8` (PICO-8 BBS search provider; declared host `www.lexaloffle.com`) | `plugins/pico8/` |
+| `korri-plugin-itchio` | `@korri:itchio` (supported-creator free raw Bitsy attachments; finite exact hosts) | `plugins/itchio/` |
 | `korri-plugin-homebrewhub` | `@korri:homebrewhub` (declared games with pinned artifacts) | `plugins/homebrewhub/` |
 | `korri-plugin-retrobrews` | `@korri:retrobrews` (declared games with pinned artifacts) | `plugins/retrobrews/` |
 | `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
@@ -102,7 +103,9 @@ separate acceptance checks.
 chooser, game copies, browser execution, or bundled games. Bitsybox's
 Anti-Capitalist Software License v1.4 restricts eligible users and organizations;
 it is not unrestricted OSS. **Publication remains blocked pending separate
-eligibility and redistribution approval.** Acquisition remains separate.
+eligibility and redistribution approval.** Acquisition remains separate in
+[`@korri:itchio`](plugins/itchio/README.md), limited to verified free raw
+attachments on a finite approved creator-host set, not the full Bitsy catalog.
 See [native behavior, exact notices and focused checks](plugins/bitsybox/README.md).
 
 ## Cemu

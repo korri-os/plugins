@@ -3,7 +3,9 @@
 `@korri:bitsybox` provides the native SDL2 runner
 `@korri:bitsybox/bitsybox` for Bitsy `.bitsy` text data, as named in upstream
 `doc/MANUAL.txt`. It includes no games, browser, HTML extractor, chooser, or tune
-demo. Acquisition is a separate blocked contract, not part of this runner.
+demo. Acquisition is separate: [`@korri:itchio`](../itchio/README.md) supports
+explicit free raw `.bitsy` attachments on a finite approved creator-host set.
+This runner never downloads games or extracts browser exports.
 
 ## Native launch
 
