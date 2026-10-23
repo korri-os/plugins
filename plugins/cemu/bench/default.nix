@@ -10,11 +10,14 @@ pkgs.stdenv.mkDerivation {
     fileset = pkgs.lib.fileset.unions [
       ./bench.py
       ./gamepad.py
+      ./input_observer.py
       ./metrics.py
       ./present-watch.c
       ./present-fixture.c
       ./test_metrics.py
+      ./test_input_observer.py
       ./test_rpc.py
+      ./wl4-title.events
     ];
   };
   nativeBuildInputs = [
@@ -60,6 +63,7 @@ pkgs.stdenv.mkDerivation {
     mkdir -p "$out/bin" "$out/lib/cemu-bench"
     cp *.py "$out/lib/cemu-bench/"
     cp present-watch "$out/bin/"
+    install -Dm444 wl4-title.events "$out/share/cemu-bench/wl4-title.events"
     makeWrapper ${python}/bin/python3 "$out/bin/korri-cemu-bench" \
       --add-flags "$out/lib/cemu-bench/bench.py" \
       --set KORRI_BENCH_PRESENT_WATCH "$out/bin/present-watch" \

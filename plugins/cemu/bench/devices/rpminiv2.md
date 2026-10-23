@@ -164,7 +164,7 @@ is active. The physical panel mode is 1080×1240; Sway logical 1240×1080.
 ## Content and admission
 
 WUA destination: `/var/lib/korri/games/wiiu/The Legend of Zelda - Breath of the Wild (USA) (DLC) (v208).wua`.
-Transfer and destination digest verification: pending at this checkpoint.
+Transfer completed; destination SHA-256 matched the source before the device update handoff.
 SHA-256 at source: `064e512446009a42e6de6399b6665c96abe820be039cb3b5a968e40591d8c9ff`.
 Size: **13,660,330,872 bytes**.
 Source access: read-only `ssh -o BatchMode=yes <owner-storage-login>`;

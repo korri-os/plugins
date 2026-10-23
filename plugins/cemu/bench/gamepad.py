@@ -19,6 +19,23 @@ AXES = {
     17: (-1, 1),
 }
 Event = tuple[float, int, int, int]
+NAME = "Korri bench gamepad"
+BUS = 5
+VENDOR = 0x045E
+PRODUCT = 0x02D1
+VERSION = 0x0114
+PHYS = "korri-cemu-bench/input0"
+
+
+def identity() -> dict[str, int | str]:
+    return {
+        "name": NAME,
+        "bus": BUS,
+        "vendor": VENDOR,
+        "product": PRODUCT,
+        "version": VERSION,
+        "phys": PHYS,
+    }
 
 
 def read_script(path: Path) -> list[Event]:
@@ -65,8 +82,13 @@ class Gamepad:
                 fcntl.ioctl(self.fd, 0x40045567, axis)
             # uinput_user_dev, stable Linux ABI. Deliberately unique identity;
             # never impersonate Korri Seat P1 or an existing physical device.
-            name = b"Korri bench gamepad"
-            header = struct.pack("80sHHHHI", name, 3, 0x045E, 0x028E, 1, 0)
+            name = NAME.encode()
+            # Bench-only synthetic controller. Native 60-xbox_one_gamepad.yaml
+            # explicitly auto-manages 045e:02d1. InputPlumber 0.75.2 manager.rs
+            # 1232-1267 accepts virtual Bluetooth (bus 5) devices. Distinct phys
+            # satisfies inputd's ordinary reconnect identity; no seat spoofing.
+            fcntl.ioctl(self.fd, 0x4008556C, PHYS.encode() + b"\0")  # UI_SET_PHYS
+            header = struct.pack("80sHHHHI", name, BUS, VENDOR, PRODUCT, VERSION, 0)
             maximum = [AXES.get(i, (0, 0))[1] for i in range(64)]
             minimum = [AXES.get(i, (0, 0))[0] for i in range(64)]
             os.write(

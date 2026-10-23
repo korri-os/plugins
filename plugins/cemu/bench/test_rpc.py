@@ -5,10 +5,16 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from bench import Rpc, RpcError, require_idle
+from bench import Rpc, RpcError, namespace_pid, require_idle
 
 
 class RpcTests(unittest.TestCase):
+    def test_private_pid_namespace_identity(self):
+        self.assertEqual(
+            namespace_pid("Name:\tretroarch\nNSpid:\t20407\t38\n", 20407), 38
+        )
+        self.assertEqual(namespace_pid("Name:\tfixture\n", 500), 500)
+
     def test_real_http_contract_and_idle_failures(self):
         requests = []
         observed_paths = []
