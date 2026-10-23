@@ -1,0 +1,18 @@
+[
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792716413,
+    "microseconds": 821014,
+    "type": 1,
+    "code": 315,
+    "value": 1
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792716413,
+    "microseconds": 919882,
+    "type": 1,
+    "code": 315,
+    "value": 0
+  }
+]

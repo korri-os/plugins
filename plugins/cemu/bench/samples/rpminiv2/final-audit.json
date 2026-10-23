@@ -1,0 +1,17 @@
+{
+  "nativeSystemdAndAllCgroupsIdle": true,
+  "rpcStatus": {
+    "terminalCode": "SessionCompleted"
+  },
+  "remainingEmulatorWrapperObserverProcesses": {},
+  "manageAllDevices": false,
+  "benchPadDevices": [],
+  "composites": [
+    "/org/shadowblip/InputPlumber/CompositeDevice0"
+  ],
+  "hostSessionJournalFiles": [],
+  "system": "/nix/store/hp7kgka5q3abwy25n48p0a511j6kxqjl-nixos-system-rpminiv2-sd-card-26.11.20260923.4975466",
+  "bootedSystem": "/nix/store/hp7kgka5q3abwy25n48p0a511j6kxqjl-nixos-system-rpminiv2-sd-card-26.11.20260923.4975466",
+  "profileSystem": "/nix/store/hp7kgka5q3abwy25n48p0a511j6kxqjl-nixos-system-rpminiv2-sd-card-26.11.20260923.4975466",
+  "librarySha256": "3743a1bd7935c6f0e7dea8a2a2cb264513da5740342ea9f5c03715f29b29e951"
+}

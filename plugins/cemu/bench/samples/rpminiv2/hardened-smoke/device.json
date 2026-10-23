@@ -1,0 +1,8 @@
+{
+  "system": "/nix/store/hp7kgka5q3abwy25n48p0a511j6kxqjl-nixos-system-rpminiv2-sd-card-26.11.20260923.4975466",
+  "systemProfile": "/nix/store/hp7kgka5q3abwy25n48p0a511j6kxqjl-nixos-system-rpminiv2-sd-card-26.11.20260923.4975466",
+  "bootId": "b829b61b-20e2-407f-88e7-ff86669afbcb",
+  "kernel": "7.2.0",
+  "host": "rpminiv2",
+  "korrid": "/nix/store/nvs92ijqg09cranbzg1d0f2whybvvr32-korrid-0.0.0/bin/korrid"
+}

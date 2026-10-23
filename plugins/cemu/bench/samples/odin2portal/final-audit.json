@@ -1,0 +1,17 @@
+{
+  "nativeSystemdAndAllCgroupsIdle": true,
+  "rpcStatus": {
+    "terminalCode": "SessionCompleted"
+  },
+  "remainingEmulatorWrapperObserverProcesses": {},
+  "manageAllDevices": false,
+  "benchPadDevices": [],
+  "composites": [
+    "/org/shadowblip/InputPlumber/CompositeDevice0"
+  ],
+  "hostSessionJournalFiles": [],
+  "system": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "bootedSystem": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "profileSystem": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "librarySha256": "99f5811e9665a93dda71f1f0b8f31f03d8b43afe5b894ccfe277d42d607df769"
+}

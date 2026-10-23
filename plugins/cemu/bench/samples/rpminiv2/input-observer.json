@@ -1,0 +1,149 @@
+{
+  "managementPolicyWritten": false,
+  "before": false,
+  "devicesBefore": [
+    {
+      "event": "event0",
+      "name": "spmi_haptics",
+      "phys": "",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/c440000.spmi/spmi-0/0-03/c440000.spmi:pmic@3:haptics@c000/input/input0"
+    },
+    {
+      "event": "event1",
+      "name": "pm8941_pwrkey",
+      "phys": "pm8941_pwrkey/input0",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/c440000.spmi/spmi-0/0-00/c440000.spmi:pmic@0:pon@800/c440000.spmi:pmic@0:pon@800:pwrkey/input/input1"
+    },
+    {
+      "event": "event10",
+      "name": "Korri Seat P3",
+      "phys": "korri/input-seat/p3",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input16"
+    },
+    {
+      "event": "event11",
+      "name": "Korri Seat P4",
+      "phys": "korri/input-seat/p4",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input17"
+    },
+    {
+      "event": "event12",
+      "name": "Microsoft X-Box 360 pad",
+      "phys": "",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input13"
+    },
+    {
+      "event": "event2",
+      "name": "pm8941_resin",
+      "phys": "pm8941_resin/input0",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/c440000.spmi/spmi-0/0-00/c440000.spmi:pmic@0:pon@800/c440000.spmi:pmic@0:pon@800:resin/input/input2"
+    },
+    {
+      "event": "event3",
+      "name": "generic ft5x06 (8d)",
+      "phys": "",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/soc@0/ac0000.geniqup/a94000.i2c/i2c-13/13-0038/input/input3"
+    },
+    {
+      "event": "event4",
+      "name": "gpio-keys",
+      "phys": "gpio-keys/input0",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/gpio-keys/input/input4"
+    },
+    {
+      "event": "event5",
+      "name": "Retroid Pocket Gamepad",
+      "phys": "retroid-pocket-gamepad/input0",
+      "gamepad": true,
+      "sysfs": "/sys/devices/platform/soc@0/8c0000.geniqup/888000.serial/888000.serial:0/888000.serial:0.0/serial0/serial0-0/input/input5"
+    },
+    {
+      "event": "event6",
+      "name": "RetroidPocket Headset Jack",
+      "phys": "ALSA",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/sound/sound/card0/input6"
+    },
+    {
+      "event": "event7",
+      "name": "RetroidPocket DP0 Jack",
+      "phys": "ALSA",
+      "gamepad": false,
+      "sysfs": "/sys/devices/platform/sound/sound/card0/input7"
+    },
+    {
+      "event": "event8",
+      "name": "Korri Seat P1",
+      "phys": "korri/input-seat/p1",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input14"
+    },
+    {
+      "event": "event9",
+      "name": "Korri Seat P2",
+      "phys": "korri/input-seat/p2",
+      "gamepad": true,
+      "sysfs": "/sys/devices/virtual/input/input15"
+    }
+  ],
+  "builtinSourcesBefore": [
+    "/dev/input/event4",
+    "/dev/input/event5",
+    "/dev/input/event2"
+  ],
+  "compositesBefore": [
+    "/org/shadowblip/InputPlumber/CompositeDevice0"
+  ],
+  "seatP1Before": {
+    "deviceNumber": 3400,
+    "keys": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "axes": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "16": 0,
+      "17": 0
+    }
+  },
+  "probeComposites": [
+    "/org/shadowblip/InputPlumber/CompositeDevice1"
+  ],
+  "after": false,
+  "managementUnchanged": true,
+  "compositesAfter": [
+    "/org/shadowblip/InputPlumber/CompositeDevice0"
+  ],
+  "compositesRestored": true,
+  "builtinSourcesAfter": [
+    "/dev/input/event4",
+    "/dev/input/event5",
+    "/dev/input/event2"
+  ],
+  "seatP1After": {
+    "deviceNumber": 3400,
+    "keys": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "axes": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "16": 0,
+      "17": 0
+    }
+  },
+  "builtinUnchanged": true,
+  "seatP1Unchanged": true
+}

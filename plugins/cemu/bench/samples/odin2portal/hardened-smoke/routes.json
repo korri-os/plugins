@@ -1,0 +1,22 @@
+{
+  "gameId": "wl4",
+  "routes": [
+    {
+      "runnerId": "@korri:mgba/mgba",
+      "familyId": "@korri:retroarch",
+      "systemId": "gba",
+      "runnerBuild": "/nix/store/92c82hj672is3k2m72yvvihjr2jwwn4p-korri-plugin",
+      "program": "/nix/store/8l6hf4n1kpkvhdfnn3na81z23mp3n01p-retroarch-bare-1.22.2/bin/retroarch",
+      "warnings": []
+    }
+  ],
+  "selection": {
+    "_tag": "Selected",
+    "runnerId": "@korri:mgba/mgba"
+  },
+  "systemRunners": {},
+  "revisions": {
+    "device": "9b98f5da431cf98c56762c8222635757f9938b7e54cb9c2a7ed1e7483b9072a0",
+    "games": "3f3e502eff02fe4581a5de517169a18c96a0585e5c45164c9af97a85f855b053"
+  }
+}

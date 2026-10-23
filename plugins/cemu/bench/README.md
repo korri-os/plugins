@@ -149,8 +149,13 @@ from a previous terminal game is accepted only after systemd and the actual game
 cgroups conclusively show no game activity; unknown native state still fails. All stop/cancel operations name
 **only this bench's launch ID**. No global kill is used. Cleanup records an empty
 exact cgroup, no newly surviving game/Cemu/Gamescope processes, and unchanged
-boot/system identity. RPC or cleanup failures fail the report rather than
-claiming success. SIGKILL or loss of access can still require an administrator
+boot/system identity. After an exact stop returns `HostRecoveryBlocked`, the tool records the original
+warning and polls read-only status for up to 10 seconds plus bounded I/O. It
+accepts cleanup only after korrid leaves that state and systemd (including
+acquisition units) plus every games-slice cgroup prove idle. It never resets a
+unit, edits a recovery journal or restarts korrid. A persistent block or uncertain
+native state fails the run. Other RPC/cleanup failures also fail the report
+rather than claiming success. See `devices/odin2portal-stop-143.md`. SIGKILL or loss of access can still require an administrator
 to stop the recorded exact session. Normal Korri play logs and game-save effects
 still occur; this is not a snapshot/rollback of the game's own progress.
 
@@ -174,3 +179,14 @@ nix build .#packages.x86_64-linux.korri-cemu-bench --no-link --builders '' --max
 The Nix build compiles C with `-Wall -Wextra -Werror`, runs the Python tests,
 and exercises the real observer against an Xvfb Present producer that omits
 `_NET_WM_PID` (proving XRes selection). Hardware sample reports live in `samples/`.
+
+## Verified delivery
+
+Final aarch64 build on fuji, signed on zao and copied to both devices:
+`/nix/store/ycx1s593595i2c2hyax3l5i58d6iqcw8-korri-cemu-bench-0.1.0`.
+It passed real 15-second lifecycle smoke runs on both updated devices.
+The [hardware samples](samples/README.md) retain the separate default-duration
+reports, exact provenance, raw FPS/telemetry, A/B/soak smoke results, visible
+Odin P2 game response, cleanup audits, limitations and operational deviations.
+Copying a closure does not install it into a profile; a later GC can remove it.
+No permanent profile or system package was changed for this delivery.

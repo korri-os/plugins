@@ -1,0 +1,39 @@
+import os,sys,time,json,subprocess
+from pathlib import Path
+PACKAGE='/nix/store/y1srqb4008k03nlrgckah2xkplmca8wz-korri-cemu-bench-0.1.0'
+sys.path.insert(0,'/var/lib/korri/cemu-bench-staging/probe-source-current')
+from bench import Rpc,require_idle,stop_exact,members,write_json
+from gamepad import Gamepad
+from input_observer import InputObserver
+out=Path('/var/lib/korri/cemu-bench-staging/mega-visible-probe-3')
+out.mkdir(mode=0o700)
+rpc=Rpc(39217,Path('/run/korri-portal-credentials/KORRID_RPC_CAPABILITY'))
+require_idle(rpc)
+obs=InputObserver(out); pad=None;launch='';error=''
+def wait(seconds):
+    for _ in range(seconds):time.sleep(1);obs.collect()
+def shot(name):
+    env={**os.environ,'XDG_RUNTIME_DIR':'/run/user/1000','WAYLAND_DISPLAY':'korri-wayland'}
+    subprocess.run(['/nix/store/rvipzj5fix74ibkrwrm9yji0y9vrwxm3-grim-1.5.0/bin/grim',str(out/name)],env=env,check=True,timeout=10)
+def press(code):
+    pad.send((0,1,code,1));time.sleep(.15);pad.send((0,1,code,0));obs.collect()
+try:
+    obs.begin()
+    reservation=rpc.call('app.session.reserve',{'gameId':'mega-man-arena'});launch=str(reservation['launchId'])
+    write_json(out/'launch.json',rpc.call('app.session.start',{'gameId':'mega-man-arena','runnerId':'@<publisher>:mega-man-arena/proton','expectedLaunchId':launch}))
+    pad=Gamepad();wait(65)
+    press(0x13d);wait(2) # L3: ordinary activity, not a protected Guide input
+    shot('before.png')
+    press(0x13b);wait(3);shot('after-start.png')
+    press(0x130);wait(2);shot('after-a.png');press(0x131);wait(2);shot('after-b.png');press(0x130);wait(2);shot('after-a2.png')
+    pad.send((0,3,16,-1));time.sleep(.2);pad.send((0,3,16,0));wait(2);shot('after-left.png')
+finally:
+    if launch:
+        try:stop_exact(rpc,launch)
+        except Exception as exc:error=str(exc)
+    obs.collect()
+    if pad:pad.close()
+    obs.close()
+    time.sleep(1)
+    write_json(out/'cleanup.json',{'remaining':members('korri-game-'+launch+'.service'),'error':error})
+print(out)

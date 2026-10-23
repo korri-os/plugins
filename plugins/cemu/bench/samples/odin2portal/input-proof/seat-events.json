@@ -1,0 +1,98 @@
+[
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715441,
+    "microseconds": 463507,
+    "type": 1,
+    "code": 317,
+    "value": 1
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715441,
+    "microseconds": 615542,
+    "type": 1,
+    "code": 317,
+    "value": 0
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715443,
+    "microseconds": 790824,
+    "type": 1,
+    "code": 315,
+    "value": 1
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715443,
+    "microseconds": 943122,
+    "type": 1,
+    "code": 315,
+    "value": 0
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715447,
+    "microseconds": 164190,
+    "type": 1,
+    "code": 304,
+    "value": 1
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715447,
+    "microseconds": 314572,
+    "type": 1,
+    "code": 304,
+    "value": 0
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715449,
+    "microseconds": 484811,
+    "type": 1,
+    "code": 305,
+    "value": 1
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715449,
+    "microseconds": 633659,
+    "type": 1,
+    "code": 305,
+    "value": 0
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715451,
+    "microseconds": 857127,
+    "type": 1,
+    "code": 304,
+    "value": 1
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715452,
+    "microseconds": 7879,
+    "type": 1,
+    "code": 304,
+    "value": 0
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715454,
+    "microseconds": 181564,
+    "type": 3,
+    "code": 16,
+    "value": -1
+  },
+  {
+    "seat": "Korri Seat P2",
+    "seconds": 1792715454,
+    "microseconds": 379020,
+    "type": 3,
+    "code": 16,
+    "value": 0
+  }
+]

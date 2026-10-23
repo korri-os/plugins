@@ -83,22 +83,22 @@ Cemu plugin installation remains forge's work through normal inspect/install/ena
 CPU
 /sys/devices/system/cpu/cpufreq/policy0
 affected_cpus=0 1 2 3
-scaling_available_frequencies=300000 403200 518400 614400 691200 787200 883200 979200 1075200 1171200 1248000 1344000 1420800 1516800 1612800 1708800 1804800 
-scaling_available_governors=ondemand powersave performance schedutil 
+scaling_available_frequencies=300000 403200 518400 614400 691200 787200 883200 979200 1075200 1171200 1248000 1344000 1420800 1516800 1612800 1708800 1804800
+scaling_available_governors=ondemand powersave performance schedutil
 scaling_governor=schedutil
 scaling_min_freq=300000
 scaling_max_freq=1804800
 /sys/devices/system/cpu/cpufreq/policy4
 affected_cpus=4 5 6
-scaling_available_frequencies=710400 825600 940800 1056000 1171200 1286400 1382400 1478400 1574400 1670400 1766400 1862400 1958400 2054400 2150400 2246400 2342400 2419200 
-scaling_available_governors=ondemand powersave performance schedutil 
+scaling_available_frequencies=710400 825600 940800 1056000 1171200 1286400 1382400 1478400 1574400 1670400 1766400 1862400 1958400 2054400 2150400 2246400 2342400 2419200
+scaling_available_governors=ondemand powersave performance schedutil
 scaling_governor=schedutil
 scaling_min_freq=710400
 scaling_max_freq=2419200
 /sys/devices/system/cpu/cpufreq/policy7
 affected_cpus=7
-scaling_available_frequencies=844800 960000 1075200 1190400 1305600 1401600 1516800 1632000 1747200 1862400 1977600 2073600 2169600 2265600 2361600 2457600 2553600 2649600 2745600 2841600 
-scaling_available_governors=ondemand powersave performance schedutil 
+scaling_available_frequencies=844800 960000 1075200 1190400 1305600 1401600 1516800 1632000 1747200 1862400 1977600 2073600 2169600 2265600 2361600 2457600 2553600 2649600 2745600 2841600
+scaling_available_governors=ondemand powersave performance schedutil
 scaling_governor=schedutil
 scaling_min_freq=844800
 scaling_max_freq=2841600
@@ -118,40 +118,40 @@ governor=simple_ondemand
 min_freq=610000000
 max_freq=925000000
 THERMALS
-/sys/class/thermal/thermal_zone0 aoss0-thermal 36800 
-/sys/class/thermal/thermal_zone1 cpu0-thermal 39100 
-/sys/class/thermal/thermal_zone10 cpu7-top-thermal 45700 
-/sys/class/thermal/thermal_zone11 cpu4-bottom-thermal 38400 
-/sys/class/thermal/thermal_zone12 cpu5-bottom-thermal 39900 
-/sys/class/thermal/thermal_zone13 cpu6-bottom-thermal 42600 
-/sys/class/thermal/thermal_zone14 cpu7-bottom-thermal 44600 
-/sys/class/thermal/thermal_zone15 gpu-top-thermal 35200 
-/sys/class/thermal/thermal_zone16 aoss1-thermal 36600 
-/sys/class/thermal/thermal_zone17 wlan-thermal 36600 
-/sys/class/thermal/thermal_zone18 video-thermal 37000 
-/sys/class/thermal/thermal_zone19 mem-thermal 37400 
-/sys/class/thermal/thermal_zone2 cpu1-thermal 40300 
-/sys/class/thermal/thermal_zone20 q6-hvx-thermal 37000 
-/sys/class/thermal/thermal_zone21 camera-thermal 35500 
-/sys/class/thermal/thermal_zone22 compute-thermal 37000 
-/sys/class/thermal/thermal_zone23 npu-thermal 35900 
-/sys/class/thermal/thermal_zone24 gpu-bottom-thermal 36600 
-/sys/class/thermal/thermal_zone25 battery 26000 
-/sys/class/thermal/thermal_zone26 xo-thermal 
-/sys/class/thermal/thermal_zone27 wifi-thermal 
-/sys/class/thermal/thermal_zone28 conn-thermal 
-/sys/class/thermal/thermal_zone29 skin-msm-thermal 
-/sys/class/thermal/thermal_zone3 cpu2-thermal 39100 
-/sys/class/thermal/thermal_zone30 pm8150l-pcb-thermal 
-/sys/class/thermal/thermal_zone31 pm8150-thermal 36808 
-/sys/class/thermal/thermal_zone32 pm8150b-thermal 34732 
-/sys/class/thermal/thermal_zone33 pm8150l-thermal 38301 
-/sys/class/thermal/thermal_zone4 cpu3-thermal 39900 
-/sys/class/thermal/thermal_zone5 cluster0-thermal 41800 
-/sys/class/thermal/thermal_zone6 cluster1-thermal 42200 
-/sys/class/thermal/thermal_zone7 cpu4-top-thermal 39100 
-/sys/class/thermal/thermal_zone8 cpu5-top-thermal 40300 
-/sys/class/thermal/thermal_zone9 cpu6-top-thermal 44200 
+/sys/class/thermal/thermal_zone0 aoss0-thermal 36800
+/sys/class/thermal/thermal_zone1 cpu0-thermal 39100
+/sys/class/thermal/thermal_zone10 cpu7-top-thermal 45700
+/sys/class/thermal/thermal_zone11 cpu4-bottom-thermal 38400
+/sys/class/thermal/thermal_zone12 cpu5-bottom-thermal 39900
+/sys/class/thermal/thermal_zone13 cpu6-bottom-thermal 42600
+/sys/class/thermal/thermal_zone14 cpu7-bottom-thermal 44600
+/sys/class/thermal/thermal_zone15 gpu-top-thermal 35200
+/sys/class/thermal/thermal_zone16 aoss1-thermal 36600
+/sys/class/thermal/thermal_zone17 wlan-thermal 36600
+/sys/class/thermal/thermal_zone18 video-thermal 37000
+/sys/class/thermal/thermal_zone19 mem-thermal 37400
+/sys/class/thermal/thermal_zone2 cpu1-thermal 40300
+/sys/class/thermal/thermal_zone20 q6-hvx-thermal 37000
+/sys/class/thermal/thermal_zone21 camera-thermal 35500
+/sys/class/thermal/thermal_zone22 compute-thermal 37000
+/sys/class/thermal/thermal_zone23 npu-thermal 35900
+/sys/class/thermal/thermal_zone24 gpu-bottom-thermal 36600
+/sys/class/thermal/thermal_zone25 battery 26000
+/sys/class/thermal/thermal_zone26 xo-thermal
+/sys/class/thermal/thermal_zone27 wifi-thermal
+/sys/class/thermal/thermal_zone28 conn-thermal
+/sys/class/thermal/thermal_zone29 skin-msm-thermal
+/sys/class/thermal/thermal_zone3 cpu2-thermal 39100
+/sys/class/thermal/thermal_zone30 pm8150l-pcb-thermal
+/sys/class/thermal/thermal_zone31 pm8150-thermal 36808
+/sys/class/thermal/thermal_zone32 pm8150b-thermal 34732
+/sys/class/thermal/thermal_zone33 pm8150l-thermal 38301
+/sys/class/thermal/thermal_zone4 cpu3-thermal 39900
+/sys/class/thermal/thermal_zone5 cluster0-thermal 41800
+/sys/class/thermal/thermal_zone6 cluster1-thermal 42200
+/sys/class/thermal/thermal_zone7 cpu4-top-thermal 39100
+/sys/class/thermal/thermal_zone8 cpu5-top-thermal 40300
+/sys/class/thermal/thermal_zone9 cpu6-top-thermal 44200
 DISPLAY
 1080x1240
 PUBCONFIG
@@ -161,7 +161,7 @@ export KORRI_PLUGIN_SYSTEMCTL='/nix/store/gnadg5slifq2r638xvz4pv6vrsdl9xkj-syste
 export KORRI_PLUGIN_IPTABLES='/nix/store/2gl1g8549r89ah0n4r69bw4yga2wigcq-iptables-1.8.13/bin/iptables'
 export KORRI_PLUGIN_IP6TABLES='/nix/store/2gl1g8549r89ah0n4r69bw4yga2wigcq-iptables-1.8.13/bin/ip6tables'
 export KORRI_PLUGIN_CURL='/nix/store/xrpn2mzijwrl6rvi8h1rg73c3dr8i4d0-curl-8.22.0-bin/bin/curl'
-exec -a "$0" "/nix/store/lkga8p06v4m4y04sxkinqlh6viqd2q7b-korri-plugin-host-0.0.0/bin/.korri-plugin-wrapped"  "$@" 
+exec -a "$0" "/nix/store/lkga8p06v4m4y04sxkinqlh6viqd2q7b-korri-plugin-host-0.0.0/bin/.korri-plugin-wrapped"  "$@"
 PACKAGES
 /nix/store/d44ibgx6klr0230z2lvm4cjyr25vikcg-gamescope-3.16.18/bin/gamescope
 /nix/store/im9nvnfnnkgcgd2i3yk3kwrwk5d9a8f8-gamescope-debug-3.16.18/bin/gamescope
@@ -222,3 +222,17 @@ existing storage/source records; do not hand-author a new schema. It rejects
 an unknown system. No pair command was run before Cemu was installed.
 A mounted microSD directory uses the same existing command; the actual mount
 and directory must first be established, not assumed or invented.
+
+## Final benchmark and restoration proof
+
+[Default 100 + 180 second report](../samples/rpminiv2/report.md),
+[final audit](../samples/rpminiv2/final-audit.json), and native clock/thermal ranges
+in [the sample README](../samples/rpminiv2/README.md). Final profile link was
+`system-29-link`; booted/current/profile resolved to the table's same toplevel.
+Final available filesystem bytes: **11,959,754,752**.
+
+The final prebuilt tool also passed a 15-second real RPC lifecycle smoke.
+No emulator/Gamescope/observer process, active game/acquisition unit, populated
+games cgroup, bench pad or active recovery journal remained. Only original
+CompositeDevice0 remained, ManageAllDevices was false, and the full-run input
+observer confirmed unchanged built-in sources and P1 state.

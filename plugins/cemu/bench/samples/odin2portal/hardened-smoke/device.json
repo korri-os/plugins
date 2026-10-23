@@ -1,0 +1,8 @@
+{
+  "system": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "systemProfile": "/nix/store/xqbqdwrn3ws25z9dpnhb3nwl47366m8q-nixos-system-odin2portal-sd-card-26.11.20260923.4975466",
+  "bootId": "c41b371b-88de-4b62-bcd7-aadc34f61d81",
+  "kernel": "7.2.0",
+  "host": "odin2portal",
+  "korrid": "/nix/store/nvs92ijqg09cranbzg1d0f2whybvvr32-korrid-0.0.0/bin/korrid"
+}
