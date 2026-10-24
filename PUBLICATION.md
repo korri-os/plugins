@@ -6,22 +6,28 @@ Nix owns signatures and verifies downloaded contents.
 
 ## Hosting setup
 
-Use two distinct release tags:
+Use GitHub Pages for metadata and GitHub Releases for payloads:
 
-| Release | Contents | Change policy |
+| Location | Contents | Change policy |
 |---|---|---|
-| Build batch | Compressed NAR files, generated `paths-SYSTEM.txt` lists and `revision.txt`. | Upload while draft, then publish. Release immutability can lock these files. |
-| Cache metadata | `nix-cache-info` and signed `.narinfo` files. | Public and mutable. The publisher only adds files; it never replaces or deletes one. |
+| `build-*` release | Compressed NAR files, architecture path lists, offline metadata and full source revision. | Upload while draft, then publish. Never replace existing assets. |
+| `cache-index` branch, served by Pages | `nix-cache-info` and signed `.narinfo` files. | Append only. Keep the first NAR URL. Reject conflicting signed fields. |
 
-The cache URL is `https://github.com/OWNER/REPO/releases/download/CACHE_TAG/`.
-NAR URLs name their batch release. Tags identify storage locations, not plugin
-versions. Updating two plugins together needs one batch tag, not two plugin tags.
+The cache URL is `https://korri-os.github.io/plugins/`. NAR URLs still name
+absolute GitHub release assets. The signing key and package paths do not change.
+The old `cache` release is frozen and retained for old devices and rollback.
+New metadata is not copied back to that release.
 
-Create the metadata release before enabling immutability for future releases.
-If that release is immutable, publication refuses it. Do not disable protection
-on an existing release or move a tag to bypass the check.
+Install `.github/workflows/cache-pages.yml` on the default branch. Configure
+Pages with GitHub Actions as its build source. The workflow checks out the
+latest `cache-index` branch and uploads only cache metadata. Its concurrency
+queue never cancels an active deployment. The publisher explicitly dispatches
+this workflow after an index push, because a `GITHUB_TOKEN` push does not
+trigger another workflow. CI publication therefore needs `actions: write` as
+well as `contents: write`; only the Pages job has `pages: write` and `id-token: write`.
+Publication waits until Pages serves the exact committed metadata bytes.
 
-No setup step below has been performed by this code change.
+The one-off move and device rollback are described in [PAGES-MIGRATION.md](PAGES-MIGRATION.md).
 
 ## Signing key
 
@@ -142,7 +148,7 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 - `tag` identifies the build batch. Before publication, this tag must already
   resolve to the workflow's exact source commit. The publisher never creates or
   moves a tag.
-- `cache_tag` identifies the existing public mutable metadata release.
+- `cache-index` is the metadata branch. `CACHE_URL` identifies its Pages site.
 - `publish` defaults to false. True explicitly permits NAR release creation,
   publication and metadata uploads after both builds and the lifecycle gate pass.
 
@@ -258,7 +264,7 @@ refuses conflicting revisions or same-named files. `publish` requires these
 files and checks their revision against both its argument and the batch tag.
 Actions artifacts expire after seven days; the same text files are uploaded
 with the NARs **before the batch is published**, so published lookup evidence
-does not expire with Actions. They never enter the mutable cache release.
+does not expire with Actions. They never enter the Pages index.
 
 The workflow combines both architectures, then uploads NARs, path listings, and
 one `offline-metadata-SYSTEM.tar.gz` asset per architecture to the batch draft.
@@ -320,7 +326,7 @@ For example, copy `paths.txt` from the build above to
 signing identity. After approval, `publish` performs the GitHub writes:
 
 ```sh
-nix run .#korri-cache -- publish prepared --repo OWNER/REPO --tag BATCH_TAG --cache-tag CACHE_TAG --revision EXACT_COMMIT
+nix run .#korri-cache -- publish prepared --repo OWNER/REPO --tag BATCH_TAG --index-branch cache-index --cache-url https://OWNER.github.io/REPO/ --revision EXACT_COMMIT
 ```
 
 The lower-level `upload --part nars` and `upload --part metadata` commands allow
@@ -344,7 +350,7 @@ change device configuration.
 
 Devices must configure the same upstream caches and their trusted public keys,
 with signatures required and builds disabled. Use the exact store path from the
-immutable batch's architecture-specific path list and the metadata release URL:
+immutable batch's architecture-specific path list and the Pages metadata URL:
 
 ```sh
 sudo korri-plugin inspect CACHE_URL EXACT_STORE_PATH
@@ -492,10 +498,10 @@ to this batch.
 ## Capacity and verification limits
 
 [GitHub's release limits](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
-are 1,000 assets per release and less than 2 GiB per asset. The metadata release
-holds one narinfo per store path plus `nix-cache-info`. It will eventually fill.
-No automatic rotation or deletion is implemented. Publication refuses the limit;
-it does not remove old software to make room.
+are 1,000 assets per release and less than 2 GiB per asset. Each NAR batch
+still observes these limits. The metadata lives in Git and Pages, not a single
+release. Pages and GitHub repository limits still apply; this is not unlimited
+storage. No automatic rotation or deletion is implemented.
 
 Metadata points to immutable NAR locations, but signing is the trust mechanism.
 Deletion or account loss can still cause an outage. There is no storage bill in

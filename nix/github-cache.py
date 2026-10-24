@@ -1,12 +1,13 @@
 #!/usr/bin/env nix-shell
-#! nix-shell -i python3 -p python3 nix gh
-"""Publish standard signed Nix file caches as GitHub Release assets.
+#! nix-shell -i python3 -p python3 nix gh git
+"""Publish signed Nix caches with Pages metadata and Release payloads.
 
 Nix owns cache metadata, closure export and signatures. Only URL changes when
-splitting a cache between a NAR release and the shared metadata release.
+splitting a cache between a NAR release and the append-only Pages index.
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import gzip
 import hashlib
 import json
@@ -21,7 +22,7 @@ import sys
 import tarfile
 import tempfile
 import time
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, build_opener
 
@@ -235,8 +236,12 @@ def offline_metadata(cache, records, output):
     # builders need only these records to register already-shipped paths;
     # they must not download NARs or carry the signing key onto the device.
     with output.open("wb") as stream:
-        with gzip.GzipFile(fileobj=stream, mode="wb", filename="", mtime=0) as compressed:
-            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as bundle:
+        with gzip.GzipFile(
+            fileobj=stream, mode="wb", filename="", mtime=0
+        ) as compressed:
+            with tarfile.open(
+                fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT
+            ) as bundle:
                 for path in [cache / "nix-cache-info", *records]:
                     source = regular(path)
                     entry = tarfile.TarInfo(source.name)
@@ -428,6 +433,12 @@ def equivalent_metadata(repo, asset, path):
         data
     ).hexdigest() != asset.get("digest"):
         raise ValueError("remote metadata digest mismatch")
+    return equivalent_metadata_bytes(data, path)
+
+
+def equivalent_metadata_bytes(data, path):
+    if not path.name.endswith(".narinfo") or not 0 < len(data) <= 64 * 1024:
+        return False
     remote = data.decode().splitlines()
     local = path.read_text().splitlines()
     remote_urls = [line[5:] for line in remote if line.startswith("URL: ")]
@@ -437,6 +448,121 @@ def equivalent_metadata(repo, asset, path):
     return [line for line in remote if not line.startswith("URL: ")] == [
         line for line in local if not line.startswith("URL: ")
     ]
+
+
+# Deliberately preserved from Core's nix/cache/github-cache.py Pages producer.
+# Plugin batch/offline evidence below remains owned by this publisher.
+def push_metadata(remote, branch, paths):
+    """Append metadata, retaining the first URL and refusing signed-field changes."""
+    for path in paths:
+        regular(path)
+        if path.name != "nix-cache-info" and not re.fullmatch(
+            r"[0-9abcdfghijklmnpqrsvwxyz]{32}\.narinfo", path.name
+        ):
+            raise ValueError("invalid metadata filename")
+        if path.name.endswith(".narinfo"):
+            metadata(path)
+    with tempfile.TemporaryDirectory(prefix="korri-cache-index-") as temporary:
+        checkout = Path(temporary) / "index"
+        auth = [
+            "-c",
+            "credential.helper=",
+            "-c",
+            "credential.helper=!gh auth git-credential",
+        ]
+        run(
+            "git",
+            *auth,
+            "clone",
+            "--depth=1",
+            "--single-branch",
+            "--branch",
+            branch,
+            remote,
+            str(checkout),
+        )
+
+        def git(*args):
+            return run("git", "-C", str(checkout), *auth, *args)
+
+        for attempt in range(20):
+            previous = git("rev-parse", "HEAD")
+            expected = {}
+            for path in paths:
+                target = checkout / path.name
+                if target.exists() or target.is_symlink():
+                    data = regular(target).read_bytes()
+                    if data != path.read_bytes() and not equivalent_metadata_bytes(
+                        data, path
+                    ):
+                        raise ValueError(
+                            f"remote metadata differs: {path.name}; no overwrite allowed"
+                        )
+                else:
+                    data = path.read_bytes()
+                    target.write_bytes(data)
+                expected[path.name] = data
+            marker = checkout / ".nojekyll"
+            if marker.exists() or marker.is_symlink():
+                if regular(marker).read_bytes():
+                    raise ValueError("expected empty .nojekyll")
+            else:
+                marker.touch()
+            git("add", "--", ".nojekyll", *[path.name for path in paths])
+            if not git("diff", "--cached", "--name-only"):
+                return expected
+            git(
+                "-c",
+                "user.name=Korri cache publisher",
+                "-c",
+                "user.email=cache@korri.org",
+                "commit",
+                "-m",
+                "Add signed cache metadata",
+            )
+            try:
+                git("push", "origin", f"HEAD:refs/heads/{branch}")
+                return expected
+            except subprocess.CalledProcessError:
+                git("fetch", "--depth=1", "origin", f"refs/heads/{branch}")
+                if git("rev-parse", "FETCH_HEAD") == previous:
+                    raise
+                print(
+                    f"korri-cache: concurrent index update; retry {attempt + 1}/20",
+                    file=sys.stderr,
+                )
+                git("reset", "--hard", "FETCH_HEAD")
+        raise ValueError("index publication failed after 20 concurrent updates")
+
+
+def wait_visible(base, expected, timeout=1200, interval=10):
+    """Wait until Pages serves the committed bytes, not merely HTTP 200."""
+    context = ssl.create_default_context(cafile=os.environ.get("NIX_SSL_CERT_FILE"))
+    opener = build_opener(HTTPSHandler(context=context), HTTPSRedirectHandler())
+    deadline = time.monotonic() + timeout
+    pending = dict(expected)
+    while pending:
+        for name, data in list(pending.items()):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                with opener.open(base + name, timeout=min(30, remaining)) as response:
+                    if response.status == 200 and response.read(len(data) + 1) == data:
+                        del pending[name]
+            except HTTPError as error:
+                error.close()
+            except (URLError, OSError, HTTPException):
+                pass
+        if not pending:
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError(
+                "Pages visibility timeout; missing or different bytes: "
+                + ", ".join(sorted(pending))
+            )
+        time.sleep(min(interval, remaining))
 
 
 def upload_files(repo, tag, paths):
@@ -498,7 +624,7 @@ def upload_files(repo, tag, paths):
             raise ValueError("uploaded assets failed verification")
 
 
-def validate_destination(repo, tag, cache_tag):
+def validate_destination(repo, tag, index_branch):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) or any(
         s in (".", "..") for s in repo.split("/")
     ):
@@ -506,11 +632,11 @@ def validate_destination(repo, tag, cache_tag):
     if (
         any(
             not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}", value)
-            for value in (tag, cache_tag)
+            for value in (tag, index_branch)
         )
-        or tag == cache_tag
+        or tag == index_branch
     ):
-        raise ValueError("use distinct bounded NAR and cache tags")
+        raise ValueError("use distinct bounded NAR tag and index branch")
 
 
 def batch_files(prepared, required=False):
@@ -545,8 +671,9 @@ def batch_files(prepared, required=False):
     return [revision, *listings]
 
 
-def upload(prepared, repo, tag, cache_tag, part):
-    validate_destination(repo, tag, cache_tag)
+def upload(prepared, repo, tag, index_branch, cache_url, part):
+    validate_destination(repo, tag, index_branch)
+    cache_url = https_base(cache_url)
     base = f"https://github.com/{repo}/releases/download/{tag}/"
     records = sorted((prepared / "metadata").glob("*.narinfo"))
     if not records:
@@ -588,12 +715,15 @@ def upload(prepared, repo, tag, cache_tag, part):
             for path in payloads
         ):
             raise ValueError("public NAR assets do not match the prepared bytes")
-        index_release = release(repo, cache_tag)
-        if index_release["draft"] or index_release.get("immutable"):
-            raise ValueError("cache metadata release must be public and mutable")
-        upload_files(
-            repo, cache_tag, [prepared / "metadata" / "nix-cache-info", *records]
+        expected = push_metadata(
+            f"https://github.com/{repo}.git",
+            index_branch,
+            [prepared / "metadata" / "nix-cache-info", *records],
         )
+        # GITHUB_TOKEN pushes do not trigger other workflows. Dispatch Pages
+        # explicitly, then verify serving, including on idempotent retries.
+        run("gh", "workflow", "run", "cache-pages.yml", "--repo", repo, "--ref", "main")
+        wait_visible(cache_url, expected)
 
 
 def combine(output, inputs):
@@ -633,8 +763,9 @@ def combine(output, inputs):
         staged.rename(output)
 
 
-def publish(prepared, repo, tag, cache_tag, revision):
-    validate_destination(repo, tag, cache_tag)
+def publish(prepared, repo, tag, index_branch, cache_url, revision):
+    validate_destination(repo, tag, index_branch)
+    https_base(cache_url)
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise ValueError("supply the exact checked source commit")
     batch_files(prepared, required=True)
@@ -643,9 +774,6 @@ def publish(prepared, repo, tag, cache_tag, revision):
     commit = api(f"repos/{repo}/commits/{quote('refs/tags/' + tag, safe='')}")
     if commit["sha"] != revision:
         raise ValueError("NAR tag must point at the checked source commit")
-    cache = release(repo, cache_tag)
-    if cache["draft"] or cache.get("immutable"):
-        raise ValueError("prepare a public mutable cache release first")
     # Do not treat a failed request as an absent release.
     found = release_records(repo, tag)
     if not found:
@@ -678,7 +806,7 @@ def publish(prepared, repo, tag, cache_tag, revision):
                     " create another draft"
                 )
     payload = release(repo, tag)
-    upload(prepared, repo, tag, cache_tag, "nars")
+    upload(prepared, repo, tag, index_branch, cache_url, "nars")
     if payload["draft"]:
         current = release(repo, tag)
         if current["id"] != payload["id"] or not current["draft"]:
@@ -696,7 +824,7 @@ def publish(prepared, repo, tag, cache_tag, revision):
         )
     # The importer cannot see new metadata until its payload is public and
     # GitHub reports a matching digest for every uploaded file.
-    upload(prepared, repo, tag, cache_tag, "metadata")
+    upload(prepared, repo, tag, index_branch, cache_url, "metadata")
 
 
 def build(system, packages, paths_file, ci_source_auth=False):
@@ -734,13 +862,85 @@ def build(system, packages, paths_file, ci_source_auth=False):
         target.write(paths + "\n")
 
 
+def migrate_metadata(output, repo, cache_tag):
+    """Read-only export of the old release, checked against GitHub asset digests.
+
+    This one-off operation never writes to GitHub. Deployment copies the result
+    to the index branch; keeping these bytes preserves signatures and NAR URLs.
+    """
+    validate_destination(repo, "migration", cache_tag)
+    if output.exists() or output.is_symlink():
+        raise ValueError("migration output must not exist")
+    source = release(repo, cache_tag)
+    if source["draft"]:
+        raise ValueError("migration requires the public metadata release")
+    records = assets(repo, source["id"])
+    if "nix-cache-info" not in records or any(
+        name != "nix-cache-info"
+        and not re.fullmatch(r"[0-9abcdfghijklmnpqrsvwxyz]{32}\.narinfo", name)
+        for name in records
+    ):
+        raise ValueError("old release must contain only cache metadata")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=output.parent) as temporary:
+        staged = Path(temporary) / "metadata"
+        staged.mkdir()
+
+        def download(item):
+            name, asset = item
+            if (
+                asset.get("state") != "uploaded"
+                or not 0 < asset.get("size", 0) <= 64 * 1024
+            ):
+                raise ValueError("invalid metadata asset")
+            data = subprocess.check_output(
+                [
+                    "gh",
+                    "api",
+                    "--hostname",
+                    "github.com",
+                    f"repos/{repo}/releases/assets/{asset['id']}",
+                    "--header",
+                    "Accept: application/octet-stream",
+                ],
+                timeout=60,
+            )
+            path = staged / name
+            path.write_bytes(data)
+            if not matches(asset, path):
+                raise ValueError(f"metadata asset digest mismatch: {name}")
+            if name.endswith(".narinfo"):
+                _, fields = metadata(path)
+                https_base(fields["URL"])
+            elif "StoreDir: /nix/store" not in data.decode().splitlines():
+                raise ValueError("invalid nix-cache-info")
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(download, records.items()))
+
+        def identity(items):
+            return {
+                name: tuple(asset.get(k) for k in ("id", "state", "size", "digest"))
+                for name, asset in items.items()
+            }
+
+        if release(repo, cache_tag)["id"] != source["id"] or identity(
+            assets(repo, source["id"])
+        ) != identity(records):
+            raise ValueError(
+                "metadata release changed during migration; retry from a fresh snapshot"
+            )
+        staged.rename(output)
+    print(f"Verified {len(records)} metadata files from {repo}:{cache_tag}")
+
+
 def main():
     parser = argparse.ArgumentParser(prog="korri-cache", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     validate_parser = commands.add_parser("validate")
     validate_parser.add_argument("--repo", required=True)
     validate_parser.add_argument("--tag", required=True)
-    validate_parser.add_argument("--cache-tag", required=True)
+    validate_parser.add_argument("--index-branch", default="cache-index")
     build_parser = commands.add_parser("build")
     build_parser.add_argument("--system", required=True)
     build_parser.add_argument("--paths-file", type=Path, required=True)
@@ -772,17 +972,27 @@ def main():
     publish_parser.add_argument("prepared", type=Path)
     publish_parser.add_argument("--repo", required=True)
     publish_parser.add_argument("--tag", required=True)
-    publish_parser.add_argument("--cache-tag", required=True)
+    publish_parser.add_argument("--index-branch", default="cache-index")
+    publish_parser.add_argument("--cache-url", required=True)
     publish_parser.add_argument("--revision", required=True)
     upload_parser = commands.add_parser("upload")
     upload_parser.add_argument("prepared", type=Path)
     upload_parser.add_argument("--repo", required=True)
     upload_parser.add_argument("--tag", required=True)
-    upload_parser.add_argument("--cache-tag", required=True)
+    upload_parser.add_argument("--index-branch", default="cache-index")
+    upload_parser.add_argument("--cache-url", required=True)
     upload_parser.add_argument("--part", choices=["nars", "metadata"], required=True)
+    migrate_parser = commands.add_parser(
+        "migrate-metadata", help="one-off read-only export of release metadata"
+    )
+    migrate_parser.add_argument("output", type=Path)
+    migrate_parser.add_argument("--repo", required=True)
+    migrate_parser.add_argument("--cache-tag", default="cache")
     args = parser.parse_args()
-    if args.command == "validate":
-        validate_destination(args.repo, args.tag, args.cache_tag)
+    if args.command == "migrate-metadata":
+        migrate_metadata(args.output, args.repo, args.cache_tag)
+    elif args.command == "validate":
+        validate_destination(args.repo, args.tag, args.index_branch)
     elif args.command == "build":
         build(args.system, args.packages, args.paths_file, args.ci_source_auth)
     elif args.command == "export":
@@ -792,9 +1002,23 @@ def main():
     elif args.command == "combine":
         combine(args.output, args.inputs)
     elif args.command == "publish":
-        publish(args.prepared, args.repo, args.tag, args.cache_tag, args.revision)
+        publish(
+            args.prepared,
+            args.repo,
+            args.tag,
+            args.index_branch,
+            args.cache_url,
+            args.revision,
+        )
     else:
-        upload(args.prepared, args.repo, args.tag, args.cache_tag, args.part)
+        upload(
+            args.prepared,
+            args.repo,
+            args.tag,
+            args.index_branch,
+            args.cache_url,
+            args.part,
+        )
 
 
 if __name__ == "__main__":

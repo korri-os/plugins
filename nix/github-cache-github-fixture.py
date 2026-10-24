@@ -12,6 +12,9 @@ from urllib.parse import parse_qs, urlsplit
 root = Path(os.environ["RELEASE_FIXTURE"])
 args = sys.argv[1:]
 state = json.loads((root / "state.json").read_text())
+if args[:2] == ["workflow", "run"]:
+    assert args[2:] == ["cache-pages.yml", "--repo", "owner/plugins", "--ref", "main"]
+    sys.exit(0)
 if args[:2] == ["release", "create"]:
     assert args[args.index("--repo") + 1] == "owner/plugins"
     assert "--draft" in args and "--verify-tag" in args

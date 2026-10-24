@@ -252,6 +252,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         pkgs.python3
         pkgs.nix
         pkgs.gh
+        pkgs.git
       ];
       text = ''
         exec python3 ${./github-cache.py} "$@"

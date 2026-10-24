@@ -2,7 +2,10 @@
 { korri, includeCore }:
 let
   requirements = import "${korri}/nix/product/requirements.nix" { inherit korri; };
-  publisher = requirements.constants.publishers."@korri";
+  # Keep the locked build interface and full key. Only transport changes.
+  publisher = requirements.constants.publishers."@korri" // {
+    cacheUrl = "https://korri-os.github.io/plugins/";
+  };
 in
 {
   # Publishing must not inherit Core signatures into its append-only cache.

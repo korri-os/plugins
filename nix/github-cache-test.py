@@ -268,7 +268,7 @@ class SignedCache(unittest.TestCase):
         (upstream / dep_nar).unlink()
         prepare(base + "/upstream")
 
-    def check_uploads(self, root, exported, env):
+    def check_uploads(self, root, exported, env, cache_url):
         fixture = root / "github"
         fixture.mkdir()
         fixture_state = fixture / "state.json"
@@ -313,6 +313,15 @@ class SignedCache(unittest.TestCase):
         env = dict(
             env, RELEASE_FIXTURE=str(fixture), PATH=str(commands) + ":" + env["PATH"]
         )
+        remote = root / "index.git"
+        run("git", "init", "--bare", str(remote), env=env)
+        seed = root / "index-seed"
+        run("git", "init", "-b", "cache-index", str(seed), env=env)
+        (seed / ".nojekyll").touch()
+        run("git", "-C", str(seed), "add", ".", env=env)
+        run("git", "-C", str(seed), "-c", "user.name=test", "-c", "user.email=test@example.org", "commit", "-m", "seed", env=env)
+        run("git", "-C", str(seed), "push", str(remote), "cache-index", env=env)
+        env = dict(env, GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0=f"url.{remote}.insteadOf", GIT_CONFIG_VALUE_0="https://github.com/owner/plugins.git")
         base = "https://github.com/owner/plugins/releases/download/"
         prepared = root / "github-prepared"
         run(
@@ -351,8 +360,10 @@ class SignedCache(unittest.TestCase):
                 "owner/plugins",
                 "--tag",
                 tag,
-                "--cache-tag",
-                "cache",
+                "--index-branch",
+                "cache-index",
+                "--cache-url",
+                cache_url,
                 "--part",
                 part,
                 env=env,
@@ -383,8 +394,10 @@ class SignedCache(unittest.TestCase):
             "owner/plugins",
             "--tag",
             "build-1",
-            "--cache-tag",
-            "cache",
+            "--index-branch",
+            "cache-index",
+            "--cache-url",
+            cache_url,
             "--revision",
             "2" * 40,
             env=env,
@@ -402,8 +415,10 @@ class SignedCache(unittest.TestCase):
             "owner/plugins",
             "--tag",
             "build-1",
-            "--cache-tag",
-            "cache",
+            "--index-branch",
+            "cache-index",
+            "--cache-url",
+            cache_url,
             "--revision",
             "2" * 40,
             env=env,
@@ -421,8 +436,10 @@ class SignedCache(unittest.TestCase):
             "owner/plugins",
             "--tag",
             "build-1",
-            "--cache-tag",
-            "cache",
+            "--index-branch",
+            "cache-index",
+            "--cache-url",
+            cache_url,
             "--revision",
             "1" * 40,
             env=env,
@@ -490,8 +507,10 @@ class SignedCache(unittest.TestCase):
             "owner/plugins",
             "--tag",
             "build-3",
-            "--cache-tag",
-            "cache",
+            "--index-branch",
+            "cache-index",
+            "--cache-url",
+            cache_url,
             "--revision",
             "1" * 40,
         ]
@@ -553,8 +572,10 @@ class SignedCache(unittest.TestCase):
                 "owner/plugins",
                 "--tag",
                 tag,
-                "--cache-tag",
-                "cache",
+                "--index-branch",
+                "cache-index",
+                "--cache-url",
+                cache_url,
                 "--revision",
                 "1" * 40,
                 env=env,
@@ -598,20 +619,13 @@ class SignedCache(unittest.TestCase):
         self.assertFalse(any(a["release"] == missing["id"] for a in state["assets"]))
         del state["hidden"]
         fixture_state.write_text(json.dumps(state))
-        # A conflicting remote file stops before writing anything else.
-        state = json.loads(fixture_state.read_text())
-        first = next(
-            a
-            for a in state["assets"]
-            if a["release"] == 2 and a["name"].endswith(".narinfo")
-        )
-        text = (
-            (fixture / str(first["id"])).read_text().replace("NarSize: ", "NarSize: 9")
-        )
-        (fixture / str(first["id"])).write_text(text)
-        first["digest"] = "sha256:" + hashlib.sha256(text.encode()).hexdigest()
-        first["size"] = len(text)
-        fixture_state.write_text(json.dumps(state))
+        # A conflicting Git index file stops without changing release assets.
+        run("git", "-C", str(seed), "pull", str(remote), "cache-index", env=env)
+        first = next((prepared / "metadata").glob("*.narinfo"))
+        (seed / first.name).write_text(first.read_text().replace("NarSize: ", "NarSize: 9"))
+        run("git", "-C", str(seed), "add", ".", env=env)
+        run("git", "-C", str(seed), "-c", "user.name=test", "-c", "user.email=test@example.org", "commit", "-m", "conflict", env=env)
+        run("git", "-C", str(seed), "push", str(remote), "cache-index", env=env)
         before = fixture_state.read_bytes()
         upload("metadata", succeeds=False)
         self.assertEqual(before, fixture_state.read_bytes())
@@ -718,7 +732,13 @@ class SignedCache(unittest.TestCase):
 
             class RedirectHandler(Handler):
                 def do_GET(self):
-                    if self.path.startswith("/download/"):
+                    if self.path.startswith("/index/"):
+                        name = self.path.removeprefix("/index/")
+                        result = subprocess.run(["git", "--git-dir", str(root / "index.git"), "show", f"cache-index:{name}"], capture_output=True)
+                        self.send_response(404 if result.returncode else 200)
+                        self.end_headers()
+                        self.wfile.write(result.stdout)
+                    elif self.path.startswith("/download/"):
                         self.send_response(302)
                         self.send_header(
                             "Location", "/nars/" + self.path.rsplit("/", 1)[-1]
@@ -808,7 +828,7 @@ class SignedCache(unittest.TestCase):
                         ],
                         [s for s in original.splitlines() if s.startswith("Sig:")],
                     )
-                self.check_uploads(root, exported, env)
+                self.check_uploads(root, exported, dict(env, NIX_SSL_CERT_FILE=str(cert)), base + "/index/")
                 self.check_upstreams(
                     root, site, base, cert, secret, public, fixture, env
                 )
@@ -983,8 +1003,10 @@ class CliInputs(unittest.TestCase):
                 "owner/plugins",
                 "--tag",
                 "build-1",
-                "--cache-tag",
-                "cache",
+                "--index-branch",
+                "cache-index",
+                "--cache-url",
+                "https://owner.github.io/plugins/",
                 "--revision",
                 "1" * 40,
                 succeeds=False,
@@ -1014,7 +1036,7 @@ class CliInputs(unittest.TestCase):
             "owner/plugins",
             "--tag",
             "release-2026-09",
-            "--cache-tag",
+            "--index-branch",
             "cache",
         )
         run(
@@ -1025,7 +1047,7 @@ class CliInputs(unittest.TestCase):
             "owner/plugins",
             "--tag",
             "cache",
-            "--cache-tag",
+            "--index-branch",
             "cache",
             succeeds=False,
         )

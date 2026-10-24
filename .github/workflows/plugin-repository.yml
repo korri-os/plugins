@@ -16,11 +16,6 @@ on:
         description: "Batch tag, not a plugin version; must already point at expected_source_sha"
         required: true
         type: string
-      cache_tag:
-        description: "Existing public mutable release for Nix metadata"
-        required: true
-        default: cache
-        type: string
       publish:
         description: "Publish verified NAR assets and append signed cache metadata"
         default: false
@@ -37,7 +32,8 @@ concurrency:
 env:
   EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
   NAR_TAG: ${{ inputs.tag }}
-  CACHE_TAG: ${{ inputs.cache_tag }}
+  INDEX_BRANCH: cache-index
+  CACHE_URL: https://korri-os.github.io/plugins/
   PACKAGES: ${{ inputs.packages }}
 
 jobs:
@@ -104,7 +100,7 @@ jobs:
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
-          nix run ".#ci.packages.$SYSTEM.korri-cache" -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG"
+          nix run ".#ci.packages.$SYSTEM.korri-cache" -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --index-branch "$INDEX_BRANCH"
           test_output=$(nix build --no-link --print-out-paths ".#ci.checks.$SYSTEM.korri-github-cache")
           nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
           # Authenticated source failures are fatal; never retry an HTTP 403.
@@ -257,6 +253,7 @@ jobs:
     environment: plugin-release
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -284,4 +281,4 @@ jobs:
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
-          ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --cache-tag "$CACHE_TAG" --revision "$EXPECTED_SOURCE_SHA"
+          ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --index-branch "$INDEX_BRANCH" --cache-url "$CACHE_URL" --revision "$EXPECTED_SOURCE_SHA"
