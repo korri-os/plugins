@@ -19,26 +19,32 @@ pkgs.writeShellApplication {
     pkgs.xprop
     pkgs.openbox
     pkgs.imagemagick
+    pkgs.mesa-demos
   ];
   text = ''
     export SDL_VIDEODRIVER=x11
-    # Do not mix the host X server's Mesa with the client's pinned EGL/DRI.
-    unset LD_LIBRARY_PATH LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
+    # Xvfb must initialize GLX before the client starts. Use nixpkgs' complete
+    # software stack for both processes, including GBM (whose default searches
+    # /run/opengl-driver and can otherwise mix the host's Mesa with this one).
+    export LD_LIBRARY_PATH=${pkgs.libglvnd}/lib
+    # shellcheck source=/dev/null
+    source ${pkgs.mesa.llvmpipeHook}/nix-support/setup-hook
     export XDG_RUNTIME_DIR
     XDG_RUNTIME_DIR=$(mktemp -d)
     trap 'rm -rf "$XDG_RUNTIME_DIR"' EXIT
     # The child shell expands its own variables after Xvfb starts.
     # shellcheck disable=SC2016
     xvfb-run -a -e /dev/stderr sh -c '
-    export LD_LIBRARY_PATH=${
-      pkgs.lib.makeLibraryPath [
-        pkgs.libglvnd
-        pkgs.mesa
-      ]
-    }
-    export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri
-    export LIBGL_ALWAYS_SOFTWARE=1
-    export __EGL_VENDOR_LIBRARY_FILENAMES=${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json
+      graphics_log="$XDG_RUNTIME_DIR/glxinfo.log"
+      if ! glxinfo -B > "$graphics_log" 2>&1 || ! grep -q "OpenGL renderer string: llvmpipe" "$graphics_log"; then
+        cat "$graphics_log" >&2
+        echo "Pinned software GLX did not initialize before Pyxel" >&2
+        exit 1
+      fi
+      if [ -n "''${KORRI_NATIVE_PROOF_DIR:-}" ]; then
+        mkdir -p "$KORRI_NATIVE_PROOF_DIR"
+        cp "$graphics_log" "$KORRI_NATIVE_PROOF_DIR/glxinfo.log"
+      fi
       openbox --sm-disable > "$XDG_RUNTIME_DIR/openbox.log" 2>&1 &
       wm=$!
       trap "kill $wm" EXIT

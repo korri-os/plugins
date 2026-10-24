@@ -92,3 +92,16 @@ content path unchanged; it does not copy the cart or reconstruct an account.
 It still requires the reviewed content hash. The probe never prints that input
 and removes the test environment value before native execution. Default original
 fixture/account-isolation tests do not change.
+
+### Headless graphics provenance
+
+The probe sources the pinned nixpkgs `mesa.llvmpipeHook` **before** starting
+Xvfb. Both Xvfb and Pyxel need the same GLX/EGL/DRI/GBM software stack. Setting
+client libraries only is too late: Xvfb omits GLX in a Nix sandbox without its
+server-side driver. Omitting `GBM_BACKENDS_PATH` can instead load a different
+Mesa through the host's `/run/opengl-driver` outside the sandbox.
+
+The probe requires a real llvmpipe GLX context before starting Pyxel and retains
+`glxinfo.log` when `KORRI_NATIVE_PROOF_DIR` is supplied. This is build-host
+acceptance configuration only. It changes neither the shipped renderer nor the
+native framebuffer, screenshot, input, save or clean-exit assertions.
