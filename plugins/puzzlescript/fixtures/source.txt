@@ -1,0 +1,26 @@
+title Korri Panda
+author Test Author
+
+OBJECTS
+
+Background
+black
+
+Player
+white
+
+LEGEND
+P = Player
+
+SOUNDS
+
+COLLISIONLAYERS
+Background
+Player
+
+RULES
+
+WINCONDITIONS
+
+LEVELS
+P
