@@ -22,6 +22,10 @@ def block(source, marker):
 
 def main():
     source = Path(sys.argv[1]).read_text()
+    # Both execution paths must use the session's negotiated FPS, not the
+    # capture backend's rate or a fixed 60 FPS deadline.
+    assert "const std::uint32_t rkmpp_fps = config.framerate;" in source
+    assert "const std::uint32_t rkmpp_fps = ctx->config.framerate;" in source
     interval = block(
         source, "  std::chrono::steady_clock::duration rkmpp_fps_interval("
     )
@@ -77,7 +81,7 @@ bool capture_step(bool frame_captured, bool pace_rkmpp,
 }
 int main() {
   const auto epoch = time_point {std::chrono::seconds {10}};
-  for (const std::uint32_t fps : {1u, 30u, 60u, 90u, 120u}) {
+  for (const std::uint32_t fps : {1u, 30u, 59u, 60u, 61u, 90u, 120u, 144u}) {
     const auto interval = rkmpp_fps_interval(fps);
     assert(interval == std::chrono::duration_cast<duration>(
       std::chrono::duration<double> {1.0 / fps}));

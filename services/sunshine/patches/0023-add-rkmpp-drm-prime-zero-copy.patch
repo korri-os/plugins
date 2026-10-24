@@ -1,16 +1,15 @@
 diff --git a/src/platform/common.h b/src/platform/common.h
-index 28704bb..a192560 100644
 --- a/src/platform/common.h
 +++ b/src/platform/common.h
-@@ -231,6 +231,7 @@ namespace platf {
+@@ -327,6 +327,7 @@
      vaapi,  ///< VAAPI
      dxgi,  ///< DXGI
      cuda,  ///< CUDA
 +    rkmpp,  ///< Rockchip MPP with DRM_PRIME input
      videotoolbox,  ///< VideoToolbox
+     vulkan,  ///< Vulkan
      unknown  ///< Unknown
-   };
-@@ -239,6 +240,7 @@ namespace platf {
+@@ -339,6 +340,7 @@
      yuv420p,  ///< YUV 4:2:0
      yuv420p10,  ///< YUV 4:2:0 10-bit
      nv12,  ///< NV12
@@ -18,7 +17,7 @@ index 28704bb..a192560 100644
      p010,  ///< P010
      ayuv,  ///< AYUV
      yuv444p16,  ///< Planar 10-bit (shifted to 16-bit) YUV 4:4:4
-@@ -255,6 +257,7 @@ namespace platf {
+@@ -364,6 +366,7 @@
        _CONVERT(yuv420p);
        _CONVERT(yuv420p10);
        _CONVERT(nv12);
@@ -27,26 +26,25 @@ index 28704bb..a192560 100644
        _CONVERT(ayuv);
        _CONVERT(yuv444p16);
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
-index 3db7489..650838f 100644
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -17,6 +17,12 @@
+@@ -19,6 +19,12 @@
+ #include <sys/mman.h>
  #include <xf86drm.h>
  #include <xf86drmMode.h>
- 
++
 +extern "C" {
 +#include <libavutil/buffer.h>
 +#include <libavutil/hwcontext_drm.h>
 +#include <libavutil/mem.h>
 +}
-+
+ 
  // local includes
  #include "cuda.h"
- #include "graphics.h"
-@@ -1328,6 +1334,115 @@ namespace platf {
-       egl::ctx_t ctx;
-     };
- 
+@@ -1856,6 +1862,115 @@
+     /**
+      * @brief KMS capture backend that exports frames as GPU resources.
+      */
 +    class rkmpp_vram_t: public avcodec_encode_device_t {
 +    public:
 +      rkmpp_vram_t() {
@@ -158,11 +156,12 @@ index 3db7489..650838f 100644
 +
      class display_vram_t: public display_t {
      public:
-       display_vram_t(mem_type_e mem_type):
-@@ -1347,6 +1462,14 @@ namespace platf {
+       /**
+@@ -1891,6 +2006,14 @@
+           return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y);
          }
  #endif
- 
++
 +        if (mem_type == mem_type_e::rkmpp) {
 +          auto device = std::make_unique<rkmpp_vram_t>();
 +          if (device->init(width, height)) {
@@ -170,13 +169,12 @@ index 3db7489..650838f 100644
 +          }
 +          return device;
 +        }
-+
+ 
          BOOST_LOG(error) << "Unsupported pixel format for egl::display_vram_t: "sv << platf::from_pix_fmt(pix_fmt);
          return nullptr;
-       }
-@@ -1367,6 +1490,24 @@ namespace platf {
-       }
- 
+@@ -1923,6 +2046,24 @@
+        * @return Capture status reported to the streaming pipeline.
+        */
        int dummy_img(platf::img_t *img) override {
 +        if (mem_type == mem_type_e::rkmpp) {
 +          file_t fb_fd[4];
@@ -199,7 +197,7 @@ index 3db7489..650838f 100644
          // Empty images are recognized as dummies by the zero sequence number
          return 0;
        }
-@@ -1477,6 +1618,22 @@ namespace platf {
+@@ -2037,6 +2178,22 @@
          }
  #endif
  
@@ -222,28 +220,27 @@ index 3db7489..650838f 100644
          return 0;
        }
  
-@@ -1486,7 +1643,7 @@ namespace platf {
-   }  // namespace kms
- 
+@@ -2054,7 +2211,7 @@
+    * @return KMS display backend, or nullptr when initialization fails.
+    */
    std::shared_ptr<display_t> kms_display(mem_type_e hwdevice_type, const std::string &display_name, const ::video::config_t &config) {
--    if (hwdevice_type == mem_type_e::vaapi || hwdevice_type == mem_type_e::cuda) {
-+    if (hwdevice_type == mem_type_e::vaapi || hwdevice_type == mem_type_e::cuda || hwdevice_type == mem_type_e::rkmpp) {
+-    if (hwdevice_type == mem_type_e::vaapi || hwdevice_type == mem_type_e::cuda || hwdevice_type == mem_type_e::vulkan) {
++    if (hwdevice_type == mem_type_e::vaapi || hwdevice_type == mem_type_e::cuda || hwdevice_type == mem_type_e::vulkan || hwdevice_type == mem_type_e::rkmpp) {
        auto disp = std::make_shared<kms::display_vram_t>(hwdevice_type);
  
        if (!disp->init(display_name, config)) {
 diff --git a/src/video.cpp b/src/video.cpp
-index eb9a6dc..bd2ea78 100644
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -126,6 +126,7 @@ namespace video {
- 
-   util::Either<avcodec_buffer_t, int> dxgi_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *);
-   util::Either<avcodec_buffer_t, int> vaapi_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *);
+@@ -206,6 +206,7 @@
+    * @param encode_device Encode device.
+    * @return Hardware buffer on success, or an error code on failure.
+    */
 +  util::Either<avcodec_buffer_t, int> rkmpp_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *);
    util::Either<avcodec_buffer_t, int> cuda_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *);
-   util::Either<avcodec_buffer_t, int> vt_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *);
- 
-@@ -1304,14 +1305,14 @@ namespace video {
+   /**
+    * @brief Create an FFmpeg hardware device buffer for VideoToolbox input.
+@@ -1269,14 +1270,14 @@
    encoder_t rkmpp {
      "rkmpp"sv,
      std::make_unique<encoder_platform_formats_avcodec>(
@@ -262,28 +259,26 @@ index eb9a6dc..bd2ea78 100644
      ),
      {},  // AV1: RKVENC-v1 (RK3566/RK3568) has no AV1 encoder
      {},  // HEVC: RKVENC-v1 has no HEVC encoder
-@@ -3681,6 +3682,19 @@ namespace video {
-     return hw_device_buf;
-   }
- 
+@@ -3661,6 +3662,17 @@
+   /**
+    * @brief Initialize AVCodec hardware input buffers for CUDA.
+    */
 +  util::Either<avcodec_buffer_t, int> rkmpp_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *encode_device) {
 +    avcodec_buffer_t hw_device_buf;
-+
 +    auto status = av_hwdevice_ctx_create(&hw_device_buf, AV_HWDEVICE_TYPE_RKMPP, nullptr, nullptr, 0);
 +    if (status < 0) {
 +      char string[AV_ERROR_MAX_STRING_SIZE];
 +      BOOST_LOG(error) << "Failed to create a RKMPP device: "sv << av_make_error_string(string, AV_ERROR_MAX_STRING_SIZE, status);
 +      return -1;
 +    }
-+
 +    return hw_device_buf;
 +  }
 +
    util::Either<avcodec_buffer_t, int> cuda_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *encode_device) {
      avcodec_buffer_t hw_device_buf;
  
-@@ -3782,6 +3796,8 @@ namespace video {
-         return platf::mem_type_e::vaapi;
+@@ -3788,6 +3800,8 @@
+ #endif
        case AV_HWDEVICE_TYPE_CUDA:
          return platf::mem_type_e::cuda;
 +      case AV_HWDEVICE_TYPE_RKMPP:
@@ -291,7 +286,7 @@ index eb9a6dc..bd2ea78 100644
        case AV_HWDEVICE_TYPE_NONE:
          return platf::mem_type_e::system;
        case AV_HWDEVICE_TYPE_VIDEOTOOLBOX:
-@@ -3805,6 +3821,8 @@ namespace video {
+@@ -3814,6 +3828,8 @@
          return platf::pix_fmt_e::yuv420p;
        case AV_PIX_FMT_NV12:
          return platf::pix_fmt_e::nv12;
@@ -299,4 +294,4 @@ index eb9a6dc..bd2ea78 100644
 +        return platf::pix_fmt_e::bgr0;
        case AV_PIX_FMT_P010:
          return platf::pix_fmt_e::p010;
-       default:
+       case AV_PIX_FMT_YUV444P:

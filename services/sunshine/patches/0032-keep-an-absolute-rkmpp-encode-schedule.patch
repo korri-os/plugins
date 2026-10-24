@@ -1,6 +1,8 @@
+diff --git a/src/video.cpp b/src/video.cpp
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -2620,10 +2620,26 @@
+@@ -2548,11 +2548,27 @@
+       // BGRA->NV12 conversion. Always pace it to the negotiated frame rate.
        const bool pace_rkmpp = encoder.name == "rkmpp";
        if (!requested_idr_frame && pace_rkmpp && rkmpp_fps > 0) {
 +        const auto interval = rkmpp_fps_interval(rkmpp_fps);

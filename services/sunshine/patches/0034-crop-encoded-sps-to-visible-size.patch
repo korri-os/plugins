@@ -1,13 +1,15 @@
+diff --git a/src/cbs.cpp b/src/cbs.cpp
 --- a/src/cbs.cpp
 +++ b/src/cbs.cpp
-@@ -5,5 +5,6 @@
+@@ -2,6 +2,7 @@
+  * @file src/cbs.cpp
   * @brief Definitions for FFmpeg Coded Bitstream API.
   */
 +#include <cstring>
  extern "C" {
  // lib includes
  #include <libavcodec/avcodec.h>
-@@ -111,6 +112,30 @@
+@@ -153,6 +154,30 @@
        sps->max_num_ref_frames = avctx->refs;
      }
  
@@ -38,16 +40,17 @@
      sps->vui_parameters_present_flag = 1;
  
      auto &vui = sps->vui;
+diff --git a/src/video.cpp b/src/video.cpp
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -1843,6 +1843,9 @@
+@@ -2411,7 +2411,9 @@
+       std::move(encode_device_final),
  
        // 0 ==> don't inject, 1 ==> inject for h264, 2 ==> inject for hevc
--      config.videoFormat <= 1 ? (1 - (int) video_format[encoder_t::VUI_PARAMETERS]) * (1 + config.videoFormat) : 0
-+      // Iris reports VUI support but omits the visible-frame crop. Replace
-+      // the H.264 SPS once even when its VUI would otherwise pass validation.
+-      config.videoFormat <= 1 ? (1 - static_cast<int>(video_format[encoder_t::VUI_PARAMETERS])) * (1 + config.videoFormat) : 0
++      // Iris advertises VUI but omits the visible-frame crop. Replace its SPS.
 +      config.videoFormat == 0 && video_format.name == "h264_v4l2m2m" ?
-+        1 : (config.videoFormat <= 1 ? (1 - (int) video_format[encoder_t::VUI_PARAMETERS]) * (1 + config.videoFormat) : 0)
++        1 : (config.videoFormat <= 1 ? (1 - static_cast<int>(video_format[encoder_t::VUI_PARAMETERS])) * (1 + config.videoFormat) : 0)
      );
  
      return session;

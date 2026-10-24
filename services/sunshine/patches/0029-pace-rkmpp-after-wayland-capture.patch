@@ -1,6 +1,7 @@
+diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -533,21 +533,24 @@
+@@ -636,11 +636,14 @@
    public:
      platf::capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
        auto next_frame = std::chrono::steady_clock::now();
@@ -9,34 +10,17 @@
        sleep_overshoot_logger.reset();
  
        while (true) {
--        auto now = std::chrono::steady_clock::now();
+-        platf::handle_pacing(next_frame, delay, sleep_overshoot_logger);
 +        if (!compositor_paced) {
-+          auto now = std::chrono::steady_clock::now();
- 
--        if (next_frame > now) {
--          std::this_thread::sleep_for(next_frame - now);
--          sleep_overshoot_logger.first_point(next_frame);
--          sleep_overshoot_logger.second_point_now_and_log();
--        }
-+          if (next_frame > now) {
-+            std::this_thread::sleep_for(next_frame - now);
-+            sleep_overshoot_logger.first_point(next_frame);
-+            sleep_overshoot_logger.second_point_now_and_log();
-+          }
- 
--        next_frame += delay;
--        if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
--          next_frame = now + delay;
-+          next_frame += delay;
-+          if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
-+            next_frame = now + delay;
-+          }
-         }
++          platf::handle_pacing(next_frame, delay, sleep_overshoot_logger);
++        }
  
          std::shared_ptr<platf::img_t> img_out;
+         auto status = snapshot(pull_free_image_cb, img_out, 1000ms, *cursor);
+diff --git a/src/video.cpp b/src/video.cpp
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -2277,6 +2277,23 @@
+@@ -2865,6 +2865,23 @@
              ctx->idr_events->pop();
            }
  

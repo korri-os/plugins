@@ -1,25 +1,18 @@
+diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -114,10 +114,11 @@
-       return 0;
-     }
- 
+@@ -197,12 +197,15 @@
+      * @param cursor Cursor image or visibility state to composite.
+      * @return Capture status reported to the streaming pipeline.
+      */
 -    inline platf::capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
 -      auto to = std::chrono::steady_clock::now() + timeout;
 -
 -      // Dispatch events until we get a new frame or the timeout expires
-+    // Ask the compositor for the next frame without waiting for it. Issuing
-+    // this request before the previous frame is handed to the encoder keeps a
-+    // request outstanding at every vblank instead of only at those that happen
-+    // to fall after the handoff.
++    // Keep one screencopy request outstanding before the encoder handoff.
 +    inline void begin_capture(bool cursor) {
        dmabuf.require_linear = mem_type == platf::mem_type_e::rkmpp;
-       dmabuf.listen(
-         interface.screencopy_manager,
-@@ -127,6 +128,11 @@
-         cursor,
-         mem_type == platf::mem_type_e::cuda
-       );
+       dmabuf.listen(interface.screencopy_manager, interface.dmabuf_interface, &interface.supported_modifiers, interface.shm_interface, output, cursor, mem_type == platf::mem_type_e::cuda);
 +    }
 +
 +    inline platf::capture_e await_capture(std::chrono::milliseconds timeout) {
@@ -28,19 +21,19 @@
        do {
          auto remaining_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(to - std::chrono::steady_clock::now());
          if (remaining_time_ms.count() < 0 || !display.dispatch(remaining_time_ms)) {
-@@ -147,6 +153,11 @@
-       return platf::capture_e::ok;
-     }
+@@ -221,6 +224,11 @@
+       }
  
+       return platf::capture_e::ok;
++    }
++
 +    inline platf::capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
 +      begin_capture(cursor);
 +      return await_capture(timeout);
-+    }
-+
-     platf::mem_type_e mem_type;
+     }
  
-     std::chrono::nanoseconds delay;
-@@ -531,26 +542,74 @@
+     platf::mem_type_e mem_type;  ///< Mem type.
+@@ -634,16 +642,65 @@
  
    class wlr_vram_t: public wlr_t {
    public:
@@ -75,6 +68,7 @@
 +        ++sequence;
 +        img->sequence = sequence;
 +        img->sd = current_frame->sd;
++        img->frame_timestamp = current_frame->frame_timestamp;
 +
 +        // Transfer the descriptor and its capture-pool token to the image.
 +        std::fill_n(current_frame->sd.fds, 4, -1);
@@ -91,11 +85,11 @@
 +      return platf::capture_e::ok;
 +    }
 +
++
      platf::capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
 +      if (mem_type == platf::mem_type_e::rkmpp) {
 +        return pipelined_capture(push_captured_image_cb, pull_free_image_cb, cursor);
 +      }
-+
        auto next_frame = std::chrono::steady_clock::now();
 -      const bool compositor_paced = mem_type == platf::mem_type_e::rkmpp;
  
@@ -103,27 +97,9 @@
  
        while (true) {
 -        if (!compositor_paced) {
--          auto now = std::chrono::steady_clock::now();
-+        auto now = std::chrono::steady_clock::now();
- 
--          if (next_frame > now) {
--            std::this_thread::sleep_for(next_frame - now);
--            sleep_overshoot_logger.first_point(next_frame);
--            sleep_overshoot_logger.second_point_now_and_log();
--          }
-+        if (next_frame > now) {
-+          std::this_thread::sleep_for(next_frame - now);
-+          sleep_overshoot_logger.first_point(next_frame);
-+          sleep_overshoot_logger.second_point_now_and_log();
-+        }
- 
--          next_frame += delay;
--          if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
--            next_frame = now + delay;
--          }
-+        next_frame += delay;
-+        if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
-+          next_frame = now + delay;
-         }
+-          platf::handle_pacing(next_frame, delay, sleep_overshoot_logger);
+-        }
++        platf::handle_pacing(next_frame, delay, sleep_overshoot_logger);
  
          std::shared_ptr<platf::img_t> img_out;
+         auto status = snapshot(pull_free_image_cb, img_out, 1000ms, *cursor);

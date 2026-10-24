@@ -1,3 +1,4 @@
+diff --git a/src/platform/linux/cuda.cu b/src/platform/linux/cuda.cu
 --- a/src/platform/linux/cuda.cu
 +++ b/src/platform/linux/cuda.cu
 @@ -116,6 +116,16 @@
@@ -17,6 +18,7 @@
    stream_t make_stream(int flags) {
      cudaStream_t stream;
  
+diff --git a/src/platform/linux/cuda.h b/src/platform/linux/cuda.h
 --- a/src/platform/linux/cuda.h
 +++ b/src/platform/linux/cuda.h
 @@ -6,6 +6,7 @@
@@ -36,11 +38,12 @@
  }  // namespace cuda
  
  typedef struct cudaArray *cudaArray_t;
+diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -26,9 +26,18 @@
- 
-   struct img_t: public platf::img_t {
+@@ -43,9 +43,18 @@
+      * @brief Destroy the Wayland capture image.
+      */
      ~img_t() override {
 +#ifdef SUNSHINE_BUILD_CUDA
 +      if (cuda_pinned) {
@@ -56,8 +59,8 @@
 +    bool cuda_pinned {false};
    };
  
-   class wlr_t: public platf::display_t {
-@@ -322,7 +331,16 @@
+   /**
+@@ -422,7 +431,16 @@
        img->height = height;
        img->pixel_pitch = 4;
        img->row_pitch = img->pixel_pitch * width;

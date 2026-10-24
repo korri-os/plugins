@@ -1,16 +1,4 @@
-What: parse capture_rt_priority=0 (off) or 1..20. Only a guarded RAM-KMS
-backend with an established vblank lock may request calling-thread FIFO with
-SCHED_RESET_ON_FORK. Other backends never request RT, regardless of config.
-The ARM backend owns promotion, operational logging, guard and scope cleanup;
-the generic asynchronous Linux capture loop has no FIFO request.
-Status: bounded, backend-specific opt-in scheduling; native LimitRTPRIO remains
-an explicit host approval. No service-wide RT, affinity or SYS_NICE.
-Evidence: capture-scheduling-test.cpp checks other backends cannot request FIFO,
-lock-before-promotion, strict parsing and unprivileged EPERM continuation.
-Removal: equivalent upstream policy, lost need, or unsafe responsiveness.
-
 diff --git a/src/capture_scheduling.h b/src/capture_scheduling.h
-new file mode 100644
 --- /dev/null
 +++ b/src/capture_scheduling.h
 @@ -0,0 +1,45 @@
@@ -60,10 +48,9 @@ new file mode 100644
 +  }
 +}  // namespace video
 diff --git a/src/config.cpp b/src/config.cpp
-index a7b7b5c..8211218 100644
 --- a/src/config.cpp
 +++ b/src/config.cpp
-@@ -20,6 +20,7 @@
+@@ -21,6 +21,7 @@
  
  // local includes
  #include "config.h"
@@ -71,7 +58,7 @@ index a7b7b5c..8211218 100644
  #include "entry_handler.h"
  #include "file_handler.h"
  #include "logging.h"
-@@ -440,6 +441,7 @@ namespace config {
+@@ -720,6 +721,7 @@
      0,  // hevc_mode
      0,  // av1_mode
  
@@ -79,7 +66,7 @@ index a7b7b5c..8211218 100644
      2,  // min_threads
      {
        "superfast"s,  // preset
-@@ -1056,6 +1058,17 @@ namespace config {
+@@ -1607,6 +1609,17 @@
      int_f(vars, "qp", video.qp);
      int_between_f(vars, "hevc_mode", video.hevc_mode, {0, 3});
      int_between_f(vars, "av1_mode", video.av1_mode, {0, 3});
@@ -98,15 +85,13 @@ index a7b7b5c..8211218 100644
      string_f(vars, "sw_preset", video.sw.sw_preset);
      if (!video.sw.sw_preset.empty()) {
 diff --git a/src/config.h b/src/config.h
-index 7ba1bd2..96577ec 100644
 --- a/src/config.h
 +++ b/src/config.h
-@@ -26,6 +26,8 @@ namespace config {
-     int hevc_mode;
-     int av1_mode;
+@@ -68,6 +68,7 @@
  
+     int hevc_mode;  ///< HEVC support mode advertised to clients.
+     int av1_mode;  ///< AV1 support mode advertised to clients.
 +    int capture_rt_priority;  // Linux capture-only FIFO; 0 disables, 1..20 request RT
-+
-     int min_threads;  // Minimum number of threads/slices for CPU encoding
  
-     struct {
+     int min_threads;  ///< Minimum number of threads or slices for CPU encoding.
+ 
