@@ -34,6 +34,12 @@ the reviewed, reachable Core revision that exports the new interface.
 | `korri-plugin-starter-pack` | `@korri:starter-pack` | `plugins/starter-pack/` |
 | `korri-plugin-pico8` | `@korri:pico8` (PICO-8 BBS search provider; declared host `www.lexaloffle.com`) | `plugins/pico8/` |
 | `korri-plugin-itchio` | `@korri:itchio` (supported-creator free raw Bitsy attachments; finite exact hosts) | `plugins/itchio/` |
+| `korri-plugin-tic80gallery` | `@korri:tic80gallery` (TIC-80 catalog provider) | `plugins/tic80gallery/` |
+| `korri-plugin-wasm4gallery` | `@korri:wasm4gallery` (WASM-4 gallery provider) | `plugins/wasm4gallery/` |
+| `korri-plugin-lowresnxgallery` | `@korri:lowresnxgallery` (LowRes NX programs provider) | `plugins/lowresnxgallery/` |
+| `korri-plugin-puzzlescript` | `@korri:puzzlescript` (raw-source gallery provider) | `plugins/puzzlescript/` |
+| `korri-plugin-pyxelgallery` | `@korri:pyxelgallery` (versioned official sample catalog provider) | `plugins/pyxelgallery/` |
+| `korri-plugin-pyxel` | `@korri:pyxel` (native `.pyxapp` runner candidate) | `plugins/pyxel/` |
 | `korri-plugin-homebrewhub` | `@korri:homebrewhub` (declared games with pinned artifacts) | `plugins/homebrewhub/` |
 | `korri-plugin-retrobrews` | `@korri:retrobrews` (declared games with pinned artifacts) | `plugins/retrobrews/` |
 | `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
@@ -45,9 +51,45 @@ plugin lifecycle gates pass. Its presence in a release does not establish
 streaming acceptance.
 
 Supported systems are `x86_64-linux` and `aarch64-linux`. Publisher composition
-binds `korri.lib.<system>.mkPlugin { pkgs = publisherPkgs; }`. The catalogue currently emits 90
-core packages. Each core package carries its selected RetroArch frontend and
+binds `korri.lib.<system>.mkPlugin { pkgs = publisherPkgs; }`. The catalogue emits one package per core entry. Each core package carries its selected RetroArch frontend and
 core library in one closure. Nix deduplicates identical store paths.
+
+## Native fantasy-console candidates
+
+Runners and acquisition providers are independent plugins. Local play needs
+only the runner. GET GAMES needs an enabled provider and the matching system
+and runner. The existing surface handles search, details, download progress,
+import and play; these plugins do not introduce a separate store UI.
+
+| System | Runner plugin | Search provider | Content |
+|---|---|---|---|
+| TIC-80 | `@korri:tic80` | `@korri:tic80gallery` | `.tic` |
+| WASM-4 | `@korri:wasm4` | `@korri:wasm4gallery` | `.wasm` |
+| LowRes NX | `@korri:lowresnx` | `@korri:lowresnxgallery` | `.nx` |
+| PuzzleScript | `@korri:pzretro` | `@korri:puzzlescript` | `.pz`, experimental `.pzp` |
+| Pyxel | `@korri:pyxel` | `@korri:pyxelgallery` | `.pyxapp` |
+
+These are candidates until their recorded checks pass. A declaration or an
+ARM build alone does not prove device play. TIC-80's libretro serialization
+stores persistent memory, not live execution state. LowRes NX's core has no
+standard savestates or virtual-disk integration. PuzzleScript Plus support
+is experimental; unsupported engine forks and HTML exports are not raw game
+source.
+
+Pyxel's initial source is the versioned upstream sample-app directory, not
+all community websites. Its cartridges can contain multiple Python modules.
+Core must preserve byte-identified native `.pyxapp` content rather than
+unpack it as transport. Older Core acquisition does not do that. The native
+runner executes Python under Korri's existing game-process restrictions;
+this is not a full filesystem or network sandbox. Opt-in automated acceptance
+executes only the reviewed, pinned Space Rescue cartridge, not arbitrary
+Python downloads. Plain `.py` projects and external pip dependency resolution
+are outside this slice.
+
+Providers fetch author-offered content at the person's request. Runtime
+licenses do not grant rights to redistribute those games. No third-party
+cartridges belong in the runner packages merely because a gallery lists them.
+Publication and physical-device acceptance remain separate approval steps.
 
 ## Starter pack
 

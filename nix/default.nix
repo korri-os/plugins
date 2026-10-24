@@ -79,6 +79,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin = _: retroarchDefinition;
     };
     libretro = import ../plugins/libretro { inherit pkgs mkPlugin; };
+    fantasyCorePackages = pkgs.lib.genAttrs [ "tic80" "wasm4" "lowresnx" "pzretro" ] (
+      name: libretro.packages."korri-plugin-${name}"
+    );
+    pyxel = import ../plugins/pyxel { inherit pkgs mkPlugin; };
+    libretroNativeProbe = import ../plugins/libretro/native-check/probe.nix { inherit pkgs; };
+    pyxelNativeProbe = import ../plugins/pyxel/probe.nix { inherit pkgs; };
     gamescopePackage = import ../plugins/gamescope/package.nix { inherit pkgs; };
     gamescopeSource = pkgs.runCommand "korri-gamescope-source" { } ''
       mkdir -p "$out"
@@ -138,6 +144,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       };
     pico8Plugin = acquisitionPlugin "pico8";
     itchioPlugin = acquisitionPlugin "itchio";
+    tic80GalleryPlugin = acquisitionPlugin "tic80gallery";
+    wasm4GalleryPlugin = acquisitionPlugin "wasm4gallery";
+    lowresnxGalleryPlugin = acquisitionPlugin "lowresnxgallery";
+    puzzlescriptPlugin = acquisitionPlugin "puzzlescript";
+    pyxelGalleryPlugin = acquisitionPlugin "pyxelgallery";
     homebrewhubPlugin = acquisitionPlugin "homebrewhub";
     retrobrewsPlugin = acquisitionPlugin "retrobrews";
     acquisitionCheck =
@@ -276,6 +287,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       moonlight-embedded-korri = moonlightPackage;
       korri-plugin-bitsybox = bitsyboxPlugin;
       bitsybox = bitsyboxPackage;
+      korri-plugin-pyxel = pyxel.plugin;
+      pyxel = pyxel.package;
+      # Off-device acceptance tools, not plugins or game-runtime dependencies.
+      korri-libretro-native-probe = libretroNativeProbe;
+      korri-pyxel-native-probe = pyxelNativeProbe;
       korri-plugin-solarus = solarusPlugin;
       solarus = solarusPackage;
       cemu = cemuPackage;
@@ -296,6 +312,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-steam = steamPlugin;
       korri-plugin-pico8 = pico8Plugin;
       korri-plugin-itchio = itchioPlugin;
+      korri-plugin-tic80gallery = tic80GalleryPlugin;
+      korri-plugin-wasm4gallery = wasm4GalleryPlugin;
+      korri-plugin-lowresnxgallery = lowresnxGalleryPlugin;
+      korri-plugin-puzzlescript = puzzlescriptPlugin;
+      korri-plugin-pyxelgallery = pyxelGalleryPlugin;
       korri-plugin-homebrewhub = homebrewhubPlugin;
       korri-plugin-retrobrews = retrobrewsPlugin;
       korri-plugin-starter-pack = starterPack;
@@ -316,6 +337,14 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-cemu-bench = {
         type = "app";
         program = "${cemuBench}/bin/korri-cemu-bench";
+      };
+      korri-libretro-native-probe = {
+        type = "app";
+        program = "${libretroNativeProbe}/bin/korri-libretro-native-probe";
+      };
+      korri-pyxel-native-probe = {
+        type = "app";
+        program = "${pyxelNativeProbe}/bin/korri-pyxel-native-probe";
       };
       eden-bench = {
         type = "app";
@@ -351,6 +380,23 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           korridPackage = korri.packages.${system}.korrid;
         };
         korri-plugin-builder = korri.lib.${system}.pluginBuilderCheck { inherit pkgs; };
+        korri-native-fantasy-runners = import ../plugins/libretro/native-check/check.nix {
+          inherit pkgs;
+          packages = fantasyCorePackages;
+          contract = korri.lib.${system}.pluginContract;
+        };
+        korri-pyxel-native = import ../plugins/pyxel/check.nix {
+          inherit pkgs;
+          package = pyxel.plugin;
+          contract = korri.lib.${system}.pluginContract;
+        };
+        korri-fantasy-runner-admission = import ./fantasy-runner-admission.nix {
+          inherit pkgs;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+          packages = fantasyCorePackages // {
+            pyxel = pyxel.plugin;
+          };
+        };
         korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
         korri-moonlight-server-pin = import ../services/moonlight/server-pin-check.nix {
           inherit pkgs moonlightPackage;
@@ -419,6 +465,19 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           "itch.io"
           "0neforgetfulbug.itch.io"
           "itchio-mirror.cb031a832f44726753d6267436f3b414.r2.cloudflarestorage.com"
+        ];
+        korri-tic80gallery-plugin = acquisitionCheck "tic80gallery" tic80GalleryPlugin [ "tic80.com" ];
+        korri-wasm4gallery-plugin = acquisitionCheck "wasm4gallery" wasm4GalleryPlugin [ "wasm4.org" ];
+        korri-lowresnxgallery-plugin = acquisitionCheck "lowresnxgallery" lowresnxGalleryPlugin [
+          "lowresnx.inutilis.com"
+        ];
+        korri-puzzlescript-plugin = acquisitionCheck "puzzlescript" puzzlescriptPlugin [
+          "www.puzzlescript.net"
+          "gist.githubusercontent.com"
+        ];
+        korri-pyxelgallery-plugin = acquisitionCheck "pyxelgallery" pyxelGalleryPlugin [
+          "api.github.com"
+          "raw.githubusercontent.com"
         ];
         korri-homebrewhub-plugin = acquisitionCheck "homebrewhub" homebrewhubPlugin [ ];
         korri-retrobrews-plugin = acquisitionCheck "retrobrews" retrobrewsPlugin [ ];
