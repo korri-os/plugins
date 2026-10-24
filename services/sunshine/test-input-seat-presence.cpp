@@ -17,7 +17,7 @@ boost::log::sources::severity_logger<int> verbose, debug, info, warning, error, 
 
 namespace platf {
   static unsigned native_allocations = 0;
-  void freeInput(void *) {}
+  void freeInput(input_raw_t *) {}
   std::unique_ptr<client_input_t> allocate_client_input_context(input_t &) { return {}; }
   void move_mouse(input_t &, int, int) {}
   void abs_mouse(input_t &, const touch_port_t &, float, float) {}
@@ -26,7 +26,9 @@ namespace platf {
   void hscroll(input_t &, int) {}
   void keyboard_update(input_t &, uint16_t, bool, uint8_t) {}
   void gamepad_update(input_t &, int, const gamepad_state_t &) {}
-  void unicode(input_t &, char *, int) {}
+  void unicode(input_t &, const char *, int) {}
+  void set_thread_name(std::string_view) {}
+  int rebind_gamepad(input_t &, const gamepad_id_t &, feedback_queue_t) { return 0; }
   void touch_update(client_input_t *, const touch_port_t &, const touch_input_t &) {}
   void pen_update(client_input_t *, const touch_port_t &, const pen_input_t &) {}
   void gamepad_touch(input_t &, const gamepad_touch_t &) {}
@@ -97,7 +99,7 @@ static void clear() { barrier(); drain(); received.clear(); }
 static std::size_t count(std::string_view kind) {
   return std::count_if(received.begin(), received.end(), [&](const auto &r) { return r.envelope["frame"]["kind"] == kind; });
 }
-static auto stream(std::string uuid = "11111111-1111-4111-8111-111111111111") { return input::alloc(std::make_shared<safe::mail_raw_t>(), std::move(uuid)); }
+static auto stream(std::string uuid = "11111111-1111-4111-8111-111111111111") { return input::alloc(std::make_shared<safe::mail_raw_t>(), "canonical-native-certificate", std::move(uuid)); }
 template<class Packet>
 static void submit(std::shared_ptr<input::input_t> &ctx, const Packet &packet) {
   const auto *bytes = reinterpret_cast<const std::uint8_t *>(&packet);
@@ -106,6 +108,7 @@ static void submit(std::shared_ptr<input::input_t> &ctx, const Packet &packet) {
 }
 static void state(std::shared_ptr<input::input_t> &ctx, unsigned buttons = 0, short number = 0, short mask = 1) {
   NV_MULTI_CONTROLLER_PACKET packet {};
+  packet.header.size = util::endian::big<std::uint32_t>(sizeof(packet) - sizeof(packet.header.size));
   packet.header.magic = util::endian::little<std::uint32_t>(MULTI_CONTROLLER_MAGIC_GEN5);
   packet.controllerNumber = number;
   packet.activeGamepadMask = mask;
@@ -116,6 +119,7 @@ static void state(std::shared_ptr<input::input_t> &ctx, unsigned buttons = 0, sh
 }
 static void arrival(std::shared_ptr<input::input_t> &ctx, unsigned number = 0) {
   SS_CONTROLLER_ARRIVAL_PACKET packet {};
+  packet.header.size = util::endian::big<std::uint32_t>(sizeof(packet) - sizeof(packet.header.size));
   packet.header.magic = util::endian::little<std::uint32_t>(SS_CONTROLLER_ARRIVAL_MAGIC);
   packet.controllerNumber = number;
   submit(ctx, packet);
@@ -138,8 +142,31 @@ int main() {
   listen_at_path();
   task_pool.start(1); // Exactly the upstream executor topology.
 
-  // Arrival is not a neutral baseline. First held state must remain held.
+  // The new upstream packet bounds must run before the mirror sees typed data.
   auto ctx = stream();
+  NV_MULTI_CONTROLLER_PACKET bounds {};
+  bounds.header.magic = util::endian::little<std::uint32_t>(MULTI_CONTROLLER_MAGIC_GEN5);
+  bounds.header.size = util::endian::big<std::uint32_t>(sizeof(bounds) - sizeof(bounds.header.size));
+  bounds.activeGamepadMask = 1;
+  const auto *bytes = reinterpret_cast<const std::uint8_t *>(&bounds);
+  for (std::size_t size = 0; size < sizeof(bounds); ++size) {
+    assert(!input::validate_input_packet(std::span(bytes, size)));
+    input::passthrough(ctx, std::vector<std::uint8_t>(bytes, bytes + size));
+  }
+  bounds.header.size = 0;
+  submit(ctx, bounds);
+  collect(250ms);
+  assert(received.empty());
+  state(ctx, 1, -1);
+  state(ctx, 1, 16);
+  arrival(ctx, 255);
+  collect(250ms);
+  assert(received.empty() && platf::native_allocations == 0);
+  stop_stream(ctx);
+  clear();
+
+  // Arrival is not a neutral baseline. First held state must remain held.
+  ctx = stream();
   arrival(ctx);
   collect(300ms);
   assert(count("source-connected") == 1 && count("source-state") == 0);
@@ -198,6 +225,7 @@ int main() {
   // Queue a real held packet BEFORE retirement. Ordinary tasks precede timers,
   // so this packet must see the atomic gate, not merely timer cancellation.
   NV_MULTI_CONTROLLER_PACKET pending {};
+  pending.header.size = util::endian::big<std::uint32_t>(sizeof(pending) - sizeof(pending.header.size));
   pending.header.magic = util::endian::little<std::uint32_t>(MULTI_CONTROLLER_MAGIC_GEN5);
   pending.controllerNumber = 0;
   pending.activeGamepadMask = 1;
@@ -382,8 +410,8 @@ int main() {
     char bytes[2048];
     auto size = ::recv(peer, bytes, sizeof(bytes), 0);
     ch = size == 0 ? 'y' : 'n';
-    ::write(ready[1], &ch, 1);
-    ::read(done[0], &ch, 1);
+    assert(::write(ready[1], &ch, 1) == 1);
+    assert(::read(done[0], &ch, 1) == 1);
     ::_exit(size == 0 ? 0 : 13);
   }
   ::close(ready[1]); ::close(done[0]);
@@ -399,6 +427,15 @@ int main() {
   ::close(ready[0]); ::close(done[1]);
   assert(platf::native_allocations == 0);
 
+  assert(::unsetenv("KORRI_INPUT_SEAT_RUNTIME_DIR") == 0);
+  assert(::unsetenv("KORRI_INPUT_SEAT_MIRROR_SOCKET") == 0);
+  auto native = input::alloc(std::make_shared<safe::mail_raw_t>(), "canonical-native-certificate");
+  auto resumed_native = input::alloc(std::make_shared<safe::mail_raw_t>(), "canonical-native-certificate");
+  assert(native == resumed_native);
+  input::terminate_gamepads("canonical-native-certificate");
+  barrier();
+  native.reset();
+  resumed_native.reset();
   barrier();
   task_pool.stop(); task_pool.join();
   std::filesystem::remove_all(directory);

@@ -11,6 +11,10 @@ let
     name = "sunshine-korri-input-presence-source";
     src = pkgs.sunshine.src;
     patches = map (record: record.path) records;
+    patchFlags = [
+      "-p1"
+      "--fuzz=0"
+    ];
   };
   binary =
     pkgs.runCommand "sunshine-input-seat-presence-regression"
@@ -27,6 +31,7 @@ let
         c++ -std=c++23 -O1 -g -pthread -DBOOST_LOG_DYN_LINK \
           -ffunction-sections -fdata-sections -Wl,--gc-sections \
           -I${source} -I${source}/third-party \
+          -I${source}/third-party/libvirtualhid/src/include \
           ${./test-input-seat-presence.cpp} \
           -lboost_log -lboost_thread -lboost_filesystem \
           -o "$out/bin/sunshine-input-seat-presence-regression"
