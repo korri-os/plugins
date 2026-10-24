@@ -1,31 +1,48 @@
+diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -8,4 +8,9 @@
+@@ -6,6 +6,11 @@
+ #include <errno.h>
+ #include <fcntl.h>
  #include <filesystem>
 +#include <cstring>
- #include <thread>
 +#include <vector>
- #include <unistd.h>
 +#ifdef SUNSHINE_BUILD_WAYLAND
 +  #include <wayland-client-protocol.h>
 +#endif
+ #include <future>
+ #include <ranges>
+ #include <stdexcept>
+@@ -394,6 +399,8 @@
+       // Monitor index in the global list
+       std::uint32_t monitor_index;  ///< Monitor index.
  
-@@ -163,2 +168,4 @@
-       platf::touch_port_t viewport;
 +      std::optional<std::int32_t> output_transform;
 +      std::string output_name;
+       platf::touch_port_t viewport;  ///< Viewport.
      };
-@@ -691,2 +698,4 @@
+ 
+@@ -1160,6 +1167,8 @@
+             auto monitor = pos->crtc_to_monitor.find(plane->crtc_id);
+             if (monitor != std::end(pos->crtc_to_monitor)) {
                auto &viewport = monitor->second.viewport;
 +              output_transform = monitor->second.output_transform;
 +              output_name = monitor->second.output_name;
  
-@@ -1108,2 +1117,4 @@
-       int img_offset_x, img_offset_y;
+               width = viewport.width;
+               height = viewport.height;
+@@ -1599,6 +1608,8 @@
+ 
+       int img_width;  ///< Img width.
+       int img_height;  ///< Img height.
 +      std::optional<std::int32_t> output_transform;
 +      std::string output_name;
+       int img_offset_x;  ///< Img offset x.
+       int img_offset_y;  ///< Img offset y.
  
-@@ -1156,2 +1167,77 @@
+@@ -1664,6 +1675,81 @@
+ 
+         ctx = std::move(*ctx_opt);
  
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +        capture_samples_ms.reserve(300);
@@ -103,8 +120,12 @@
 +        }
 +#endif
          return 0;
-@@ -1268,3 +1354,34 @@
+       }
  
+@@ -1785,7 +1871,38 @@
+        * @param cursor Cursor image or visibility state to composite.
+        * @return Capture status reported to the streaming pipeline.
+        */
 +      void blend_rotated_cursor(img_t &img) {
 +        // Only visit cursor pixels. The image shader maps a raw source pixel
 +        // (x, y) to (source_height - 1 - y, x) in top-left image coordinates.
@@ -138,7 +159,11 @@
 +        auto capture_start = std::chrono::steady_clock::now();
 +#endif
          file_t fb_fd[4];
-@@ -1299,4 +1416,24 @@
+ 
+         egl::surface_descriptor_t sd;
+@@ -1817,14 +1934,41 @@
+           return platf::capture_e::interrupted;
+         }
  
 -        gl::ctx.GetTextureSubImage(rgb->tex[0], 0, img_offset_x, img_offset_y, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
 -
@@ -165,23 +190,28 @@
 +        report_probe_samples(readback_samples_ms, "readback plus conditional draw");
 +#endif
          img_out->frame_timestamp = frame_timestamp;
-@@ -1304,5 +1441,12 @@
+ 
          if (cursor && captured_cursor.visible) {
 -          blend_cursor(*img_out);
+-        }
+-
 +          if (capture_rotate_90) {
 +            blend_rotated_cursor(*img_out);
 +          } else {
 +            blend_cursor(*img_out);
 +          }
-         }
--
++        }
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +        capture_samples_ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - capture_start).count());
 +        report_probe_samples(capture_samples_ms, "capture (excludes FPS pacing)");
 +#endif
          return capture_e::ok;
-@@ -1328,2 +1472,23 @@
-       egl::ctx_t ctx;
+       }
+ 
+@@ -1857,6 +2001,28 @@
+       gbm::gbm_t gbm;  ///< GBM device used for buffer allocation.
+       egl::display_t display;  ///< EGL display created from the GBM device.
+       egl::ctx_t ctx;  ///< EGL context used to copy KMS frames into RAM.
 +      bool capture_rotate_90 {false};
 +      std::optional<gl::tex_t> rotated_texture;
 +      std::optional<gl::frame_buf_t> rotated_framebuffer;
@@ -203,8 +233,13 @@
 +        samples.clear();
 +      }
 +#endif
++
      };
-@@ -1544,2 +1709,9 @@
+ 
+     /**
+@@ -2268,6 +2434,14 @@
+           if (monitor_descriptor.index == index && monitor_descriptor.type == type) {
+             monitor_descriptor.viewport.offset_x = monitor->viewport.offset_x;
              monitor_descriptor.viewport.offset_y = monitor->viewport.offset_y;
 +            monitor_descriptor.output_transform = monitor->output_transform;
 +            monitor_descriptor.output_name = monitor->name;
@@ -213,51 +248,75 @@
 +                            << " DRM monitor="sv << monitor_descriptor.monitor_index
 +                            << " expected="sv << monitor_descriptor.viewport.width << 'x' << monitor_descriptor.viewport.height
 +                            << " observed="sv << monitor->viewport.width << 'x' << monitor->viewport.height;
++
+             monitor_descriptor.viewport.logical_width = monitor->viewport.logical_width;
+             monitor_descriptor.viewport.logical_height = monitor->viewport.logical_height;
  
-@@ -1555,2 +1727,4 @@
+@@ -2281,6 +2455,8 @@
+                 << monitor_descriptor.viewport.width << 'x' << monitor_descriptor.viewport.height
+                 << " vs "sv
                  << monitor->viewport.width << 'x' << monitor->viewport.height;
 +              // A guessed match with conflicting mode cannot authorize rotation.
 +              monitor_descriptor.output_transform.reset();
              }
+ 
+             BOOST_LOG(info) << "Monitor " << monitor_descriptor.monitor_index << " is "sv << name << ": "sv << monitor->description;
+diff --git a/src/platform/linux/wayland.cpp b/src/platform/linux/wayland.cpp
 --- a/src/platform/linux/wayland.cpp
 +++ b/src/platform/linux/wayland.cpp
-@@ -151,2 +151,6 @@
- 
-+  void monitor_t::wl_geometry(wl_output *, std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t, const char *, const char *, std::int32_t transform) {
-+    output_transform = transform;
+@@ -162,6 +162,10 @@
+     viewport.logical_width = width;
+     viewport.logical_height = height;
+     BOOST_LOG(info) << "[wayland] Logical size: "sv << width << 'x' << height;
 +  }
 +
++  void monitor_t::wl_geometry(wl_output *, std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t, const char *, const char *, std::int32_t transform) {
++    output_transform = transform;
+   }
+ 
    void monitor_t::wl_mode(
+diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
 --- a/src/platform/linux/wayland.h
 +++ b/src/platform/linux/wayland.h
-@@ -8,2 +8,3 @@
- #include <bitset>
-+#include <optional>
- #include <cstddef>
-@@ -126,3 +127,3 @@
- 
+@@ -310,7 +310,7 @@
+      * @param model Monitor model string reported by Wayland.
+      * @param transform Wayland output transform value.
+      */
 -    void wl_geometry(wl_output *wl_output, std::int32_t x, std::int32_t y, std::int32_t physical_width, std::int32_t physical_height, std::int32_t subpixel, const char *make, const char *model, std::int32_t transform) {}
 +    void wl_geometry(wl_output *wl_output, std::int32_t x, std::int32_t y, std::int32_t physical_width, std::int32_t physical_height, std::int32_t subpixel, const char *make, const char *model, std::int32_t transform);
  
-@@ -137,2 +138,3 @@
+     /**
+      * @brief Store the active pixel mode reported by wl-output.
+@@ -341,6 +341,7 @@
+     wl_output *output;  ///< Wayland output associated with this monitor.
+     std::string name;  ///< xdg-output name used for display selection.
+     std::string description;  ///< xdg-output description used for logs and UI.
++    std::optional<std::int32_t> output_transform;
+     platf::touch_port_t viewport;  ///< Logical monitor bounds used to scale absolute input.
+     wl_output_listener wl_listener;  ///< Callback table for wl-output events.
+     zxdg_output_v1_listener xdg_listener;  ///< Callback table for xdg-output events.
+@@ -501,6 +502,7 @@
+     wl_output *output;
+     std::string name;
      std::string description;
 +    std::optional<std::int32_t> output_transform;
      platf::touch_port_t viewport;
-@@ -235,2 +237,3 @@
-     std::string description;
-+    std::optional<std::int32_t> output_transform;
-     platf::touch_port_t viewport;
+   };
+ 
+diff --git a/src/video.cpp b/src/video.cpp
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -5,2 +5,3 @@
- // standard includes
-+#include <algorithm>
- #include <atomic>
-@@ -9,2 +10,3 @@
+@@ -10,6 +10,7 @@
+ #include <list>
  #include <thread>
+ #include <utility>
 +#include <vector>
  
-@@ -2379,2 +2381,15 @@
+ // lib includes
+ #include <boost/pointer_cast.hpp>
+@@ -2523,6 +2524,19 @@
+       }
+     }
  
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +    std::vector<double> conversion_ms;
@@ -273,13 +332,21 @@
 +    };
 +#endif
      while (true) {
-@@ -2583,2 +2598,5 @@
+       bool requested_idr_frame = false;
+ 
+@@ -2542,6 +2556,9 @@
+       }
+ 
        std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +      std::optional<double> converted_ms;
 +#endif
  
-@@ -2606,3 +2624,10 @@
+       // The RKMPP encoder returns immediately in async mode, so without pacing
+       // the encode loop spins at the KMS capture rate and burns a full core on
+@@ -2575,7 +2592,14 @@
+       if (!requested_idr_frame || images->peek()) {
+         if (auto img = images->pop(max_frametime)) {
            frame_timestamp = img->frame_timestamp;
 -          if (session->convert(*img)) {
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
@@ -291,7 +358,11 @@
 +#endif
 +          if (conversion_failed) {
              BOOST_LOG(error) << "Could not convert image"sv;
-@@ -2617,3 +2642,18 @@
+             return;
+           }
+@@ -2598,7 +2622,22 @@
+         break;
+       }
  
 -      if (encode(frame_nr++, *session, packets, channel_data, frame_timestamp)) {
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
@@ -311,3 +382,5 @@
 +#endif
 +      if (encode_failed) {
          BOOST_LOG(error) << "Could not encode video packet"sv;
+         return;
+       }

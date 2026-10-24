@@ -1,3 +1,4 @@
+diff --git a/src/platform/linux/graphics.h b/src/platform/linux/graphics.h
 --- a/src/platform/linux/graphics.h
 +++ b/src/platform/linux/graphics.h
 @@ -5,6 +5,8 @@
@@ -9,21 +10,17 @@
  #include <optional>
  #include <string_view>
  
-@@ -235,6 +237,11 @@
-     std::uint64_t modifier;
-     std::uint32_t pitches[4];
-     std::uint32_t offsets[4];
-+
-+    // Wayland RKMPP capture buffers are pooled. The capture thread sets this
-+    // token while a descriptor is queued for encoding; resetting the image
-+    // releases the slot only after the encoder has finished consuming it.
+@@ -500,6 +502,7 @@
+     std::uint32_t fourcc;  ///< DRM fourcc pixel format for the buffer.
+     std::uint64_t modifier;  ///< DRM format modifier describing the buffer layout.
+     std::uint32_t pitches[4];  ///< Row stride in bytes for each DMA-BUF plane.
 +    std::shared_ptr<std::atomic_bool> capture_busy;
+     std::uint32_t offsets[4];  ///< Byte offset to the first pixel for each DMA-BUF plane.
    };
  
-   display_t make_display(std::variant<gbm::gbm_t::pointer, wl_display *, _XDisplay *> native_display);
-@@ -282,6 +289,10 @@
-     }
- 
+@@ -615,6 +618,10 @@
+      * @brief Reset the object to its initial empty state.
+      */
      void reset() {
 +      if (sd.capture_busy) {
 +        sd.capture_busy->store(false, std::memory_order_release);
@@ -32,60 +29,16 @@
        for (auto x = 0; x < 4; ++x) {
          if (sd.fds[x] >= 0) {
            close(sd.fds[x]);
---- a/src/platform/linux/wayland.h
-+++ b/src/platform/linux/wayland.h
-@@ -5,9 +5,12 @@
- #pragma once
- 
- // standard includes
-+#include <array>
-+#include <atomic>
- #include <bitset>
- #include <cstddef>
- #include <cstdint>
-+#include <memory>
- 
- #ifdef SUNSHINE_BUILD_WAYLAND
-   #include <linux-dmabuf-unstable-v1.h>
-@@ -79,9 +82,23 @@
-     bool require_linear {false};
- 
-   private:
-+    struct reusable_dmabuf_t {
-+      struct gbm_bo *bo {nullptr};
-+      struct wl_buffer *buffer {nullptr};
-+      int fd {-1};
-+      std::uint32_t format {};
-+      std::uint32_t width {};
-+      std::uint32_t height {};
-+      std::uint32_t stride {};
-+      std::uint64_t modifier {};
-+      std::shared_ptr<std::atomic_bool> busy {std::make_shared<std::atomic_bool>(false)};
-+    };
-+
-     bool init_gbm();
-     void cleanup_gbm();
-+    void cleanup_reusable_dmabufs();
-     void create_and_copy_dmabuf(zwlr_screencopy_frame_v1 *frame);
-+    void create_and_copy_reusable_dmabuf(zwlr_screencopy_frame_v1 *frame);
-     void create_and_copy_shm(zwlr_screencopy_frame_v1 *frame);
- 
-     zwp_linux_dmabuf_v1 *dmabuf_interface {nullptr};
-@@ -106,6 +123,8 @@
-     struct gbm_device *gbm_device {nullptr};
-     struct gbm_bo *current_bo {nullptr};
-     struct wl_buffer *current_wl_buffer {nullptr};
-+    static constexpr std::size_t reusable_dmabuf_count = 12;
-+    std::array<reusable_dmabuf_t, reusable_dmabuf_count> reusable_dmabufs;
-     bool y_invert {false};
-   };
- 
+diff --git a/src/platform/linux/wayland.cpp b/src/platform/linux/wayland.cpp
 --- a/src/platform/linux/wayland.cpp
 +++ b/src/platform/linux/wayland.cpp
-@@ -273,6 +273,24 @@
-     }
-   }
- 
+@@ -292,6 +292,24 @@
+     if (current_wl_buffer) {
+       wl_buffer_destroy(current_wl_buffer);
+       current_wl_buffer = nullptr;
++    }
++  }
++
 +  void dmabuf_t::cleanup_reusable_dmabufs() {
 +    for (auto &slot : reusable_dmabufs) {
 +      if (slot.buffer) {
@@ -101,13 +54,10 @@
 +        slot.fd = -1;
 +      }
 +      slot.busy->store(false, std::memory_order_release);
-+    }
-+  }
-+
-   dmabuf_t::dmabuf_t():
-       status {READY},
-       frames {},
-@@ -322,10 +340,7 @@
+     }
+   }
+ 
+@@ -346,10 +364,7 @@
  
    dmabuf_t::~dmabuf_t() {
      cleanup_gbm();
@@ -119,8 +69,8 @@
  
      for (auto &frame : frames) {
        frame.destroy();
-@@ -376,8 +391,133 @@
-     BOOST_LOG(debug) << "Frame flags: "sv << flags << (y_invert ? " (y_invert)" : "");
+@@ -421,8 +436,134 @@
+     return static_cast<std::uint32_t>(plane_count);
    }
  
 +  void dmabuf_t::create_and_copy_reusable_dmabuf(zwlr_screencopy_frame_v1 *frame) {
@@ -178,7 +128,8 @@
 +      slot->format = dmabuf_info.format;
 +      slot->width = dmabuf_info.width;
 +      slot->height = dmabuf_info.height;
-+      if (slot->fd < 0 ||
++      if (gbm_bo_get_plane_count(slot->bo) != 1 || gbm_bo_get_offset(slot->bo, 0) != 0 ||
++          slot->fd < 0 ||
 +          (slot->modifier != DRM_FORMAT_MOD_LINEAR && slot->modifier != DRM_FORMAT_MOD_INVALID)) {
 +        BOOST_LOG(error) << "Failed to create a linear reusable Wayland capture buffer"sv;
 +        if (slot->fd >= 0) {
@@ -253,49 +204,7 @@
      if (!init_gbm()) {
        BOOST_LOG(error) << "Failed to initialize GBM"sv;
        zwlr_screencopy_frame_v1_destroy(frame);
-@@ -575,14 +715,15 @@
-     current_frame->destroy();
-     current_frame = get_next_frame();
- 
--    // Keep the GBM buffer alive but destroy the Wayland objects
--    if (current_wl_buffer) {
--      wl_buffer_destroy(current_wl_buffer);
--      current_wl_buffer = nullptr;
-+    if (!require_linear) {
-+      // Non-RKMPP paths allocate their GBM and Wayland objects per frame.
-+      if (current_wl_buffer) {
-+        wl_buffer_destroy(current_wl_buffer);
-+        current_wl_buffer = nullptr;
-+      }
-+      cleanup_gbm();
-     }
- 
--    cleanup_gbm();
--
-     zwlr_screencopy_frame_v1_destroy(frame);
-     status = READY;
-   }
-@@ -591,11 +732,14 @@
-   void dmabuf_t::failed(zwlr_screencopy_frame_v1 *frame) {
-     BOOST_LOG(error) << "Frame capture failed"sv;
- 
--    // Clean up resources
--    cleanup_gbm();
--    if (current_wl_buffer) {
--      wl_buffer_destroy(current_wl_buffer);
--      current_wl_buffer = nullptr;
-+    // Clean up resources. Reusable RKMPP buffers stay allocated; destroying
-+    // the pending frame releases only its busy token.
-+    if (!require_linear) {
-+      cleanup_gbm();
-+      if (current_wl_buffer) {
-+        wl_buffer_destroy(current_wl_buffer);
-+        current_wl_buffer = nullptr;
-+      }
-     }
-     auto next_frame = get_next_frame();
-     next_frame->destroy();
-@@ -613,6 +757,10 @@
+@@ -666,6 +807,10 @@
    ) {};
  
    void frame_t::destroy() {
@@ -306,37 +215,79 @@
      if (shm_data) {
        munmap(shm_data, shm_size);
        shm_data = nullptr;
+diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
+--- a/src/platform/linux/wayland.h
++++ b/src/platform/linux/wayland.h
+@@ -6,6 +6,8 @@
+ 
+ // standard includes
+ #include <array>
++#include <atomic>
++#include <memory>
+ #include <bitset>
+ #include <cstddef>
+ #include <cstdint>
+@@ -193,8 +195,22 @@
+     bool require_linear {false};
+ 
+   private:
++    struct reusable_dmabuf_t {
++      struct gbm_bo *bo {nullptr};
++      struct wl_buffer *buffer {nullptr};
++      int fd {-1};
++      std::uint32_t format {};
++      std::uint32_t width {};
++      std::uint32_t height {};
++      std::uint32_t stride {};
++      std::uint64_t modifier {};
++      std::shared_ptr<std::atomic_bool> busy {std::make_shared<std::atomic_bool>(false)};
++    };
++
+     bool init_gbm();
+     void cleanup_gbm();
++    void cleanup_reusable_dmabufs();
++    void create_and_copy_reusable_dmabuf(zwlr_screencopy_frame_v1 *frame);
+     void create_and_copy_dmabuf(zwlr_screencopy_frame_v1 *frame);
+     void create_and_copy_shm(zwlr_screencopy_frame_v1 *frame);
+     wl_shm *shm_interface {nullptr};
+@@ -221,6 +237,8 @@
+     struct gbm_device *gbm_device {nullptr};
+     struct gbm_bo *current_bo {nullptr};
+     struct wl_buffer *current_wl_buffer {nullptr};
++    static constexpr std::size_t reusable_dmabuf_count = 12;
++    std::array<reusable_dmabuf_t, reusable_dmabuf_count> reusable_dmabufs;
+     bool y_invert {false};
+   };
+ 
+diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -580,17 +580,20 @@
-     }
- 
+@@ -689,16 +689,17 @@
+      * @return Capture status reported to the streaming pipeline.
+      */
      platf::capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
--      auto status = wlr_t::snapshot(pull_free_image_cb, img_out, timeout, cursor);
--      if (status != platf::capture_e::ok) {
--        return status;
--      }
--
-+      // Release the buffer from this image before choosing the target for the
-+      // next screencopy. This lets the capture pool reuse it without racing an
-+      // image that is still queued for encoding.
-       if (!pull_free_image_cb(img_out)) {
-         return platf::capture_e::interrupted;
-       }
-       auto img = (egl::img_descriptor_t *) img_out.get();
-       img->reset();
- 
-+      auto status = wlr_t::snapshot(pull_free_image_cb, img_out, timeout, cursor);
-+      if (status != platf::capture_e::ok) {
-+        return status;
++      if (!pull_free_image_cb(img_out)) {
++        return platf::capture_e::interrupted;
 +      }
++      auto img = (egl::img_descriptor_t *) img_out.get();
++      img->reset();
 +
+       auto status = wlr_t::snapshot(pull_free_image_cb, img_out, timeout, cursor);
+       if (status != platf::capture_e::ok) {
+         return status;
+       }
+ 
+-      if (!pull_free_image_cb(img_out)) {
+-        return platf::capture_e::interrupted;
+-      }
+-      auto img = (egl::img_descriptor_t *) img_out.get();
+-      img->reset();
+ 
        auto current_frame = dmabuf.current_frame;
  
-       ++sequence;
-@@ -598,8 +601,9 @@
- 
+@@ -708,8 +709,9 @@
        img->sd = current_frame->sd;
+       img->frame_timestamp = current_frame->frame_timestamp;
  
 -      // Prevent dmabuf from closing the file descriptors.
 +      // Transfer the descriptor and its capture-pool token to the image.
