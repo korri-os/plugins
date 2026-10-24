@@ -1,6 +1,7 @@
+diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -206,21 +206,50 @@
+@@ -283,21 +283,50 @@
          ) {
            return platf::capture_e::reinit;
          }
@@ -66,11 +67,11 @@
              std::memcpy(destination_row, source_row, destination_row_bytes);
            }
          }
-@@ -298,6 +327,7 @@
+@@ -398,6 +427,7 @@
        return img;
      }
  
 +    video::sws_t bgr_to_bgra;
-     egl::display_t egl_display;
-     egl::ctx_t ctx;
+     egl::display_t egl_display;  ///< EGL display.
+     egl::ctx_t ctx;  ///< EGL context used for wlroots capture conversion.
    };
