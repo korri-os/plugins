@@ -29,13 +29,6 @@ client-certificate identity; unknown issuers rejected), GHSA-26q2 and GHSA-6w33
 certificate from an enrolled identity on purpose (`openssl_verify_cb`, Moonlight
 clock tolerance); Korri keeps that behaviour and does not modify `crypto.*`.
 
-The experimental runtime-settings series (`0001`-`0005`, `0010`, `0012`-`0014`,
-`0016`) was removed: its edge cases were never resolved, upstream now uses packet
-`0x5504` for player LEDs, and its private VAAPI/NVENC struct copies cannot
-follow FFmpeg 9. Git history keeps it. A revival needs new packet IDs and no
-private struct copies. `0024` was removed because upstream `72faa710` carries the
-same stdin pairing return.
-
 ## Current patches
 
 ### V4L2 M2M encoder profile
