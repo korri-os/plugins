@@ -26,15 +26,20 @@ let
     name = "sunshine-korri-certificate-control-source";
     src = pkgs.sunshine.src;
     patches = map (record: record.path) approved.patches;
+    patchFlags = [
+      "-p1"
+      "--fuzz=0"
+    ];
   };
   identityPatch = builtins.readFile ./patches/0039-bind-paired-client-input-identity.patch;
   checks = [
     (check "paired UUID is authenticated, propagated and unbound input fails closed" (
       contains "X509_cmp(paired.get(), x509.get()) == 0" identityPatch
       && contains "return client.uuid" identityPatch
+      && contains "client.enabled && paired" identityPatch
       && contains "request->verified_client_uuid()" identityPatch
       && contains "session->client_uuid = launch_session.client_uuid" identityPatch
-      && contains "input::alloc(session.mail, session.client_uuid)" identityPatch
+      && contains "input::alloc(session.mail, session.input_session_id, session.client_uuid)" identityPatch
       && contains "other->client_id == client_id" identityPatch
       && contains "clientId" identityPatch
       && contains "refused stream without authenticated paired-client UUID" identityPatch
@@ -77,7 +82,9 @@ let
       && contains "http::unique_id" patch
     ))
     (check "state mutation is serialized, candidate-based, and atomic" (
-      contains "client_state_mutex" patch
+      contains "client_auth_mutex()" patch
+      && contains "entry.enabled" patch
+      && contains "validated.canonical_pem" patch
       && contains "candidate" patch
       && contains "mkostemp" patch
       && contains "fsync" patch
@@ -140,6 +147,33 @@ else
       success_status = body.index('output_tree["status"] = true;', failure_return)
       terminate = body.index('proc::proc.terminate();', success_status)
       assert failure < failure_status < failure_return < success_status < terminate
+      PY
+            # These upstream security boundaries are not Korri extension points.
+            python3 - ${pkgs.sunshine.src} ${patchedSource} <<'PY'
+      import pathlib
+      import sys
+
+      base, patched = map(pathlib.Path, sys.argv[1:])
+      for name in ("crypto.cpp", "crypto.h"):
+          assert (base / "src" / name).read_bytes() == (patched / "src" / name).read_bytes()
+
+      def function(root, name, marker):
+          text = (root / "src" / name).read_text()
+          start = text.index(marker)
+          return text[start:text.index("\n  }\n", start) + 5]
+
+      for name, marker in (
+          ("input.cpp", "  bool validate_input_packet("),
+          ("stream.cpp", "  std::optional<std::pair<std::uint16_t, std::string_view>> parse_control_packet("),
+          ("nvhttp.cpp", "  bool start_pairing_session("),
+          ("nvhttp.cpp", "  bool pin("),
+          ("nvhttp.cpp", "  const char *verify_client_certificate("),
+      ):
+          assert function(base, name, marker) == function(patched, name, marker), marker
+      text = (patched / "src/nvhttp.cpp").read_text()
+      verification = text[text.index("    https_server.verify = "):text.index("    https_server.on_verify_failed = ")]
+      assert verification.index("verify_client_certificate(x509.get())") < verification.index("return client.uuid;")
+      assert "client.enabled && paired && X509_cmp(paired.get(), x509.get()) == 0" in verification
       PY
             work="$TMPDIR/certs"
             mkdir -p "$work"

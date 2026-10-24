@@ -1,6 +1,7 @@
 #include "korri_certificate_control.h"
 #include "crypto.h"
 
+#include <boost/property_tree/json_parser.hpp>
 #include <nlohmann/json.hpp>
 
 #include <array>
@@ -85,6 +86,9 @@ static std::string receive_packet(const int fd) {
 int main(int argc, char **argv) {
   assert(argc == 4);
   const auto client_one = read_all(argv[1]);
+  auto client_one_x509 = crypto::x509(client_one);
+  assert(client_one_x509);
+  const auto canonical_one = crypto::pem(client_one_x509);
   const auto client_two = read_all(argv[2]);
   const auto server = read_all(argv[3]);
 
@@ -134,6 +138,13 @@ int main(int argc, char **argv) {
   assert(clients[0].name == "Korri device");
   assert(clients[0].uuid == "generated-1");
   assert(clients[0].fingerprint.size() == 64);
+  assert(clients[0].enabled);
+  assert(clients[0].certificate == canonical_one);
+  // Re-provisioning canonicalizes input and re-enables the existing UUID.
+  clients[0].enabled = false;
+  assert(kc::apply_provision(clients, "\n" + client_one + " \n", uuid_factory).changed);
+  assert(clients[0].enabled && clients[0].uuid == "generated-1");
+  assert(clients[0].certificate == canonical_one);
   assert(!kc::apply_provision(clients, client_one, uuid_factory).changed);
   assert(clients.size() == 1);
   assert(next_uuid == 2);
@@ -197,6 +208,21 @@ int main(int argc, char **argv) {
   assert(!parsed_candidate["root"].contains("devices"));
   assert(parsed_candidate["root"]["named_devices"].size() == 1);
   assert(parsed_candidate["root"]["named_devices"][0]["cert"] == client_one);
+  assert(parsed_candidate["root"]["named_devices"][0]["enabled"] == true);
+  // The shared offline/online reader preserves disabled trust and canonical PEM.
+  auto disabled_clients = candidate_clients;
+  disabled_clients[0].enabled = false;
+  disabled_clients[0].certificate = "\n" + client_one + " \n";
+  std::istringstream state_stream(kc::build_state_document(original, "sunshine-host", disabled_clients));
+  boost::property_tree::ptree state_tree;
+  boost::property_tree::read_json(state_stream, state_tree);
+  auto loaded = kc::parse_client_state(state_tree.get_child("root"), [] { return "imported"; });
+  assert(loaded.size() == 1 && !loaded[0].enabled);
+  assert(loaded[0].certificate == canonical_one);
+  assert(loaded[0].uuid == "client-1");
+  state_tree.get_child("root.named_devices").front().second.erase("enabled");
+  loaded = kc::parse_client_state(state_tree.get_child("root"), [] { return "imported"; });
+  assert(loaded[0].enabled); // Upstream's default for an existing old record.
 
   for (const auto stage : {
            kc::fault_stage::write,
@@ -398,6 +424,32 @@ int main(int argc, char **argv) {
   assert(accepted_client && rejected_client);
   assert(active_chain.verify(accepted_client.get()) == nullptr);
   assert(active_chain.verify(rejected_client.get()) != nullptr);
+
+  // Preserve upstream's intentional clock tolerance for an exact enrolled identity.
+  auto credentials = crypto::gen_creds("clock-tolerant-client", 2048);
+  auto expired = crypto::x509(credentials.x509);
+  auto key = crypto::pkey(credentials.pkey);
+  assert(X509_gmtime_adj(X509_getm_notBefore(expired.get()), -7200));
+  assert(X509_gmtime_adj(X509_getm_notAfter(expired.get()), -3600));
+  assert(X509_sign(expired.get(), key.get(), EVP_sha256()) > 0);
+  crypto::cert_chain_t clock_tolerant_chain;
+  clock_tolerant_chain.add(crypto::x509(crypto::pem(expired)));
+  assert(clock_tolerant_chain.verify(expired.get()) == nullptr);
+
+  // A different identity signed by an enrolled issuer must still be rejected.
+  auto child_credentials = crypto::gen_creds("not-enrolled", 2048);
+  auto child = crypto::x509(child_credentials.x509);
+  assert(X509_set_issuer_name(child.get(), X509_get_subject_name(expired.get())) == 1);
+  assert(X509_sign(child.get(), key.get(), EVP_sha256()) > 0);
+  assert(clock_tolerant_chain.verify(child.get()) != nullptr);
+  crypto::cert_chain_t rejected_chain;
+  rejected_chain.add(crypto::x509(client_one));
+  assert(!kc::activate_verified_state(
+      active_state, active_chain, live_state{"unverified"}, std::move(rejected_chain),
+      std::vector<std::string>{crypto::pem(child)},
+      [](const std::string &certificate) { return crypto::x509(certificate); }));
+  assert(active_state.marker == "new");
+  assert(active_chain.verify(accepted_client.get()) == nullptr);
 
   int sockets[2] {-1, -1};
   const auto socket_request = provision_frame(client_one);
