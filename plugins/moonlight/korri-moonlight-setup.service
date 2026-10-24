@@ -2,11 +2,11 @@
 Description=Moonlight client identity directory
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=exec
 User=korri
 Group=korri
-ExecStart=@coreutils@/bin/install -d -m 0700 /home/korri/.config/moonlight
+ExecStartPre=+@coreutils@/bin/install -d -m 0700 -o korri -g korri /home/korri/.config/moonlight
+ExecStart=@coreutils@/bin/sleep infinity
 UMask=0077
 NoNewPrivileges=true
 CapabilityBoundingSet=
