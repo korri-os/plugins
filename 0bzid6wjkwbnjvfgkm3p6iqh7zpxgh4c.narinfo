@@ -1,0 +1,10 @@
+StorePath: /nix/store/0bzid6wjkwbnjvfgkm3p6iqh7zpxgh4c-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/1wag5kgvxwb6f5qir2fgdwkcwhm6wrw971hrk9dd0kkjrn2av0s3.nar.xz
+Compression: xz
+FileHash: sha256:1wag5kgvxwb6f5qir2fgdwkcwhm6wrw971hrk9dd0kkjrn2av0s3
+FileSize: 6352
+NarHash: sha256:1gargdjrfwrm0zgpsw8lr0a00wc5ay164pljg08jp9c49fwn57hw
+NarSize: 20664
+References: 3a37q92pl3i2q36k708s15l3jqwilyfg-retroarch-bare-1.22.2 aqds97jdwswwxl6qarswpx7mr5kj95kd-retroarch-source-checked-settings-1.22.2 h4ckwh6jp349d8gv8d9f84i7v48c7nap-korri-inputplumber-retroarch-autoconfig-1.22.0 wb86qlvnw61s259y23ycxb5hc2p9f4bm-libretro-bsnes-mercury-performance-0-unstable-2024-10-21
+Deriver: krmy098y3jzsql5npprf07ngl2maa5xd-korri-plugin.drv
+Sig: korri-plugins-1:hWaqObQIVaCy1aLZpt/yaGHbMVo+WCX39PCNHUAWrH20yE6ytZMBFeudCfOb7cUc41dS2a8LmkPq9j1wbGTsDg==

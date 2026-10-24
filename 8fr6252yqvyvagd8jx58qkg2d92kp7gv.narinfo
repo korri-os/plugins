@@ -1,0 +1,10 @@
+StorePath: /nix/store/8fr6252yqvyvagd8jx58qkg2d92kp7gv-libretro-fbneo-0-unstable-2025-12-11
+URL: https://github.com/korri-os/plugins/releases/download/build-5e564b9cdceb/14hkk7vm80qhyg098k4kc51aj8vjmmppnr229phwhpcn8zpl0whp.nar.xz
+Compression: xz
+FileHash: sha256:14hkk7vm80qhyg098k4kc51aj8vjmmppnr229phwhpcn8zpl0whp
+FileSize: 14450968
+NarHash: sha256:04s7xs8d8245icd02z9b66jzpwaxh99d95ywh421dx3a60kr9fvx
+NarSize: 83171232
+References: 2wb8rbpnpax9gmxnnxakyxbrma6y2050-retroarch-bare-1.22.2 8fr6252yqvyvagd8jx58qkg2d92kp7gv-libretro-fbneo-0-unstable-2025-12-11 rlq03x4cwf8zn73hxaxnx0zn5q9kifls-bash-5.3p3 xm08aqdd7pxcdhm0ak6aqb1v7hw5q6ri-gcc-14.3.0-lib xx7cm72qy2c0643cm1ipngd87aqwkcdp-glibc-2.40-66
+Deriver: zv919fnggi40l7bqdlwy0wdaj39ydj2h-libretro-fbneo-0-unstable-2025-12-11.drv
+Sig: korri-plugins-1:ST/nrY94YafP+5Q4BcK0FRuuf3vZg1aTrnpF8/xbGdaqM28FqeK1ty7oG7M7YHQ/x+fGWpevHFTxzPihtkSaBg==

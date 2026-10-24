@@ -1,0 +1,10 @@
+StorePath: /nix/store/y7m5hcxy6a0hvh581xi38fanqibwfi6l-korri-sshd-start
+URL: https://github.com/korri-os/plugins/releases/download/build-e5e27ed406f2/1sian4y0v1v6bcsydglx8gb18dsyw9yd94bb4wcjvmwjav7gq98q.nar.xz
+Compression: xz
+FileHash: sha256:1sian4y0v1v6bcsydglx8gb18dsyw9yd94bb4wcjvmwjav7gq98q
+FileSize: 440
+NarHash: sha256:1c5j4qpr1lr8qbmxlff1p14r5w9xk92n4564p455ls9rzvfxsdg2
+NarSize: 832
+References: chzw0j0hib0z4bbgpgqvxiqm53bns4jv-korri-sshd-config fdbay05j3dmzk8mbvqdm8hh7l80cg58p-openssh-10.2p1 rlq03x4cwf8zn73hxaxnx0zn5q9kifls-bash-5.3p3
+Deriver: c711wlk347hrfjmfhh8nzfcay9nf931c-korri-sshd-start.drv
+Sig: korri-plugins-1:LpoAdDoK9SebTPcsNuu/bzv2PlcXIUhJpHXPMC95Pu2puFTZdySSi8eOxO6OWPIkzDbRMNEvgK0MEfTKinuWBQ==

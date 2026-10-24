@@ -1,0 +1,10 @@
+StorePath: /nix/store/yz1y0xh5bz1nvb98q8qz69yvszg9ws0s-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/1i9fnn7kmcvrjiq6amz31647r9jhlaf9p10rgf3n1jcv1ihgpgci.nar.xz
+Compression: xz
+FileHash: sha256:1i9fnn7kmcvrjiq6amz31647r9jhlaf9p10rgf3n1jcv1ihgpgci
+FileSize: 2392
+NarHash: sha256:0cblbnf6rqr7y6ivqbw1xyj6p6wy4kzlxdkhs1kcdaim999x41cm
+NarSize: 6464
+References: 2149isrkz37dy98kqv1gi86xksgy1y91-korri-plugin rjan002x2hvpk9n0ncwzxvzfvr25ri6v-korri-plugin spwz93hj1svmpxa33kr7k4cjav0m8b8v-steam-session
+Deriver: b7xg0d5xawpk3kl3jyc4nd2cgm0499mx-korri-plugin.drv
+Sig: korri-plugins-1:nXgHyObAHvh2MA1e6Rwk7KJw+nkm6kyYABvFnxF4FRg6xMuBqi8CVJsdpKOS35e3HvXTGwY2ukr74VauYYLTAg==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/z84fpnkc5zlw4k0aadfcz727yvdmyn96-korri-inputd-0.0.0
+URL: https://github.com/korri-os/plugins/releases/download/build-5e564b9cdceb/153afqvfali8bd1crg5placnl55w1sjw2pzd47i0zzd1ikgp04f6.nar.xz
+Compression: xz
+FileHash: sha256:153afqvfali8bd1crg5placnl55w1sjw2pzd47i0zzd1ikgp04f6
+FileSize: 1807764
+NarHash: sha256:1w4hbbb7q7p10myf1iqas8mjdkqzfs78y4481rrsa945w412q8x0
+NarSize: 10868424
+References: 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 qipd93x9gjyiygqk673rd2ssnf8y7jj0-gcc-14.3.0-lib
+Deriver: 2k6rpj1wcnkrpdcn9sbbbfriradj97h4-korri-inputd-0.0.0.drv
+Sig: korri-plugins-1:9kQigUrNbHRK0wgf+6odtC4qoRJbW0NdsiDT91nvN6mYOPR2e5itSSlwgdpGbgz1oc4DJGLPKFEJ7th7LMh5Dw==

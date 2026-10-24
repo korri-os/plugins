@@ -1,0 +1,10 @@
+StorePath: /nix/store/52pslpkw387rlc6cgwfp3f8jfbjv7z87-libretro-snes9x2010-0-unstable-2024-11-19
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/19y84cprmyisb41ml3hss7id60lzjvaw3k81w2yml42w7fy55nk0.nar.xz
+Compression: xz
+FileHash: sha256:19y84cprmyisb41ml3hss7id60lzjvaw3k81w2yml42w7fy55nk0
+FileSize: 441300
+NarHash: sha256:1fxdr5lfqgsdfx4b1adh42sydwvb2mb6mxj8nr6qpi2s3z1ac50k
+NarSize: 2303416
+References: 52pslpkw387rlc6cgwfp3f8jfbjv7z87-libretro-snes9x2010-0-unstable-2024-11-19 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 ybnc2kzrsa2ijsy2hxqb4hdcwxwjhqfv-retroarch-bare-1.22.2
+Deriver: xmwmvxi24wjjy3r18ad5ki5p81mflpjw-libretro-snes9x2010-0-unstable-2024-11-19.drv
+Sig: korri-plugins-1:nk5zEqCgkaeIwwHbcfH6YmC+vVLa8MHPyMP4HmPsQs7iyoVWoGCFiEU+oNpe4LuYtNA0TcPVoKYGmc5Z1VqtAQ==

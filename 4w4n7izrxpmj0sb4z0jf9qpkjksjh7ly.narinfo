@@ -1,0 +1,10 @@
+StorePath: /nix/store/4w4n7izrxpmj0sb4z0jf9qpkjksjh7ly-zquest-classic-software-midi
+URL: https://github.com/korri-os/plugins/releases/download/build-ac8fae593e42-zquest/1i08g9iy9kb2prwj1j1fia3jlhcfz8x2rdxpikxqa427x4jycgz6.nar.xz
+Compression: xz
+FileHash: sha256:1i08g9iy9kb2prwj1j1fia3jlhcfz8x2rdxpikxqa427x4jycgz6
+FileSize: 10408
+NarHash: sha256:0nh4q87c78k90q3b6z6qhd5k1grl0pj8diba08bmba3nh23p5qm9
+NarSize: 42096
+References: 4w4n7izrxpmj0sb4z0jf9qpkjksjh7ly-zquest-classic-software-midi b8zycxnksrc67d9a3627akysjbcadjih-freepats-20060219
+Deriver: njma1ixr7y8bs16dm8i7hqh9964mxxzp-zquest-classic-software-midi.drv
+Sig: korri-plugins-1:t6z63lJTc/y0i8RJInLG94EZazRL+K109lyOqRVcEO9UqsmAfhIAO8TRK+aH8eSqxt7UpqfVMOZ3YG47u/gbDA==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/l5gmahijn1cj04lg2spq2hyh2rzmf7fm-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-5e564b9cdceb/02l6qv5pcxz0k0sic3i9s6kf2s53l9l4mi7j96gq69i41k9f8b4z.nar.xz
+Compression: xz
+FileHash: sha256:02l6qv5pcxz0k0sic3i9s6kf2s53l9l4mi7j96gq69i41k9f8b4z
+FileSize: 5516
+NarHash: sha256:1lri3cxw07029n7lks01jpxmrc7sam74qgfyaqkl6w9qmfsad85v
+NarSize: 17680
+References: 8l6hf4n1kpkvhdfnn3na81z23mp3n01p-retroarch-bare-1.22.2 fgpsvkpd3x91k27ircgp2ak5715zf4iw-retroarch-source-checked-settings-1.22.2 nv6j41k7zdh1dxjn2bk97k454mk16dzx-korri-inputplumber-retroarch-autoconfig-1.22.0 qfnlk8j54vslybhzbw7j02asj7npr0ap-libretro-handy-0-unstable-2025-06-16
+Deriver: yi1yl4bzy9csyxff29q7xv9bh8izdqp3-korri-plugin.drv
+Sig: korri-plugins-1:NjFdsN+zfJjSCNuk/15/RgbWN0lN/WvV0HDxfoRhs7ty51iz0W81P1qxZ8tVnZJWbhp9WTzJ2dtw47wj3/xzDg==

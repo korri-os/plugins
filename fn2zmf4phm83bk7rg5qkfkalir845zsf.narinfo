@@ -1,0 +1,10 @@
+StorePath: /nix/store/fn2zmf4phm83bk7rg5qkfkalir845zsf-fmt-12.1.0
+URL: https://github.com/korri-os/plugins/releases/download/build-ccb331071d1c/1sv5k8dyax0j7c11rhwl4nya4z6xqzpzpwx0hjqryrzd4id1pcx6.nar.xz
+Compression: xz
+FileHash: sha256:1sv5k8dyax0j7c11rhwl4nya4z6xqzpzpwx0hjqryrzd4id1pcx6
+FileSize: 57968
+NarHash: sha256:0krjl2bgs5i0y25shk5cjwxs1vhbppynaskpvh67d7x3k1y8sh9s
+NarSize: 223704
+References: 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 qipd93x9gjyiygqk673rd2ssnf8y7jj0-gcc-14.3.0-lib
+Deriver: 6r26s1b5afrlbaibf6bzbvrq9bjzmxab-fmt-12.1.0.drv
+Sig: korri-plugins-1:GIslQgADDYmxNkUP7PjjmosVkhZJGZ3zFEe8Q8ml1D277c19emF+XybnZkh6YAseR65K8CjzV6P298mHR/62BA==

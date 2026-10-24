@@ -1,0 +1,10 @@
+StorePath: /nix/store/lqlv4dsxvvpcc6qj8px2lkxn6nkg2wfq-libretro-picodrive-0-unstable-2025-12-03
+URL: https://github.com/korri-os/plugins/releases/download/build-5e564b9cdceb/1dsh2p408rhgvhxvfq6ps83hydzlqlml4b5sb6arvn4yfyhqsphh.nar.xz
+Compression: xz
+FileHash: sha256:1dsh2p408rhgvhxvfq6ps83hydzlqlml4b5sb6arvn4yfyhqsphh
+FileSize: 631864
+NarHash: sha256:1xpsn7klvjg38wsd5d2fvv5jr3l099x93y57bpm8im3gi42x4rp5
+NarSize: 2102152
+References: 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 lqlv4dsxvvpcc6qj8px2lkxn6nkg2wfq-libretro-picodrive-0-unstable-2025-12-03 ybnc2kzrsa2ijsy2hxqb4hdcwxwjhqfv-retroarch-bare-1.22.2
+Deriver: c7b5gwy8016igkvgz1khbw7cplrk7p9y-libretro-picodrive-0-unstable-2025-12-03.drv
+Sig: korri-plugins-1:kp3U5OGKd6l3LlVNseotQiOO1L8/EBJBVu9lmYo7eFLcg8ukrM57YivlMGj/6nTCckYHPp0YCh3e1BLF8Q/EDQ==

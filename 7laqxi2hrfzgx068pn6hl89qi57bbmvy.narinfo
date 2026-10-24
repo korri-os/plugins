@@ -1,0 +1,10 @@
+StorePath: /nix/store/7laqxi2hrfzgx068pn6hl89qi57bbmvy-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/04p68jcg461ymlggkw4w411c6kn8xmzn8r86clrhc659z3hcm3pa.nar.xz
+Compression: xz
+FileHash: sha256:04p68jcg461ymlggkw4w411c6kn8xmzn8r86clrhc659z3hcm3pa
+FileSize: 6308
+NarHash: sha256:1v6w2b7mj7xx2x1l4nlckdmb4p0y1fkc8pqzfssnrdx2kxkxr0yi
+NarSize: 20400
+References: 73773v9b8fg6hkrfs7mm0kw0w8x6mrwd-libretro-atari800-0-unstable-2025-12-04 8l6hf4n1kpkvhdfnn3na81z23mp3n01p-retroarch-bare-1.22.2 nv6j41k7zdh1dxjn2bk97k454mk16dzx-korri-inputplumber-retroarch-autoconfig-1.22.0 p3cf8bif4g9hhd00qi0n0c20ss88bm14-retroarch-source-checked-settings-1.22.2
+Deriver: jmff1afx5v467xyjqzxxj06ll8m6s9qc-korri-plugin.drv
+Sig: korri-plugins-1:+57NpR8Dw0TP4bqBd6S8xgiOxJohRLf0kNaLwf6VZd2d/plaCBb3ihYO6XV4ibckD8XtBsIubu0vEKQiLeFZCQ==

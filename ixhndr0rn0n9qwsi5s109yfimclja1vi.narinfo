@@ -1,0 +1,10 @@
+StorePath: /nix/store/ixhndr0rn0n9qwsi5s109yfimclja1vi-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/0v486h1j8klgg54xb0a9qg5v7px1kqx8gbf5fjq9ihwbs4k0i6bz.nar.xz
+Compression: xz
+FileHash: sha256:0v486h1j8klgg54xb0a9qg5v7px1kqx8gbf5fjq9ihwbs4k0i6bz
+FileSize: 6332
+NarHash: sha256:1k5kaf8bhwas2n56q4mr2ijcwkqx5ysy0r42il3h8lcqs62xkvl8
+NarSize: 20392
+References: 3a37q92pl3i2q36k708s15l3jqwilyfg-retroarch-bare-1.22.2 aqds97jdwswwxl6qarswpx7mr5kj95kd-retroarch-source-checked-settings-1.22.2 h4ckwh6jp349d8gv8d9f84i7v48c7nap-korri-inputplumber-retroarch-autoconfig-1.22.0 s0sv0bb315ack89km47qlizjmvxwc8bj-libretro-snes9x2010-0-unstable-2024-11-19
+Deriver: r52nwvf4knc29k3l4ss7b9aqz4qdy5n4-korri-plugin.drv
+Sig: korri-plugins-1:XNrZCkbw0m8WgJp50ofodj1gzZLN9RqY2v9GIi1aD73uUaGzSQ1nkbc7QzWQu63NGrWj5jDbJEZlsUcKBw/cDQ==

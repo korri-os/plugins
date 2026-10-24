@@ -1,0 +1,10 @@
+StorePath: /nix/store/8wbmicaavipyyxnm6ld74kmgl3kh3qyw-korri-moonlight-setup.service
+URL: https://github.com/korri-os/plugins/releases/download/build-56d3f4c297f0-stream-play/1i0asbkic9b5p34rkzlmbjvc9a1yrakzg3wlgnrr5j6989rjxd7a.nar.xz
+Compression: xz
+FileHash: sha256:1i0asbkic9b5p34rkzlmbjvc9a1yrakzg3wlgnrr5j6989rjxd7a
+FileSize: 580
+NarHash: sha256:0cwks0abri1aw96kvx2lqv9kphsfyybk28yzkyy6587pwhaq60ff
+NarSize: 1392
+References: cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12
+Deriver: d7v538ni38k0x67r1pk65cg70sh1aawi-korri-moonlight-setup.service.drv
+Sig: korri-plugins-1:ro+k2QNWvzVGeH7mPYa0ZOP+5snp/F6Df6WIDFL47YfNPt4SyCKKwiGM0iH2A4+V0m005G1ciU0pD1PRZTcwBw==

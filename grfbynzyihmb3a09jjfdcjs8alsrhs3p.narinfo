@@ -1,0 +1,10 @@
+StorePath: /nix/store/grfbynzyihmb3a09jjfdcjs8alsrhs3p-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/0sb8ar0hql79zmf8p0vlmfg8jmd8xj17svsnv715fsbcq7v7ss61.nar.xz
+Compression: xz
+FileHash: sha256:0sb8ar0hql79zmf8p0vlmfg8jmd8xj17svsnv715fsbcq7v7ss61
+FileSize: 4036
+NarHash: sha256:0vqj2vhd8g61ynmdl3791ih5hgw0a0s0psk57f7zkr71bwpdv88a
+NarSize: 12784
+References: anbpwd4z4jrgrpsv87hip9xkzlsdzl5l-gamescope-3.16.18
+Deriver: r2mfiv3m595m2x6k706gvpzqp9qa6qff-korri-plugin.drv
+Sig: korri-plugins-1:mc2rxHOvN5yL/xHwE1oGS4MK4X5jRnjldGjnpazdoKOfnmJaHXcjO4kqvHjvbBf0JSEUwzZoUjAVZVCZKM4GCg==

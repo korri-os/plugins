@@ -1,0 +1,10 @@
+StorePath: /nix/store/fxafkf5xgbnsqrf30ljx7pycqhlvg1xf-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-211e26ed0ca1/0pyq14lm29nk3fgsv4wn8jhnwxqgd6dadkjl35rfyn0x2j2lzccl.nar.xz
+Compression: xz
+FileHash: sha256:0pyq14lm29nk3fgsv4wn8jhnwxqgd6dadkjl35rfyn0x2j2lzccl
+FileSize: 848
+NarHash: sha256:0ybvjjcphgwfsxzqb44k5ddjfykaqkmx6a4cirmbay8rfxl3scqp
+NarSize: 2240
+References: 063zkyf78qyjj2ncr5hpim3069824cfv-korri-inputd-0.0.0 0ap474jw0a9vq9x4ml31vyiqwczqhz4v-korri-sunshine-input-seat-setup 0scbqn2qj0prnrb0hh6f1gybmlxs8120-korri-korri-sunshine-certificate-control.socket bzcx1n2nbxr6hvbmmhddv17f4l5p6h4l-sunshine-rotation-experiment-2025.924.154138-korri-probe-off iadmdcxfla4qffjik7sbsjqy1hi2hk44-korri-sunshine-run krnvllb1jgqd2b398pkj4sazf39q1fnf-korri-sunshine-input-rules s7ywxkjrl79r2dgmvvpskph0z8yg3zk3-korri-korri-sunshine-input-seat-receiver.service xkqn41ds52542nz98bp5xgcyqz8wyiri-korri-korri-sunshine.service
+Deriver: 7ik2wb8yycb5b2nc7mz34pbj741d8d9w-korri-plugin.drv
+Sig: korri-plugins-1:pGAMNS0dYPSjKVPIZJ6ZVMEKfNgcZ2JYzyYbII16s/ERnOIKXPqyUM7OI6NHyMJ4BPDkA+3GfhPEafsQSmglAA==

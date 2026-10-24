@@ -1,0 +1,10 @@
+StorePath: /nix/store/iadmdcxfla4qffjik7sbsjqy1hi2hk44-korri-sunshine-run
+URL: https://github.com/korri-os/plugins/releases/download/build-211e26ed0ca1/0j24hyjvshr7xjrxsj2niggv8rn4m00b84hib206h4v0mvlj9r68.nar.xz
+Compression: xz
+FileHash: sha256:0j24hyjvshr7xjrxsj2niggv8rn4m00b84hib206h4v0mvlj9r68
+FileSize: 1236
+NarHash: sha256:1dwbm9nfllbzpmkm8njzzzkccs758ijf2ffx1gr6604vjrn5bfc5
+NarSize: 2968
+References: 3rmzb92a65vp55dmmzmh2qygq5wkdmb8-jq-1.8.1-bin 5728bdap49nsnk1c8zq96fqsm4b7ihj6-gnugrep-3.12 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 bzcx1n2nbxr6hvbmmhddv17f4l5p6h4l-sunshine-rotation-experiment-2025.924.154138-korri-probe-off d9jxdwalyr5qzmyz9m5avmzn7w40h7iy-coreutils-9.8 dh752ravf4jlgd1p6adyc3zy2lzpapd7-pipewire-1.4.9 jvyrvx9rfwgqw4ky86g7ig0idra8khqi-sway-1.11
+Deriver: amx66ik6k3hhmpp8z81mvxflza6s7j9z-korri-sunshine-run.drv
+Sig: korri-plugins-1:MYbLzEYxDONAKc6GtkSiCSpi+qqt5ZqVwOmkOp5BOkhyUMJeQ8W606ESUdItrfYtFlU+SFjVWpo5DemUVWYYAA==

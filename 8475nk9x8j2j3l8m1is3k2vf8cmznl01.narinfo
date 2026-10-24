@@ -1,0 +1,10 @@
+StorePath: /nix/store/8475nk9x8j2j3l8m1is3k2vf8cmznl01-korri-steam-input-guard-1
+URL: https://github.com/korri-os/plugins/releases/download/build-e479fd55b3aa/0yjw8b4355v92sfq2418q0h66jbx09ab7w128y81jybaldjgl8lj.nar.xz
+Compression: xz
+FileHash: sha256:0yjw8b4355v92sfq2418q0h66jbx09ab7w128y81jybaldjgl8lj
+FileSize: 3652
+NarHash: sha256:1w35dvlx6mcpvpcr407fbybqjrl5b1gxva4qnv710jkmqxijfn4f
+NarSize: 70576
+References: 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66
+Deriver: mbzbq0jnb4lwdz18n4wfxgqhwvgzjgxj-korri-steam-input-guard-1.drv
+Sig: korri-plugins-1:MBeM4MQz4D8ki/Y/QGOHfIxshhCpCWHIMtsD8AzVsxZetQN/5yIqs49qWKfe4fvkELekNqEBhYZTsi8lFyCdAA==

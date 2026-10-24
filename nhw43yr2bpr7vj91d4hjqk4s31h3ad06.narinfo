@@ -1,0 +1,10 @@
+StorePath: /nix/store/nhw43yr2bpr7vj91d4hjqk4s31h3ad06-fex-unpack
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/0xfyg4glldqqrbwwg6zxlfcbm8ksv6ji4gfg548fwazsiqwlxmp1.nar.xz
+Compression: xz
+FileHash: sha256:0xfyg4glldqqrbwwg6zxlfcbm8ksv6ji4gfg548fwazsiqwlxmp1
+FileSize: 1628
+NarHash: sha256:1knc4i42mx7lhlj2pjvwh6cd3d9w1ydnwyjb5fdks273icrpbpg9
+NarSize: 3392
+References: 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 d9jxdwalyr5qzmyz9m5avmzn7w40h7iy-coreutils-9.8 f3asnnqprb40a3v6jskd8sr3r2s8sqrb-gnutar-1.35 g62aig90xf1dw5sqbkxw9nqnglzfydgk-zstd-1.5.7-bin w0p5aj5bcciv94h2s2wh1dmh66x0rgiw-squashfs-4.7.4
+Deriver: i09i8bz88rr2q07b412f8mkgxpwrfhxg-fex-unpack.drv
+Sig: korri-plugins-1:8WXDX4uB94kVcbQXy+X/m59u4nBVxnj7Kzu3wIINmXlGiA9c3LlYyGSMffQwcck0DGvjTkcXbrRpvVJN30RtDw==

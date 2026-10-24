@@ -1,0 +1,10 @@
+StorePath: /nix/store/ydz9wpkp9rf7hrhhhjapx59gv38srgmg-korri-steam-arm64-fhs-fhsenv-profile
+URL: https://github.com/korri-os/plugins/releases/download/build-e479fd55b3aa/0wnmr31cp30blrmnsn4w073ryf9sc6mma12p9xfhc005a0807zmy.nar.xz
+Compression: xz
+FileHash: sha256:0wnmr31cp30blrmnsn4w073ryf9sc6mma12p9xfhc005a0807zmy
+FileSize: 992
+NarHash: sha256:164qqzhcaqcmhy6z97n3nwqpgb8a0jhg2gz6k0jzma6nygr1zcj5
+NarSize: 2128
+References: 
+Deriver: sdb8f8psmx2fpwihc5n4r0lj65c1sg1d-korri-steam-arm64-fhs-fhsenv-profile.drv
+Sig: korri-plugins-1:ADbslsF+NHdv2E0GfeDmLfPiizO6FIPofRh8poUm9Rtm7qhzXdVD9Sv+JsMD9CWqrDT4UjjkD9tb8xeOj3GkAw==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/zkbhsj6l1zjym3cic041li0c63m254mm-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-75eb41b75907/0hp7ggmp802qgki69jrbkvflbra8zylkjhv540fqfzpxm0kkiq1y.nar.xz
+Compression: xz
+FileHash: sha256:0hp7ggmp802qgki69jrbkvflbra8zylkjhv540fqfzpxm0kkiq1y
+FileSize: 2716
+NarHash: sha256:0j8rm0ifklj0lf36j7klisppp63787n9cb96zrn12p8fbsd7pcdh
+NarSize: 9048
+References: 74bhd9050sw2srv7jia8aqgm72cw892l-korri-starter-pack-cartridges 8n2ar4s593bz07ych8ld4w6ln04mnv1h-korri-plugin 943x8pcmik2qbn04ckxq8c5qnykxjznn-korri-plugin q3p9qz33lccf1diwpv8z17fgpgbq2f0x-korri-plugin
+Deriver: 9jfdggv1048bp7r1p9h78gffd1fglz20-korri-plugin.drv
+Sig: korri-plugins-1:Syh4y5vnnVk0QM6tTUo2NXuSmFFIgzcSWimM1qt4HNbHctD94arIlOyTfn7ug4mBAZH57YJ7HHpXA5zKaAIDBw==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/87iq5aia2arv75kqxlpwqq9c4cyhgb7y-korri-steam-arm64-fhs-bwrap
+URL: https://github.com/korri-os/plugins/releases/download/build-e479fd55b3aa/1fzi08rp3g17izihabrrvl80rpx2w2lpdh4ycd27jkz0799qyd7s.nar.xz
+Compression: xz
+FileHash: sha256:1fzi08rp3g17izihabrrvl80rpx2w2lpdh4ycd27jkz0799qyd7s
+FileSize: 2164
+NarHash: sha256:0zji4yn58yy8ws34rlb41a8q7pdfw7nbwqp1z4759cb6x1fw65c5
+NarSize: 5152
+References: 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 8jjaf9i1ky3mf88bvdblcw9wlfnkl4iq-korri-steam-arm64-fhs-init az275nq7nq81kx3pxdpj20x7qpwi2gak-bubblewrap-0.11.0 d9jxdwalyr5qzmyz9m5avmzn7w40h7iy-coreutils-9.8 l62nzsgbcxm72p05lgwhkc2yv7k913r0-korri-steam-arm64-fhs-fhsenv-rootfs yg2z6ygz9jq8jp7vwzb6cdgxdpkac1qw-container-init
+Deriver: j4g12nvyi8rbr2sk1h2rmkdmcjcy1blj-korri-steam-arm64-fhs-bwrap.drv
+Sig: korri-plugins-1:qd65RIxnf7H+3W85BOOy4MnPA2n6EzZf1xyYW5jnbFT4POQaedIeucl3ex5dfdnqVSgTO8T/kWfS0cE1dht+CA==

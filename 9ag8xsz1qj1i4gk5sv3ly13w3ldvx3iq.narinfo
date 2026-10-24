@@ -1,0 +1,10 @@
+StorePath: /nix/store/9ag8xsz1qj1i4gk5sv3ly13w3ldvx3iq-sdl3-3.4.18-lib
+URL: https://github.com/korri-os/plugins/releases/download/build-ccb331071d1c/0v68kwkkfkyznl9k9vf24cfd4bfqfmj9apg1i7l59dlzns81cf56.nar.xz
+Compression: xz
+FileHash: sha256:0v68kwkkfkyznl9k9vf24cfd4bfqfmj9apg1i7l59dlzns81cf56
+FileSize: 1292000
+NarHash: sha256:14ijb68nbigh9ssss00iy02idimz8wv1xzfwbxx1v1711fjnl45j
+NarSize: 4782344
+References: 0gz222x6bjjk82mj2pnk4828hg8vih6b-alsa-lib-1.2.14 0zdmkggg3bjhqmxiajflrng8ca5yk8is-libxcursor-1.2.3 1s5rcnx7qnvbxkzijzfqacay05b2fyp9-libxrandr-1.5.4 478vjdcpbqbvzy71y3f3zfbnxh22mdk2-libglvnd-1.7.0 4n8zz7skl4frah1r2r2cbpyq8narf34d-libjack2-1.9.22 53bbslxqirqx59ic6762nm2449jc2s60-libdrm-2.4.128 772bd2hypghqqhh1h08rzi5w1hf9myvx-libxext-1.3.6 840xrn0lhhdxfmqdbxal8hv5a3q0ffkv-libxrender-0.9.12 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 9clgd2wfp5syfglbpmzlg6dm5p6hwa1v-libusb-1.0.29 9pfmhchdpqqbqixabschz07ig8y5i7d2-libxi-1.8.2 b5jdc3gjpgbkx1qqkc1lr72981hzcz05-zenity-4.2.1 dagqbkc58c3dglbwlvyhzy06imdn8xxf-libx11-1.8.12 dh752ravf4jlgd1p6adyc3zy2lzpapd7-pipewire-1.4.9 dkwh6bdkrlf6y9b0h5sqwy7smsrw3wls-libxkbcommon-1.11.0 hjgn7q59x9jsv21md2rv0d1jzg8h7z2y-libpulseaudio-17.0 lakwr4km61b88w61ljq5kk53fkh783dc-mesa-libgbm-25.1.0 nnjh0087b4z6wgvcpcm953x5qymid93b-libxfixes-6.0.2 q5a602jydkz3ina0pnaf32yb2zacch8v-libdecor-0.2.4 v4i3p1mv5jbsz2jpbjpfh9fgcvgdd3iz-libxscrnsaver-1.2.5 xcpdzp823kbj5qp5n3qgab3h8ny098fs-wayland-1.24.0 yqjf0g7ijnwcbrgspi8jj1fanj3406q8-libxtst-1.2.5
+Deriver: a5ms3gl6mfn60qggcdfv0hbixrcww1wg-sdl3-3.4.18.drv
+Sig: korri-plugins-1:9dOZIRe2mvQtIoEDr9UN9ej5emvjDO5d1kYaEUHVfWOi89bpcPv1mTYrEMZtV5ec4QHaVZlwwjg8MDV2PYP7Dw==

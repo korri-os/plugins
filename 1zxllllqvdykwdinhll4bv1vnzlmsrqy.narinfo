@@ -1,0 +1,10 @@
+StorePath: /nix/store/1zxllllqvdykwdinhll4bv1vnzlmsrqy-steam-session-run
+URL: https://github.com/korri-os/plugins/releases/download/build-365ce4e054d5/1z77913fiy6kmkglmvimwzm2mrhv59p8y6cnjka7rb8541d5p096.nar.xz
+Compression: xz
+FileHash: sha256:1z77913fiy6kmkglmvimwzm2mrhv59p8y6cnjka7rb8541d5p096
+FileSize: 6080
+NarHash: sha256:0gzfl6anxhas1n8j30iqm9r8pnws13039kq4d3v4049ixbwm8kwz
+NarSize: 16728
+References: 20axvl7mgj15m23jgmnq97hx37fgz7bk-diffutils-3.12 3c6r8gh8zrqw8xmncmlj9vivz9rz6r30-util-linux-2.41.2-bin av4xw9f56xlx5pgv862wabfif6m1yc0a-findutils-4.10.0 bq3m2dnm7lnwkwpjb5mwnwv876p46jlg-korri-steam-arm64-fhs g08ibc7gxi7nb8m93lqdxzksm05dqa45-steam-vdf-settings imad8dvhp77h0pjbckp6wvmnyhp8dpgg-coreutils-9.8 iw8rj036lq792cyy7lwl60vxp6zyzmj7-acl-2.3.2-bin rlq03x4cwf8zn73hxaxnx0zn5q9kifls-bash-5.3p3 v5lx2zmgp754ci64ln3m9f4j8bhvbgps-procps-4.0.4 x3zjxxz8m4ki88axp0gn8q8m6bldybba-gnugrep-3.12 xq3lj0fyr597lgk2a3h0h2736y119wxw-steam-arm64-helpers-1
+Deriver: 5c0hcwn8vfqhqfldxbq0r6csm03qw7f0-steam-session-run.drv
+Sig: korri-plugins-1:dLUJhAg1Y2EYChFjEsqFfIs3EbSEabnzJDZ+xoiWPZywVLAKtTWe5QHXslDSQeHRc4eeluPmXrjy7dKLc3uuBg==

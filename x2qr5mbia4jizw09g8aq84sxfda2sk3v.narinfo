@@ -1,0 +1,10 @@
+StorePath: /nix/store/x2qr5mbia4jizw09g8aq84sxfda2sk3v-korri-tailscale-1.90.9
+URL: https://github.com/korri-os/plugins/releases/download/build-74a9d8c2d256/03c85chb793kyyhdxlpdwysyjdx3s2xhb5z08qvarq5z4ixh2lqf.nar.xz
+Compression: xz
+FileHash: sha256:03c85chb793kyyhdxlpdwysyjdx3s2xhb5z08qvarq5z4ixh2lqf
+FileSize: 644
+NarHash: sha256:0qjqa04lp8zi9by0h3sza907k9af87a53383kbrn2fha7sfrqbfk
+NarSize: 1688
+References: d65nh80n5dwmnfzfizfvw71b1rw03r4q-tailscale-1.90.9
+Deriver: rycr802r2k9vs32n5g8cj7l5l5038nw9-korri-tailscale-1.90.9.drv
+Sig: korri-plugins-1:0SLbbj8ozLdVoB7eHL/1HTANFNM/rziKift8Tyw3wH2UjYmCNJwfI5s1kwVESSod06GdD2HAuB8ulBjzPsOyDg==

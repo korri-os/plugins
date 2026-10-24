@@ -1,0 +1,10 @@
+StorePath: /nix/store/rxjjhb9iw2sjycylxb6yairpmnrd2185-libretro-fmsx-0-unstable-2025-07-31
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/1mq27vr3xbm6w9vi0wg4bh7ggcwlgkvhc35gq3n8mh4k3a5vhws0.nar.xz
+Compression: xz
+FileHash: sha256:1mq27vr3xbm6w9vi0wg4bh7ggcwlgkvhc35gq3n8mh4k3a5vhws0
+FileSize: 96524
+NarHash: sha256:0ms2r7qxwawg3g33rks6avws064ywq9s25yh0hnww2hzb3z7sqjf
+NarSize: 298360
+References: 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 rxjjhb9iw2sjycylxb6yairpmnrd2185-libretro-fmsx-0-unstable-2025-07-31 ybnc2kzrsa2ijsy2hxqb4hdcwxwjhqfv-retroarch-bare-1.22.2
+Deriver: 0bzkkdv2dd7bbsqhkwj5qdj8zxc5mpsq-libretro-fmsx-0-unstable-2025-07-31.drv
+Sig: korri-plugins-1:q6cEYNaeRkdIc5GWgCURuT0z79RMzFTp4dzTY4ZEuWuslD8LJJm7dIPnKkdGIJpEqU96I7pYjX3tRGVsIebzDg==

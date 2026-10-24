@@ -1,0 +1,10 @@
+StorePath: /nix/store/1m72m5hrmgq2163nnvn7py537452jyxy-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-9f946f33bd18/1phrs4bf8z2ydw5mcmzqv7p09z8413qbrywryzk9bbfldx1qqih3.nar.xz
+Compression: xz
+FileHash: sha256:1phrs4bf8z2ydw5mcmzqv7p09z8413qbrywryzk9bbfldx1qqih3
+FileSize: 768
+NarHash: sha256:07kfaplpyphrl5ipw46wphrb0pdfg9hl0xh8djg47xwf4l61fp7v
+NarSize: 1968
+References: 5djgl7p660k60vxz0cgln8wx4nqhrwp1-korri-korri-sunshine-certificate-control.socket 690aijw716db4wdhk94wkj87yv5xfyqb-korri-korri-sunshine.service ddnklmsf2l410lf5r6x5h46zj42gprin-korri-sunshine-run liwixnqj67l7mv8phg96fby760xlpdns-korri-sunshine-input-seat-setup mi635c4sx2rdwdmgy32aq6rzddj7y47d-korri-korri-sunshine-input-setup.service nllml2lxrj1myfimxf2lw0i30x5n3jhr-sunshine-korri-2025.924.154138-korri pi33fxavs6sm4a2729wn8fis596gh5l3-korri-sunshine-input-rules
+Deriver: k67syhb62ipkhnlgwy174f3kyl2nxf2r-korri-plugin.drv
+Sig: korri-plugins-1:gigxv0Jvp/zTXVMFVozdcb1Ih31rOtO3O3YAqTanCaedyx5TljzZV51tqPhAIyD6h56ys6BRCwe0Xe3dHiJFDw==

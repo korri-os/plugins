@@ -1,0 +1,10 @@
+StorePath: /nix/store/lqyn474xjg1p0k1wr9wyydflc9z9al6p-eden-korri-0.2.1
+URL: https://github.com/korri-os/plugins/releases/download/build-00265c30b274/0hp4c6393bj6zj4azlzv6n9hyx4q0mwnh12kv21jjk3cjphbpkgf.nar.xz
+Compression: xz
+FileHash: sha256:0hp4c6393bj6zj4azlzv6n9hyx4q0mwnh12kv21jjk3cjphbpkgf
+FileSize: 5208
+NarHash: sha256:0a02g2vpm8w8hr0gl3s6509w1m0qbrhn7dpacdas5dxfynwipq9s
+NarSize: 18392
+References: 010847afgzfll903n5dbzqdajmm1m0n7-eden-0.2.1 6f33vzdycrsybq6qpj7dmvw9g0lc19iy-vulkan-tools-1.4.363.0 9qkvx8c89fqsz63f4z9gngk9hpi00ss4-sdl2-compat-2.32.74 czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 lq2fsnmg0q3y0vlxn91w8s8wvj1m6fld-python3-3.14.8 lqyn474xjg1p0k1wr9wyydflc9z9al6p-eden-korri-0.2.1 lrmcqxc8pd7b9vnzpz016j31k5z1bnif-crudini-0.9.6 m2ar7c5ylhgg8vp7dfdx9bhjfvki5xdg-coreutils-9.12 mjb9kmza0ij2lspmm5zspr9kfky36vdp-sdl3-3.4.18-lib
+Deriver: 4a7y0j7h12wvw8s791rzkzjfjp5ljm4v-eden-korri-0.2.1.drv
+Sig: korri-plugins-1:1y6/TYfXyVkki/QQnoek+6PUuN2jhlR+Yb5XSOz32OmHItHyfM2XQrNUsPT/hcLHZTW6IN4wjaYzsU8AEKUqDw==

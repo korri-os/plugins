@@ -1,0 +1,10 @@
+StorePath: /nix/store/cs0qbkq5dbyfp84l1pdq42ra6wq6hyn5-libretro-fake08-0-unstable-2026-06-13
+URL: https://github.com/korri-os/plugins/releases/download/build-bd4bfcfe4e9a/030hih9sx7gbz01q8hhpw50n6927h5dl32zyjxkgjzsr3rd7pj1y.nar.xz
+Compression: xz
+FileHash: sha256:030hih9sx7gbz01q8hhpw50n6927h5dl32zyjxkgjzsr3rd7pj1y
+FileSize: 543312
+NarHash: sha256:159ggbsakdmwk86rf8mzgsr1k2p1ya4yd205y899yfwpbanwpjqg
+NarSize: 2403704
+References: 89n0gcl1yjp37ycca45rn50h7lms5p6f-glibc-2.40-66 qipd93x9gjyiygqk673rd2ssnf8y7jj0-gcc-14.3.0-lib
+Deriver: 6h5ad9609yfl5n6s8z4ipvw7n37acsc8-libretro-fake08-0-unstable-2026-06-13.drv
+Sig: korri-plugins-1:CRAluTHjDn2VOvqOBVSn1TdkL228grTRMimw+E0iXYjDZ2B5jGOcsBeOewjWRyi4i7JdDDg0hFipZm9JxPu0Ag==

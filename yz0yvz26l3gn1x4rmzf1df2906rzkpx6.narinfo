@@ -1,0 +1,10 @@
+StorePath: /nix/store/yz0yvz26l3gn1x4rmzf1df2906rzkpx6-cachyos-unpack
+URL: https://github.com/korri-os/plugins/releases/download/build-365ce4e054d5/1fnnvd0drvfi4m67cyjmfjlq2x0kl2q3dy7khizbcl9aclnrv9pz.nar.xz
+Compression: xz
+FileHash: sha256:1fnnvd0drvfi4m67cyjmfjlq2x0kl2q3dy7khizbcl9aclnrv9pz
+FileSize: 1288
+NarHash: sha256:19djsbhacfkn92npg7r8yz90q1h958jc7z03q0f5afcm3z6l32ya
+NarSize: 2600
+References: imad8dvhp77h0pjbckp6wvmnyhp8dpgg-coreutils-9.8 rlq03x4cwf8zn73hxaxnx0zn5q9kifls-bash-5.3p3 v0rfdwhg6w6i0yb6dbry4srk6pnj3xp0-xz-5.8.1-bin x3zjxxz8m4ki88axp0gn8q8m6bldybba-gnugrep-3.12 xgpcpdrsl4q02xnqhsh26krfyawpxgd4-korri-proton-cachyos-compatibilitytool yi3c5karhx764ham5rfwk7iynr8mjf6q-gnutar-1.35
+Deriver: x97h1v3y47gydl6r56yxx45a382n1kab-cachyos-unpack.drv
+Sig: korri-plugins-1:GYzoDlWoMntkouDzWKeborDGGj9h471Na/1yKLnGRSD9DZ8O0qLwBqtssqC8n5sKVstOo4qNSPNsnl10ZaeMDA==

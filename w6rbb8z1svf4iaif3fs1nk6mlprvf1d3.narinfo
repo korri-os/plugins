@@ -1,0 +1,10 @@
+StorePath: /nix/store/w6rbb8z1svf4iaif3fs1nk6mlprvf1d3-solarus-2.1.4
+URL: https://github.com/korri-os/plugins/releases/download/build-9514b1b382d3/1zz44irgpcxf8f5ydrjlgbncpv4f440nl5c7278zdmb3inkhqvrn.nar.xz
+Compression: xz
+FileHash: sha256:1zz44irgpcxf8f5ydrjlgbncpv4f440nl5c7278zdmb3inkhqvrn
+FileSize: 18596
+NarHash: sha256:04s9dc8krgabmh4dllc2adjgv0mrgbs18sr0k5p0xls6m1gx90bg
+NarSize: 61920
+References: 0fg3i32f8m2xfpxnlm0w8n2832ifm2vy-libmodplug-0.8.9.0 1j6iki3c52l79vnaf7l0xq14nkf42xgg-libogg-1.3.6 219ngjralijbfv7jrc94cqaplx2i23c3-openal-soft-1.24.3 29jvc5mhg3c4ar4rs7qx85cijvgmnrjh-SDL2_image-2.8.8 52my14rxr6hxd7rr8gci2cirnvx7m4gj-physfs-3.2.0 5yz401mldgwqfag7b6wi6pn8x3ybhd33-libvorbis-1.3.7 dgvj2cvlyqp5513cjza6lmy2bah6vdqj-sdl2-compat-2.32.58 gml149pfcz4nzddya7877npws836iw1j-SDL2_ttf-2.24.0 hfnqglxcx5fax5gm2wibcb1lc9jcsj33-solarus-2.1.4-lib l005kykfiqr0s9i4k56vmf83fn2pd31q-luajit-2.1.1741730670 xm08aqdd7pxcdhm0ak6aqb1v7hw5q6ri-gcc-14.3.0-lib xx7cm72qy2c0643cm1ipngd87aqwkcdp-glibc-2.40-66
+Deriver: fnglw54vgrc1d2vsdafz5b6xqqfixh94-solarus-2.1.4.drv
+Sig: korri-plugins-1:uVANvs5Kqoo4LBTs8d0eQnlWLBbTqIBv3hjlYWX5rTip5mBHirdQmImAEEAn+5a96UC3eHw4AzX8MZd+0rDHAQ==

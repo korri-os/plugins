@@ -1,0 +1,10 @@
+StorePath: /nix/store/q50x5m3424yr7q8kdmxxgjgc5n5m6gvz-korri-plugin-host-0.0.0
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/0c2yz3ypk3v8pf0d2q232az04yw2rkwmh4rg21a977sjzwdgzpmq.nar.xz
+Compression: xz
+FileHash: sha256:0c2yz3ypk3v8pf0d2q232az04yw2rkwmh4rg21a977sjzwdgzpmq
+FileSize: 3780748
+NarHash: sha256:0midmi54fpa81hcc8v25r3jrl9j941r2b3s0igw7imkc8ha3s8ii
+NarSize: 18044928
+References: 604gsr59rj7dzd0nrhp143rpvf7gyiaz-gcc-15.3.0-lib baxgs06659w4i6ggsfr56srjrb52v1h8-systemd-261.2 cp8qnyl8i0s62g3a1465i258mf5bcr6k-curl-8.22.0-bin ghv1q328il86gx71a6kfwspzjz70j8nw-iptables-1.8.13 lm3pknxi0ipypy3lxh1wmm8wvvavdwrn-glibc-2.42-84 q50x5m3424yr7q8kdmxxgjgc5n5m6gvz-korri-plugin-host-0.0.0 qfwk7cyvb885l2mc06ac3a7nmv19nigi-nix-2.34.8 svx59425zxp552p2b8gm11qj5r09b56i-bash-5.3p15
+Deriver: hd9b63awl9lm6x1mjq0pm5653sh3w2gw-korri-plugin-host-0.0.0.drv
+Sig: korri-plugins-1:aX2BQVHZjoYwiu0nH6hq2jEh0f4eaKrD1AFVr1TDXsCovdshgpFH2WImYj/b35+68RnSvZE71iaHprGyP0OMDg==

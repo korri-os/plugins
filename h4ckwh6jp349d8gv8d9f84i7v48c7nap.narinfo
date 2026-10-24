@@ -1,0 +1,10 @@
+StorePath: /nix/store/h4ckwh6jp349d8gv8d9f84i7v48c7nap-korri-inputplumber-retroarch-autoconfig-1.22.0
+URL: https://github.com/korri-os/plugins/releases/download/build-5e564b9cdceb/0p04h3nih6x39i186aa5jz69kjvcpzf1d697n9hk7gbqhixp1lhk.nar.xz
+Compression: xz
+FileHash: sha256:0p04h3nih6x39i186aa5jz69kjvcpzf1d697n9hk7gbqhixp1lhk
+FileSize: 620
+NarHash: sha256:0dppcd54didrixhfbc4wi99zpy6bwsl5y7glng7gj6d6n02djih1
+NarSize: 2608
+References: 
+Deriver: ihs1ai9vcnc3mllw33zpbn8gyyybffwj-korri-inputplumber-retroarch-autoconfig-1.22.0.drv
+Sig: korri-plugins-1:nrnsioIIHvv9RHg+WTrabvOwPKqu3SQLOrefMxvmR9uy+rwy/cWTklzDwUQBQ+5K8LIoakA24oyq+fAbyHhKBw==

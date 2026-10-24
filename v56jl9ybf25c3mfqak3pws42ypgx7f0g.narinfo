@@ -1,0 +1,10 @@
+StorePath: /nix/store/v56jl9ybf25c3mfqak3pws42ypgx7f0g-fex-rootfs-pins
+URL: https://github.com/korri-os/plugins/releases/download/build-e479fd55b3aa/14v7i5ymiz8n3ac7whl6g745rs5l0kvvm4763x1ww0lh29y3zlxx.nar.xz
+Compression: xz
+FileHash: sha256:14v7i5ymiz8n3ac7whl6g745rs5l0kvvm4763x1ww0lh29y3zlxx
+FileSize: 840
+NarHash: sha256:13rr47kwvaqfrxzmwvsv0fyw0a6pb50v6b12yp3lz8ln1jgzddiq
+NarSize: 2080
+References: 
+Deriver: 0hc4nfm5jll1ls509fnrp2sakh75iml5-fex-rootfs-pins.drv
+Sig: korri-plugins-1:bq0cAl8H6f7QWqFQxoakMgZoKS0q+jPHU/HE99gy4l6ivpnV1zWQoCuKFl9tFaSVoNk9IOQHH/G+pbxduz4ZAQ==

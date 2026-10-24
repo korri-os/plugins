@@ -1,0 +1,10 @@
+StorePath: /nix/store/562jkrdp25ahfac4266wqcncd49y5bn2-steam-session-run
+URL: https://github.com/korri-os/plugins/releases/download/build-e479fd55b3aa/1gg6diqmzi3r3civ6agsk3hscn479727qp3490f3x24mf1x91408.nar.xz
+Compression: xz
+FileHash: sha256:1gg6diqmzi3r3civ6agsk3hscn479727qp3490f3x24mf1x91408
+FileSize: 4284
+NarHash: sha256:1ypms0p0pr1kiljip2dm7md5r3ljad7ys5kmsac58dq21nmc7n9a
+NarSize: 11296
+References: 5728bdap49nsnk1c8zq96fqsm4b7ihj6-gnugrep-3.12 59d87n4d81lca0hr8ijiim6dn1n8gqh7-util-linux-2.41.2-bin 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 cy7aqw5j5rjk2pza5p2j2jcdm3vjy12q-findutils-4.10.0 d9jxdwalyr5qzmyz9m5avmzn7w40h7iy-coreutils-9.8 dfigs9z1bnilkcz3cgkgnbxn44ljzyns-korri-steam-arm64-fhs qlmfhgnvmnmxwp2ppf3m9ncrn2mgsmzb-steam-arm64-helpers-1 sdjaypqzkny1nvgmjwl55jywa6c7v7kw-procps-4.0.4 yd6hnlhcznh9mm5gw32shsyii1bn9ddf-steam-vdf-settings
+Deriver: b67kjcd9lwkz4nmskis315lxba9vl94s-steam-session-run.drv
+Sig: korri-plugins-1:EOueaDnBYsZ5LtQ4EtEuT7B71Ba9olABEQkPmNvQEjKzEjeyv+9L5g3zy7CG+XezuzePNSO71RkF7LTMk7C4AQ==

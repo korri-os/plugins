@@ -1,0 +1,10 @@
+StorePath: /nix/store/q3p9qz33lccf1diwpv8z17fgpgbq2f0x-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-ac8fae593e42-zquest/1i2jgfd0b1g8x8phn2jli6ycpfh75663nf8gz8r3fdvppk4x4lqg.nar.xz
+Compression: xz
+FileHash: sha256:1i2jgfd0b1g8x8phn2jli6ycpfh75663nf8gz8r3fdvppk4x4lqg
+FileSize: 996
+NarHash: sha256:153i5ifzdcarr462pf55n8mjz07y43h4acslr6s6qk2i1c0w205h
+NarSize: 2216
+References: m81hg81r0vcb6i0wh22fkd4rhfp59kfg-zquest-classic-launcher-unstable-2026-06-18-public3
+Deriver: 9fhpn1bza81lzppqjb58l0mraqpc8ijg-korri-plugin.drv
+Sig: korri-plugins-1:i8dEfVAn9jYNTuiG6voG0RkBpkuTvVsnJqTJ5xx16DYVqpd6OflidJRFa69sZB6RiIrS5LkdxQ7A0IPP8s3KDg==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/2h55k5pw84c1i3daipa7497glady4434-cemu-0-unstable-2026-10-22-29f2f1f
+URL: https://github.com/korri-os/plugins/releases/download/build-56d3f4c297f0/1m0nnfgb8kxraq4455psr7ibc7hf60wsblia3r6h2qrg330imcd2.nar.xz
+Compression: xz
+FileHash: sha256:1m0nnfgb8kxraq4455psr7ibc7hf60wsblia3r6h2qrg330imcd2
+FileSize: 15671188
+NarHash: sha256:0iqx655l8q20x45m3jb7jkzcg2k2ih6nymyswlc9yfb5fy8wjf5v
+NarSize: 58940984
+References: 00s3yaabi3v8y64qq5jwgg5g4dlnmcpq-libusb-1.0.29 0ci3da6db19gckz0i5j3br992cspvlz1-cairo-1.18.4 2h55k5pw84c1i3daipa7497glady4434-cemu-0-unstable-2026-10-22-29f2f1f 2ryq506h3bjvkrbydqjrr5b4id9m63a3-pango-1.57.0 543fcj44fgrazby9im48n4rzhi2x7rq2-boost-1.87.0 5qdsnc26nv61j5rrw492f19xav2rz45v-glib-2.86.1 61i74yjkj9p1qphfl7018ja4sdwkipx0-openssl-3.6.0 8idis3j5l13c3x74jl8xly0k4qyk9mx6-curl-8.17.0 8lfw7ps7icpyqn4pwkk6n4fsw6qd4hg8-glslang-16.0.0 8mk1lafnnrx0a6lvjh69afm8w3i4pvqx-harfbuzz-12.1.0 9xwxjkrwxjsvc5gs1l0syr4wbfvvvvcn-bluez-5.84 b1bldnpjpys7np3361plhp2wxcaw9iwr-vulkan-loader-1.4.328.0 cfnas28yx8ni9izjmk3f9hgwzin798nl-gdk-pixbuf-2.44.4 cm2986rrpqxbdjr46a7kxf1pgi2bwyss-alsa-lib-1.2.14 cs86fhm7hsgxm20m826cl5qqc4nyg33s-gtk+3-3.24.51 dgjd3hf8ny62vbjg10w64x4jwm7cv81k-libxrender-0.9.12 h9grlk1b07l80k6rnmyliawg25bdpsv5-wayland-1.24.0 ildy6f9q59c8c4imgwcbdbf3xc9dnc5j-at-spi2-core-2.58.1 imad8dvhp77h0pjbckp6wvmnyhp8dpgg-coreutils-9.8 ja09m2gfni7pqk4bsrhjb8y9cq74rspp-libx11-1.8.12 kpq5h1lif6x6ji3g8xbqnvz0mljv6nl9-sdl3-3.4.18-lib l7xwm1f6f3zj2x8jwdbi8gdyfbx07sh7-zlib-1.3.1 mq8wxzd90bskaxqca07y22ln5ha78g39-libpulseaudio-17.0 msk9h3b6nkmwmkf1z2d8h768vggb01i5-libzip-1.11.4 n3rjjw0571j3szdil4z06689j1cp6mrm-wxwidgets-3.3.1 rlq03x4cwf8zn73hxaxnx0zn5q9kifls-bash-5.3p3 rvnwz8lwqsrgrsxrpj22ib3cfscjbdsv-fmt-12.1.0 s7vmxmhkq439cjb7ag9w198p6dk7kl0w-zstd-1.5.7 shs2lyjm5yv7fmg4pwyvrlv9zr4macmv-gcc-14.3.0-libgcc xm08aqdd7pxcdhm0ak6aqb1v7hw5q6ri-gcc-14.3.0-lib xx7cm72qy2c0643cm1ipngd87aqwkcdp-glibc-2.40-66
+Deriver: 8rrlab60za80qh87ai6nb5vv199i595x-cemu-0-unstable-2026-10-22-29f2f1f.drv
+Sig: korri-plugins-1:Xzn6KKIuUkzVpM0rxzXIPmlQy+mb6HEmVjpRa4wCWUh9YW8WGvPBJywNlSIYx5rAZL3pYWaHQrUX4bdCFr6tDA==

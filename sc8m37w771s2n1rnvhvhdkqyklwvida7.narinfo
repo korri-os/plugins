@@ -1,0 +1,10 @@
+StorePath: /nix/store/sc8m37w771s2n1rnvhvhdkqyklwvida7-libretro-opera-0-unstable-2024-10-16
+URL: https://github.com/korri-os/plugins/releases/download/build-adaccd5610ce-b2/00php1m568ghppfppjq7sdv585lsw7lx5fxnbb8ig3v8qdfxyl3y.nar.xz
+Compression: xz
+FileHash: sha256:00php1m568ghppfppjq7sdv585lsw7lx5fxnbb8ig3v8qdfxyl3y
+FileSize: 170912
+NarHash: sha256:1w9wcxxb59gcnh9avi7ycwkqswwqzyiyq74b12hpcc6426b340ga
+NarSize: 475808
+References: 2wb8rbpnpax9gmxnnxakyxbrma6y2050-retroarch-bare-1.22.2 rlq03x4cwf8zn73hxaxnx0zn5q9kifls-bash-5.3p3 sc8m37w771s2n1rnvhvhdkqyklwvida7-libretro-opera-0-unstable-2024-10-16 xx7cm72qy2c0643cm1ipngd87aqwkcdp-glibc-2.40-66
+Deriver: r1krfyk7gllnz2fd5jy4j02780dhc8wd-libretro-opera-0-unstable-2024-10-16.drv
+Sig: korri-plugins-1:NHnD8M3aV5/NkVBv5J0JPe2+L8sHzXaL1hB5spyn0VXkAp8MTfeAJ0kw2yHW0eO28CXHkH9mzgBNyISCFs91DQ==

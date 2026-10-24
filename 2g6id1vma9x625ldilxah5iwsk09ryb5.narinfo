@@ -1,0 +1,10 @@
+StorePath: /nix/store/2g6id1vma9x625ldilxah5iwsk09ryb5-fex-prepare
+URL: https://github.com/korri-os/plugins/releases/download/build-e479fd55b3aa/10q4hs1qcg7sriqy83pc5sslarc9cssdh24vrwpp7270bf9xf9nj.nar.xz
+Compression: xz
+FileHash: sha256:10q4hs1qcg7sriqy83pc5sslarc9cssdh24vrwpp7270bf9xf9nj
+FileSize: 2700
+NarHash: sha256:1kk57509axm4s289v5hrqsv7d28zf3ydg72lc7fczhbirz9xzpz1
+NarSize: 6152
+References: 4x19j6zihdl6pya63xs8g360f2r614sx-curl-8.17.0-bin 59d87n4d81lca0hr8ijiim6dn1n8gqh7-util-linux-2.41.2-bin 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 d9jxdwalyr5qzmyz9m5avmzn7w40h7iy-coreutils-9.8 f3asnnqprb40a3v6jskd8sr3r2s8sqrb-gnutar-1.35 g62aig90xf1dw5sqbkxw9nqnglzfydgk-zstd-1.5.7-bin w0p5aj5bcciv94h2s2wh1dmh66x0rgiw-squashfs-4.7.4 w9ms47plwgn7rq9wnv16qiv23yhmdxfj-fex-rootfs-pins
+Deriver: phfm3ckbygv8qcjjbakh67cvzv0l9423-fex-prepare.drv
+Sig: korri-plugins-1:tQK8zl4Yj0Ir8PTGOBEDBdcIZfxenQWLbiHBu8lQfFfJgw+xN06tPAP2i9ubrflQMtgRKcaIEE1xM3VUK4wgAQ==

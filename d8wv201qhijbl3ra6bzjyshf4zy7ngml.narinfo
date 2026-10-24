@@ -1,0 +1,10 @@
+StorePath: /nix/store/d8wv201qhijbl3ra6bzjyshf4zy7ngml-cachyos-prepare
+URL: https://github.com/korri-os/plugins/releases/download/build-e479fd55b3aa/18cm837vfqp0d5jifnavfc2i11g6p53gyf3hlwv3g9q82rvii7ri.nar.xz
+Compression: xz
+FileHash: sha256:18cm837vfqp0d5jifnavfc2i11g6p53gyf3hlwv3g9q82rvii7ri
+FileSize: 2624
+NarHash: sha256:14a7d3356c4l4xbgdbh0yr1ir14kjnw5rw3y0c43kl5ir0qgrvyw
+NarSize: 5856
+References: 4x19j6zihdl6pya63xs8g360f2r614sx-curl-8.17.0-bin 5728bdap49nsnk1c8zq96fqsm4b7ihj6-gnugrep-3.12 59d87n4d81lca0hr8ijiim6dn1n8gqh7-util-linux-2.41.2-bin 690lffhvivszs10ixbi6pmifnzgcqcnl-xz-5.8.1-bin 6cankpvayjgidrbx5sj1gms2s13nvfvh-bash-5.3p3 d9jxdwalyr5qzmyz9m5avmzn7w40h7iy-coreutils-9.8 f099k6mfrn3iydaa16p8pic9454igy31-korri-proton-cachyos-compatibilitytool f3asnnqprb40a3v6jskd8sr3r2s8sqrb-gnutar-1.35
+Deriver: l0yhwcx2wydp8p7z54zny6l81p63a7r8-cachyos-prepare.drv
+Sig: korri-plugins-1:/KIvxczOXLu3pI12neWTlR8x2A1TOJl6vCz4YcK9ibpmlhJIKhLmaFao9nF8vUbZYkJK9DBcxZnL3E385OPHAQ==

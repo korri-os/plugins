@@ -1,0 +1,10 @@
+StorePath: /nix/store/8d35fnrckhaj18c6z2hiqwn29dckb4x6-steam-session
+URL: https://github.com/korri-os/plugins/releases/download/build-96a06b0a82ef/0304s5j7ki7z299xw8lciy8zk4fg8snmgh3vrq3igpn0lamy7rjp.nar.xz
+Compression: xz
+FileHash: sha256:0304s5j7ki7z299xw8lciy8zk4fg8snmgh3vrq3igpn0lamy7rjp
+FileSize: 948
+NarHash: sha256:1890yx96ahnwks3c5sv5i58fcf18ak0dhg1a5f9x57z5bamz0758
+NarSize: 2112
+References: c6pqhpgxpf6gy8ah189qg2g3dn32sxx2-steam-session-run imad8dvhp77h0pjbckp6wvmnyhp8dpgg-coreutils-9.8 rlq03x4cwf8zn73hxaxnx0zn5q9kifls-bash-5.3p3 rxzvps8zldnz4sgphbw6893n6ikai6gn-dbus-1.14.10
+Deriver: jxaqjbdqqyzjnx8bl68g85n4byiqd5y5-steam-session.drv
+Sig: korri-plugins-1:+pCx7oDw2HRZVPPpi/HdhaEm0I0DpIgbx8u6yizPr2UY+7AgYVauCECMV77vcY95yFvFY8PfQgF6k7jY9VvZCg==

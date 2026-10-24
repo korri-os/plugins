@@ -1,0 +1,10 @@
+StorePath: /nix/store/fgpsvkpd3x91k27ircgp2ak5715zf4iw-retroarch-source-checked-settings-1.22.2
+URL: https://github.com/korri-os/plugins/releases/download/build-5e564b9cdceb/0s6cd5gkvk796dx94lw4px4h5qhygjm0z061s8lslnclxhdgr3vd.nar.xz
+Compression: xz
+FileHash: sha256:0s6cd5gkvk796dx94lw4px4h5qhygjm0z061s8lslnclxhdgr3vd
+FileSize: 2116
+NarHash: sha256:0d6rbilfq4sz14biajbm6fdh9s0zvx61rcmwij9xkxlnvmmnl2gb
+NarSize: 11400
+References: 8l6hf4n1kpkvhdfnn3na81z23mp3n01p-retroarch-bare-1.22.2
+Deriver: a39fr3sm1ag10wvqiqvmkwkysyqw3qr5-retroarch-source-checked-settings-1.22.2.drv
+Sig: korri-plugins-1:YdZuok6efrQeJJe9Y5mxrWXRmFllqNGYXnBUzqDITDIHrsOl5B8N+un4cUhDX8iJSBDkYSApNH9Y1xh/fs5eBg==

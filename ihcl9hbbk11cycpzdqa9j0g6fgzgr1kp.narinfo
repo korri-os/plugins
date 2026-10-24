@@ -1,0 +1,10 @@
+StorePath: /nix/store/ihcl9hbbk11cycpzdqa9j0g6fgzgr1kp-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-5e564b9cdceb/1amdl8xxpzbaz4gyrjwkl4kxq9c2skx7hpigk6xk39rr9zs50yp5.nar.xz
+Compression: xz
+FileHash: sha256:1amdl8xxpzbaz4gyrjwkl4kxq9c2skx7hpigk6xk39rr9zs50yp5
+FileSize: 5540
+NarHash: sha256:058qnnqpk7s020kynwwwnddzfm5n62m2w8z4bqgrn5iivi8jmpzw
+NarSize: 17896
+References: 3a37q92pl3i2q36k708s15l3jqwilyfg-retroarch-bare-1.22.2 7wa7l44dvirm4dkx2mq2fa3pqkxmj916-retroarch-source-checked-settings-1.22.2 h4ckwh6jp349d8gv8d9f84i7v48c7nap-korri-inputplumber-retroarch-autoconfig-1.22.0 lshz2r83d5l9d3ylr8vkddj4qlmzwrq7-libretro-mednafen-pce-fast-0-unstable-2025-11-14
+Deriver: 048vn4s99bknd8291al78fz41lshg11s-korri-plugin.drv
+Sig: korri-plugins-1:ynflKNOrF6c+qGEZCiypZTroTGkTBdOVQxtaohHJGaBtc0C6+bAVd2IQ+0ouyvkT5dckwjR+K3xotn6rHskzCA==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/zdl32751slgn23vldwh847lx02dywdbl-korri-korri-sunshine-input-seat-receiver.service
+URL: https://github.com/korri-os/plugins/releases/download/build-46b91cb7fcb0/02rl74n7cgfnhg0akikly5m8f18ip4d5vn8kaw3f950mv693nvhl.nar.xz
+Compression: xz
+FileHash: sha256:02rl74n7cgfnhg0akikly5m8f18ip4d5vn8kaw3f950mv693nvhl
+FileSize: 892
+NarHash: sha256:0kazp5mjzrbkfgwablhg28g71j1w59k2mm706nhcyrdla21gqjr1
+NarSize: 2272
+References: 44k8s5khfd0mapjbw9dz8gxm8ypb44vr-korri-sunshine-input-seat-setup pphxfpiii10qlk3spng5syvdx4vqy17y-korri-inputd-0.0.0
+Deriver: zwzijwjkxa8w6zas8m45fhsxbiilhii8-korri-korri-sunshine-input-seat-receiver.service.drv
+Sig: korri-plugins-1:tYI/M1KbSlRE2Y/L9YJcHjINpfR+UnBfA6xJgX9xEp4UZyTWwk3DkK6p2OQb/9Xe5/fQC4iwFSZuqyob4iE/DQ==
