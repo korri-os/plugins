@@ -1,18 +1,7 @@
-What: read explicitly LINEAR single-plane XRGB/ARGB8888 KMS dma-bufs into
-owned RGB RAM with checked DMA_BUF_IOCTL_SYNC READ START/END. Keep EGL for
-unsupported formats, modifiers, transforms, bounds and mapping/sync failures.
-Status: experimental downstream optimization; potentially upstreamable after
-wider driver/coherency testing. DMA-BUF sync does not lock compositor reuse.
-Evidence: RG35XX Pro readback experiment 4cc7af7; /tmp/h700-sun/readback.md
-and profile.md (2026-10-22): GL p50 72 ms, direct memcpy about 13 ms.
-Removal: upstream equivalent, unsafe coherency/lifetime evidence, or a faster
-accepted cached/engine path. See services/sunshine/README.md for limits.
-
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
-index d46cc5a..a495761 100644
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -1386,6 +1386,62 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+@@ -1899,6 +1899,62 @@
          }
        }
  
@@ -75,7 +64,7 @@ index d46cc5a..a495761 100644
        capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
  #ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
          auto capture_start = std::chrono::steady_clock::now();
-@@ -1400,22 +1456,6 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+@@ -1913,23 +1969,6 @@
            return status;
          }
  
@@ -90,7 +79,8 @@ index d46cc5a..a495761 100644
 -        gl::ctx.BindTexture(GL_TEXTURE_2D, rgb->tex[0]);
 -
 -        // Don't remove these lines, see https://github.com/LizardByte/Sunshine/issues/453
--        int w, h;
+-        int h;
+-        int w;
 -        gl::ctx.GetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
 -        gl::ctx.GetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
 -        BOOST_LOG(debug) << "width and height: w "sv << w << " h "sv << h;
@@ -98,7 +88,7 @@ index d46cc5a..a495761 100644
          if (!pull_free_image_cb(img_out)) {
            return platf::capture_e::interrupted;
          }
-@@ -1423,19 +1463,37 @@ void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
+@@ -1937,19 +1976,37 @@
  #ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
          auto readback_start = std::chrono::steady_clock::now();
  #endif

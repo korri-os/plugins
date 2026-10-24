@@ -47,6 +47,11 @@ pkgs.stdenv.mkDerivation {
     fi
     grep -F 'DRM_VBLANK_EVENT' ${source}/src/platform/linux/kmsgrab.cpp
     grep -F 'wait_vblank_event(event_fd, cookie, event_deadline)' ${source}/src/platform/linux/kmsgrab.cpp
+    # Opening the separate pacing fd must use the same privileged worker and
+    # DRM-master release policy as capture. Do not add a second capability site.
+    grep -F 'event_fd = privileged_drm_worker::open_drm_card_fd_privileged(device);' ${source}/src/platform/linux/kmsgrab.cpp
+    test "$(grep -c CAP_SYS_ADMIN ${source}/src/platform/linux/kmsgrab.cpp)" \
+      = "$(grep -c CAP_SYS_ADMIN ${pkgs.sunshine.src}/src/platform/linux/kmsgrab.cpp)"
     # Native permission and Sunshine policy must remain aligned and narrow.
     grep -Fx 'LimitRTPRIO=5' ${../../plugins/sunshine/korri-sunshine.service}
     grep -F 'capture_rt_priority=5' ${../../plugins/sunshine/runtime.sh}

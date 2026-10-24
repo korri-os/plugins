@@ -1,21 +1,52 @@
-What: phase-lock RAM KMS capture to the captured plane's CRTC vblank sequence.
-Sample at capture_vblank_offset_ms (strict 0..1000 ms, default 0), validated
-against physical refresh. Resynchronise missed refreshes; never drift or reuse a
-sequence. Late entry waits for a future refresh. Timing fallback skips overdue
-nominal deadlines. A call/sequence guard drops RT on missing pacing, re-reading or backwards sequence,
-keeping RESET_ON_FORK. Failed demotion sleeps every refresh without acquisition.
-Only this guarded backend requests FIFO, after a valid lock; scope exit restores
-OTHER. Dedicated DRM EVENT requests use poll with one 100 ms deadline; timeout
-closes/cancels events, delivers stop and permanently falls back to nominal pacing.
-No modesetting, affinity or additional scheduling authority is added.
-Status: downstream ARM RAM KMS scheduling and safety correction.
-Evidence: 2026-10-22 source-ID hunt: 135/4/0/38 misses; bad phases 2..5 ms,
-clean 11..13 ms, nominal timer drift 2.27 ms/min; no scored CMA migrations.
-Cost: vblank ioctls and phase latency; bounded driver waits and source-starvation
-risk require real-device acceptance. Remove for equivalent upstream pacing.
-
+diff --git a/src/config.cpp b/src/config.cpp
+--- a/src/config.cpp
++++ b/src/config.cpp
+@@ -22,6 +22,7 @@
+ // local includes
+ #include "config.h"
+ #include "capture_scheduling.h"
++#include "kms_capture_pacing.h"
+ #include "entry_handler.h"
+ #include "file_handler.h"
+ #include "logging.h"
+@@ -722,6 +723,7 @@
+     0,  // av1_mode
+ 
+     0,  // capture_rt_priority: no RT request without explicit configuration
++    platf::kms::default_vblank_offset_ms,  // capture_vblank_offset_ms: CRTC vblank edge
+     2,  // min_threads
+     {
+       "superfast"s,  // preset
+@@ -1618,6 +1620,17 @@
+       } else {
+         video.capture_rt_priority = 0;
+         BOOST_LOG(warning) << "Invalid capture_rt_priority; expected 0..20, disabling capture FIFO"sv;
++      }
++    }
++    std::string capture_vblank_offset_ms;
++    string_f(vars, "capture_vblank_offset_ms", capture_vblank_offset_ms);
++    if (!capture_vblank_offset_ms.empty()) {
++      auto offset = platf::kms::parse_vblank_offset_ms(capture_vblank_offset_ms);
++      if (offset) {
++        video.capture_vblank_offset_ms = *offset;
++      } else {
++        video.capture_vblank_offset_ms = platf::kms::default_vblank_offset_ms;
++        BOOST_LOG(warning) << "Invalid capture_vblank_offset_ms; expected 0..1000, using "sv << platf::kms::default_vblank_offset_ms << " ms"sv;
+       }
+     }
+     int_f(vars, "min_threads", video.min_threads);
+diff --git a/src/config.h b/src/config.h
+--- a/src/config.h
++++ b/src/config.h
+@@ -69,6 +69,7 @@
+     int hevc_mode;  ///< HEVC support mode advertised to clients.
+     int av1_mode;  ///< AV1 support mode advertised to clients.
+     int capture_rt_priority;  // Linux capture-only FIFO; 0 disables, 1..20 request RT
++    int capture_vblank_offset_ms;
+ 
+     int min_threads;  ///< Minimum number of threads or slices for CPU encoding.
+ 
 diff --git a/src/kms_capture_pacing.h b/src/kms_capture_pacing.h
-new file mode 100644
 --- /dev/null
 +++ b/src/kms_capture_pacing.h
 @@ -0,0 +1,77 @@
@@ -97,7 +128,6 @@ new file mode 100644
 +  }
 +}  // namespace platf::kms
 diff --git a/src/kms_capture_rt_guard.h b/src/kms_capture_rt_guard.h
-new file mode 100644
 --- /dev/null
 +++ b/src/kms_capture_rt_guard.h
 @@ -0,0 +1,205 @@
@@ -307,7 +337,6 @@ new file mode 100644
 +  };
 +}  // namespace platf::kms
 diff --git a/src/kms_vblank_wait.h b/src/kms_vblank_wait.h
-new file mode 100644
 --- /dev/null
 +++ b/src/kms_vblank_wait.h
 @@ -0,0 +1,65 @@
@@ -379,7 +408,7 @@ new file mode 100644
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -32,6 +32,12 @@
+@@ -35,6 +35,12 @@
  #include "cuda.h"
  #include "graphics.h"
  #include "src/config.h"
@@ -392,10 +421,10 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  #include "src/nv12.h"
  #include "src/logging.h"
  #include "src/platform/common.h"
-@@ -1138,6 +1144,201 @@
-       card_t card;
-     };
- 
+@@ -1630,6 +1636,206 @@
+     /**
+      * @brief KMS capture backend that copies frames into system memory.
+      */
 +    // Borrow the captured plane's DRM card and CRTC index. Never use a
 +    // different monitor's vblank or infer refresh from wall-clock sleeps.
 +    class vblank_pacer_t {
@@ -522,7 +551,12 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +        if (!device) {
 +          return fail("cannot identify CRTC DRM device");
 +        }
-+        event_fd = open(device, O_RDWR | O_NONBLOCK | O_CLOEXEC);
++        // Keep privileged card opening and DRM-master release inside the worker.
++        event_fd = privileged_drm_worker::open_drm_card_fd_privileged(device);
++        if (event_fd >= 0 && fcntl(event_fd, F_SETFL, O_NONBLOCK) < 0) {
++          close(event_fd);
++          event_fd = -1;
++        }
 +        std::free(device);
 +        if (event_fd < 0) {
 +          return fail("cannot open dedicated CRTC event fd");
@@ -593,16 +627,16 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +
      class display_ram_t: public display_t {
      public:
-       display_ram_t(mem_type_e mem_type):
-@@ -1145,6 +1346,7 @@
-       }
- 
+       /**
+@@ -1649,6 +1855,7 @@
+        * @return 0 on success; nonzero or negative platform status on failure.
+        */
        int init(const std::string &display_name, const ::video::config_t &config) {
 +        BOOST_LOG(info) << "KMS RAM Moonlight requested_fps="sv << config.framerate;
          if (!gbm::create_device) {
            BOOST_LOG(warning) << "libgbm not initialized"sv;
            return -1;
-@@ -1247,25 +1449,116 @@
+@@ -1756,14 +1963,116 @@
  
        capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
          auto next_frame = std::chrono::steady_clock::now();
@@ -627,10 +661,8 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          sleep_overshoot_logger.reset();
  
          while (true) {
--          auto now = std::chrono::steady_clock::now();
+-          platf::handle_pacing(next_frame, delay, sleep_overshoot_logger);
 -
--          if (next_frame > now) {
--            std::this_thread::sleep_for(next_frame - now);
 +          if (rt_guard) {
 +            rt_guard->begin_pacing();
 +          }
@@ -655,16 +687,12 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +            next_frame = std::chrono::steady_clock::time_point(std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::nanoseconds(*scheduled)));
 +            ++pacing_calls;
 +            std::this_thread::sleep_until(next_frame);
-             sleep_overshoot_logger.first_point(next_frame);
-             sleep_overshoot_logger.second_point_now_and_log();
++            sleep_overshoot_logger.first_point(next_frame);
++            sleep_overshoot_logger.second_point_now_and_log();
 +            phase_locked = false;
 +          } else {
 +            phase_locked = true;
-           }
--
--          next_frame += delay;
--          if (next_frame < now) {  // some major slowdown happened; we couldn't keep up
--            next_frame = now + delay;
++          }
 +          pacing_calls += vblank.wait_calls();
 +          if (!rt_guard) {
 +            if (phase_locked && !rt_disabled) {
@@ -720,59 +748,10 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +                               << " pacing_start_ns="sv << event.pacing_start_ns << " pacing_cpu_ns="sv << event.cpu_ns
 +                               << " pacing_wall_ns="sv << event.wall_ns << " blocked_ns="sv << event.blocked_ns
 +                               << "; using SCHED_OTHER for the rest of the session"sv;
-           }
--
++          }
            std::shared_ptr<platf::img_t> img_out;
            auto status = snapshot(pull_free_image_cb, img_out, 1000ms, *cursor);
 +          rt_guard->acquisition_complete();
            switch (status) {
              case platf::capture_e::reinit:
              case platf::capture_e::error:
-diff --git a/src/config.h b/src/config.h
---- a/src/config.h
-+++ b/src/config.h
-@@ -27,6 +27,7 @@
-     int av1_mode;
- 
-     int capture_rt_priority;  // Linux capture-only FIFO; 0 disables, 1..20 request RT
-+    int capture_vblank_offset_ms;  // RAM KMS phase after CRTC vblank, default 0 ms
- 
-     int min_threads;  // Minimum number of threads/slices for CPU encoding
- 
-diff --git a/src/config.cpp b/src/config.cpp
---- a/src/config.cpp
-+++ b/src/config.cpp
-@@ -21,6 +21,7 @@
- // local includes
- #include "config.h"
- #include "capture_scheduling.h"
-+#include "kms_capture_pacing.h"
- #include "entry_handler.h"
- #include "file_handler.h"
- #include "logging.h"
-@@ -442,6 +443,7 @@
-     0,  // av1_mode
- 
-     0,  // capture_rt_priority: no RT request without explicit configuration
-+    platf::kms::default_vblank_offset_ms,  // capture_vblank_offset_ms: CRTC vblank edge
-     2,  // min_threads
-     {
-       "superfast"s,  // preset
-@@ -1069,6 +1071,17 @@
-         BOOST_LOG(warning) << "Invalid capture_rt_priority; expected 0..20, disabling capture FIFO"sv;
-       }
-     }
-+    std::string capture_vblank_offset_ms;
-+    string_f(vars, "capture_vblank_offset_ms", capture_vblank_offset_ms);
-+    if (!capture_vblank_offset_ms.empty()) {
-+      auto offset = platf::kms::parse_vblank_offset_ms(capture_vblank_offset_ms);
-+      if (offset) {
-+        video.capture_vblank_offset_ms = *offset;
-+      } else {
-+        video.capture_vblank_offset_ms = platf::kms::default_vblank_offset_ms;
-+        BOOST_LOG(warning) << "Invalid capture_vblank_offset_ms; expected 0..1000, using "sv << platf::kms::default_vblank_offset_ms << " ms"sv;
-+      }
-+    }
-     int_f(vars, "min_threads", video.min_threads);
-     string_f(vars, "sw_preset", video.sw.sw_preset);
-     if (!video.sw.sw_preset.empty()) {

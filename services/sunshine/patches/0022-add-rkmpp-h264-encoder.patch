@@ -1,6 +1,26 @@
+diff --git a/src/video.cpp b/src/video.cpp
 --- a/src/video.cpp
 +++ b/src/video.cpp
-@@ -1331,6 +1331,36 @@
+@@ -632,6 +632,7 @@
+     config_t config;  ///< Stream or encoder configuration captured for the worker.
+     int frame_nr;  ///< Next capture-frame number assigned to encoded packets.
+     void *channel_data;  ///< Platform-specific channel data forwarded to packet senders.
++    std::chrono::steady_clock::time_point next_rkmpp_frame;
+   };
+ 
+   /**
+@@ -684,6 +685,10 @@
+    * @param ctx Native context object used by the operation or callback.
+    * @return 0 when the capture thread is started.
+    */
++  std::chrono::steady_clock::duration rkmpp_fps_interval(std::uint32_t fps) {
++    return std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double> {1.0 / fps});
++  }
++
+   int start_capture_sync(capture_thread_sync_ctx_t &ctx);
+   /**
+    * @brief Stop capture sync processing.
+@@ -1261,6 +1266,37 @@
      LIMITED_GOP_SIZE | PARALLEL_ENCODING | NO_RC_BUF_LIMIT
    };
  
@@ -30,6 +50,7 @@
 +      {},  // YUV444 HDR-specific options
 +      {},  // Fallback options
 +      "h264_rkmpp"s,
++      {},  // capabilities
 +    },
 +    H264_ONLY | LIMITED_GOP_SIZE | SINGLE_SLICE_ONLY | PARALLEL_ENCODING | NO_RC_BUF_LIMIT
 +  };
@@ -37,36 +58,15 @@
    encoder_t vaapi {
      "vaapi"sv,
      std::make_unique<encoder_platform_formats_avcodec>(
-@@ -1468,6 +1498,7 @@
- #ifdef __linux__
+@@ -1492,6 +1528,7 @@
+   #endif
      &vaapi,
      &v4l2m2m,
 +    &rkmpp,
  #endif
  #ifdef __APPLE__
      &videotoolbox,
---- a/src/video.cpp
-+++ b/src/video.cpp
-@@ -436,6 +436,7 @@
-     config_t config;
-     int frame_nr;
-     void *channel_data;
-+    std::chrono::steady_clock::time_point next_rkmpp_frame;
-   };
- 
-   struct sync_session_t {
-@@ -463,6 +464,10 @@
-   struct capture_thread_sync_ctx_t {
-     encode_session_ctx_queue_t encode_session_ctx_queue {30};
-   };
-+
-+  std::chrono::steady_clock::duration rkmpp_fps_interval(std::uint32_t fps) {
-+    return std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double> {1.0 / fps});
-+  }
- 
-   int start_capture_sync(capture_thread_sync_ctx_t &ctx);
-   void end_capture_sync(capture_thread_sync_ctx_t &ctx);
-@@ -1972,6 +1977,8 @@
+@@ -2471,6 +2508,8 @@
      auto packets = mail::man->queue<packet_t>(mail::video_packets);
      auto idr_events = mail->event<bool>(mail::idr);
      auto invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
@@ -75,7 +75,7 @@
  
      {
        // Load a dummy image into the AVFrame to ensure we have something to encode
-@@ -2014,6 +2021,18 @@
+@@ -2502,6 +2541,18 @@
        }
  
        std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
