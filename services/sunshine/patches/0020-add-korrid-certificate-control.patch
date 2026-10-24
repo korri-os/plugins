@@ -1,47 +1,47 @@
+Port atomic certificate control to enabled, canonical upstream identities.
+Use the upstream authorization mutex and unchanged expiry/issuer verifier.
+Pairing IDs and PIN processing remain entirely upstream-owned.
+
 diff --git a/cmake/compile_definitions/common.cmake b/cmake/compile_definitions/common.cmake
-index f387330..6106685 100644
 --- a/cmake/compile_definitions/common.cmake
 +++ b/cmake/compile_definitions/common.cmake
-@@ -81,6 +81,8 @@ set(SUNSHINE_TARGET_FILES
+@@ -159,6 +159,8 @@
+         "${CMAKE_SOURCE_DIR}/src/main.h"
+         "${CMAKE_SOURCE_DIR}/src/crypto.cpp"
          "${CMAKE_SOURCE_DIR}/src/crypto.h"
-         "${CMAKE_SOURCE_DIR}/src/nvhttp.cpp"
-         "${CMAKE_SOURCE_DIR}/src/nvhttp.h"
 +        "${CMAKE_SOURCE_DIR}/src/korri_certificate_control.cpp"
 +        "${CMAKE_SOURCE_DIR}/src/korri_certificate_control.h"
+         "${CMAKE_SOURCE_DIR}/src/nvhttp.cpp"
+         "${CMAKE_SOURCE_DIR}/src/nvhttp.h"
          "${CMAKE_SOURCE_DIR}/src/httpcommon.cpp"
-         "${CMAKE_SOURCE_DIR}/src/httpcommon.h"
-         "${CMAKE_SOURCE_DIR}/src/confighttp.cpp"
 diff --git a/src/confighttp.cpp b/src/confighttp.cpp
-index 5fad47b..fc2fc72 100644
 --- a/src/confighttp.cpp
 +++ b/src/confighttp.cpp
-@@ -817,12 +817,16 @@ namespace confighttp {
- 
+@@ -1398,11 +1398,14 @@
+
      print_req(request);
- 
+
 -    nvhttp::erase_all_clients();
--    proc::proc.terminate();
--
-     nlohmann::json output_tree;
++    nlohmann::json output_tree;
 +    if (!nvhttp::erase_all_clients()) {
 +      output_tree["status"] = false;
 +      send_response(response, output_tree);
 +      return;
 +    }
-+
-     output_tree["status"] = true;
++    output_tree["status"] = true;
+     proc::proc.terminate();
+-
+-    nlohmann::json output_tree;
+-    output_tree["status"] = true;
      send_response(response, output_tree);
-+    proc::proc.terminate();
    }
- 
-   /**
+
 diff --git a/src/korri_certificate_control.cpp b/src/korri_certificate_control.cpp
-new file mode 100644
-index 0000000..eb7b1eb
 --- /dev/null
 +++ b/src/korri_certificate_control.cpp
-@@ -0,0 +1,542 @@
+@@ -0,0 +1,549 @@
 +#include "korri_certificate_control.h"
++#include "crypto.h"
 +
 +#include <openssl/pem.h>
 +#include <openssl/sha.h>
@@ -273,6 +273,11 @@ index 0000000..eb7b1eb
 +#endif
 +  }  // namespace
 +
++  std::string canonical_certificate_pem(const std::string_view pem) {
++    auto certificate = crypto::x509(pem);
++    return certificate ? crypto::pem(certificate) : std::string {};
++  }
++
 +  validated_certificate validate_single_certificate(const std::string &pem) {
 +    if (pem.empty() || pem.size() > max_frame_bytes || pem.find('\0') != std::string::npos) {
 +      throw protocol_error("InvalidCertificate", "certificate is empty or too large");
@@ -319,7 +324,7 @@ index 0000000..eb7b1eb
 +    if (i2d_X509(cert.get(), &cursor) != der_size) {
 +      throw protocol_error("InvalidCertificate", "certificate encoding failed");
 +    }
-+    return {hex_sha256(der.data(), der.size())};
++    return {hex_sha256(der.data(), der.size()), canonical_certificate_pem(pem)};
 +  }
 +
 +  std::string json_quote(const std::string &value) {
@@ -443,6 +448,7 @@ index 0000000..eb7b1eb
 +          {"name", client.name},
 +          {"cert", client.certificate},
 +          {"uuid", client.uuid},
++          {"enabled", client.enabled},
 +      });
 +    }
 +    root["named_devices"] = std::move(named_devices);
@@ -584,11 +590,9 @@ index 0000000..eb7b1eb
 +
 +}  // namespace korri_certificate_control
 diff --git a/src/korri_certificate_control.h b/src/korri_certificate_control.h
-new file mode 100644
-index 0000000..fbb4481
 --- /dev/null
 +++ b/src/korri_certificate_control.h
-@@ -0,0 +1,330 @@
+@@ -0,0 +1,345 @@
 +#pragma once
 +
 +#include <openssl/x509.h>
@@ -645,6 +649,7 @@ index 0000000..fbb4481
 +
 +  struct validated_certificate {
 +    std::string fingerprint;
++    std::string canonical_pem;
 +  };
 +
 +  struct named_certificate {
@@ -652,7 +657,10 @@ index 0000000..fbb4481
 +    std::string uuid;
 +    std::string certificate;
 +    std::string fingerprint;
++    bool enabled = true;
 +  };
++
++  std::string canonical_certificate_pem(std::string_view pem);
 +
 +  // Shared by load_state and the offline administrator. Keep the producer's
 +  // legacy devices/certs import and named_devices field interpretation here.
@@ -677,7 +685,14 @@ index 0000000..fbb4481
 +            entry.get_child("uuid").get_value<std::string>(),
 +            entry.get_child("cert").get_value<std::string>(),
 +            {},
++            entry.get<bool>("enabled", true),
 +        });
++      }
++    }
++    for (auto &client : clients) {
++      auto canonical = canonical_certificate_pem(client.certificate);
++      if (!canonical.empty()) {
++        client.certificate = std::move(canonical);
 +      }
 +    }
 +    return clients;
@@ -728,14 +743,18 @@ index 0000000..fbb4481
 +        client.fingerprint = validate_single_certificate(client.certificate).fingerprint;
 +      }
 +      if (client.fingerprint == validated.fingerprint) {
-+        return {false};
++        const bool changed = !client.enabled || client.certificate != validated.canonical_pem;
++        client.enabled = true;
++        client.certificate = validated.canonical_pem;
++        return {changed};
 +      }
 +    }
 +    clients.push_back({
 +        std::string(fixed_client_name),
 +        std::invoke(std::forward<UuidFactory>(uuid_factory)),
-+        certificate,
++        validated.canonical_pem,
 +        validated.fingerprint,
++        true,
 +    });
 +    return {true};
 +  }
@@ -920,29 +939,28 @@ index 0000000..fbb4481
 +
 +}  // namespace korri_certificate_control
 diff --git a/src/nvhttp.cpp b/src/nvhttp.cpp
-index c1d9401..0ae83ac 100644
 --- a/src/nvhttp.cpp
 +++ b/src/nvhttp.cpp
-@@ -6,11 +6,32 @@
- #define BOOST_BIND_GLOBAL_PLACEHOLDERS
- 
+@@ -7,12 +7,31 @@
+
  // standard includes
+ #include <algorithm>
 +#include <array>
 +#include <atomic>
 +#include <cerrno>
 +#include <cstdlib>
- #include <filesystem>
- #include <format>
 +#include <fstream>
-+#include <mutex>
 +#include <limits>
 +#include <optional>
 +#include <sstream>
- #include <string>
 +#include <thread>
+ #include <chrono>
+ #include <filesystem>
+ #include <format>
+ #include <mutex>
+ #include <string>
  #include <utility>
- 
-+// Unix includes
++
 +#ifndef _WIN32
 +#include <fcntl.h>
 +#include <poll.h>
@@ -952,11 +970,10 @@ index c1d9401..0ae83ac 100644
 +#include <sys/un.h>
 +#include <unistd.h>
 +#endif
-+
+
  // lib includes
  #include <boost/asio/ssl/context.hpp>
- #include <boost/asio/ssl/context_base.hpp>
-@@ -25,6 +46,7 @@
+@@ -28,6 +47,7 @@
  #include "file_handler.h"
  #include "globals.h"
  #include "httpcommon.h"
@@ -964,22 +981,23 @@ index c1d9401..0ae83ac 100644
  #include "logging.h"
  #include "network.h"
  #include "nvhttp.h"
-@@ -139,6 +161,8 @@ namespace nvhttp {
-   // uniqueID, session
-   std::unordered_map<std::string, pair_session_t> map_id_sess;
-   client_t client_root;
-+  std::mutex client_state_mutex;
-+  std::atomic<bool> client_state_integrity_failed {false};
-   std::atomic<uint32_t> session_id_counter;
- 
-   using args_t = SimpleWeb::CaseInsensitiveMultimap;
-@@ -164,43 +188,91 @@ namespace nvhttp {
-     return it->second;
+@@ -195,6 +215,7 @@
+     return mutex;
    }
- 
+
++  std::atomic<bool> client_state_integrity_failed {false};
+   client_t client_root;  ///< In-memory representation of the paired-client database.
+   std::atomic<uint32_t> session_id_counter;  ///< Monotonic counter used to allocate GameStream session IDs.
+
+@@ -254,41 +275,94 @@
+   /**
+    * @brief Persist the current state to its backing store.
+    */
 -  void save_state() {
 -    pt::ptree root;
 -
++  bool is_client_enabled(const X509 *certificate, const client_t &client = client_root);
++
 +  std::optional<std::string> serialize_client_state(const client_t &candidate) {
 +    std::string existing;
      if (fs::exists(config::nvhttp.file_state)) {
@@ -988,20 +1006,9 @@ index c1d9401..0ae83ac 100644
 -      } catch (std::exception &e) {
 -        BOOST_LOG(error) << "Couldn't read "sv << config::nvhttp.file_state << ": "sv << e.what();
 -        return;
-+      std::ifstream input(config::nvhttp.file_state, std::ios::binary);
-+      if (!input) {
-+        BOOST_LOG(error) << "Couldn't read "sv << config::nvhttp.file_state;
-+        return std::nullopt;
-       }
-+      std::ostringstream contents;
-+      contents << input.rdbuf();
-+      if (input.bad()) {
-+        BOOST_LOG(error) << "Couldn't read "sv << config::nvhttp.file_state;
-+        return std::nullopt;
-+      }
-+      existing = contents.str();
-     }
- 
+-      }
+-    }
+-
 -    root.erase("root"s);
 -
 -    root.put("root.uniqueid", http::unique_id);
@@ -1014,28 +1021,45 @@ index c1d9401..0ae83ac 100644
 -      named_cert_node.put("name"s, named_cert.name);
 -      named_cert_node.put("cert"s, named_cert.cert);
 -      named_cert_node.put("uuid"s, named_cert.uuid);
+-      named_cert_node.put("enabled"s, named_cert.enabled);
 -      named_cert_nodes.push_back(std::make_pair(""s, named_cert_node));
-+    std::vector<korri_certificate_control::named_certificate> clients;
-+    clients.reserve(candidate.named_devices.size());
-+    for (const auto &entry : candidate.named_devices) {
-+      clients.push_back({entry.name, entry.uuid, entry.cert, {}});
-+    }
-+    try {
-+      return korri_certificate_control::build_state_document(existing, http::unique_id, clients);
-+    } catch (const std::exception &exception) {
-+      BOOST_LOG(error) << "Couldn't serialize Sunshine state: "sv << exception.what();
-+      return std::nullopt;
-     }
+-    }
 -    root.add_child("root.named_devices"s, named_cert_nodes);
-+  }
- 
-+  bool build_cert_chain(const client_t &candidate, crypto::cert_chain_t &candidate_chain) {
+-
++      std::ifstream input(config::nvhttp.file_state, std::ios::binary);
++      if (!input) {
++        return std::nullopt;
++      }
++      std::ostringstream contents;
++      contents << input.rdbuf();
++      if (input.bad()) {
++        return std::nullopt;
++      }
++      existing = contents.str();
++    }
++    std::vector<korri_certificate_control::named_certificate> clients;
++    for (const auto &entry : candidate.named_devices) {
++      clients.push_back({entry.name, entry.uuid, entry.cert, {}, entry.enabled});
++    }
      try {
 -      pt::write_json(config::nvhttp.file_state, root);
 -    } catch (std::exception &e) {
 -      BOOST_LOG(error) << "Couldn't write "sv << config::nvhttp.file_state << ": "sv << e.what();
 -      return;
+-    }
++      return korri_certificate_control::build_state_document(existing, http::unique_id, clients);
++    } catch (const std::exception &) {
++      BOOST_LOG(error) << "Couldn't serialize Sunshine client state"sv;
++      return std::nullopt;
++    }
++  }
++
++  bool build_cert_chain(const client_t &candidate, crypto::cert_chain_t &candidate_chain) {
++    try {
 +      for (const auto &named_cert : candidate.named_devices) {
++        if (!named_cert.enabled) {
++          continue;
++        }
 +        auto certificate = crypto::x509(named_cert.cert);
 +        if (!certificate) {
 +          return false;
@@ -1057,7 +1081,9 @@ index c1d9401..0ae83ac 100644
 +    std::vector<std::string> candidate_certificates;
 +    candidate_certificates.reserve(candidate.named_devices.size());
 +    for (const auto &entry : candidate.named_devices) {
-+      candidate_certificates.push_back(entry.cert);
++      if (entry.enabled) {
++        candidate_certificates.push_back(entry.cert);
++      }
 +    }
 +    auto activate = [&]() {
 +      return korri_certificate_control::activate_verified_state(
@@ -1066,13 +1092,17 @@ index c1d9401..0ae83ac 100644
 +          std::move(candidate),
 +          std::move(candidate_chain),
 +          candidate_certificates,
-+          [](const std::string &certificate) {
-+            return crypto::x509(certificate);
++          [&](const std::string &certificate) {
++            auto parsed = crypto::x509(certificate);
++            if (parsed && !is_client_enabled(parsed.get(), candidate)) {
++              parsed.reset();
++            }
++            return parsed;
 +          });
 +    };
 +    if (config::sunshine.flags[config::flag::FRESH_STATE]) {
 +      return activate();
-     }
++    }
 +    auto document = serialize_client_state(candidate);
 +    if (!document) {
 +      return false;
@@ -1085,33 +1115,28 @@ index c1d9401..0ae83ac 100644
 +          std::abort();
 +        });
    }
- 
-   void load_state() {
-+    std::lock_guard lock(client_state_mutex);
-     if (!fs::exists(config::nvhttp.file_state)) {
-       BOOST_LOG(info) << "File "sv << config::nvhttp.file_state << " doesn't exist"sv;
-       http::unique_id = uuid_util::uuid_t::generate().string();
-@@ -212,71 +284,172 @@ namespace nvhttp {
-       pt::read_json(config::nvhttp.file_state, tree);
-     } catch (std::exception &e) {
-       BOOST_LOG(error) << "Couldn't read "sv << config::nvhttp.file_state << ": "sv << e.what();
--
-       return;
-     }
- 
-     auto unique_id_p = tree.get_optional<std::string>("root.uniqueid");
-     if (!unique_id_p) {
--      // This file doesn't contain moonlight credentials
-       http::unique_id = uuid_util::uuid_t::generate().string();
-       return;
+
+   /**
+@@ -331,9 +405,9 @@
+    * @return `true` only when exactly one matching paired-client record is enabled.
+    * @note The caller must hold `client_auth_mutex()`.
+    */
+-  bool is_client_enabled(const X509 *certificate) {
++  bool is_client_enabled(const X509 *certificate, const client_t &client) {
+     bool matched = false;
+-    for (const auto &named_cert : client_root.named_devices) {
++    for (const auto &named_cert : client.named_devices) {
+       if (auto stored_certificate = crypto::x509(named_cert.cert); !stored_certificate || X509_cmp(stored_certificate.get(), certificate) != 0) {
+         continue;
+       }
+@@ -387,77 +461,164 @@
      }
      http::unique_id = std::move(*unique_id_p);
- 
-     auto root = tree.get_child("root");
+
+-    auto root = tree.get_child("root");
 -    client_t client;
 -
 -    // Import from old format
-+    client_t candidate;
 -    if (root.get_child_optional("devices")) {
 -      auto device_nodes = root.get_child("devices");
 -      for (auto &[_, device_node] : device_nodes) {
@@ -1135,62 +1160,89 @@ index c1d9401..0ae83ac 100644
 -        named_cert.name = el.get_child("name").get_value<std::string>();
 -        named_cert.cert = el.get_child("cert").get_value<std::string>();
 -        named_cert.uuid = el.get_child("uuid").get_value<std::string>();
+-        named_cert.enabled = el.get<bool>("enabled", true);
 -        client.named_devices.emplace_back(named_cert);
 -      }
 -    }
-+    for (const auto &entry : korri_certificate_control::parse_client_state(
-+             root, []() { return uuid_util::uuid_t::generate().string(); })) {
-+      candidate.named_devices.push_back({entry.name, entry.uuid, entry.certificate});
-+    }
- 
--    // Empty certificate chain and import certs from file
--    cert_chain.clear();
+-
 -    for (auto &named_cert : client.named_devices) {
--      cert_chain.add(crypto::x509(named_cert.cert));
+-      auto canonical_certificate = canonical_certificate_pem(named_cert.cert);
+-      if (!canonical_certificate.empty()) {
+-        named_cert.cert = std::move(canonical_certificate);
+-      }
+-    }
+-
++    client_t candidate;
++    for (const auto &entry : korri_certificate_control::parse_client_state(
++             tree.get_child("root"), []() { return uuid_util::uuid_t::generate().string(); })) {
++      candidate.named_devices.push_back({entry.name, entry.uuid, entry.certificate, entry.enabled});
++    }
 +    crypto::cert_chain_t loaded_chain;
 +    if (!build_cert_chain(candidate, loaded_chain)) {
 +      BOOST_LOG(error) << "Sunshine state contains an invalid client certificate"sv;
 +      return;
-     }
++    }
+     std::lock_guard lock {client_auth_mutex()};
+-    client_root = std::move(client);
+-    rebuild_client_cert_chain();
+-  }
+-
+-  /**
+-   * @brief Add authorized client data.
+-   *
+-   * @param name Human-readable name to assign.
+-   * @param cert Certificate data or object used by the operation.
+-   * @return Persistent UUID for the added client, or an empty string when the certificate is invalid.
+-   */
 +    client_root = std::move(candidate);
 +    cert_chain = std::move(loaded_chain);
 +  }
- 
--    client_root = client;
-+  bool add_authorized_client(const std::string &name, std::string &&cert) {
-+    std::lock_guard lock(client_state_mutex);
-+    client_t candidate = client_root;
-+    candidate.named_devices.push_back({name, uuid_util::uuid_t::generate().string(), std::move(cert)});
-+    return commit_client_state(std::move(candidate));
-   }
- 
--  void add_authorized_client(const std::string &name, std::string &&cert) {
--    client_t &client = client_root;
++
+   std::string add_authorized_client(const std::string &name, std::string &&cert) {
+-    auto canonical_certificate = canonical_certificate_pem(cert);
+-    if (canonical_certificate.empty()) {
++    auto canonical = canonical_certificate_pem(cert);
++    if (canonical.empty()) {
+       return {};
+     }
+-
 -    named_cert_t named_cert;
 -    named_cert.name = name;
--    named_cert.cert = std::move(cert);
+-    named_cert.cert = std::move(canonical_certificate);
 -    named_cert.uuid = uuid_util::uuid_t::generate().string();
--    client.named_devices.emplace_back(named_cert);
+-
++    const auto uuid = uuid_util::uuid_t::generate().string();
+     std::lock_guard lock {client_auth_mutex()};
+-    client_root.named_devices.emplace_back(std::move(named_cert));
+-    rebuild_client_cert_chain();
+-
+-    if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
+-      save_state();
+-    }
+-    return client_root.named_devices.back().uuid;
+-  }
++    client_t candidate = client_root;
++    candidate.named_devices.push_back({name, uuid, std::move(canonical), true});
++    return commit_client_state(std::move(candidate)) ? uuid : std::string {};
++  }
++
 +  std::vector<korri_certificate_control::named_certificate> korri_named_clients(const client_t &source) {
 +    std::vector<korri_certificate_control::named_certificate> output;
 +    output.reserve(source.named_devices.size());
 +    for (const auto &entry : source.named_devices) {
-+      output.push_back({entry.name, entry.uuid, entry.cert, {}});
++      output.push_back({entry.name, entry.uuid, entry.cert, {}, entry.enabled});
 +    }
 +    return output;
 +  }
- 
--    if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
--      save_state();
 +  client_t sunshine_clients(const std::vector<korri_certificate_control::named_certificate> &source) {
 +    client_t output;
 +    output.named_devices.reserve(source.size());
 +    for (const auto &entry : source) {
-+      output.named_devices.push_back({entry.name, entry.uuid, entry.certificate});
-     }
++      output.named_devices.push_back({entry.name, entry.uuid, entry.certificate, entry.enabled});
++    }
 +    return output;
-   }
- 
++  }
++
 +  std::string handle_korri_certificate_request(const std::string &frame) {
 +    if (client_state_integrity_failed.load()) {
 +      return korri_certificate_control::error_response("StateIntegrityFailed");
@@ -1199,7 +1251,7 @@ index c1d9401..0ae83ac 100644
 +        frame,
 +        http::unique_id,
 +        conf_intern.servercert,
-+        client_state_mutex,
++        client_auth_mutex(),
 +        []() {
 +          return korri_named_clients(client_root);
 +        },
@@ -1305,49 +1357,13 @@ index c1d9401..0ae83ac 100644
 +        handle_korri_certificate_request);
 +  }
 +#endif
-+
-   std::shared_ptr<rtsp_stream::launch_session_t> make_launch_session(bool host_audio, const args_t &args) {
-     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
- 
-@@ -442,6 +615,7 @@ namespace nvhttp {
-   }
- 
-   void clientpairingsecret(pair_session_t &sess, std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, pt::ptree &tree, const std::string &client_pairing_secret) {
-+    (void) add_cert;
-     if (sess.last_phase != PAIR_PHASE::SERVERCHALLENGERESP) {
-       fail_pair(sess, tree, "Out of order call to clientpairingsecret");
-       return;
-@@ -477,12 +651,8 @@ namespace nvhttp {
-     // if hash not correct, probably MITM
-     bool same_hash = hash.size() == sess.clienthash.size() && std::equal(hash.begin(), hash.end(), sess.clienthash.begin());
-     auto verify = crypto::verify256(crypto::x509(client.cert), secret, sign);
--    if (same_hash && verify) {
-+    if (same_hash && verify && add_authorized_client(client.name, std::move(client.cert))) {
-       tree.put("root.paired", 1);
--      add_cert->raise(crypto::x509(client.cert));
--
--      // The client is now successfully paired and will be authorized to connect
--      add_authorized_client(client.name, std::move(client.cert));
-     } else {
-       tree.put("root.paired", 0);
-     }
-@@ -767,9 +937,10 @@ namespace nvhttp {
-   }
- 
-   nlohmann::json get_all_clients() {
-+    std::lock_guard lock(client_state_mutex);
-     nlohmann::json named_cert_nodes = nlohmann::json::array();
--    client_t &client = client_root;
--    for (auto &named_cert : client.named_devices) {
-+    const client_t &client = client_root;
-+    for (const auto &named_cert : client.named_devices) {
-       nlohmann::json named_cert_node;
-       named_cert_node["name"] = named_cert.name;
-       named_cert_node["uuid"] = named_cert.uuid;
-@@ -1061,6 +1232,16 @@ namespace nvhttp {
+
+   /**
+    * @brief Create launch session.
+@@ -1618,6 +1779,15 @@
+     auto pkey = file_handler::read_file(config::nvhttp.pkey.c_str());
      auto cert = file_handler::read_file(config::nvhttp.cert.c_str());
      setup(pkey, cert);
- 
 +#ifndef _WIN32
 +    auto korri_socket = systemd_korri_control_socket();
 +    std::optional<std::thread> korri_control_thread;
@@ -1357,86 +1373,83 @@ index c1d9401..0ae83ac 100644
 +      });
 +    }
 +#endif
-+
-     auto add_cert = std::make_shared<safe::queue_t<crypto::x509_t>>(30);
- 
+
      // resume doesn't always get the parameter "localAudioPlayMode"
-@@ -1094,13 +1275,9 @@ namespace nvhttp {
-         BOOST_LOG(debug) << subject_name << " -- "sv << (verified ? "verified"sv : "denied"sv);
-       });
- 
-+      std::lock_guard state_lock(client_state_mutex);
-       while (add_cert->peek()) {
--        char subject_name[256];
--
-         auto cert = add_cert->pop();
--        X509_NAME_oneline(X509_get_subject_name(cert.get()), subject_name, sizeof(subject_name));
--
--        BOOST_LOG(debug) << "Added cert ["sv << subject_name << ']';
-         cert_chain.add(std::move(cert));
-       }
- 
-@@ -1185,29 +1362,29 @@ namespace nvhttp {
- 
+     // launch will store it in host_audio
+@@ -1744,40 +1914,35 @@
+
      ssl.join();
      tcp.join();
+-  }
+-
+-  void erase_all_clients() {
 +#ifndef _WIN32
 +    if (korri_control_thread) {
 +      korri_control_thread->join();
 +    }
 +#endif
-   }
- 
--  void erase_all_clients() {
--    client_t client;
--    client_root = client;
++  }
++
++  bool erase_all_clients() {
+     std::lock_guard lock {client_auth_mutex()};
+-    client_root = {};
 -    cert_chain.clear();
 -    save_state();
-+  bool erase_all_clients() {
-+    std::lock_guard lock(client_state_mutex);
 +    return commit_client_state(client_t {});
    }
- 
+
    bool unpair_client(const std::string_view uuid) {
+     std::lock_guard lock {client_auth_mutex()};
 -    bool removed = false;
--    client_t &client = client_root;
--    for (auto it = client.named_devices.begin(); it != client.named_devices.end();) {
+-    for (auto it = client_root.named_devices.begin(); it != client_root.named_devices.end();) {
 -      if ((*it).uuid == uuid) {
--        it = client.named_devices.erase(it);
+-        it = client_root.named_devices.erase(it);
 -        removed = true;
 -      } else {
 -        ++it;
 -      }
-+    std::lock_guard lock(client_state_mutex);
+-    }
+-
+-    rebuild_client_cert_chain();
+-    save_state();
+-    return removed;
 +    client_t candidate = client_root;
 +    const auto before = candidate.named_devices.size();
 +    std::erase_if(candidate.named_devices, [uuid](const named_cert_t &entry) {
 +      return entry.uuid == uuid;
 +    });
-+    const bool removed = candidate.named_devices.size() != before;
-+    if (!removed) {
-+      return false;
-     }
--
--    save_state();
--    load_state();
--    return removed;
-+    return commit_client_state(std::move(candidate));
++    return candidate.named_devices.size() != before && commit_client_state(std::move(candidate));
    }
- }  // namespace nvhttp
+
+   bool set_client_enabled(const std::string_view uuid, bool enabled) {
+     std::lock_guard lock {client_auth_mutex()};
+-    for (auto &named_cert : client_root.named_devices) {
+-      if (named_cert.uuid == uuid) {
+-        named_cert.enabled = enabled;
+-        rebuild_client_cert_chain();
+-        save_state();
+-        return true;
++    client_t candidate = client_root;
++    for (auto &entry : candidate.named_devices) {
++      if (entry.uuid == uuid) {
++        entry.enabled = enabled;
++        return commit_client_state(std::move(candidate));
+       }
+     }
+     return false;
 diff --git a/src/nvhttp.h b/src/nvhttp.h
-index 6363370..8f25e05 100644
 --- a/src/nvhttp.h
 +++ b/src/nvhttp.h
-@@ -196,8 +196,9 @@ namespace nvhttp {
+@@ -357,10 +357,10 @@
    /**
     * @brief Remove all paired clients.
     * @examples
 -   * nvhttp::erase_all_clients();
 +   * bool erased = nvhttp::erase_all_clients();
     * @examples_end
-+   * @return true only when durable state and the live verifier were both updated.
     */
 -  void erase_all_clients();
 +  bool erase_all_clients();
- }  // namespace nvhttp
+
+ #ifdef SUNSHINE_TESTS
+   /**
