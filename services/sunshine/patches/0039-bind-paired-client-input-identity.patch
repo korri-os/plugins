@@ -1,180 +1,14 @@
-Bind the authenticated paired-client UUID through HTTPS, RTSP and input.
-Never use query uniqueid as controller identity. Missing bindings fail closed.
+Bind authenticated paired UUIDs through HTTPS, RTSP and per-stream mirrors.
+Preserve upstream native gamepad retention keyed by canonical certificate.
+UUID binding requires the upstream exact enabled identity and trust verifier.
 
---- a/third-party/Simple-Web-Server/server_http.hpp
-+++ b/third-party/Simple-Web-Server/server_http.hpp
-@@ -239,6 +239,11 @@
-       }
- 
-     public:
-+      // Server-bound identity, never populated from request headers or query.
-+      std::string verified_client_uuid() const {
-+        auto peer = connection.lock();
-+        return peer ? peer->verified_client_uuid : std::string{};
-+      }
-       std::string method, path, query_string, http_version;
- 
-       Content content;
-@@ -307,6 +312,7 @@
- 
-       std::shared_ptr<ScopeRunner> handler_runner;
- 
-+      std::string verified_client_uuid;
-       std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
- 
-       /**
---- a/src/nvhttp.cpp
-+++ b/src/nvhttp.cpp
-@@ -79,7 +79,7 @@
-       context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
-     }
- 
--    std::function<int(SSL *)> verify;
-+    std::function<std::string(SSL *)> verify;
-     std::function<void(std::shared_ptr<Response>, std::shared_ptr<Request>)> on_verify_failed;
- 
-   protected:
-@@ -124,9 +124,11 @@
-               return;
-             }
-             if (!ec) {
--              if (verify && !verify(session->connection->socket->native_handle())) {
-+              auto client_uuid = verify ? verify(session->connection->socket->native_handle()) : std::string{};
-+              if (client_uuid.empty()) {
-                 this->write(session, on_verify_failed);
-               } else {
-+                session->connection->verified_client_uuid = std::move(client_uuid);
-                 this->read(session);
-               }
-             } else if (this->on_error) {
-@@ -450,10 +452,11 @@
-   }
- #endif
- 
--  std::shared_ptr<rtsp_stream::launch_session_t> make_launch_session(bool host_audio, const args_t &args) {
-+  std::shared_ptr<rtsp_stream::launch_session_t> make_launch_session(bool host_audio, const args_t &args, const std::string &client_uuid) {
-     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
- 
-     launch_session->id = ++session_id_counter;
-+    launch_session->client_uuid = client_uuid;
- 
-     auto rikey = util::from_hex_vec(get_arg(args, "rikey"), true);
-     std::copy(rikey.cbegin(), rikey.cend(), std::back_inserter(launch_session->gcm_key));
-@@ -1021,7 +1024,7 @@
-     }
- 
-     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
--    auto launch_session = make_launch_session(host_audio, args);
-+    auto launch_session = make_launch_session(host_audio, args, request->verified_client_uuid());
- 
-     if (rtsp_stream::session_count() == 0) {
-       // The display should be restored in case something fails as there are no other sessions.
-@@ -1125,7 +1128,7 @@
-     if (no_active_sessions && args.find("localAudioPlayMode"s) != std::end(args)) {
-       host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
-     }
--    const auto launch_session = make_launch_session(host_audio, args);
-+    const auto launch_session = make_launch_session(host_audio, args, request->verified_client_uuid());
- 
-     if (no_active_sessions) {
-       // We want to prepare display only if there are no active sessions at
-@@ -1252,7 +1255,7 @@
-     http_server_t http_server;
- 
-     // Verify certificates after establishing connection
--    https_server.verify = [add_cert](SSL *ssl) {
-+    https_server.verify = [add_cert](SSL *ssl) -> std::string {
-       crypto::x509_t x509 {
- #if OPENSSL_VERSION_MAJOR >= 3
-         SSL_get1_peer_certificate(ssl)
-@@ -1262,7 +1265,7 @@
-       };
-       if (!x509) {
-         BOOST_LOG(info) << "unknown -- denied"sv;
--        return 0;
-+        return {};
-       }
- 
-       int verified = 0;
-@@ -1285,12 +1288,18 @@
-       if (err_str) {
-         BOOST_LOG(warning) << "SSL Verification error :: "sv << err_str;
- 
--        return verified;
--      }
--
--      verified = 1;
--
--      return verified;
-+        return {};
-+      }
-+
-+      for (const auto &client : client_root.named_devices) {
-+        auto paired = crypto::x509(client.cert);
-+        if (paired && X509_cmp(paired.get(), x509.get()) == 0 && !client.uuid.empty()) {
-+          verified = 1;
-+          return client.uuid;
-+        }
-+      }
-+      // Verification alone is insufficient: the bound UUID must be persisted.
-+      return {};
-     };
- 
-     https_server.on_verify_failed = [](resp_https_t resp, req_https_t req) {
---- a/src/rtsp.h
-+++ b/src/rtsp.h
-@@ -25,6 +25,7 @@
- 
-     bool host_audio;
-     std::string unique_id;
-+    std::string client_uuid;  // Authenticated paired-client UUID, not query uniqueid.
-     int width;
-     int height;
-     int fps;
---- a/src/stream.cpp
-+++ b/src/stream.cpp
-@@ -421,6 +421,7 @@
-     safe::mail_t mail;
- 
-     std::shared_ptr<input::input_t> input;
-+    std::string client_uuid;
- 
-     std::thread audioThread;
-     std::thread videoThread;
-@@ -2318,7 +2319,7 @@
-     }
- 
-     int start(session_t &session, const std::string &addr_string) {
--      session.input = input::alloc(session.mail);
-+      session.input = input::alloc(session.mail, session.client_uuid);
- 
-       session.broadcast_ref = broadcast.ref();
-       if (!session.broadcast_ref) {
-@@ -2366,6 +2367,7 @@
- 
-       session->shutdown_event = mail->event<bool>(mail::shutdown);
-       session->launch_session_id = launch_session.id;
-+      session->client_uuid = launch_session.client_uuid;
- 
-       session->config = config;
- 
---- a/src/input.h
-+++ b/src/input.h
-@@ -24,7 +24,7 @@
- 
-   bool probe_gamepads();
- 
--  std::shared_ptr<input_t> alloc(safe::mail_t mail);
-+  std::shared_ptr<input_t> alloc(safe::mail_t mail, std::string client_uuid);
- 
-   struct touch_port_t: public platf::touch_port_t {
-     int env_width, env_height;
+diff --git a/src/input.cpp b/src/input.cpp
 --- a/src/input.cpp
 +++ b/src/input.cpp
-@@ -333,32 +333,33 @@
+@@ -351,32 +351,33 @@
      return true;
    }
- 
+
 -  std::ostringstream korri_input_seat_frame_prefix(std::string_view kind, std::int32_t controller_number, std::string_view launch_id) {
 +  std::ostringstream korri_input_seat_frame_prefix(std::string_view kind, std::int32_t controller_number, std::string_view launch_id, std::string_view client_id) {
      std::ostringstream out;
@@ -184,7 +18,7 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
          << "\",\"controllerNumber\":" << controller_number;
      return out;
    }
- 
+
 -  bool korri_input_seat_emit_source_connected(std::int32_t controller_number, const korri_input_seat_active_launch_t &active) {
 -    auto out = korri_input_seat_frame_prefix("source-connected"sv, controller_number, active.launch_id);
 +  bool korri_input_seat_emit_source_connected(std::int32_t controller_number, const korri_input_seat_active_launch_t &active, std::string_view client_id) {
@@ -193,7 +27,7 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
      korri_input_seat_emit_json(out.str(), active);
      return true;
    }
- 
+
 -  bool korri_input_seat_emit_source_disconnected(std::int32_t controller_number, std::string_view reason, const korri_input_seat_active_launch_t &active) {
 -    auto out = korri_input_seat_frame_prefix("source-disconnected"sv, controller_number, active.launch_id);
 +  bool korri_input_seat_emit_source_disconnected(std::int32_t controller_number, std::string_view reason, const korri_input_seat_active_launch_t &active, std::string_view client_id) {
@@ -202,7 +36,7 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
      korri_input_seat_emit_json(out.str(), active);
      return true;
    }
- 
+
 -  bool korri_input_seat_emit_source_state(PNV_MULTI_CONTROLLER_PACKET packet, const korri_input_seat_active_launch_t &active) {
 +  bool korri_input_seat_emit_source_state(PNV_MULTI_CONTROLLER_PACKET packet, const korri_input_seat_active_launch_t &active, std::string_view client_id) {
      const auto buttons = static_cast<std::uint32_t>(static_cast<std::uint16_t>(packet->buttonFlags)) |
@@ -212,9 +46,9 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
      out << ",\"buttons\":" << buttons
          << ",\"leftTrigger\":" << static_cast<std::uint32_t>(packet->leftTrigger)
          << ",\"rightTrigger\":" << static_cast<std::uint32_t>(packet->rightTrigger)
-@@ -382,6 +383,13 @@
+@@ -400,6 +401,13 @@
    }
- 
+
    struct korri_input_seat_stream_t: std::enable_shared_from_this<korri_input_seat_stream_t> {
 +    const std::string client_id;
 +    explicit korri_input_seat_stream_t(std::string uuid): client_id(std::move(uuid)) {
@@ -226,8 +60,8 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
      // Capture exactly once, at input::alloc, NOT on first input or on a timer.
      const bool configured {korri_input_seat_receiver_configured()};
      const korri_input_seat_active_launch_t authority {configured ? korri_input_seat_active_launch() : korri_input_seat_active_launch_t {}};
-@@ -402,7 +410,7 @@
- 
+@@ -420,7 +428,7 @@
+
      void disconnect(std::size_t number, std::string_view reason) {
        if (controllers[number].connected) {
 -        korri_input_seat_emit_source_disconnected(number, reason, authority);
@@ -235,7 +69,7 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
          controllers[number] = {};
        }
      }
-@@ -441,10 +449,10 @@
+@@ -459,10 +467,10 @@
        }
        for (const auto &entry : korri_input_seat_streams) {
          auto other = entry.lock();
@@ -249,7 +83,7 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
            other->retire("ambiguous-controller-number"sv);
            retire("ambiguous-controller-number"sv);
            BOOST_LOG(warning) << "input seat mirror fenced colliding stream controller numbers"sv;
-@@ -453,7 +461,7 @@
+@@ -471,7 +479,7 @@
        }
        if (!controllers[number].connected) {
          controllers[number].connected = true;
@@ -258,7 +92,7 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
        }
        schedule();
        return true;
-@@ -485,7 +493,7 @@
+@@ -503,7 +511,7 @@
            break;
          }
          if (controller.has_state) {
@@ -267,7 +101,7 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
          }
          // Arrival does not establish neutral state. Never fabricate a baseline
          // for a controller that has not sent its first actual state packet.
-@@ -514,7 +522,7 @@
+@@ -532,7 +540,7 @@
          controllers[number].state = *packet;
          controllers[number].has_state = true;
          if (!stopped.load()) {
@@ -276,29 +110,231 @@ Never use query uniqueid as controller identity. Missing bindings fail closed.
          }
        }
      }
-@@ -646,7 +654,7 @@
+@@ -753,7 +761,7 @@
      }
- 
+
  #ifdef __linux__
 -    std::shared_ptr<korri_input_seat_stream_t> mirror {std::make_shared<korri_input_seat_stream_t>()};
 +    std::shared_ptr<korri_input_seat_stream_t> mirror;
- 
+
      ~input_t() {
        korri_input_seat_stop(mirror);
-@@ -2144,11 +2152,15 @@
-     return true;
-   }
- 
--  std::shared_ptr<input_t> alloc(safe::mail_t mail) {
-+  std::shared_ptr<input_t> alloc(safe::mail_t mail, std::string client_uuid) {
-     auto input = std::make_shared<input_t>(
-       mail->event<input::touch_port_t>(mail::touch_port),
-       mail->queue<platf::gamepad_feedback_msg_t>(mail::gamepad_feedback)
-     );
-+
+@@ -2826,7 +2834,7 @@
+   /**
+    * @brief Allocate and initialize platform input state for a stream.
+    */
+-  std::shared_ptr<input_t> alloc(safe::mail_t mail, std::string session_id) {
++  std::shared_ptr<input_t> alloc(safe::mail_t mail, std::string session_id, std::string client_uuid) {
+     std::shared_ptr<input_t> input;
+     bool resumed = false;
+ #ifdef __linux__
+@@ -2854,6 +2862,12 @@
+       }
+     }
+
 +#ifdef __linux__
-+    input->mirror = std::make_shared<korri_input_seat_stream_t>(std::move(client_uuid));
++    if (!resumed) {
++      input->mirror = std::make_shared<korri_input_seat_stream_t>(std::move(client_uuid));
++    }
 +#endif
- 
-     // Workaround to ensure new frames will be captured when a client connects
-     task_pool.pushDelayed([]() {
++
+     if (resumed) {
+       dispatch_input_task([input, mail = std::move(mail)]() {
+         rebind_input(input, mail);
+diff --git a/src/input.h b/src/input.h
+--- a/src/input.h
++++ b/src/input.h
+@@ -10,6 +10,7 @@
+ #include <functional>
+ #include <memory>
+ #include <span>
++#include <string>
+ #include <string_view>
+ #include <vector>
+
+@@ -82,9 +83,10 @@
+    *
+    * @param mail Mailbox used to exchange messages with worker threads.
+    * @param session_id Stable paired-client identity shared by launch and resume connections.
++   * @param client_uuid Authenticated persisted UUID required by the protected input mirror.
+    * @return Shared input state bound to the stream mailbox.
+    */
+-  std::shared_ptr<input_t> alloc(safe::mail_t mail, std::string session_id);
++  std::shared_ptr<input_t> alloc(safe::mail_t mail, std::string session_id, std::string client_uuid = {});
+
+ #ifdef SUNSHINE_TESTS
+   namespace testing {
+diff --git a/src/nvhttp.cpp b/src/nvhttp.cpp
+--- a/src/nvhttp.cpp
++++ b/src/nvhttp.cpp
+@@ -101,7 +101,7 @@
+       context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
+     }
+
+-    std::function<int(SSL *)> verify;  ///< Callback that validates a client's TLS certificate after handshake.
++    std::function<std::string(SSL *)> verify;  ///< Callback that validates a client's TLS certificate after handshake.
+     std::function<void(std::shared_ptr<Response>, std::shared_ptr<Request>)> on_verify_failed;  ///< Handler used to return the pairing challenge when client verification fails.
+
+   protected:
+@@ -152,9 +152,11 @@
+               return;
+             }
+             if (!ec) {
+-              if (verify && !verify(session->connection->socket->native_handle())) {
++              auto client_uuid = verify ? verify(session->connection->socket->native_handle()) : std::string{};
++              if (client_uuid.empty()) {
+                 this->write(session, on_verify_failed);
+               } else {
++                session->connection->verified_client_uuid = std::move(client_uuid);
+                 this->read(session);
+               }
+             } else if (this->on_error) {
+@@ -627,10 +629,11 @@
+    * @param args Arguments forwarded to the callable or parser.
+    * @return Constructed launch session object.
+    */
+-  std::shared_ptr<rtsp_stream::launch_session_t> make_launch_session(bool host_audio, const args_t &args) {
++  std::shared_ptr<rtsp_stream::launch_session_t> make_launch_session(bool host_audio, const args_t &args, const std::string &client_uuid) {
+     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
+
+     launch_session->id = ++session_id_counter;
++    launch_session->client_uuid = client_uuid;
+
+     auto rikey = util::from_hex_vec(get_arg(args, "rikey"), true);
+     std::copy(rikey.cbegin(), rikey.cend(), std::back_inserter(launch_session->gcm_key));
+@@ -1536,7 +1539,7 @@
+     }
+
+     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
+-    auto launch_session = make_launch_session(host_audio, args);
++    auto launch_session = make_launch_session(host_audio, args, request->verified_client_uuid());
+
+     if (rtsp_stream::session_count() == 0) {
+       // The display should be restored in case something fails as there are no other sessions.
+@@ -1651,7 +1654,7 @@
+     if (no_active_sessions && args.find("localAudioPlayMode"s) != std::end(args)) {
+       host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
+     }
+-    const auto launch_session = make_launch_session(host_audio, args);
++    const auto launch_session = make_launch_session(host_audio, args, request->verified_client_uuid());
+
+     if (no_active_sessions) {
+       // We want to prepare display only if there are no active sessions at
+@@ -1797,7 +1800,7 @@
+     http_server_t http_server;
+
+     // Verify certificates after establishing connection
+-    https_server.verify = [](SSL *ssl) {
++    https_server.verify = [](SSL *ssl) -> std::string {
+       crypto::x509_t x509 {
+ #if OPENSSL_VERSION_MAJOR >= 3
+         SSL_get1_peer_certificate(ssl)
+@@ -1807,7 +1810,7 @@
+       };
+       if (!x509) {
+         BOOST_LOG(info) << "unknown -- denied"sv;
+-        return 0;
++        return {};
+       }
+
+       int verified = 0;
+@@ -1825,22 +1828,21 @@
+       if (err_str) {
+         BOOST_LOG(warning) << "SSL Verification error :: "sv << err_str;
+
+-        return verified;
+-      }
+-
+-      // Check if this client is enabled
+-      auto pem = crypto::pem(x509);
+-      auto [enabled, client_name] = get_client_status(pem);
+-      if (!enabled) {
+-        BOOST_LOG(info) << "Client is disabled -- denied"sv;
+-        return verified;
+-      }
+-
+-      last_verified_client_cert = pem;
+-      last_verified_client_name = client_name;
+-      verified = 1;
+-
+-      return verified;
++        return {};
++      }
++
++      // Verification includes upstream expiry/issuer checks and an exact,
++      // single enabled identity. UUID binding must not bypass either check.
++      for (const auto &client : client_root.named_devices) {
++        auto paired = crypto::x509(client.cert);
++        if (client.enabled && paired && X509_cmp(paired.get(), x509.get()) == 0 && !client.uuid.empty()) {
++          last_verified_client_cert = crypto::pem(x509);
++          last_verified_client_name = client.name;
++          verified = 1;
++          return client.uuid;
++        }
++      }
++      return {};
+     };
+
+     https_server.on_verify_failed = [](resp_https_t resp, req_https_t req) {
+diff --git a/src/rtsp.h b/src/rtsp.h
+--- a/src/rtsp.h
++++ b/src/rtsp.h
+@@ -43,6 +43,7 @@
+     std::optional<crypto::cipher::gcm_t> rtsp_cipher;  ///< AES-GCM cipher used once encrypted RTSP is negotiated.
+     std::string rtsp_url_scheme;  ///< URL scheme selected by the RTSP SETUP flow.
+     uint32_t rtsp_iv_counter;  ///< Counter value mixed into encrypted RTSP IVs.
++    std::string client_uuid;  ///< Authenticated persisted paired UUID, never query uniqueid.
+     std::string client_cert;  ///< PEM certificate for the paired Moonlight client.
+   };
+
+diff --git a/src/stream.cpp b/src/stream.cpp
+--- a/src/stream.cpp
++++ b/src/stream.cpp
+@@ -552,6 +552,7 @@
+
+     std::uint32_t launch_session_id;  ///< RTSP launch-session ID associated with this stream.
+     std::string client_cert;  ///< PEM certificate for the paired client owning the stream.
++    std::string client_uuid;  ///< Authenticated persisted UUID used by the protected mirror.
+     std::string input_session_id;  ///< Stable client identity used to retain input devices across resume.
+
+     safe::mail_raw_t::event_t<bool> shutdown_event;  ///< Event raised when the stream should shut down.
+@@ -2265,7 +2266,7 @@
+      * @brief Start the audio, video, and control workers for a streaming session.
+      */
+     int start(session_t &session, const std::string &addr_string) {
+-      session.input = input::alloc(session.mail, session.input_session_id);
++      session.input = input::alloc(session.mail, session.input_session_id, session.client_uuid);
+
+       session.broadcast_ref = broadcast.ref();
+       if (!session.broadcast_ref) {
+@@ -2317,6 +2318,7 @@
+       session->shutdown_event = mail->event<bool>(mail::shutdown);
+       session->launch_session_id = launch_session.id;
+       session->client_cert = launch_session.client_cert;
++      session->client_uuid = launch_session.client_uuid;
+       session->input_session_id = launch_session.client_cert.empty() ? launch_session.unique_id : launch_session.client_cert;
+
+       session->config = config;
+diff --git a/third-party/Simple-Web-Server/server_http.hpp b/third-party/Simple-Web-Server/server_http.hpp
+--- a/third-party/Simple-Web-Server/server_http.hpp
++++ b/third-party/Simple-Web-Server/server_http.hpp
+@@ -239,6 +239,11 @@
+       }
+
+     public:
++      // Server-bound identity, never populated from request headers or query.
++      std::string verified_client_uuid() const {
++        auto peer = connection.lock();
++        return peer ? peer->verified_client_uuid : std::string{};
++      }
+       std::string method, path, query_string, http_version;
+
+       Content content;
+@@ -307,6 +312,7 @@
+
+       std::shared_ptr<ScopeRunner> handler_runner;
+
++      std::string verified_client_uuid;
+       std::unique_ptr<socket_type> socket; // Socket must be unique_ptr since asio::ssl::stream<asio::ip::tcp::socket> is not movable
+
+       /**
