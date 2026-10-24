@@ -18,6 +18,7 @@ pkgs.writeShellApplication {
     pkgs.xdotool
     pkgs.xprop
     pkgs.openbox
+    pkgs.imagemagick
   ];
   text = ''
     export SDL_VIDEODRIVER=x11

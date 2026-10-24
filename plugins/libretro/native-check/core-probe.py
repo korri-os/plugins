@@ -6,9 +6,12 @@ This checks callbacks and nonuniform content frames, not hardware presentation.
 
 import ctypes as c
 import hashlib
+import os
 import sys
 import tempfile
 import time
+
+from frame import write_png
 
 
 class SystemInfo(c.Structure):
@@ -48,6 +51,8 @@ def probe(core_file, content, frames=180):
     core = c.CDLL(core_file)
     frame = 0
     videos = []
+    last_video = None
+    pixel_format = 0
     input_ids = set()
     shutdown = []
     polls = []
@@ -57,6 +62,10 @@ def probe(core_file, content, frames=180):
 
         @ENV
         def environment(command, data):
+            nonlocal pixel_format
+            if command == 10:
+                pixel_format = c.cast(data, c.POINTER(c.c_int))[0]
+                return True
             if command in (9, 30, 31):
                 c.cast(data, c.POINTER(c.c_char_p))[0] = directory
                 return True
@@ -80,8 +89,10 @@ def probe(core_file, content, frames=180):
 
         @VIDEO
         def video(data, width, height, pitch):
+            nonlocal last_video
             if data and data != c.c_void_p(-1).value:
                 pixels = c.string_at(data, height * pitch)
+                last_video = (width, height, pitch, pixel_format, pixels)
                 videos.append(
                     (
                         width,
@@ -114,6 +125,7 @@ def probe(core_file, content, frames=180):
                     and (
                         (button == 8 and 20 <= frame < 25)
                         or (button == 3 and 60 <= frame < 65)
+                        or (button == 4 and frame >= 90)
                         or (button == 7 and 90 <= frame < 95)
                     )
                 )
@@ -152,11 +164,21 @@ def probe(core_file, content, frames=180):
         assert core.retro_load_game(c.byref(game)), (
             "Native core refused selected content"
         )
+        print("retro_load_game returned true for selected content")
         try:
             for frame in range(frames):
                 core.retro_run()
                 # pzretro executes on its own thread; do not starve that thread.
                 time.sleep(0.002)
+            if last_video and os.environ.get("KORRI_NATIVE_FRAME"):
+                write_png(os.environ["KORRI_NATIVE_FRAME"], *last_video)
+            fixture = os.environ.get("KORRI_NATIVE_FIXTURE")
+            if fixture in ("tic80", "wasm4", "lowresnx"):
+                memory = c.string_at(
+                    core.retro_get_memory_data(0), core.retro_get_memory_size(0)
+                )
+                offset = {"tic80": 4, "wasm4": 6, "lowresnx": 1}[fixture]
+                assert memory[offset] == 42, "Original cart did not receive Up input"
             assert len(videos) > 10, "No native content frames"
             assert any(v[3] > 1 for v in videos), "Only blank/uniform frames"
             assert polls, "Core did not poll input"

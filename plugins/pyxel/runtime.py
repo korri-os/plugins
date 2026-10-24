@@ -23,6 +23,14 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
     package = Path(package)
     manifest = json.loads((package / "manifest.json").read_text())
     program = manifest["files"]["pyxel"]
+    proof = None
+    if external or os.environ.get("KORRI_NATIVE_PROOF_DIR"):
+        proof = Path(
+            os.environ.get("KORRI_NATIVE_PROOF_DIR")
+            or tempfile.mkdtemp(prefix="korri-native-proof-")
+        )
+        proof.mkdir(parents=True, exist_ok=True)
+        print(f"Retained native proof: {proof}")
     with tempfile.TemporaryDirectory(prefix="pyxel-native-") as temporary:
         work = Path(temporary)
         media = work / "read-only media"
@@ -144,6 +152,18 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                     trigger.touch()
                 time.sleep(1.5)
                 assert process.poll() is None, "Pyxel exited on Start or startup"
+                if proof:
+                    subprocess.run(
+                        [
+                            "magick",
+                            "import",
+                            "-window",
+                            window,
+                            str(proof / "pyxel.png"),
+                        ],
+                        check=True,
+                        timeout=10,
+                    )
                 if original:
                     assert int(marker.read_text()) > before_frame, (
                         "Native updates stopped after Start"
@@ -154,6 +174,8 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                     timeout=5,
                 )
                 stdout, stderr = process.communicate(timeout=10)
+                if proof:
+                    (proof / "pyxel-load.log").write_text(stdout + stderr)
                 assert process.returncode == 0, stdout + stderr
                 if start_probe:
                     assert (

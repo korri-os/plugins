@@ -74,3 +74,9 @@ separate build-host tool, not part of the plugin's runtime closure.
 No target installation, publication or physical display/audio/controller,
 performance or return-to-portal acceptance follows from these checks. Devices
 must download approved prebuilt outputs with signatures; never compile there.
+
+The live probe retains an actual X11 window screenshot `pyxel.png` and native
+output `pyxel-load.log`. Set `KORRI_NATIVE_PROOF_DIR` to choose their directory.
+Otherwise external mode prints a retained temporary directory. Inspect the image
+for the reviewed game's actual title/content; process-alive is not gameplay
+acceptance. The original fixture check exercises PNG capture too.

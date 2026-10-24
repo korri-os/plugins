@@ -69,7 +69,9 @@ plugin packages. It typechecks only those four declarations/helpers. Original
 frames with input/audio callbacks and nonuniform framebuffer content. The real
 packaged frontend then runs exactly the selected content with a bounded clean
 exit, native save persistence and separate accounts. Source media is read-only.
-Start is injected at the core callback boundary; physical input is untested.
+Start is injected at the core callback boundary; TIC-80, WASM-4 and LowRes NX
+fixtures also write an expected SRAM marker only after receiving Up. Supported
+native serialization is round-tripped. Physical input is untested.
 
 The optional `./probe.nix { inherit pkgs; }` exports a separate build-host tool:
 
@@ -86,3 +88,11 @@ Both checks run natively on the selected build architecture. Window tests use
 Xvfb/software SDL, not target GPU/display/audio. Hardware controls, performance,
 Start-to-host handling and return to the real portal remain separate acceptance.
 No device operations or publication are authorized by a successful check.
+
+Live probes retain `<core>.png`, `core-load.log`, `frontend.log` and the missing-file
+negative-case log. Set `KORRI_NATIVE_PROOF_DIR` to choose their directory; without
+it external mode prints a new retained directory under the host temporary root.
+The PNG is the selected native core's actual video callback frame, not an image
+from a catalog. PuzzleScript additionally must report successful compilation.
+Inspect the retained image for acquired-content acceptance: nonuniform pixels
+alone do not distinguish a game from every possible interpreter error screen.

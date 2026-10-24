@@ -30,13 +30,30 @@ def run(package, core, content, external=False, korrid=None, architecture=None):
     source = Path(content).resolve()
     before = hashlib.sha256(source.read_bytes()).digest()
     neighbors = {p.name for p in source.parent.iterdir()}
+    proof = None
+    if external or os.environ.get("KORRI_NATIVE_PROOF_DIR"):
+        proof = Path(
+            os.environ.get("KORRI_NATIVE_PROOF_DIR")
+            or tempfile.mkdtemp(prefix="korri-native-proof-")
+        )
+        proof.mkdir(parents=True, exist_ok=True)
+        print(f"Retained native proof: {proof}")
+    probe_env = dict(os.environ)
+    if proof:
+        probe_env["KORRI_NATIVE_FRAME"] = str(proof / f"{core}.png")
+    if not external:
+        probe_env["KORRI_NATIVE_FIXTURE"] = core
     probe = subprocess.run(
         [sys.executable, str(HERE / "core-probe.py"), native, str(source)],
-        check=True,
+        check=False,
+        env=probe_env,
         timeout=35,
         capture_output=True,
         text=True,
     )
+    if proof:
+        (proof / "core-load.log").write_text(probe.stdout + probe.stderr)
+    assert probe.returncode == 0, probe.stdout + probe.stderr
     print(probe.stdout, end="")
     print(probe.stderr, end="", file=sys.stderr)
     if core == "pzretro":
@@ -103,6 +120,11 @@ def run(package, core, content, external=False, korrid=None, architecture=None):
                 timeout=35,
             )
             log = result.stdout + result.stderr
+            if proof:
+                (
+                    proof
+                    / ("frontend.log" if selected == source else "missing-content.log")
+                ).write_text(log)
             assert result.returncode == 0, log
             assert "[Core]" in log and "[Content]" in log, log
             assert "Failed to load content" not in log, log

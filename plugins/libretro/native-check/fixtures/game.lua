@@ -4,5 +4,5 @@ function TIC()
  if first then pmem(0,pmem(0)+1) first=false end
  cls(3)
  rect(20,20,40,40,6)
- if btn(0) then pix(0,0,12) end
+ if btn(0) then pix(0,0,12) pmem(1,42) end
 end
