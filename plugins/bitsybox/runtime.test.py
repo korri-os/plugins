@@ -11,7 +11,9 @@ import tempfile
 import time
 from pathlib import Path
 
-package, system, korrid, fixture = sys.argv[1:]
+package, system, korrid, fixture = sys.argv[1:5]
+# Build-host regression mode. Live device acceptance supplies its own real pad.
+start_probe = sys.argv[5] if len(sys.argv) > 5 else None
 package = Path(package)
 manifest = json.loads((package / "manifest.json").read_text())
 engine = manifest["files"]["bitsybox"]
@@ -82,7 +84,18 @@ with tempfile.TemporaryDirectory(prefix="bitsy-runtime-") as temporary:
     process = subprocess.Popen(
         command,
         cwd=work,
-        env={**os.environ, "SDL_AUDIODRIVER": "dummy"},
+        env={
+            **os.environ,
+            "SDL_AUDIODRIVER": "dummy",
+            **(
+                {
+                    "LD_PRELOAD": start_probe,
+                    "KORRI_TEST_START_TRIGGER": str(work / "start-trigger"),
+                }
+                if start_probe
+                else {}
+            ),
+        },
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -95,24 +108,36 @@ with tempfile.TemporaryDirectory(prefix="bitsy-runtime-") as temporary:
             timeout=15,
             check=True,
         ).stdout.splitlines()[0]
-        # Keep a real native world alive for a bounded interval, not just an SDL init.
-        time.sleep(1)
-        assert process.poll() is None
         subprocess.run(
             ["xdotool", "windowfocus", "--sync", window], check=True, timeout=5
         )
+        # Arm input only after observing and focusing the real native window.
+        if start_probe:
+            (work / "start-trigger").touch()
+        time.sleep(1)
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            raise AssertionError(
+                "Controller Start must not terminate the game\n" + stdout + stderr
+            )
         subprocess.run(
             ["xdotool", "key", "--clearmodifiers", "Escape"], check=True, timeout=5
         )
         stdout, stderr = process.communicate(timeout=10)
         assert process.returncode == 0, stdout + stderr
+        if start_probe:
+            assert "BITSY_TEST_START_DOWN" in stderr, stderr
+            assert "BITSY_TEST_START_UP" in stderr, stderr
         assert "bitsy::world loaded" in stdout, stdout + stderr
         assert "Error:" not in stdout and "error:" not in stdout, stdout + stderr
         assert "Update Bitsy Error" not in stdout, stdout + stderr
     finally:
         if process.poll() is None:
             process.kill()
-            process.communicate()
+        final_stdout, diagnostic = process.communicate()
+        if process.returncode != 0:
+            print(f"Native test process exit: {process.returncode}", file=sys.stderr)
+            print(final_stdout + diagnostic, file=sys.stderr)
     assert account.is_dir()  # Provisioned by the real launch executor.
     assert list(account.iterdir()) == []  # No new saves/config policy.
     after = {
@@ -176,5 +201,5 @@ with tempfile.TemporaryDirectory(prefix="bitsy-runtime-") as temporary:
         assert "Usage:" in result.stderr or "Bitsy" in result.stderr, result.stderr
 
 print(
-    f"Bitsybox {system}: native world, >256-byte literal path, menu-exit, invalid-file refusal and no media writes passed"
+    f"Bitsybox {system}: native world, >256-byte literal path, Start-safe play, keyboard menu-exit, invalid-file refusal and no media writes passed"
 )

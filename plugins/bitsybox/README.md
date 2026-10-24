@@ -26,11 +26,11 @@ The engine runs the retained bytes, so it does not reopen a different file after
 validation. No shell parses filenames. Long paths and spaces are supported up
 to the operating system's limits.
 
-Keyboard and SDL gamepad mapping remain upstream's: arrows/WASD or D-pad move;
-space/enter or face buttons confirm; Alt+Enter toggles fullscreen. Escape,
-Ctrl+R, or gamepad Start now end the selected-file session instead of reopening
-the chooser. A native reset/end also exits. Fullscreen and rendering defaults
-remain upstream's; no extra UI is added.
+Arrows/WASD or D-pad move; space/enter or face buttons confirm; Alt+Enter
+toggles fullscreen. Gamepad Start is not mapped by this runner. Korri owns
+controller session controls. Escape and Ctrl+R end the selected-file session
+instead of reopening the chooser. A native reset/end also exits. Fullscreen
+and rendering defaults remain upstream's; no extra UI is added.
 
 ## Licensing and publication block
 
@@ -75,7 +75,9 @@ nix build --no-link .#packages.aarch64-linux.korri-plugin-bitsybox \
 The check covers strict launch types, real host admission and `plugin-run`,
 negative launch inputs, native ELF architecture, pre-SDL invalid-file refusal,
 bounded startup of original native data, paths longer than 256 bytes with shell
-characters/spaces, keyboard menu-exit, and unchanged media bytes/directory.
+characters/spaces, continued play after SDL controller Start press/release,
+keyboard menu-exit, and unchanged media bytes/directory. The controller-input
+probe is test-only and is not shipped in either runtime output.
 It uses Xvfb on build hosts, never target devices. Physical gamepad, display,
 audio and complete-game acceptance remain separate. No publication, image pin,
 installation, device changes, or acquisition permission changes are authorized.
