@@ -160,9 +160,12 @@ def run(package, core, content, external=False, korrid=None, architecture=None):
         else:
             raise AssertionError("Missing selected content was accepted")
     assert hashlib.sha256(source.read_bytes()).digest() == before, "Media changed"
-    assert {p.name for p in source.parent.iterdir()} == neighbors, (
-        "Media directory changed"
-    )
+    # Original fixture media is an exclusive read-only directory. An acquired
+    # file's parent can also contain live host state and probe output.
+    if not external:
+        assert {p.name for p in source.parent.iterdir()} == neighbors, (
+            "Media directory changed"
+        )
     print(
         f"{core}: selected-file frontend launch, clean bounded exit, unchanged media and account saves passed"
     )
