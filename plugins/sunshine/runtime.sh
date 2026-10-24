@@ -48,4 +48,4 @@ export PULSE_SERVER="unix:$runtime_dir/pulse/native"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime_dir/bus"
 
 @coreutils@/bin/mkdir -p /home/korri/.config/sunshine
-exec @sunshine@/bin/sunshine /home/korri/.config/sunshine/sunshine.conf log_path=/dev/null capture=kms encoder=auto capture_rt_priority=5 file_apps=@apps@
+exec @sunshine@/bin/sunshine /home/korri/.config/sunshine/sunshine.conf log_path=/dev/null capture=kms encoder=auto capture_rt_priority=5 system_tray=disabled file_apps=@apps@
