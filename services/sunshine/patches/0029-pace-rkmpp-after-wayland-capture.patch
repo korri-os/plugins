@@ -1,7 +1,7 @@
 diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -644,11 +644,14 @@
+@@ -636,11 +636,14 @@
    public:
      platf::capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
        auto next_frame = std::chrono::steady_clock::now();

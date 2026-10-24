@@ -33,7 +33,7 @@ diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
      }
  
      platf::mem_type_e mem_type;  ///< Mem type.
-@@ -642,16 +650,65 @@
+@@ -634,16 +642,65 @@
  
    class wlr_vram_t: public wlr_t {
    public:

@@ -35,6 +35,15 @@ pkgs.stdenv.mkDerivation {
   doCheck = true;
   checkPhase = ''
     python3 ${./test-rkmpp-pacing.py} ${source}/src/video.cpp
+    # RAM and VRAM factories have similar patch context. RKMPP descriptors
+    # must stay in VRAM capture, never in the RGB image factory.
+    if sed -n '/class wlr_ram_t:/,/class wlr_vram_t:/p' ${source}/src/platform/linux/wlgrab.cpp \
+      | grep -F 'make_unique<rkmpp_wl_t>'; then
+      echo 'RKMPP Wayland device attached to RAM capture' >&2
+      exit 1
+    fi
+    sed -n '/class wlr_vram_t:/,$p' ${source}/src/platform/linux/wlgrab.cpp \
+      | grep -F 'make_unique<rkmpp_wl_t>'
     ./row-pair-test
     ./capture-scheduling-test
     ./kms-pacing-test
