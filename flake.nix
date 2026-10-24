@@ -8,9 +8,6 @@
     # Temporary: the previous nixpkgs lock, held for the plugins that cannot
     # move yet. Every other plugin follows `nixpkgs`. Remove this input when
     # the last holder moves:
-    # - Sunshine: its approved base derivations were reviewed against this
-    #   revision (services/sunshine/approved-patches.nix). Moves with the
-    #   patch-set rebase onto a newer upstream release.
     # - Cemu: retain its runtime dependencies while qualifying the separate
     #   patched Mesa 26.2.5 Turnip (plugins/cemu/README.md). Moving the rest
     #   of Cemu to the current pin needs separate dependency qualification.

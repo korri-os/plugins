@@ -1,33 +1,21 @@
 rec {
-  baseSunshineVersion = "2025.924.154138";
-  approvedBaseSourceHash = "sha256-QrPfZqd9pgufohUjxlTpO6V0v7B41UrXHZaESsFjZ48=";
-  approvedDeviceBaseDerivation = "/nix/store/5hmg1ff3wjkzcmspssckdlydk0d5bbjz-sunshine-2025.924.154138.drv";
+  baseSunshineVersion = "2026.914.233613";
+  approvedBaseSourceHash = "sha256-HqbswLvX/UiY3nOwxSesBMqnFAF0zKP1ueE6PwDtTNs=";
+  approvedDeviceBaseDerivation = "/nix/store/832s1aqgsrkcawmf5pcff634mla3a03r-sunshine-2026.914.233613.drv";
   approvedDeviceBaseDerivations = {
-    "x86_64-linux-cuda" = "/nix/store/5hmg1ff3wjkzcmspssckdlydk0d5bbjz-sunshine-2025.924.154138.drv";
-    "aarch64-linux-software" =
-      "/nix/store/8dhfxx3xi04qvlv8ihrg4p6ycqwx6fhc-sunshine-2025.924.154138.drv";
-    "aarch64-linux-rkmpp" = "/nix/store/8dhfxx3xi04qvlv8ihrg4p6ycqwx6fhc-sunshine-2025.924.154138.drv";
+    "x86_64-linux-cuda" = "/nix/store/832s1aqgsrkcawmf5pcff634mla3a03r-sunshine-2026.914.233613.drv";
+    "aarch64-linux-software" = "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv";
+    "aarch64-linux-rkmpp" = "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv";
   };
   approvedBaseDerivationsByProfile = {
-    "x86_64-linux-cuda" = [
-      # Korri nixpkgs revision a6531044f6d0bef691ea18d4d4ce44d0daa6e816.
-      "/nix/store/63c39c0mjs72ixh20hs18r8l8zh3wix7-sunshine-2025.924.154138.drv"
-      # Mountainous nixpkgs revision c06b4ae3d6599a672a6210b7021d699c351eebda.
-      "/nix/store/5hmg1ff3wjkzcmspssckdlydk0d5bbjz-sunshine-2025.924.154138.drv"
-    ];
-    "aarch64-linux-software" = [
-      # Korri nixpkgs revision a6531044f6d0bef691ea18d4d4ce44d0daa6e816.
-      "/nix/store/8dhfxx3xi04qvlv8ihrg4p6ycqwx6fhc-sunshine-2025.924.154138.drv"
-    ];
-    "aarch64-linux-rkmpp" = [
-      # Same reviewed CUDA-free upstream recipe; RKMPP is added only downstream.
-      "/nix/store/8dhfxx3xi04qvlv8ihrg4p6ycqwx6fhc-sunshine-2025.924.154138.drv"
-    ];
-    "aarch64-linux-rkmpp-v4l2m2m" = [
-      # Both encoder patches change the downstream static FFmpeg, not this
-      # reviewed upstream Sunshine derivation.
-      "/nix/store/8dhfxx3xi04qvlv8ihrg4p6ycqwx6fhc-sunshine-2025.924.154138.drv"
-    ];
+    # Korri plugins nixpkgs revision 02c087f3fe673c9e317f206a627cb6b910336dbe.
+    "x86_64-linux-cuda" = [ "/nix/store/832s1aqgsrkcawmf5pcff634mla3a03r-sunshine-2026.914.233613.drv" ];
+    "aarch64-linux-software" = [ "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv" ];
+    # Same reviewed CUDA-free upstream recipe; RKMPP is added only downstream.
+    "aarch64-linux-rkmpp" = [ "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv" ];
+    # Both encoder patches change the downstream static FFmpeg, not this
+    # reviewed upstream Sunshine derivation.
+    "aarch64-linux-rkmpp-v4l2m2m" = [ "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv" ];
   };
   approvedBaseDerivations = builtins.concatLists (
     builtins.attrValues approvedBaseDerivationsByProfile
@@ -52,50 +40,50 @@ rec {
       sha256 = "2d6cd48d31a3b0eae109e2487851a6b0c6b8101de11e70c0817f3d03908686d5";
     }
   ];
-  v4l2m2mPatchSetSha256 = "e918232613be4264d0c7c55900ff030674cc66e3f8f37f4daa0c59f1051960a6";
-  reviewedNvencApiMajor = 12;
-  reviewedNvencApiMinor = 0;
-  patchSetSha256 = "64d07a531579a764b001497890eaaf4d635caf6589c6642e6a500c05dc1d2438";
+  v4l2m2mPatchSetSha256 = "4aeb0e1fcd2602fca166659fcff9ad74c37abb6d27797ba4eda0c2ef0b7cdf2e";
+  reviewedNvencApiMajor = 13;
+  reviewedNvencApiMinor = 1;
+  patchSetSha256 = "480077e8a76fa390a4e122053882d1605e9e2b23226f09bbb92cb0aa3c3bd484";
   patches = [
     {
       name = "0015-add-korri-input-seat-event-mirror.patch";
       path = ./patches/0015-add-korri-input-seat-event-mirror.patch;
-      sha256 = "f7fe0901a3735e09d08c8dc58c17ff51b687755649579512879467a5fb2a4793";
+      sha256 = "ef17f7585ae23e869a0b8de932bd094d9f705a4c0629219e4b11b53be00ed2b6";
     }
     {
       name = "0017-use-wayland-ram-capture-for-cuda.patch";
       path = ./patches/0017-use-wayland-ram-capture-for-cuda.patch;
-      sha256 = "a87aefc6eb5f71a4d413d751eefb87743745a2fab126dded5b66b23b949f66b2";
+      sha256 = "3ea2bffbcddc618b515bc98a4c0790260b00962fac0306739e39821a52e8587b";
     }
     {
       name = "0018-vectorize-wayland-bgr888-with-swscale.patch";
       path = ./patches/0018-vectorize-wayland-bgr888-with-swscale.patch;
-      sha256 = "753971f16e33598215caa455074f3bbca23e43b0cf2a2b8a97779f356486203f";
+      sha256 = "9c16386d03e8d7508a491b394265406dd69ec362b46f42dc9a73ae296fb25e5b";
     }
     {
       name = "0019-use-pinned-memory-for-cuda-capture.patch";
       path = ./patches/0019-use-pinned-memory-for-cuda-capture.patch;
-      sha256 = "83fd586d210668b06753fdd8bb6312967ba8805ce7a2fdc992c5cbdc49c79c88";
+      sha256 = "52542104b98574f0360b15cee8466b9a104e75ec59d28e1df26fd937a6f92d0c";
     }
     {
       name = "0020-add-korrid-certificate-control.patch";
       path = ./patches/0020-add-korrid-certificate-control.patch;
-      sha256 = "8e97eb5c8cf30a5b80b6a13aa88102de4ff443103875873ae4eb8f483ccfe059";
+      sha256 = "40dd5e8c914bac588ec5f167df82355fbb6e2387cffdb04af42d576efa60a2c8";
     }
     {
       name = "0021-add-v4l2m2m-encoder.patch";
       path = ./patches/0021-add-v4l2m2m-encoder.patch;
-      sha256 = "64e51b7085e2678d2abb04aafb5d9a4c8d961a2f2b6ced7c7636f85ec67a66b3";
+      sha256 = "9dfa95777c45e230c08a5c150ab9e9b7264bcde41ba5dd74112b6db0dc180e12";
     }
     {
       name = "0038-configure-linux-capture-fifo.patch";
       path = ./patches/0038-configure-linux-capture-fifo.patch;
-      sha256 = "314fd4d8bda3ecbe46e30aa394236d6527e558a280676e351e2bcf6508dc8eba";
+      sha256 = "388d8ab90e4d06c95cdcb1d1f0c148b4e9a090a18efe8e0d969b93fad3f052d6";
     }
     {
       name = "0039-bind-paired-client-input-identity.patch";
       path = ./patches/0039-bind-paired-client-input-identity.patch;
-      sha256 = "3d8cb7be912b0bd7afa66aa49cd7f0a78be3702e4242fe7bb1bcb52fa161f943";
+      sha256 = "f08fb2ba63c534349cf5ab63e7bcfa39f7a063db01a224242812ddc8bda0fa8f";
     }
   ];
 
@@ -105,7 +93,7 @@ rec {
   rkmppPatch = {
     name = "0022-add-rkmpp-h264-encoder.patch";
     path = ./patches/0022-add-rkmpp-h264-encoder.patch;
-    sha256 = "ccaee940f2bfd8b28c2f9487931cfa8ceb1b707770a093df62096d17e6980003";
+    sha256 = "818b5fc1d16a69746e21933d8ce69f8f75c6334149bea5cac2addbc363739fc7";
   };
 
   # Applied after the RKMPP encoder patch, only for the
@@ -114,18 +102,11 @@ rec {
   rkmppZeroCopyPatch = {
     name = "0023-add-rkmpp-drm-prime-zero-copy.patch";
     path = ./patches/0023-add-rkmpp-drm-prime-zero-copy.patch;
-    sha256 = "601a6ce16580902dae652920f4af819fa19afb7aa430b1c65860b3c8f99b9086";
+    sha256 = "11639b5df70d46bee1358b765cb9d202f36734eaefc2b1120d53f4a350c67557";
   };
 
-  # Scope the stdin pairing fix to the device profile while validating it;
-  # leave the approved x86 build unchanged.
-  stdinPinPatch = {
-    name = "0024-fix-stdin-pin-pairing-return.patch";
-    path = ./patches/0024-fix-stdin-pin-pairing-return.patch;
-    sha256 = "eeab5c78eea1c2c1f72277fb370681b5352b28da75a58668bfda043836b28020";
-  };
 
-  # Applied after the stdin pairing fix, only for the aarch64-linux-rkmpp
+  # Applied after the zero-copy patch, only for the aarch64-linux-rkmpp
   # profile. wlroots compositors expose no KMS scanout framebuffer, so the
   # KMS zero-copy route never runs on a Wayland host. This hands the
   # compositor's exported dma-buf to h264_rkmpp as a DRM_PRIME frame, which
@@ -133,7 +114,7 @@ rec {
   rkmppWaylandPatch = {
     name = "0027-capture-wayland-frames-for-rkmpp.patch";
     path = ./patches/0027-capture-wayland-frames-for-rkmpp.patch;
-    sha256 = "d501ea2c8db6ed4905794b036094796a82aa04d147e92f54b6f73feb35f443b5";
+    sha256 = "74a9d3b3551d9e0f7133c417817c9cef6113882c13e35c3cd25de026cc4d47b6";
   };
 
   # The compositor has already advertised the capture format before Sunshine
@@ -142,7 +123,7 @@ rec {
   rkmppWaylandImmediatePatch = {
     name = "0028-create-wayland-dmabuf-immediately.patch";
     path = ./patches/0028-create-wayland-dmabuf-immediately.patch;
-    sha256 = "0433b060174c0ea3bea40612558ec8a9da6d7e9ff6b72bd398fb752b0ecb1d82";
+    sha256 = "9cd531b77a21ed11ba5f99c4049cde5e8081e79c4b56ee73a48ce6c4a9503cbe";
   };
 
   # Let Wayland capture follow the compositor, then enforce the negotiated
@@ -151,7 +132,7 @@ rec {
   rkmppWaylandPacingPatch = {
     name = "0029-pace-rkmpp-after-wayland-capture.patch";
     path = ./patches/0029-pace-rkmpp-after-wayland-capture.patch;
-    sha256 = "902e5f87c1050a0db82aa9760485ef6ea2f0202d8c78fd681cae318f1ac3b0b7";
+    sha256 = "28f0b532a162172e7eee53191265b51caf6d087b5f74ab3bcc912bbb3e455ec6";
   };
 
   # Keep a bounded pool of linear GBM buffers instead of allocating and
@@ -160,7 +141,7 @@ rec {
   rkmppWaylandBufferPoolPatch = {
     name = "0030-reuse-wayland-capture-buffers.patch";
     path = ./patches/0030-reuse-wayland-capture-buffers.patch;
-    sha256 = "194d34f3ba95aba3dd5a0011bca4f9bef1bd6436b8b3d7d43f9d3db15c3cc963";
+    sha256 = "a0ae2553c5278e4245e2911a552f13578644da5c86b42a09386153e3e1881bb8";
   };
 
   # Issue the next screencopy request before handing the current frame to the
@@ -169,7 +150,7 @@ rec {
   rkmppWaylandPipelinePatch = {
     name = "0031-pipeline-wayland-capture-requests.patch";
     path = ./patches/0031-pipeline-wayland-capture-requests.patch;
-    sha256 = "6d05d0d8f22ee61e7dc51d43080ba0ef7e2acf6786397fe13104146c5c3584cd";
+    sha256 = "fc849deec75baab1e8eba7befdd5f57d82a3ed0c5fe3429b8f8537ef00165163";
   };
 
   # The async encode loop reset its deadline from the clock after sleeping,
@@ -179,7 +160,7 @@ rec {
   rkmppEncodeSchedulePatch = {
     name = "0032-keep-an-absolute-rkmpp-encode-schedule.patch";
     path = ./patches/0032-keep-an-absolute-rkmpp-encode-schedule.patch;
-    sha256 = "e46d0639328923b43fa165ef9ad66bebc720532acf19140d68802a8f7aa43b18";
+    sha256 = "28dedb7a2987178f1859c0fed739d4dc841174c833285bf6d7b0dd41d79588e2";
   };
 
   # Accepted from the Mini V2 rotation trial as tested on the device (signed
@@ -190,36 +171,35 @@ rec {
   rotationPatch = {
     name = "0033-rotate-kms-capture-to-output-transform.patch";
     path = ./patches/0033-rotate-kms-capture-to-output-transform.patch;
-    sha256 = "0ef6edf82c50f8d700b5ab288f069b5801f404e33b0f2af3e229eee975b0fb1f";
+    sha256 = "bcdaa3f1a0401f9a88f2c47d6b08e6b0201695a4a255c51af1fe5cf646648b03";
   };
   rotationCropPatch = {
     name = "0034-crop-encoded-sps-to-visible-size.patch";
     path = ./patches/0034-crop-encoded-sps-to-visible-size.patch;
-    sha256 = "dd2ef90eba90c1628e418e540502b42aea4c85339c70114ca7a806aa257cbe7f";
+    sha256 = "0e0688cc462f94813df9d6192aeba9c8f15e115058279563e45daf6986fab461";
   };
 
   kmsLinearPatch = {
     name = "0035-read-linear-kms-dmabuf.patch";
     path = ./patches/0035-read-linear-kms-dmabuf.patch;
-    sha256 = "049202bf0baa783b5936a1d9be4fa17adf63cfb1cbc75d984c904fa1bce5de7a";
+    sha256 = "965f8ef9f7d66c656c6ce4385cbd43fb01969731da35f88ffdf05710ec327afd";
   };
 
   kmsNv12Patch = {
     name = "0036-convert-kms-row-pairs-to-nv12.patch";
     path = ./patches/0036-convert-kms-row-pairs-to-nv12.patch;
-    sha256 = "d925d87bb009dbac48b013236ebf9efa98c494c8f128c923fd835247dbdd08a1";
+    sha256 = "dc76392269aa18672ce9836b904724b6486d16c57abf57b30e76ba93570bbb65";
   };
 
   kmsPacingPatch = {
     name = "0037-preserve-kms-capture-phase.patch";
     path = ./patches/0037-preserve-kms-capture-phase.patch;
-    sha256 = "a568a1c9c9a1460dd4bc1893c3028bbaa63eb1b0c86e91055c8aa6a843d11d1c";
+    sha256 = "cc3fb70f3886f98c7cbe230d92620e3a6feae7604c3a3ebd192a4939f9a2faf1";
   };
 
   rkmppPatches = [
     rkmppPatch
     rkmppZeroCopyPatch
-    stdinPinPatch
     rkmppWaylandPatch
     rkmppWaylandImmediatePatch
     rkmppWaylandPacingPatch
@@ -233,7 +213,7 @@ rec {
     kmsPacingPatch
   ];
 
-  # Ordered digest of 8 base patches ++ 14 rkmppPatches. Bump after reviewing the
+  # Ordered digest of 8 base patches ++ 13 rkmppPatches. Bump after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "749776f23caf2536cf4fe3baa2f920cab05518c0f158f50ccd0e6e46f4891a5c";
+  rkmppPatchSetSha256 = "0ddf3a31bc2c7a76988784646b1aeb95e1f5825240f524806da123a16c6e4975";
 }
