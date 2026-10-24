@@ -90,22 +90,7 @@ diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
        dmabuf.listen(interface.screencopy_manager, interface.dmabuf_interface, &interface.supported_modifiers, interface.shm_interface, output, cursor, mem_type == platf::mem_type_e::cuda);
        do {
          auto remaining_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(to - std::chrono::steady_clock::now());
-@@ -417,6 +428,14 @@
-       }
- #endif
- 
-+      if (mem_type == platf::mem_type_e::rkmpp) {
-+        auto device = std::make_unique<rkmpp_wl_t>();
-+        if (device->init(width, height)) {
-+          return nullptr;
-+        }
-+        return device;
-+      }
-+
-       return std::make_unique<platf::avcodec_encode_device_t>();
-     }
- 
-@@ -453,6 +472,174 @@
+@@ -453,6 +464,174 @@
    /**
     * @brief Wayland screencopy backend that exports frames as GPU resources.
     */
@@ -280,6 +265,21 @@ diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
    class wlr_vram_t: public wlr_t {
    public:
      platf::capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
+@@ -563,6 +742,14 @@
+       }
+ #endif
+ 
++      if (mem_type == platf::mem_type_e::rkmpp) {
++        auto device = std::make_unique<rkmpp_wl_t>();
++        if (device->init(width, height)) {
++          return nullptr;
++        }
++        return device;
++      }
++
+       return std::make_unique<platf::avcodec_encode_device_t>();
+     }
+ 
 @@ -587,12 +774,15 @@
     * @brief Create a Wayland capture backend for the requested memory type.
     */

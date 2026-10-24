@@ -262,7 +262,7 @@ diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
 diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -689,16 +689,17 @@
+@@ -681,16 +681,17 @@
       * @return Capture status reported to the streaming pipeline.
       */
      platf::capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
@@ -285,7 +285,7 @@ diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
  
        auto current_frame = dmabuf.current_frame;
  
-@@ -708,8 +709,9 @@
+@@ -700,8 +701,9 @@
        img->sd = current_frame->sd;
        img->frame_timestamp = current_frame->frame_timestamp;
  
