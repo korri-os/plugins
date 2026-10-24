@@ -11,6 +11,7 @@ requested V4L2 header controls cannot be read back with the required values.
 The controls and both supported values were read from the Portal Iris
 encoder with v4l2-ctl. This is not an upstream patch.
 
+diff --git a/libavcodec/v4l2_m2m.h b/libavcodec/v4l2_m2m.h
 --- a/libavcodec/v4l2_m2m.h
 +++ b/libavcodec/v4l2_m2m.h
 @@ -75,6 +75,7 @@
@@ -21,6 +22,7 @@ encoder with v4l2-ctl. This is not an upstream patch.
  } V4L2m2mPriv;
  
  /**
+diff --git a/libavcodec/v4l2_m2m_enc.c b/libavcodec/v4l2_m2m_enc.c
 --- a/libavcodec/v4l2_m2m_enc.c
 +++ b/libavcodec/v4l2_m2m_enc.c
 @@ -193,7 +193,20 @@

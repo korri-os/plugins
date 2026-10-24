@@ -32,16 +32,16 @@ rec {
   approvedBaseDerivations = builtins.concatLists (
     builtins.attrValues approvedBaseDerivationsByProfile
   );
-  reviewedLibavcodecVersion = "62.11.100";
-  reviewedFfmpegCommit = "61c50407fd429a5e2ec616e2e846c3fe3743879a";
-  reviewedFfmpegSourceHash = "sha256-LKQUfHb9/Z4uvPx4vrtAOPL95Un9/C26lvCbQZ51avk=";
-  reviewedBuildDepsCommit = "2851db101eeddae8f02489d48a52a4d83e6f7e7b";
-  reviewedBuildDepsSourceHash = "sha256-ojpcgvn2DItXQp1lqrL4eVdv0MXwcAo0eGfcqzZQvz4=";
+  reviewedLibavcodecVersion = "63.1.101";
+  reviewedFfmpegCommit = "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa";
+  reviewedFfmpegSourceHash = "sha256-9Vnryl9jSSXRfvt2jPsNp7vHWL0KYdWA29D2zDRAZ+0=";
+  reviewedBuildDepsCommit = "a1fe2841cbc0d8c4501a1006d2d1cb88f219cc8c";
+  reviewedBuildDepsSourceHash = "sha256-y24dqgVODlpRnlwlLwK/8n38m2FE1sZpD6V+mgLITTU=";
   v4l2m2mPatches = [
     {
       name = "0001-fix-v4l2m2m-buffer-alignment.patch";
       path = ./patches/ffmpeg/0001-fix-v4l2m2m-buffer-alignment.patch;
-      sha256 = "11f484533ca7cc2296c67d145fc95cc77dda4e99ac601cdec8e8682db2b1856f";
+      sha256 = "d066bb790cc3ee3bdaf1fd44060fd03fbc875be72d3f225c3b59f734d990d540";
       upstreamPullRequest = "https://code.ffmpeg.org/FFmpeg/FFmpeg/pulls/24328";
       upstreamCommit = "3fda94e1309bead4d39ea4b2cc42d13f8cdf48b4";
       sourceArchive = "https://www.mail-archive.com/ffmpeg-devel@ffmpeg.org/msg190438.html";
@@ -49,7 +49,7 @@ rec {
     {
       name = "0002-add-v4l2m2m-repeat-headers.patch";
       path = ./patches/ffmpeg/0002-add-v4l2m2m-repeat-headers.patch;
-      sha256 = "80830fb6bb168281d14ff537c9691b0bfb036db53bdb01d47f72b16b2847666c";
+      sha256 = "2d6cd48d31a3b0eae109e2487851a6b0c6b8101de11e70c0817f3d03908686d5";
     }
   ];
   v4l2m2mPatchSetSha256 = "e918232613be4264d0c7c55900ff030674cc66e3f8f37f4daa0c59f1051960a6";
