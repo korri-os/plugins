@@ -18,7 +18,9 @@ assert Path("sibling.py").is_file()
 
 def update():
     # A changing native frame counter proves updates continue after input.
-    (data / "alive-after-start").write_text(str(pyxel.frame_count))
+    temporary = data / "frame.tmp"
+    temporary.write_text(str(pyxel.frame_count))
+    temporary.replace(data / "alive-after-start")
 
 
 def draw():

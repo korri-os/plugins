@@ -55,6 +55,9 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
 
         def launch(account, chosen=content, original=True):
             root = work / account
+            marker = root / "save/.pyxel/korri/nativefixture/alive-after-start"
+            if original:
+                marker.unlink(missing_ok=True)
             request = {
                 "runnerId": "@korri:pyxel/pyxel",
                 "program": program,
@@ -139,7 +142,6 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                     ["xprop", "-id", window, "_NET_WM_STATE"], text=True
                 )
                 assert "_NET_WM_STATE_FULLSCREEN" in state, state
-                marker = root / "save/.pyxel/korri/nativefixture/alive-after-start"
                 before_frame = -1
                 if original:
                     for attempt in range(100):

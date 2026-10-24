@@ -40,9 +40,13 @@ an update require startup-semantics review. Its source is
 `kitao/pyxel` tag `v2.9.9`, NAR hash
 `sha256-rz29OHlrAP+OPxMlYwyGdVMLDt7bFtVTcTh8PA3V6WI=`, with Cargo vendor hash
 `sha256-IBjnYZ9H0KImX1Lf21F0j0dB++fXo4vt+wzQ4EDUI+g=`. Nixpkgs owns both
-pins. The native package includes Pyxel's MIT LICENSE and README in
+pins. The filtered native runtime includes Pyxel's MIT LICENSE and README in
 `lib/python*/site-packages/pyxel/`. This does not license third-party carts.
-No game is shipped. `fixture.py` is original CC0 test code only.
+The cached upstream package contains seven third-party sample carts. The
+runtime copies its module and resources without the entire `examples` tree or
+bytecode carrying upstream store paths. `disallowedReferences` refuses a hidden
+reference to the unfiltered upstream output. No game is shipped. `fixture.py`
+is original CC0 test code only.
 
 ## Integration and focused checks
 
