@@ -60,22 +60,11 @@ in
     sunshine-korri-package = pkgs.runCommand "sunshine-korri-package-check" { } ''
       test -f ${sunshinePackage}/bin/sunshine
       test -x ${sunshinePackage}/bin/sunshine
-      ${
-        if sunshinePackage.korriCudaEnabled then
-          ''
-            test ! -L ${sunshinePackage}/bin/sunshine
-            test -L ${sunshinePackage}/bin/.sunshine-wrapped
-            grep -F '"${sunshinePackage}/bin/.sunshine-wrapped"' ${sunshinePackage}/bin/sunshine >/dev/null
-          ''
-        else
-          ''
-            test -L ${sunshinePackage}/bin/sunshine
-            case "$(readlink -f ${sunshinePackage}/bin/sunshine)" in
-              ${sunshinePackage}/bin/sunshine-*) ;;
-              *) exit 1 ;;
-            esac
-          ''
-      }
+      # nixpkgs wraps Sunshine 2026.914 on every platform with
+      # makeBinaryWrapper: an ELF that embeds the wrapped path.
+      test ! -L ${sunshinePackage}/bin/sunshine
+      test -x ${sunshinePackage}/bin/.sunshine-wrapped
+      grep -aF '${sunshinePackage}/bin/.sunshine-wrapped' ${sunshinePackage}/bin/sunshine >/dev/null
       test "${sunshinePackage.pname}" = sunshine-korri
       test "${sunshinePackage.version}" = "${pkgs.sunshine.version}-korri"
       test "${toString (builtins.length sunshinePackage.korriPatchNames)}" = 8

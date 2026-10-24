@@ -41,7 +41,7 @@ assert
   );
 pkgs.runCommand "sunshine-korri-v4l2m2m-check" { } ''
   ${pkgs.gawk}/bin/awk '
-    /static const std::vector<encoder_t \*> encoders/ { registry = 1 }
+    /static const std::vector(<encoder_t \*>)? encoders/ { registry = 1 }
     registry && /&v4l2m2m,/ { found = 1 }
     registry && /};/ { registry = 0 }
     END { exit !found }
