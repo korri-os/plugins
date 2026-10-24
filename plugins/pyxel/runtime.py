@@ -22,7 +22,22 @@ HERE = Path(__file__).parent
 def runtime(package, external=None, expected_hash=None, start_probe=None, korrid=None):
     package = Path(package)
     manifest = json.loads((package / "manifest.json").read_text())
-    program = manifest["files"]["pyxel"]
+    supplied = (
+        json.loads(os.environ["KORRI_NATIVE_PROBE_INPUT"])
+        if os.environ.get("KORRI_NATIVE_PROBE_INPUT")
+        else None
+    )
+    if supplied:
+        assert korrid and external, (
+            "A supplied real route requires Core and reviewed content"
+        )
+        assert supplied["runnerId"] == "@korri:pyxel/pyxel", (
+            "Supplied runner differs from selected package"
+        )
+        assert Path(supplied["contentPath"]).resolve() == Path(external).resolve(), (
+            "Supplied route differs from selected content"
+        )
+    program = supplied["program"] if supplied else manifest["files"]["pyxel"]
     proof = None
     if external or os.environ.get("KORRI_NATIVE_PROOF_DIR"):
         proof = Path(
@@ -43,14 +58,18 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
             assert (
                 hashlib.sha256(Path(external).read_bytes()).hexdigest() == expected_hash
             )
-            shutil.copyfile(external, content)
+            if supplied:
+                content = Path(supplied["contentPath"])
+            else:
+                shutil.copyfile(external, content)
         else:
             with zipfile.ZipFile(content, "w") as archive:
                 archive.writestr("fixture/.pyxapp_startup_script", "main.py")
                 archive.writestr("fixture/main.py", (HERE / "fixture.py").read_bytes())
                 archive.writestr("fixture/sibling.py", "COLOR = 3\n")
-        content.chmod(0o444)
-        media.chmod(0o555)
+        if not supplied:
+            content.chmod(0o444)
+            media.chmod(0o555)
         before = hashlib.sha256(content.read_bytes()).hexdigest()
 
         def launch(account, chosen=content, original=True):
@@ -68,18 +87,31 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                 "files": manifest["files"],
                 "artifacts": {},
             }
+            if supplied:
+                request = supplied  # Exact resolve_linux_route/launch_route output.
+                root = Path(request["accountRoot"])
             # Use the exact deployed effect-free declaration, not a parallel plan.
-            plan = json.loads(
-                subprocess.check_output(
+            try:
+                prepared = subprocess.run(
                     [
                         "bun",
                         str(HERE.parent / "libretro/native-check/plan.ts"),
                         str(package),
                         json.dumps(request),
                     ],
+                    check=False,
+                    capture_output=True,
                     text=True,
+                    timeout=15,
                 )
+            except subprocess.TimeoutExpired:
+                raise AssertionError(
+                    "Launch preparation exceeded its deadline"
+                ) from None
+            assert prepared.returncode == 0, (
+                "Launch preparation failed: " + prepared.stderr
             )
+            plan = json.loads(prepared.stdout)
             for directory in plan["directories"]:
                 Path(directory).mkdir(parents=True, exist_ok=True)
             trigger = work / "start-trigger"
@@ -96,13 +128,13 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                 if korrid
                 else [plan["command"], *plan["args"]]
             )
+            environment = {**os.environ, **plan["env"], "SDL_AUDIODRIVER": "dummy"}
+            environment.pop("KORRI_NATIVE_PROBE_INPUT", None)
             process = subprocess.Popen(
                 command,
                 cwd=plan["cwd"],
                 env={
-                    **os.environ,
-                    **plan["env"],
-                    "SDL_AUDIODRIVER": "dummy",
+                    **environment,
                     **(
                         {
                             "LD_PRELOAD": start_probe,
@@ -175,7 +207,10 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                     check=True,
                     timeout=5,
                 )
-                stdout, stderr = process.communicate(timeout=10)
+                try:
+                    stdout, stderr = process.communicate(timeout=10)
+                except subprocess.TimeoutExpired:
+                    raise AssertionError("Pyxel did not exit after Escape") from None
                 if proof:
                     (proof / "pyxel-load.log").write_text(stdout + stderr)
                 assert process.returncode == 0, stdout + stderr
@@ -207,6 +242,11 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                 b / "save/.pyxel/korri/nativefixture/fixture-save.txt"
             ).read_text() == "1"
         assert hashlib.sha256(content.read_bytes()).hexdigest() == before
+        if supplied:
+            print(
+                "Pyxel: exact supplied route, reviewed selected content, native screenshot and clean exit passed"
+            )
+            return
         assert list(media.iterdir()) == [content]
         assert not list(work.rglob("injected"))
         # Fail before executing code for missing/non-file/unsupported input.

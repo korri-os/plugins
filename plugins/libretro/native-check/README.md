@@ -96,3 +96,14 @@ The PNG is the selected native core's actual video callback frame, not an image
 from a catalog. PuzzleScript additionally must report successful compilation.
 Inspect the retained image for acquired-content acceptance: nonuniform pixels
 alone do not distinguish a game from every possible interpreter error screen.
+
+`KORRI_NATIVE_PROBE_INPUT` may supply serialized existing `PluginLaunchInput`
+from Core's real resolved route. In this mode the probe passes every field
+unchanged to `korrid plugin-run`, including program, core, selected file, named
+files and account/save roots. It does not replace the route's settings with its
+fixture settings. Core performs the actual preparation/effects. Only bounded
+frontend arguments are appended through the existing composition. The caller
+must produce graphics/input settings usable on its build host. This mode skips
+synthetic missing-file/account-counter tests, which remain in original-fixture
+mode. The probe never prints the supplied input and removes the test environment
+value before executing native programs.

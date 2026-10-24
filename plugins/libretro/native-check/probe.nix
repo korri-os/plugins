@@ -12,6 +12,6 @@ pkgs.writeShellApplication {
     export XDG_RUNTIME_DIR
     XDG_RUNTIME_DIR=$(mktemp -d)
     trap 'rm -rf "$XDG_RUNTIME_DIR"' EXIT
-    xvfb-run -a python3 ${./.}/runtime.py "$@"
+    xvfb-run -a -e /dev/stderr python3 ${./.}/runtime.py "$@"
   '';
 }

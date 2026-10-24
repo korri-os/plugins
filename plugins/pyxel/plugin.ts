@@ -61,8 +61,8 @@ function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
       PYTHONDONTWRITEBYTECODE: "1",
     },
     cwd: input.saveRoot,
-    directories: [input.accountRoot, input.saveRoot],
-    saveLocations: [{ key: "saves", kind: "save", path: input.saveRoot }],
+    directories: [input.accountRoot, input.saveRoot, `${input.saveRoot}/.pyxel`],
+    saveLocations: [{ key: "saves", kind: "save", path: `${input.saveRoot}/.pyxel` }],
   }
 }
 

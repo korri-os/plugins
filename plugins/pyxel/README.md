@@ -20,7 +20,8 @@ pixels; checks also inspect the actual X11 fullscreen property.
 
 `resource.rs::user_data_dir` writes `HOME/.pyxel/<vendor>/<app>`, lowercasing and
 sanitizing the two names. Korri sets HOME to the supplied account/game save root
-and declares that root for save sync. **Relative project writes are temporary**
+and declares the native `.pyxel` child for save sync. Core requires save
+locations to be strictly inside the save root. **Relative project writes are temporary**
 inside the upstream extracted application; they are not durable saves. Games
 that write arbitrary absolute paths can ignore this save convention. Start is
 not Pyxel's default quit key. Escape exits. A game can define its own controls.
@@ -84,3 +85,10 @@ output `pyxel-load.log`. Set `KORRI_NATIVE_PROOF_DIR` to choose their directory.
 Otherwise external mode prints a retained temporary directory. Inspect the image
 for the reviewed game's actual title/content; process-alive is not gameplay
 acceptance. The original fixture check exercises PNG capture too.
+
+`KORRI_NATIVE_PROBE_INPUT` accepts the existing serialized `PluginLaunchInput`
+from Core's actual resolved route. That mode keeps every field and selected
+content path unchanged; it does not copy the cart or reconstruct an account.
+It still requires the reviewed content hash. The probe never prints that input
+and removes the test environment value before native execution. Default original
+fixture/account-isolation tests do not change.

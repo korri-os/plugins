@@ -18,7 +18,7 @@ const input: PluginLaunchInput = {
 const launch = handlers["launch.prepare"](input)
 assert.deepEqual(launch.args, [input.contentPath])
 assert.equal(launch.cwd, input.saveRoot)
-assert.deepEqual(launch.saveLocations, [{ key: "saves", kind: "save", path: input.saveRoot }])
+assert.deepEqual(launch.saveLocations, [{ key: "saves", kind: "save", path: `${input.saveRoot}/.pyxel` }])
 assert.equal(launch.env?.HOME, input.saveRoot)
 assert.equal(launch.env?.PYTHONDONTWRITEBYTECODE, "1")
 for (const change of [

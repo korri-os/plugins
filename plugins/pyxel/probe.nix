@@ -22,6 +22,14 @@ pkgs.writeShellApplication {
   ];
   text = ''
     export SDL_VIDEODRIVER=x11
+    # Do not mix the host X server's Mesa with the client's pinned EGL/DRI.
+    unset LD_LIBRARY_PATH LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
+    export XDG_RUNTIME_DIR
+    XDG_RUNTIME_DIR=$(mktemp -d)
+    trap 'rm -rf "$XDG_RUNTIME_DIR"' EXIT
+    # The child shell expands its own variables after Xvfb starts.
+    # shellcheck disable=SC2016
+    xvfb-run -a -e /dev/stderr sh -c '
     export LD_LIBRARY_PATH=${
       pkgs.lib.makeLibraryPath [
         pkgs.libglvnd
@@ -31,12 +39,6 @@ pkgs.writeShellApplication {
     export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri
     export LIBGL_ALWAYS_SOFTWARE=1
     export __EGL_VENDOR_LIBRARY_FILENAMES=${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json
-    export XDG_RUNTIME_DIR
-    XDG_RUNTIME_DIR=$(mktemp -d)
-    trap 'rm -rf "$XDG_RUNTIME_DIR"' EXIT
-    # The child shell expands its own variables after Xvfb starts.
-    # shellcheck disable=SC2016
-    xvfb-run -a sh -c '
       openbox --sm-disable > "$XDG_RUNTIME_DIR/openbox.log" 2>&1 &
       wm=$!
       trap "kill $wm" EXIT
