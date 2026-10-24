@@ -56,6 +56,11 @@ stdenv.mkDerivation {
       patch -d third-party/FFmpeg/FFmpeg -p1 < ${record.path}
     '') approved.v4l2m2mPatches}
 
+    # Apply CBS patches explicitly; do not rely on git apply in an unpacked tree.
+    for cbsPatch in patches/FFmpeg/FFmpeg/cbs/*.patch; do
+      patch -d third-party/FFmpeg/FFmpeg -p1 < "$cbsPatch"
+    done
+
     substituteInPlace cmake/ffmpeg/ffmpeg.cmake \
       --replace-fail \
         '--enable-encoder=h264_v4l2m2m' \
@@ -63,6 +68,7 @@ stdenv.mkDerivation {
   '';
 
   cmakeFlags = [
+    "-DFFMPEG_INSTALL_PREFIX=${placeholder "out"}"
     "-DCMAKE_BUILD_TYPE=Release"
     "-DBUILD_ALL=OFF"
     "-DBUILD_FFMPEG=ON"
@@ -73,7 +79,8 @@ stdenv.mkDerivation {
     "-DBUILD_FFMPEG_MF=OFF"
     "-DBUILD_FFMPEG_NV_CODEC_HEADERS=OFF"
     "-DBUILD_FFMPEG_SVT_AV1=OFF"
-    "-DBUILD_FFMPEG_VAAPI=OFF"
+    "-DBUILD_FFMPEG_LIBVA=OFF"
+    "-DBUILD_FFMPEG_VULKAN=OFF"
     "-DBUILD_FFMPEG_X264=OFF"
     "-DBUILD_FFMPEG_X265=OFF"
   ];
