@@ -8,7 +8,7 @@ const fixture = (name: string) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8")
 const providerId = "@korri:pyxelgallery"
 const candidateUrl =
-  "https://github.com/kitao/pyxel/blob/v2.9.9/python/pyxel/examples/apps/korri_panda.pyxapp"
+  "https://github.com/kitao/pyxel/blob/5d8e7b4f37c106684c1e91692772569a32a5e3d4/python/pyxel/examples/apps/korri_panda.pyxapp"
 const catalog = fixture("catalog.json")
 const ok = (text: string): PluginHttpResponse => ({
   status: 200,
@@ -47,7 +47,7 @@ describe("pyxelgallery pure provider turns", () => {
       requests: [
         {
           url: "https://api.github.com/repos/kitao/pyxel/contents/python/pyxel/examples/apps",
-          query: { ref: "v2.9.9" },
+          query: { ref: "5d8e7b4f37c106684c1e91692772569a32a5e3d4" },
           headers: { accept: "application/vnd.github+json" },
         },
       ],
@@ -96,12 +96,25 @@ describe("pyxelgallery pure provider turns", () => {
     expect(resolve([ok(catalog)])).toMatchObject({
       _tag: "FinalDownload",
       filename: "korri_panda.pyxapp",
-      url: "https://raw.githubusercontent.com/kitao/pyxel/v2.9.9/python/pyxel/examples/apps/korri_panda.pyxapp",
+      url: "https://raw.githubusercontent.com/kitao/pyxel/5d8e7b4f37c106684c1e91692772569a32a5e3d4/python/pyxel/examples/apps/korri_panda.pyxapp",
     })
     expect(resolve([unavailable])).toMatchObject({
       _tag: "FailedDownload",
       reason: "provider-error",
     })
+  })
+  test("keeps the release label but refuses mutable tag candidates and rows", () => {
+    expect(details([ok(catalog)])).toMatchObject({
+      description: expect.stringContaining("Official Pyxel 2.9.9 example app"),
+    })
+    expect(
+      resolve([], candidateUrl.replace("5d8e7b4f37c106684c1e91692772569a32a5e3d4", "v2.9.9")),
+    ).toMatchObject({ _tag: "NonFinalDownload", reason: "unsupported" })
+    expect(() =>
+      search("panda", [
+        ok(catalog.replaceAll("5d8e7b4f37c106684c1e91692772569a32a5e3d4", "v2.9.9")),
+      ]),
+    ).toThrow()
   })
   test("a valid catalog with no matching title is genuinely empty", () => {
     expect(search("no-such-original-title", [ok(catalog)])).toEqual([])
@@ -110,7 +123,7 @@ describe("pyxelgallery pure provider turns", () => {
     for (const bad of [
       catalog.replace("raw.githubusercontent.com", "evil.invalid"),
       catalog.replace('"path":"python/pyxel/examples/apps/', '"path":"other/'),
-      catalog.replaceAll("v2.9.9", "main"),
+      catalog.replaceAll("5d8e7b4f37c106684c1e91692772569a32a5e3d4", "main"),
     ]) {
       expect(() => search("panda", [ok(bad)])).toThrow()
       expect(resolve([ok(bad)])).toMatchObject({ _tag: "FailedDownload", reason: "provider-error" })

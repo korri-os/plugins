@@ -54,7 +54,7 @@ expand existing itch.io permissions. Existing native runner declarations must
 supply the corresponding systems and file extensions. Pyxel additionally needs
 Core's positive byte-evidence native-container handling before integration.
 
-Focused offline tests (47 tests across five test files, not
+Focused offline tests (48 tests across five test files, not
 live traffic):
 
 ```sh
@@ -96,7 +96,8 @@ bun plugins/tic80gallery/live-probe.ts tic80gallery --rpc --acquire --isolated
 ```
 
 Do not use an existing person's library as the probe instance. Pyxel's specimen
-is only the parent-reviewed Space Rescue at v2.9.9. Inert acquisition is not
+is only the parent-reviewed Space Rescue from version 2.9.9, with the full
+upstream revision pinned by `pyxelgallery`. Inert acquisition is not
 permission to run arbitrary downloaded Python. Native launch acceptance belongs
 to the separate reviewed runner integration.
 

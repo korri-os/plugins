@@ -19,9 +19,15 @@ export const description =
 const providerId = "@korri:pyxelgallery"
 export const providers = { [providerId]: { id: providerId, title } }
 const path = "python/pyxel/examples/apps"
-const ref = "v2.9.9"
+const version = "2.9.9"
+// Annotated v2.9.9 tag object e8052ccef8b0840f903af5260d64059658c1b285
+// resolves to this full upstream source commit, not a mutable tag request.
+const ref = "5d8e7b4f37c106684c1e91692772569a32a5e3d4"
 const htmlBase = `https://github.com/kitao/pyxel/blob/${ref}/${path}/`
 const rawBase = `https://raw.githubusercontent.com/kitao/pyxel/${ref}/${path}/`
+const candidatePattern = new RegExp(
+  `^https://github\\.com/kitao/pyxel/blob/${ref}/${path}/([A-Za-z0-9_-]+\\.pyxapp)$`,
+)
 interface Entry {
   id: string
   title: string
@@ -120,16 +126,13 @@ function describe(input: PluginDetailsInput): PluginDetailsOutput {
     id,
     title: entry.title,
     url: `${htmlBase}${id}`,
-    description: `Official Pyxel ${ref} example app (${entry.id}, ${entry.bytes} bytes). Title is derived from its upstream filename. Native .pyxapp acquisition requires Core's byte-evidence native-container handling. Runtime compatibility and dependencies are untested. Python executes with the native game's permissions; review and trust the author code before running. Refer to the app's own licence, not the engine licence.`,
+    description: `Official Pyxel ${version} example app (${entry.id}, ${entry.bytes} bytes). Title is derived from its upstream filename. Native .pyxapp acquisition requires Core's byte-evidence native-container handling. Runtime compatibility and dependencies are untested. Python executes with the native game's permissions; review and trust the author code before running. Refer to the app's own licence, not the engine licence.`,
     downloadPageUrl: `${rawBase}${id}`,
     artifact: artifact(entry),
   }
 }
 function resolve(input: PluginResolveDownloadInput): PluginResolveDownloadOutput {
-  const match =
-    /^https:\/\/github\.com\/kitao\/pyxel\/blob\/v2\.9\.9\/python\/pyxel\/examples\/apps\/([A-Za-z0-9_-]+\.pyxapp)$/.exec(
-      input.candidateUrl,
-    )
+  const match = candidatePattern.exec(input.candidateUrl)
   if (!match || match[0] !== input.candidateUrl)
     return { _tag: "NonFinalDownload", providerId, reason: "unsupported", url: input.candidateUrl }
   const response = input.responses[0]
