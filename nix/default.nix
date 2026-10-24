@@ -32,14 +32,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         };
     pkgs = packageSet nixpkgs;
     mkPlugin = korri.lib.${system}.mkPlugin { inherit pkgs; };
-    # Temporary split (see flake.nix): every Sunshine and Cemu output builds
-    # from the held nixpkgs revision.
+    # Temporary split (see flake.nix): every Cemu output builds from the held
+    # nixpkgs revision.
     heldPkgs = packageSet nixpkgs-held;
     heldMkPlugin = korri.lib.${system}.mkPlugin { pkgs = heldPkgs; };
-    sunshine = import ../services/sunshine {
-      inherit system;
-      pkgs = heldPkgs;
-    };
+    sunshine = import ../services/sunshine { inherit pkgs system; };
     moonlightPackage = pkgs.callPackage ../services/moonlight/package.nix { };
     moonlightDefinition = import ../plugins/moonlight/plugin.nix { inherit pkgs moonlightPackage; };
     moonlightPlugin = mkPlugin {
@@ -53,10 +50,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin = ../plugins/ssh/plugin.nix;
     };
     sunshineDefinition = import ../plugins/sunshine/plugin.nix {
-      pkgs = heldPkgs;
+      inherit pkgs;
       sunshinePackage = sunshine.pluginPackage;
     };
-    sunshinePlugin = heldMkPlugin {
+    sunshinePlugin = mkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/sunshine;
       plugin = _: sunshineDefinition;
@@ -408,7 +405,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           hostPackage = korri.packages.${system}.korri-plugin-host;
         };
         korri-sunshine-plugin-native = import ../plugins/sunshine/native-check.nix {
-          pkgs = heldPkgs;
+          inherit pkgs;
           plugin = sunshineDefinition;
         };
         korri-github-cache = import ./github-cache-check.nix { inherit pkgs; };

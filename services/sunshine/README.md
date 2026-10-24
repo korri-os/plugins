@@ -19,13 +19,30 @@ Source hashes, ordered patches, root credentials, and test assertions stay the
 same. Software emulation is slower and does not prove encoder performance or
 physical-device behavior.
 
+## Base
+
+The base is upstream Sunshine `v2026.914.233613` from the shared `nixpkgs`
+input (`02c087f3`). It carries the upstream fixes for GHSA-ph75 (exact enrolled
+client-certificate identity; unknown issuers rejected), GHSA-26q2 and GHSA-6w33
+(input packet bounds), GHSA-c428 (short control packets) and GHSA-36ff
+(`pairing_id`-bound PINs). Upstream still accepts an expired or not-yet-valid
+certificate from an enrolled identity on purpose (`openssl_verify_cb`, Moonlight
+clock tolerance); Korri keeps that behaviour and does not modify `crypto.*`.
+
+The experimental runtime-settings series (`0001`-`0005`, `0010`, `0012`-`0014`,
+`0016`) was removed: its edge cases were never resolved, upstream now uses packet
+`0x5504` for player LEDs, and its private VAAPI/NVENC struct copies cannot
+follow FFmpeg 9. Git history keeps it. A revival needs new packet IDs and no
+private struct copies. `0024` was removed because upstream `72faa710` carries the
+same stdin pairing return.
+
 ## Current patches
 
 ### V4L2 M2M encoder profile
 
-Patch `0021-add-v4l2m2m-encoder.patch` exposes Sunshine encoder name `v4l2m2m`. It maps H.264 to FFmpeg `h264_v4l2m2m` and HEVC to `hevc_v4l2m2m`. The backend accepts host-memory NV12 frames and relies on the Linux V4L2 M2M codec API. The removable plugin carries it in the approved aarch64 package and lets Sunshine select an available encoder at startup.
+Patch `0021-add-v4l2m2m-encoder.patch` exposes Sunshine encoder name `v4l2m2m`. Open upstream Sunshine PR `#5717` (zero-copy V4L2) uses the same name; if it merges, this patch must be dropped or renamed. It maps H.264 to FFmpeg `h264_v4l2m2m` and HEVC to `hevc_v4l2m2m`. The backend accepts host-memory NV12 frames and relies on the Linux V4L2 M2M codec API. The removable plugin carries it in the approved aarch64 package and lets Sunshine select an available encoder at startup.
 
-The `sunshine-korri-v4l2m2m` package uses the same reviewed Sunshine source and Korri patch set as `sunshine-korri`. It replaces only Sunshine's prepared FFmpeg libraries. Those libraries come from historical `build-deps` commit `2851db101eeddae8f02489d48a52a4d83e6f7e7b`, which introduced the reviewed FFmpeg commit `61c50407fd429a5e2ec616e2e846c3fe3743879a`. Korri applies the buffer-layout fix from FFmpeg PR `#24328`. The fix copies visible rows into the driver-aligned storage width and height. This prevents the `ff_v4l2_buffer_avframe_to_buf()` crash seen with the `qcom-iris` encoder at standard `1280x720` and `1920x1080` frame sizes.
+The `sunshine-korri-v4l2m2m` package uses the same reviewed Sunshine source and Korri patch set as `sunshine-korri`. It replaces only Sunshine's prepared FFmpeg libraries. Those libraries come from `build-deps` commit `a1fe2841cbc0d8c4501a1006d2d1cb88f219cc8c`, the one Sunshine `v2026.914.233613` pins, with FFmpeg commit `bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa` (libavcodec `63.1.101`). The bundle also ships `nv-codec-headers` 13.1 (`include/ffnvcodec`): Sunshine configures against them even without CUDA, and would otherwise fetch them from Git during the build. Korri applies the buffer-layout fix from FFmpeg PR `#24328`. The fix copies visible rows into the driver-aligned storage width and height. This prevents the `ff_v4l2_buffer_avframe_to_buf()` crash seen with the `qcom-iris` encoder at standard `1280x720` and `1920x1080` frame sizes.
 
 The Odin 2 Portal kernel carries upstream Linux commit `6f62dcefd2494aa9ac01538372353bf07755491e`, `media: qcom: iris: Add request key frame support for encoder`. It maps `V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME` to the Iris encoder's request-sync-frame property. Sunshine needs this control for Moonlight recovery requests and stream refreshes after loss.
 
@@ -99,7 +116,7 @@ The RKMPP pacer uses the negotiated `config.framerate`, not mutable session sett
 
 Patch `0023` adds a KMS DRM_PRIME path for native-size streams. On the RG353M, Sway scans out a single-plane linear XRGB8888 framebuffer. Sunshine duplicates that dma-buf file descriptor into a ref-counted `AVDRMFrameDescriptor` and gives it directly to `h264_rkmpp`; RKVENC performs RGB-to-YUV conversion in hardware. This avoids the previous `GetTextureSubImage` readback, `sws_scale`, and CPU upload. Streams whose requested size does not exactly match the KMS framebuffer retain the RAM scaling and RKMPP upload fallback. The zero-copy path reduced total Sunshine CPU from about 135% to about 10% at 640x480@30.
 
-The profile links Sunshine against `ffmpeg-rkmpp-static.nix`. That derivation builds Sunshine's own `build-deps` recipe against the reviewed FFmpeg commit from `approved-patches.nix`, so the libavcodec ABI matches the other profiles, and adds the RKMPP encoder and hardware context from `patches/ffmpeg/`. `rockchip-mpp.nix` builds the official Rockchip MPP 1.1.0 source at commit `c08762ebfadeb4e986d2fed993bc7a54862d3ebe`; the pinned Nixpkgs has no MPP package. `0001` is the encoder and hardware context lifted from the `ffmpeg-rockchip` fork. `0002` removes the fork's use of two APIs that do not exist at the reviewed commit. The aarch64 build also enables the reviewed H.264 and HEVC V4L2 M2M encoders in the same static FFmpeg archive. Sunshine selects the available encoder at startup.
+The profile links Sunshine against `ffmpeg-rkmpp-static.nix`. That derivation builds Sunshine's own `build-deps` recipe against the reviewed FFmpeg commit from `approved-patches.nix`, so the libavcodec ABI matches the other profiles, and adds the RKMPP encoder and hardware context from `patches/ffmpeg/`. `rockchip-mpp.nix` builds the official Rockchip MPP 1.1.0 source at commit `c08762ebfadeb4e986d2fed993bc7a54862d3ebe`; the pinned Nixpkgs has no MPP package. `0001` is the encoder and hardware context lifted from the `ffmpeg-rockchip` fork; it replaces the NV12-only `h264_rkmpp` that FFmpeg 8.1 and later ship (`61b034a47c`), because Korri needs XRGB8888 DRM_PRIME input and requested-IDR behaviour. There is one `h264_rkmpp`. `0002` adapts the fork to the reviewed FFmpeg's APIs. The aarch64 build also enables the reviewed H.264 and HEVC V4L2 M2M encoders in the same static FFmpeg archive. Sunshine selects the available encoder at startup.
 
 The combined profile is approved only for `aarch64-linux`, is mutually exclusive with CUDA, and keeps the same reviewed upstream base derivation as the software profile.
 

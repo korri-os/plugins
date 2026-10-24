@@ -8,6 +8,7 @@
   perl,
   libdrm,
   rockchipMpp,
+  nv-codec-headers-13,
 }:
 
 let
@@ -97,6 +98,11 @@ stdenv.mkDerivation {
   enableParallelBuilding = true;
 
   postInstall = ''
+    # Sunshine v2026.914 configures against ffnvcodec headers in the prepared
+    # binaries even without CUDA; without them its CMake fetches
+    # nv_codec_headers_13_1 (n13.1.15.0) from Git, which the sandbox refuses.
+    cp -r ${nv-codec-headers-13}/include/ffnvcodec "$out/include/"
+    grep -F 'NVENCAPI_MAJOR_VERSION 13' "$out/include/ffnvcodec/nvEncodeAPI.h" >/dev/null
     test -f "$out/lib/libavcodec.a"
     test -f "$out/lib/libavutil.a"
     test -f "$out/lib/libswscale.a"
