@@ -1,23 +1,18 @@
 diff --git a/src/platform/linux/wayland.cpp b/src/platform/linux/wayland.cpp
-index 4fa05a2..0d8620e 100644
 --- a/src/platform/linux/wayland.cpp
 +++ b/src/platform/linux/wayland.cpp
-@@ -4,12 +4,14 @@
+@@ -2,6 +2,10 @@
+  * @file src/platform/linux/wayland.cpp
+  * @brief Definitions for Wayland capture.
   */
- // standard includes
- #include <cstdlib>
++// standard includes
 +#include <limits>
- 
++#include <sys/mman.h>
++
  // platform includes
  #include <drm_fourcc.h>
  #include <fcntl.h>
- #include <gbm.h>
- #include <poll.h>
-+#include <sys/mman.h>
- #include <unistd.h>
- #include <wayland-client.h>
- #include <wayland-util.h>
-@@ -170,6 +172,7 @@ namespace wl {
+@@ -193,6 +197,7 @@
        :
        screencopy_manager {nullptr},
        dmabuf_interface {nullptr},
@@ -25,22 +20,21 @@ index 4fa05a2..0d8620e 100644
        output_manager {nullptr},
        listener {
          &CLASS_CALL(interface_t, add_interface),
-@@ -211,6 +214,11 @@ namespace wl {
-       dmabuf_interface = (zwp_linux_dmabuf_v1 *) wl_registry_bind(registry, id, &zwp_linux_dmabuf_v1_interface, version);
+@@ -249,6 +254,10 @@
+       zwp_linux_dmabuf_v1_add_listener(dmabuf_interface, &dmabuf_listener, this);
  
        this->interface[LINUX_DMABUF] = true;
 +    } else if (!std::strcmp(interface, wl_shm_interface.name)) {
-+      BOOST_LOG(info) << "Found interface: "sv << interface << '(' << id << ") version "sv << version;
++      BOOST_LOG(info) << "[wayland] Found interface: "sv << interface << '(' << id << ") version "sv << version;
 +      shm_interface = (wl_shm *) wl_registry_bind(registry, id, &wl_shm_interface, 1);
-+
 +      this->interface[SHM] = true;
      }
    }
  
-@@ -290,10 +298,14 @@ namespace wl {
-   void dmabuf_t::listen(
+@@ -312,11 +321,15 @@
      zwlr_screencopy_manager_v1 *screencopy_manager,
      zwp_linux_dmabuf_v1 *dmabuf_interface,
+     const std::map<std::uint32_t, std::vector<std::uint64_t>> *supported_modifiers,
 +    wl_shm *shm_interface,
      wl_output *output,
 -    bool blend_cursor
@@ -48,12 +42,13 @@ index 4fa05a2..0d8620e 100644
 +    bool prefer_shm
    ) {
      this->dmabuf_interface = dmabuf_interface;
+     this->supported_modifiers = supported_modifiers;
 +    this->shm_interface = shm_interface;
 +    this->prefer_shm = prefer_shm;
      // Reset state
      shm_info.supported = false;
      dmabuf_info.supported = false;
-@@ -316,6 +328,10 @@ namespace wl {
+@@ -339,6 +352,10 @@
  
    dmabuf_t::~dmabuf_t() {
      cleanup_gbm();
@@ -64,7 +59,7 @@ index 4fa05a2..0d8620e 100644
  
      for (auto &frame : frames) {
        frame.destroy();
-@@ -416,12 +432,94 @@ namespace wl {
+@@ -470,12 +487,94 @@
      zwp_linux_buffer_params_v1_create(params, dmabuf_info.width, dmabuf_info.height, dmabuf_info.format, 0);
    }
  
@@ -161,21 +156,21 @@ index 4fa05a2..0d8620e 100644
        // Store format info first
        next_frame->sd.fourcc = dmabuf_info.format;
        next_frame->sd.width = dmabuf_info.width;
-@@ -429,11 +527,8 @@ namespace wl {
+@@ -483,11 +582,8 @@
  
        // Create and start copy
        create_and_copy_dmabuf(frame);
 -    } else if (shm_info.supported) {
 -      // SHM fallback would go here
--      BOOST_LOG(warning) << "SHM capture not implemented"sv;
+-      BOOST_LOG(warning) << "[wayland] SHM capture not implemented"sv;
 -      zwlr_screencopy_frame_v1_destroy(frame);
 -      status = REINIT;
 +    } else if (shm_info.supported && shm_interface) {
 +      create_and_copy_shm(frame);
      } else {
-       BOOST_LOG(error) << "No supported buffer types"sv;
+       BOOST_LOG(error) << "[wayland] No supported buffer types"sv;
        zwlr_screencopy_frame_v1_destroy(frame);
-@@ -503,6 +598,10 @@ namespace wl {
+@@ -564,6 +660,10 @@
  
      // Clean up resources
      cleanup_gbm();
@@ -186,7 +181,7 @@ index 4fa05a2..0d8620e 100644
      auto next_frame = get_next_frame();
      next_frame->destroy();
  
-@@ -519,6 +618,14 @@ namespace wl {
+@@ -581,6 +681,14 @@
    ) {};
  
    void frame_t::destroy() {
@@ -202,52 +197,48 @@ index 4fa05a2..0d8620e 100644
        if (sd.fds[x] >= 0) {
          close(sd.fds[x]);
 diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
-index 08d5acb..0fdf496 100644
 --- a/src/platform/linux/wayland.h
 +++ b/src/platform/linux/wayland.h
-@@ -6,6 +6,8 @@
- 
+@@ -7,6 +7,7 @@
  // standard includes
+ #include <array>
  #include <bitset>
 +#include <cstddef>
-+#include <cstdint>
- 
- #ifdef SUNSHINE_BUILD_WAYLAND
-   #include <linux-dmabuf-unstable-v1.h>
-@@ -31,6 +33,11 @@ namespace wl {
+ #include <cstdint>
+ #include <map>
+ #include <optional>
+@@ -66,6 +67,11 @@
      void destroy();
  
-     egl::surface_descriptor_t sd;
+     egl::surface_descriptor_t sd;  ///< DMA-BUF surface descriptor received from the compositor.
 +    std::uint8_t *shm_data {nullptr};
 +    std::size_t shm_size {0};
 +    std::uint32_t shm_format {0};
 +    std::uint32_t shm_stride {0};
 +    bool shm_y_invert {false};
+     std::optional<std::chrono::steady_clock::time_point> frame_timestamp;  ///< Capture timestamp associated with the frame.
    };
  
-   class dmabuf_t {
-@@ -49,7 +56,7 @@ namespace wl {
-     dmabuf_t &operator=(const dmabuf_t &) = delete;
-     dmabuf_t &operator=(dmabuf_t &&) = delete;
- 
--    void listen(zwlr_screencopy_manager_v1 *screencopy_manager, zwp_linux_dmabuf_v1 *dmabuf_interface, wl_output *output, bool blend_cursor = false);
-+    void listen(zwlr_screencopy_manager_v1 *screencopy_manager, zwp_linux_dmabuf_v1 *dmabuf_interface, wl_shm *shm_interface, wl_output *output, bool blend_cursor = false, bool prefer_shm = false);
-     static void buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *params, struct wl_buffer *wl_buffer);
-     static void buffer_params_failed(void *data, struct zwp_linux_buffer_params_v1 *params);
-     void buffer(zwlr_screencopy_frame_v1 *frame, std::uint32_t format, std::uint32_t width, std::uint32_t height, std::uint32_t stride);
-@@ -73,8 +80,11 @@ namespace wl {
+@@ -110,7 +116,7 @@
+      * @param output Wayland output to capture.
+      * @param blend_cursor Whether the compositor should include the cursor in the frame.
+      */
+-    void listen(zwlr_screencopy_manager_v1 *screencopy_manager, zwp_linux_dmabuf_v1 *dmabuf_interface, const std::map<std::uint32_t, std::vector<std::uint64_t>> *supported_modifiers, wl_output *output, bool blend_cursor = false);
++    void listen(zwlr_screencopy_manager_v1 *screencopy_manager, zwp_linux_dmabuf_v1 *dmabuf_interface, const std::map<std::uint32_t, std::vector<std::uint64_t>> *supported_modifiers, wl_shm *shm_interface, wl_output *output, bool blend_cursor = false, bool prefer_shm = false);
+     /**
+      * @brief Store the Wayland buffer created for a DMA-BUF parameter request.
+      *
+@@ -202,6 +208,9 @@
      bool init_gbm();
      void cleanup_gbm();
      void create_and_copy_dmabuf(zwlr_screencopy_frame_v1 *frame);
 +    void create_and_copy_shm(zwlr_screencopy_frame_v1 *frame);
- 
-     zwp_linux_dmabuf_v1 *dmabuf_interface {nullptr};
 +    wl_shm *shm_interface {nullptr};
 +    bool prefer_shm {false};
  
-     struct {
-       bool supported {false};
-@@ -141,6 +151,7 @@ namespace wl {
+     zwp_linux_dmabuf_v1 *dmabuf_interface {nullptr};
+     const std::map<std::uint32_t, std::vector<std::uint64_t>> *supported_modifiers {nullptr};
+@@ -348,6 +357,7 @@
        XDG_OUTPUT,  ///< xdg-output
        WLR_EXPORT_DMABUF,  ///< screencopy manager
        LINUX_DMABUF,  ///< linux-dmabuf protocol
@@ -255,60 +246,66 @@ index 08d5acb..0fdf496 100644
        MAX_INTERFACES,  ///< Maximum number of interfaces
      };
  
-@@ -160,6 +171,7 @@ namespace wl {
-     std::vector<std::unique_ptr<monitor_t>> monitors;
-     zwlr_screencopy_manager_v1 *screencopy_manager {nullptr};
-     zwp_linux_dmabuf_v1 *dmabuf_interface {nullptr};
+@@ -397,6 +407,7 @@
+     std::map<std::uint32_t, std::vector<std::uint64_t>> supported_modifiers;  ///< DRM format modifiers grouped by format.
+     zwlr_screencopy_manager_v1 *screencopy_manager {nullptr};  ///< WLR screencopy global used to request frames.
+     zwp_linux_dmabuf_v1 *dmabuf_interface {nullptr};  ///< Linux DMA-BUF global used to allocate frame buffers.
 +    wl_shm *shm_interface {nullptr};
-     zxdg_output_manager_v1 *output_manager {nullptr};
+     zxdg_output_manager_v1 *output_manager {nullptr};  ///< xdg-output global used to query monitor names and sizes.
  
    private:
 diff --git a/src/platform/linux/wlgrab.cpp b/src/platform/linux/wlgrab.cpp
-index 9ef3e09..6d9c269 100644
 --- a/src/platform/linux/wlgrab.cpp
 +++ b/src/platform/linux/wlgrab.cpp
-@@ -3,8 +3,13 @@
+@@ -3,7 +3,12 @@
   * @brief Definitions for wlgrab capture.
   */
  // standard includes
 +#include <cstddef>
 +#include <cstring>
  #include <thread>
- 
++
 +// platform includes
 +#include <drm_fourcc.h>
-+
+ 
  // local includes
  #include "cuda.h"
- #include "src/logging.h"
-@@ -49,6 +54,10 @@ namespace wl {
-         BOOST_LOG(error) << "Missing Wayland wire for wlr-export-dmabuf"sv;
-         return -1;
-       }
-+      if (hwdevice_type == platf::mem_type_e::cuda && !interface[wl::interface_t::SHM]) {
-+        BOOST_LOG(error) << "Missing Wayland shared-memory interface for CUDA capture"sv;
+@@ -24,11 +29,8 @@
+       return true;
+     }
+ 
+-#ifdef SUNSHINE_BUILD_CUDA
+-    if (hwdevice_type == platf::mem_type_e::cuda) {
+-      return true;
+-    }
+-#endif
++    // Headless NVIDIA modifiers are not reliably importable through CUDA GL.
++    // Use the SHM RAM bridge, then upload to CUDA for strict NVENC encoding.
+ 
+     return false;
+   }
+@@ -86,6 +88,11 @@
+ 
+       if (!interface[wl::interface_t::WLR_EXPORT_DMABUF]) {
+         BOOST_LOG(error) << "[wlgrab] Missing Wayland wire for wlr-export-dmabuf"sv;
 +        return -1;
 +      }
++
++      if (hwdevice_type == platf::mem_type_e::cuda && !interface[wl::interface_t::SHM]) {
++        BOOST_LOG(error) << "Missing Wayland shared-memory interface for CUDA capture"sv;
+         return -1;
+       }
  
-       auto monitor = interface.monitors[0].get();
- 
-@@ -90,7 +99,14 @@ namespace wl {
+@@ -175,7 +182,7 @@
        auto to = std::chrono::steady_clock::now() + timeout;
  
        // Dispatch events until we get a new frame or the timeout expires
--      dmabuf.listen(interface.screencopy_manager, interface.dmabuf_interface, output, cursor);
-+      dmabuf.listen(
-+        interface.screencopy_manager,
-+        interface.dmabuf_interface,
-+        interface.shm_interface,
-+        output,
-+        cursor,
-+        mem_type == platf::mem_type_e::cuda
-+      );
+-      dmabuf.listen(interface.screencopy_manager, interface.dmabuf_interface, &interface.supported_modifiers, output, cursor);
++      dmabuf.listen(interface.screencopy_manager, interface.dmabuf_interface, &interface.supported_modifiers, interface.shm_interface, output, cursor, mem_type == platf::mem_type_e::cuda);
        do {
          auto remaining_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(to - std::chrono::steady_clock::now());
          if (remaining_time_ms.count() < 0 || !display.dispatch(remaining_time_ms)) {
-@@ -177,6 +193,40 @@ namespace wl {
+@@ -263,6 +270,41 @@
  
        auto current_frame = dmabuf.current_frame;
  
@@ -343,21 +340,10 @@ index 9ef3e09..6d9c269 100644
 +            std::memcpy(destination_row, source_row, destination_row_bytes);
 +          }
 +        }
++        img_out->frame_timestamp = current_frame->frame_timestamp;
 +        return platf::capture_e::ok;
 +      }
 +
        auto rgb_opt = egl::import_source(egl_display.get(), current_frame->sd);
  
        if (!rgb_opt) {
-@@ -372,7 +422,10 @@ namespace platf {
-       return nullptr;
-     }
- 
--    if (hwdevice_type == platf::mem_type_e::vaapi || hwdevice_type == platf::mem_type_e::cuda) {
-+    // NVIDIA headless wlroots buffers can carry modifiers that the CUDA GL
-+    // interop path cannot import. Capture through SHM, then use Sunshine's
-+    // CUDA upload path. This keeps strict NVENC while avoiding blank frames.
-+    if (hwdevice_type == platf::mem_type_e::vaapi) {
-       auto wlr = std::make_shared<wl::wlr_vram_t>();
-       if (wlr->init(hwdevice_type, display_name, config)) {
-         return nullptr;
