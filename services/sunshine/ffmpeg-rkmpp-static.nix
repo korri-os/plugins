@@ -28,7 +28,9 @@ in
 assert v4l2m2mPatchesApproved;
 stdenv.mkDerivation {
   pname = "sunshine-ffmpeg-rkmpp";
-  version = "8.0-${builtins.substring 0 7 approved.reviewedFfmpegCommit}";
+  version = "${approved.reviewedLibavcodecVersion}-${
+    builtins.substring 0 12 approved.reviewedFfmpegCommit
+  }";
 
   src = fetchFromGitHub {
     owner = "LizardByte";
@@ -77,6 +79,7 @@ stdenv.mkDerivation {
   '';
 
   cmakeFlags = [
+    "-DFFMPEG_INSTALL_PREFIX=${placeholder "out"}"
     (lib.cmakeBool "BUILD_ALL" false)
     (lib.cmakeBool "BUILD_FFMPEG" true)
     (lib.cmakeBool "BUILD_FFMPEG_ALL_PATCHES" false)
@@ -85,7 +88,8 @@ stdenv.mkDerivation {
     (lib.cmakeBool "BUILD_FFMPEG_MF" false)
     (lib.cmakeBool "BUILD_FFMPEG_NV_CODEC_HEADERS" false)
     (lib.cmakeBool "BUILD_FFMPEG_SVT_AV1" false)
-    (lib.cmakeBool "BUILD_FFMPEG_VAAPI" false)
+    (lib.cmakeBool "BUILD_FFMPEG_LIBVA" false)
+    (lib.cmakeBool "BUILD_FFMPEG_VULKAN" false)
     (lib.cmakeBool "BUILD_FFMPEG_X264" false)
     (lib.cmakeBool "BUILD_FFMPEG_X265" false)
   ];
