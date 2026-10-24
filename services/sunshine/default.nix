@@ -82,7 +82,7 @@ in
       }
       test "${sunshinePackage.pname}" = sunshine-korri
       test "${sunshinePackage.version}" = "${pkgs.sunshine.version}-korri"
-      test "${toString (builtins.length sunshinePackage.korriPatchNames)}" = 17
+      test "${toString (builtins.length sunshinePackage.korriPatchNames)}" = 18
       test "${sunshinePackage.korriBaseSunshineVersion}" = "${sunshineApprovedPatches.baseSunshineVersion}"
       test "${sunshinePackage.korriApprovedBaseSunshineSourceHash}" = "${sunshineApprovedPatches.approvedBaseSourceHash}"
       test "${pkgs.sunshine.src.outputHash}" = "${sunshineApprovedPatches.approvedBaseSourceHash}"
