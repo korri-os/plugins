@@ -66,15 +66,15 @@ import and play; these plugins do not introduce a separate store UI.
 | TIC-80 | `@korri:tic80` | `@korri:tic80gallery` | `.tic` |
 | WASM-4 | `@korri:wasm4` | `@korri:wasm4gallery` | `.wasm` |
 | LowRes NX | `@korri:lowresnx` | `@korri:lowresnxgallery` | `.nx` |
-| PuzzleScript | `@korri:pzretro` | `@korri:puzzlescript` | `.pz`, experimental `.pzp` |
+| PuzzleScript | `@korri:pzretro` | `@korri:puzzlescript` | `.pz` |
 | Pyxel | `@korri:pyxel` | `@korri:pyxelgallery` | `.pyxapp` |
 
 These are candidates until their recorded checks pass. A declaration or an
 ARM build alone does not prove device play. TIC-80's libretro serialization
 stores persistent memory, not live execution state. LowRes NX's core has no
-standard savestates or virtual-disk integration. PuzzleScript Plus support
-is experimental; unsupported engine forks and HTML exports are not raw game
-source.
+standard savestates or virtual-disk integration. PuzzleScript discovery
+recognizes only `.pz`. Plus compatibility, `.pzp` discovery, other engine
+forks and HTML exports are not promised.
 
 Pyxel's initial source is the versioned upstream sample-app directory, not
 all community websites. Its cartridges can contain multiple Python modules.
