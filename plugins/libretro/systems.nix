@@ -835,6 +835,21 @@
     };
   };
 
+  wasm4 = {
+    title = "WASM-4";
+    content.extensions = [ "wasm" ];
+  };
+
+  lowresnx = {
+    title = "LowRes NX";
+    content.extensions = [ "nx" ];
+  };
+
+  puzzlescript = {
+    title = "PuzzleScript";
+    content.extensions = [ "pz" ];
+  };
+
   tic80 = {
     title = "TIC-80";
     content = {

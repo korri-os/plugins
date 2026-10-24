@@ -1,0 +1,72 @@
+title Native Runner Fixture
+author Korri contributors
+
+========
+OBJECTS
+========
+
+Background
+black
+
+Player
+green
+.000.
+00000
+00000
+.000.
+.0.0.
+
+Wall
+blue
+00000
+00000
+00000
+00000
+00000
+
+Goal
+yellow
+.....
+.000.
+.0.0.
+.000.
+.....
+
+========
+LEGEND
+========
+
+. = Background
+# = Wall
+P = Player
+G = Goal
+
+========
+SOUNDS
+========
+
+================
+COLLISIONLAYERS
+================
+
+Background
+Goal
+Player, Wall
+
+======
+RULES
+======
+
+==============
+WINCONDITIONS
+==============
+
+All Player on Goal
+
+========
+LEVELS
+========
+
+#####
+#P.G#
+#####

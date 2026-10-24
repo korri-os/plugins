@@ -9,6 +9,9 @@
 { pkgs }:
 let
   fake08 = pkgs.callPackage ./fake08/package.nix { };
+  wasm4 = pkgs.callPackage ./wasm4/package.nix { };
+  lowresnx = pkgs.callPackage ./lowresnx/package.nix { };
+  pzretro = pkgs.callPackage ./pzretro/package.nix { };
   # nixpkgs marks PPSSPP `badPlatforms = [ "aarch64-linux" ]`. It is the only
   # first-party PSP libretro core and it is wanted on the SM8550 target, so the
   # platform block is lifted for this catalogue only. Every other core keeps
@@ -465,6 +468,30 @@ in
     core = pkgs.libretro.tic80;
     coreFile = "${pkgs.libretro.tic80}/lib/retroarch/cores/tic80_libretro.so";
     systems = [ "tic80" ];
+  };
+
+  wasm4 = {
+    title = "WASM-4";
+    description = "Runs WASM-4 cartridges with its native libretro runtime.";
+    core = wasm4;
+    coreFile = "${wasm4}/lib/retroarch/cores/wasm4_libretro.so";
+    systems = [ "wasm4" ];
+  };
+
+  lowresnx = {
+    title = "LowRes NX";
+    description = "Runs LowRes NX programs (virtual disk not supported).";
+    core = lowresnx;
+    coreFile = "${lowresnx}/lib/retroarch/cores/lowresnx_libretro.so";
+    systems = [ "lowresnx" ];
+  };
+
+  pzretro = {
+    title = "pzretro";
+    description = "Runs original PuzzleScript source with embedded QuickJS.";
+    core = pzretro;
+    coreFile = "${pzretro}/lib/retroarch/cores/puzzlescript_libretro.so";
+    systems = [ "puzzlescript" ];
   };
 
   vecx = {
