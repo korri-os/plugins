@@ -374,6 +374,50 @@ in
     core = pkgs.libretro.melonds;
     coreFile = "${pkgs.libretro.melonds}/lib/retroarch/cores/melonds_libretro.so";
     systems = [ "nds" ];
+    # melonDS 66b5d263: src/libretro/{libretro_core_options.h,screenlayout.cpp}.
+    # Equal-sized panes, with melonds_screen_gap = 0 at launch.
+    layouts = {
+      "Top/Bottom".panes = {
+        upper = {
+          x = 0;
+          y = 0;
+          width = 1;
+          height = 0.5;
+        };
+        lower = {
+          x = 0;
+          y = 0.5;
+          width = 1;
+          height = 0.5;
+        };
+      };
+      "Left/Right".panes = {
+        upper = {
+          x = 0;
+          y = 0;
+          width = 0.5;
+          height = 1;
+        };
+        lower = {
+          x = 0.5;
+          y = 0;
+          width = 0.5;
+          height = 1;
+        };
+      };
+      "Top Only".panes.upper = {
+        x = 0;
+        y = 0;
+        width = 1;
+        height = 1;
+      };
+      "Bottom Only".panes.lower = {
+        x = 0;
+        y = 0;
+        width = 1;
+        height = 1;
+      };
+    };
   };
 
   neocd = {

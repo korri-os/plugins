@@ -20,8 +20,31 @@ for (const [core, systemIds] of Object.entries(expected)) {
   assert.equal(plugin.controls.quit.owner.id, `@korri:${core}/${core}`)
   assert.deepEqual(Object.keys(plugin.systems).sort(), [...systemIds].sort(), core)
   assert.deepEqual(plugin.runners[core].systems, [...systemIds].sort(), core)
+  if (core === "melonds") {
+    assert.deepEqual(plugin.runners[core].layouts, {
+      "Top/Bottom": { panes: {
+        upper: { x: 0, y: 0, width: 1, height: 0.5 },
+        lower: { x: 0, y: 0.5, width: 1, height: 0.5 },
+      } },
+      "Left/Right": { panes: {
+        upper: { x: 0, y: 0, width: 0.5, height: 1 },
+        lower: { x: 0.5, y: 0, width: 0.5, height: 1 },
+      } },
+      "Top Only": { panes: { upper: { x: 0, y: 0, width: 1, height: 1 } } },
+      "Bottom Only": { panes: { lower: { x: 0, y: 0, width: 1, height: 1 } } },
+    })
+  } else {
+    assert.ok(!("layouts" in plugin.runners[core]), `${core}: no declared layouts`)
+  }
   for (const id of systemIds) {
     const system = plugin.systems[id]
+    if (id === "nds") {
+      assert.deepEqual(system.panes, ["upper", "lower"], core)
+      assert.equal(system.arrangement, "upper-above-lower", core)
+    } else {
+      assert.ok(!("panes" in system), `${core}/${id}: implicit single pane`)
+      assert.ok(!("arrangement" in system), `${core}/${id}: no arrangement`)
+    }
     assert.equal(system.id, id, core)
     assert.ok(system.title.length > 0, `${core}/${id}: title`)
     assert.ok(system.content?.extensions.length > 0, `${core}/${id}: content extensions`)
