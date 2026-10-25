@@ -530,6 +530,11 @@
 
   nds = {
     title = "Nintendo DS";
+    panes = [
+      "upper"
+      "lower"
+    ];
+    arrangement = "upper-above-lower";
     content = {
       extensions = [
         "nds"

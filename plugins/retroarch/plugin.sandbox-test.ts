@@ -1,6 +1,6 @@
 // Runs inside settings-check.nix against the selected program's evidence.
 import { afterAll, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { handlers } from "./plugin"
@@ -356,11 +356,11 @@ describe("RetroArch nested settings operations", () => {
 const parser = process.env.KORRI_TEST_RETROARCH_CONFIG_PARSER
 const directory = mkdtempSync(join(tmpdir(), "retroarch-config-"))
 afterAll(() => rmSync(directory, { recursive: true, force: true }))
-function parsed(cfg: string, keys: string[]): string[] {
+function parsed(cfg: string, keys: string[], env: Record<string, string> = {}): string[] {
   if (!parser) throw new Error("Native parser executable is required")
   const path = join(directory, "retroarch.cfg")
   writeFileSync(path, cfg)
-  const result = Bun.spawnSync([parser, path, ...keys])
+  const result = Bun.spawnSync([parser, path, ...keys], { env: { ...process.env, ...env } })
   expect(result.exitCode).toBe(0)
   return result.stdout.toString().split("\0").slice(0, -1)
 }
@@ -498,5 +498,75 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
         "audio_device",
       ]),
     ).toEqual(["native\\path#1"])
+  })
+})
+
+
+describe("melonDS chosen layout", () => {
+  for (const layout of ["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"]) {
+    it(`provisions ${layout} without changing the launch command`, () => {
+      const request = { ...input(), runnerId: "@korri:melonds/melonds" }
+      const unchanged = launch(request)
+      const plan = launch({ ...request, layout })
+      expect(plan.args).toEqual(unchanged.args)
+      expect(plan.files).toHaveLength(2)
+      expect(plan.files![0].content).toContain('global_core_options = "true"')
+      expect(plan.files![0].content).toContain('game_specific_options = "false"')
+      expect(plan.files![0].content).toContain(`core_options_path = "${plan.files![1].path}"`)
+      expect(plan.files![1].content).toContain(`melonds_screen_layout = "${layout}"`)
+      expect(plan.files![1].content).toContain('melonds_screen_gap = "0"')
+      expect(plan.files![1].content).toContain('#include "~/.config/retroarch/config/melonDS/melonDS.opt"')
+    })
+  }
+
+  it("does not change existing behavior without a layout", () => {
+    const plan = launch({ ...input(), runnerId: "@korri:melonds/melonds" })
+    expect(plan.files).toHaveLength(1)
+    expect(plan.files![0].content).not.toContain("core_options_path")
+    expect(plan.files![0].content).not.toContain("global_core_options")
+    expect(plan.files![0].content).not.toContain("game_specific_options")
+  })
+
+  it("refuses layouts it cannot apply", () => {
+    expect(() => launch({ ...input(), layout: "Top/Bottom" })).toThrow("melonDS")
+    for (const layout of ["invalid", 'Top Only"\nmelonds_screen_gap = "10']) {
+      expect(() => launch({ ...input(), runnerId: "@korri:melonds/melonds", layout })).toThrow("layout")
+    }
+  })
+
+  it("keeps the chosen layout even when raw settings try to replace its options route", () => {
+    const plan = launch({
+      ...input({ config: { append: 'global_core_options = "false"\ngame_specific_options = "true"\ncore_options_path = "/other.opt"' } }),
+      runnerId: "@korri:melonds/melonds", layout: "Top/Bottom",
+    })
+    expect(plan.files![0].content).toContain('global_core_options = "true"')
+    expect(plan.files![0].content).toContain('game_specific_options = "false"')
+    expect(plan.files![0].content).not.toContain("/other.opt")
+  })
+})
+
+describe.skipIf(!parser)("melonDS options through the pinned native parser", () => {
+  it("keeps all other per-core options and never writes the person's file", () => {
+    const home = join(directory, "home")
+    const perCoreDirectory = join(home, ".config/retroarch/config/melonDS")
+    mkdirSync(perCoreDirectory, { recursive: true })
+    const original = 'melonds_screen_layout = "Hybrid Top"\nmelonds_screen_gap = "64"\nmelonds_threaded_renderer = "enabled"\nmelonds_touch_mode = "Mouse"\n'
+    const perCore = join(perCoreDirectory, "melonDS.opt")
+    writeFileSync(perCore, original)
+    for (const layout of ["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"]) {
+      const plan = launch({ ...input(), runnerId: "@korri:melonds/melonds", layout })
+      expect(parsed(plan.files![1].content, [
+        "melonds_screen_layout", "melonds_screen_gap", "melonds_threaded_renderer", "melonds_touch_mode",
+      ], { HOME: home })).toEqual([layout, "0", "enabled", "Mouse"])
+      expect(readFileSync(perCore, "utf8")).toBe(original)
+      expect(plan.files!.some(file => file.path === perCore)).toBe(false)
+    }
+  })
+
+  it("also reads the chosen layout when no per-core file exists", () => {
+    const plan = launch({ ...input(), runnerId: "@korri:melonds/melonds", layout: "Top/Bottom" })
+    expect(parsed(plan.files![1].content, ["melonds_screen_layout", "melonds_screen_gap"], {
+      HOME: join(directory, "missing-home"),
+    })).toEqual(["Top/Bottom", "0"])
   })
 })

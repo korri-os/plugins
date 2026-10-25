@@ -17,6 +17,9 @@ import {
   type SettingSchema,
 } from "./policy"
 import { renderRetroArchSettings } from "./render-settings"
+// Remove this local type when the Core pin includes PluginLaunchInput.layout.
+type LaunchInput = PluginLaunchInput & { layout?: string }
+
 
 // Mirrors the nested launch treaty until the pinned Korri input includes it.
 interface SettingsTree {
@@ -84,7 +87,7 @@ function quoteSetting(key: string, value: string): string {
   throw new Error(`Unsupported RetroArch string setting: ${key}`)
 }
 
-function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
+function prepareLaunch(input: LaunchInput): LaunchOutput {
   const root = input.accountRoot
   const saveRoot = input.saveRoot
   if (!input.corePath) throw new Error("RetroArch runner requires a core path")
@@ -209,6 +212,32 @@ video_context_driver = "x"`
     if (position === undefined) throw new Error(`Missing managed RetroArch baseline key: ${key}`)
     merged[position] = `${key} = ${quoteSetting(key, path)}`
   }
+  const files: NonNullable<LaunchOutput["files"]> = []
+  if (input.layout !== undefined) {
+    if (input.runnerId !== "@korri:melonds/melonds")
+      throw new Error("Chosen layout requires the melonDS runner")
+    if (!["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"].includes(input.layout))
+      throw new Error("Unsupported melonDS layout")
+    const optionsPath = `${root}/melonds-layout.opt`
+    // RetroArch 1.22.2 runloop_init_core_options_path prefers game/folder,
+    // then per-core options over core_options_path. Select our launch-local
+    // file explicitly. Its native include keeps the person's per-core values
+    // read-only; first-wins lookup overrides only layout and gap.
+    for (const [key, value] of Object.entries({
+      global_core_options: '"true"',
+      game_specific_options: '"false"',
+      core_options_path: quoteSetting("core_options_path", optionsPath),
+    })) {
+      const line = `${key} = ${value}`
+      const position = positions.get(key)
+      if (position === undefined) merged.push(line)
+      else merged[position] = line
+    }
+    files.push({
+      path: optionsPath,
+      content: `melonds_screen_layout = "${input.layout}"\nmelonds_screen_gap = "0"\n#include "~/.config/retroarch/config/melonDS/melonDS.opt"\n`,
+    })
+  }
   const content = `${merged.join("\n")}\n`
   return {
     command: input.program,
@@ -230,7 +259,7 @@ video_context_driver = "x"`
       { key: "states", kind: "savestate", path: `${saveRoot}/states` },
       { key: "screenshots", kind: "screenshot", path: `${saveRoot}/screenshots` },
     ],
-    files: [{ path: configPath, content }],
+    files: [{ path: configPath, content }, ...files],
     env: {},
     envUnset: [],
   }

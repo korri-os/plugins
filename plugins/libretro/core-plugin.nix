@@ -33,7 +33,11 @@ let
   systemEntries = lib.concatMapStringsSep "\n" (
     id:
     "  ${json id}: { id: ${json id}, title: ${json systems.${id}.title}, "
-    + "content: ${json systems.${id}.content} },"
+    + "content: ${json systems.${id}.content}"
+    + lib.optionalString (
+      systems.${id} ? panes
+    ) ", panes: ${json systems.${id}.panes}, arrangement: ${json systems.${id}.arrangement}"
+    + " },"
   ) systemIds;
 
   pluginTemplate = pkgs.writeText "korri-core-plugin-${name}.ts" ''
@@ -54,7 +58,9 @@ let
         family: "@korri:retroarch",
         program: "retroarch",
         core: ${json name},
-        systems: ${json systemIds},
+        systems: ${json systemIds},${
+          lib.optionalString (spec ? layouts) "\n        layouts: ${json spec.layouts},"
+        }
         // @netplay@
       },
     }

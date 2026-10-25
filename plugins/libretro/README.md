@@ -134,6 +134,39 @@ settings family, not a package a core depends on.
 Two cores may run one system. Genesis Plus GX and PicoDrive both run Mega
 Drive. Their content rules combine and the player chooses the runner.
 
+## Nintendo DS panes and melonDS layouts
+
+Nintendo DS declares `upper` and `lower` panes, arranged `upper-above-lower`.
+The melonDS runner offers `Top/Bottom`, `Left/Right`, `Top Only` and `Bottom
+Only`. These are native `melonds_screen_layout` values in the pinned libretro
+melonDS source (`66b5d2634cd0a79030562811e6e05f5532f800ba`,
+`src/libretro/libretro_core_options.h`). Its `screenlayout.cpp` and
+`opengl.cpp` give equal halves for the two-pane layouts with screen gap zero.
+Reversed layouts (`Bottom/Top`, `Right/Left`) do not serve the first display
+arrangement case. Hybrid layouts remain outside this slice.
+
+When korrid supplies a layout, the handler provisions `melonds-layout.opt`
+beside its existing account-local `retroarch.cfg`. It sets the chosen layout
+and gap zero, then uses a native `#include` of the person's existing
+`~/.config/retroarch/config/melonDS/melonDS.opt`. First-wins native lookup
+preserves every other option without changing that file. A missing included
+file is allowed by the native parser.
+
+RetroArch 1.22.2's `runloop_init_core_options_path` normally prefers game and
+folder options, then per-core options over `core_options_path`. For a chosen
+layout only, the handler sets `global_core_options = "true"` and
+`game_specific_options = "false"` so RetroArch reads the provisioned file.
+Separate game/folder option files and global option files are not merged in
+this route; the existing per-core file is the source. Without a layout, the
+handler keeps its existing files, arguments and option precedence unchanged.
+The handler performs no reads or writes; korrid provisions its returned plan.
+
+The local `LaunchInput` type is temporary until this repository advances its
+Core pin to the generated contract with `PluginLaunchInput.layout`. Remove
+the local type in that pin update. Host admission also needs Core's panes and
+layouts parser; building this package alone does not establish admission on
+an older host.
+
 ## The runner owns its settings
 
 `settings.ts` is generated beside the plugin from the pinned RetroArch source:
