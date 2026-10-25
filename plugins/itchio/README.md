@@ -62,9 +62,10 @@ nix build --no-link .#checks.x86_64-linux.korri-itchio-plugin \
   .#checks.aarch64-linux.korri-itchio-plugin
 ```
 
-The publisher pins Core `1e5f6b8b432d3970b9814884769503827d0c8629`, which
-provides request-turn form POSTs. This is a consumed contract change, not an
-unrelated dependency update. No developer-path override is needed. Tests use
+The publisher pins Core `37c12fc04baca4d3f1e008f0f134f7e54b56b210`. Core
+`1e5f6b8b432d3970b9814884769503827d0c8629` first provided request-turn form
+POSTs. That pin was a consumed contract change, not an unrelated dependency
+update. No developer-path override is needed. Tests use
 static fixtures and synthetic artifact URLs, not live signed links.
 
 Core also carries the ignored live test
