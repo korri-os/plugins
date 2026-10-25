@@ -36,6 +36,25 @@ for (const [core, systemIds] of Object.entries(expected)) {
   } else {
     assert.ok(!("layouts" in plugin.runners[core]), `${core}: no declared layouts`)
   }
+  // Exercise the real generated entrypoint, including its declaration binding.
+  const request = {
+    runnerId: plugin.runners[core].id, program: "/program", corePath: "/core",
+    contentPath: "/rom", accountRoot: "/account", saveRoot: "/saves", cacheRoot: "/cache",
+    files: { autoconfig: "/autoconfig" },
+  }
+  const launch = plugin.handlers["launch.prepare"]
+  const original = launch(request)
+  if (core === "melonds") {
+    for (const layout of ["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"]) {
+      const plan = launch({ ...request, layout })
+      assert.deepEqual(plan.files[0], original.files[0])
+      assert.equal(plan.files[1].content, `melonds_screen_layout = "${layout}"\nmelonds_screen_gap = "0"\n`)
+      assert.deepEqual(plan.env, { KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files[1].path })
+    }
+    assert.throws(() => launch({ ...request, layout: "not-declared" }), /layout/)
+  } else {
+    assert.throws(() => launch({ ...request, layout: "Top/Bottom" }), /layout/)
+  }
   for (const id of systemIds) {
     const system = plugin.systems[id]
     if (id === "nds") {

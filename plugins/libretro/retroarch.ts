@@ -87,7 +87,9 @@ function quoteSetting(key: string, value: string): string {
   throw new Error(`Unsupported RetroArch string setting: ${key}`)
 }
 
-function prepareLaunch(input: LaunchInput): LaunchOutput {
+type RunnerDeclarations = Record<string, { id: string; layouts?: object }>
+
+function prepareLaunch(input: LaunchInput, runners: RunnerDeclarations): LaunchOutput {
   const root = input.accountRoot
   const saveRoot = input.saveRoot
   if (!input.corePath) throw new Error("RetroArch runner requires a core path")
@@ -213,30 +215,19 @@ video_context_driver = "x"`
     merged[position] = `${key} = ${quoteSetting(key, path)}`
   }
   const files: NonNullable<LaunchOutput["files"]> = []
+  const env: Record<string, string> = {}
   if (input.layout !== undefined) {
-    if (input.runnerId !== "@korri:melonds/melonds")
-      throw new Error("Chosen layout requires the melonDS runner")
-    if (!["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"].includes(input.layout))
-      throw new Error("Unsupported melonDS layout")
+    const runner = Object.values(runners).find(runner => runner.id === input.runnerId)
+    if (!runner?.layouts || !Object.hasOwn(runner.layouts, input.layout))
+      throw new Error("Unsupported runner layout")
     const optionsPath = `${root}/melonds-layout.opt`
-    // RetroArch 1.22.2 runloop_init_core_options_path prefers game/folder,
-    // then per-core options over core_options_path. Select our launch-local
-    // file explicitly. Its native include keeps the person's per-core values
-    // read-only; first-wins lookup overrides only layout and gap.
-    for (const [key, value] of Object.entries({
-      global_core_options: '"true"',
-      game_specific_options: '"false"',
-      core_options_path: quoteSetting("core_options_path", optionsPath),
-    })) {
-      const line = `${key} = ${value}`
-      const position = positions.get(key)
-      if (position === undefined) merged.push(line)
-      else merged[position] = line
-    }
+    // The patched frontend applies this in memory AFTER native source
+    // selection. No routing settings change, and no overlay value is saved.
     files.push({
       path: optionsPath,
-      content: `melonds_screen_layout = "${input.layout}"\nmelonds_screen_gap = "0"\n#include "~/.config/retroarch/config/melonDS/melonDS.opt"\n`,
+      content: `melonds_screen_layout = ${quoteSetting("melonds_screen_layout", input.layout)}\nmelonds_screen_gap = "0"\n`,
     })
+    env.KORRI_RETROARCH_CORE_OPTIONS_OVERLAY = optionsPath
   }
   const content = `${merged.join("\n")}\n`
   return {
@@ -260,7 +251,7 @@ video_context_driver = "x"`
       { key: "screenshots", kind: "screenshot", path: `${saveRoot}/screenshots` },
     ],
     files: [{ path: configPath, content }, ...files],
-    env: {},
+    env,
     envUnset: [],
   }
 }
@@ -355,8 +346,13 @@ function acceptedPolicy(values: unknown): RetroArchPolicy {
   }
 }
 
-export const handlers = {
-  "launch.prepare": prepareLaunch,
-  "settings.describe": describeSettings,
-  "settings.validate": validateSettings,
+// The host names the operation it wants; every runner answers through the
+// same map, so a new operation adds a key rather than a new export contract.
+export function createHandlers(runners: RunnerDeclarations) {
+  return {
+    "launch.prepare": (input: LaunchInput) => prepareLaunch(input, runners),
+    "settings.describe": describeSettings,
+    "settings.validate": validateSettings,
+  }
+
 }

@@ -1,0 +1,140 @@
+Korri-specific: launch-local core-options overlay, never persisted.
+
+Pinned RetroArch 1.22.2 grounding:
+  runloop.c:1082–1238 selects the native game/folder/per-core/custom/global source.
+  core_option_manager.c:1114–1124 loads that source before parsing option values.
+
+Apply KORRI_RETROARCH_CORE_OPTIONS_OVERLAY only after native parsing. Retain
+each overridden native raw value (including absence) for every exit/menu flush.
+With no overlay, native selection, parsing and serialization stay unchanged.
+
+--- a/core_option_manager.h
++++ b/core_option_manager.h
+@@ -49,6 +49,9 @@
+    size_t index;
+    uint32_t key_hash;
+    bool visible;
++   /* Korri launch overlay: never persist its value, including menu saves. */
++   bool launch_override;
++   char *launch_original_value;
+ };
+ 
+ struct core_category
+--- a/core_option_manager.c
++++ b/core_option_manager.c
+@@ -26,6 +26,7 @@
+ 
+ #include "core_option_manager.h"
+ #include "msg_hash.h"
++#include "verbosity.h"
+ 
+ /*********************/
+ /* Option Conversion */
+@@ -653,6 +654,57 @@
+    return label;
+ }
+ 
++/* Korri-specific, process-local overlay. Native path selection and parsing
++ * have already finished. Keep the original raw bytes (or absence), not just
++ * the parsed index: even invalid native values must survive a flush. */
++static bool core_option_manager_apply_launch_overlay(
++      core_option_manager_t *opt, config_file_t *native)
++{
++   size_t i;
++   const char *path = getenv("KORRI_RETROARCH_CORE_OPTIONS_OVERLAY");
++   config_file_t *overlay;
++
++   if (string_is_empty(path))
++      return true;
++   if (!(overlay = config_file_new_from_path_to_string(path)))
++   {
++      RARCH_ERR("[Core] Cannot read Korri launch core-options overlay.\n");
++      return false;
++   }
++   for (i = 0; i < opt->size; i++)
++   {
++      size_t j;
++      struct core_option *option = &opt->opts[i];
++      struct config_entry_list *entry = config_get_entry(overlay, option->key);
++      struct config_entry_list *original;
++      if (!entry)
++         continue;
++      for (j = 0; j < option->vals->size; j++)
++         if (string_is_equal(option->vals->elems[j].data, entry->value))
++            break;
++      if (j == option->vals->size)
++      {
++         RARCH_ERR("[Core] Invalid Korri launch core-option value.\n");
++         config_file_free(overlay);
++         return false;
++      }
++      original = config_get_entry(native, option->key);
++      if (original && original->value)
++      {
++         option->launch_original_value = strdup(original->value);
++         if (!option->launch_original_value)
++         {
++            config_file_free(overlay);
++            return false;
++         }
++      }
++      option->launch_override = true;
++      option->index = j;
++   }
++   config_file_free(overlay);
++   return true;
++}
++
+ /* Parses a single legacy core options interface
+  * variable, extracting all present core_option
+  * information */
+@@ -879,6 +931,10 @@
+          goto error;
+    }
+ 
++   if (!core_option_manager_apply_launch_overlay(opt,
++         config_src ? config_src : opt->conf))
++      goto error;
++
+    if (config_src)
+       config_file_free(config_src);
+ 
+@@ -1220,6 +1276,10 @@
+          goto error;
+    }
+ 
++   if (!core_option_manager_apply_launch_overlay(opt,
++         config_src ? config_src : opt->conf))
++      goto error;
++
+    if (config_src)
+       config_file_free(config_src);
+ 
+@@ -1278,6 +1338,7 @@
+          if (option->category_key)
+             free(option->category_key);
+ 
++         free(option->launch_original_value);
+          if (option->vals)
+             string_list_free(option->vals);
+          if (option->val_labels)
+@@ -1897,7 +1958,17 @@
+       struct core_option *option = (struct core_option*)&opt->opts[i];
+ 
+       if (option)
+-         config_set_string(conf, option->key,
+-               opt->opts[i].vals->elems[opt->opts[i].index].data);
++      {
++         if (option->launch_override)
++         {
++            if (option->launch_original_value)
++               config_set_string(conf, option->key, option->launch_original_value);
++            else
++               config_unset(conf, option->key);
++         }
++         else
++            config_set_string(conf, option->key,
++                  opt->opts[i].vals->elems[opt->opts[i].index].data);
++      }
+    }
+ }
