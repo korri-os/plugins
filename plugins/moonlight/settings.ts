@@ -40,7 +40,7 @@ interface Rule {
   args: (value: SettingValue) => string[]
 }
 const intMax = 2_147_483_647
-const revision = "1"
+const revision = "2"
 const integer = (minimum = 0, maximum = intMax): Schema => ({
   type: "integer",
   title: "",
@@ -162,7 +162,14 @@ const rules: Record<string, Rule> = {
   "video.resolution.width": { schema: integer(1), args: flag("width") },
   "video.resolution.height": { schema: integer(1), args: flag("height") },
   "video.fps": { schema: integer(1), args: flag("fps") },
-  "video.bitrate-kbps": { schema: integer(1), args: flag("bitrate") },
+  "video.bitrate-kbps": {
+    schema: {
+      ...integer(1),
+      description:
+        "Unset: twice Moonlight's native bitrate for the resolved size and fps (60 when unset). The RG35XX SP cedrus encoder looked soft at 3 Mbit/s, 640x480 (2026-10-25).",
+    },
+    args: flag("bitrate"),
+  },
   "video.codec": {
     schema: { ...choice(["auto", "h264", "h265", "av1"]), default: "h264" },
     args: flag("codec"),
@@ -178,7 +185,14 @@ const rules: Record<string, Rule> = {
     schema: choice(["stereo", "5.1", "7.1"]),
     args: (value) => (value === "stereo" ? [] : flag("surround")(value)),
   },
-  "audio.play-on-host": { schema: boolean(), args: switchFlag("localaudio") },
+  "audio.play-on-host": {
+    schema: {
+      ...boolean(),
+      default: true,
+      description: "Keep audio on the holder: the holder keeps playing and keeps its sound.",
+    },
+    args: switchFlag("localaudio"),
+  },
   "input.mouse-emulation": { schema: boolean(), args: switchFlag("nomouseemulation", false) },
   "network.remote-optimizations": {
     schema: choice(["auto", "on", "off"]),
@@ -213,6 +227,29 @@ export function validateSettings(input: SettingsValidateInput): {
   resolutionPair(settings, diagnostics)
   return { valid: diagnostics.length === 0, diagnostics }
 }
+// config.c at the pinned revision: pixel bands and kbps per 30 fps.
+// Twice the native default: cedrus looked soft at 640x480, 2026-10-25.
+function defaultBitrate(settings: Map<string, SettingValue>): number {
+  const width = settings.get("video.resolution.width")
+  const height = settings.get("video.resolution.height")
+  const fps = settings.get("video.fps")
+  // With no display fact, match Moonlight's own 1280x720 / 60 defaults.
+  const pixels =
+    (typeof width === "number" ? width : 1280) * (typeof height === "number" ? height : 720)
+  const base =
+    pixels <= 640 * 360
+      ? 1000
+      : pixels <= 854 * 480
+        ? 1500
+        : pixels <= 1366 * 768
+          ? 5000
+          : pixels <= 1920 * 1200
+            ? 10000
+            : pixels <= 2560 * 1600
+              ? 20000
+              : 40000
+  return 2 * Math.trunc(base * ((typeof fps === "number" ? fps : 60) / 30))
+}
 export function renderSettings(input: SettingsRenderInput): { args: string[] } {
   checkId(input.id)
   const { settings, diagnostics } = collect(input.settings)
@@ -227,6 +264,8 @@ export function renderSettings(input: SettingsRenderInput): { args: string[] } {
     settings.set("video.resolution.width", display.width)
     settings.set("video.resolution.height", display.height)
   }
+  if (!settings.has("video.bitrate-kbps"))
+    settings.set("video.bitrate-kbps", defaultBitrate(settings))
   const args: string[] = []
   for (const [path, rule] of Object.entries(rules)) {
     const value = settings.get(path) ?? rule.schema.default

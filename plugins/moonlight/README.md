@@ -52,21 +52,34 @@ come from moonlight-embedded `775444287305849ebdf4736c75298ad0713e2d5d`,
 | `video.resolution.width` | integer | `-width`; display width when unset |
 | `video.resolution.height` | integer | `-height`; display height when unset |
 | `video.fps` | integer | `-fps`; unset lets Moonlight choose (60) |
-| `video.bitrate-kbps` | integer | `-bitrate`; unset lets Moonlight choose from size and fps |
+| `video.bitrate-kbps` | integer | `-bitrate`; unset uses twice Moonlight's native default for size and fps |
 | `video.codec` | auto, h264, h265, av1 | `-codec`; schema default **h264** |
 | `video.hdr.enable` | boolean | true: `-hdr` |
 | `video.rotation-degrees` | 0, 90, 180, 270 | `-rotate` |
 | `video.optimize-game-settings` | boolean | false: `-nosops` |
 | `video.allow-unsupported-resolution` | boolean | false: `-nounsupported` |
 | `audio.channels` | stereo, 5.1, 7.1 (strings) | `-surround 5.1` / `7.1`; stereo emits nothing |
-| `audio.play-on-host` | boolean | true: `-localaudio` |
+| `audio.play-on-host` | boolean; default **true** | true: `-localaudio`; the holder keeps playing and keeps its sound |
 | `input.mouse-emulation` | boolean | false: `-nomouseemulation` |
 | `network.remote-optimizations` | auto, on, off | `-remote auto` / `yes` / `no` |
 | `network.packet-size-bytes` | integer | `-packetsize` |
 | `logging.level` | info, verbose, debug | nothing / `-verbose` / `-debug` |
 
-Except for codec and display fallback, an unset path emits no argument.
-There are no ranges or live changes during a stream.
+The bitrate default follows the pinned `config.c` pixel bands: 1000, 1500,
+5000, 10000, 20000 and 40000 kbps per 30 fps, then doubles the native result.
+An unset fps uses 60 for this calculation without emitting `-fps`. Size comes
+from the explicit resolution pair, then the display; without either, the
+calculation uses Moonlight's native 1280x720. At 640x480 and 60 fps it emits
+`-bitrate 6000`. An explicit bitrate is unchanged. Evidence: on 2026-10-25,
+3 Mbit/s looked soft on the RG35XX SP cedrus encoder at 640x480. Doubling costs
+bandwidth; it does not guarantee the same image quality on every encoder.
+
+Host audio defaults to true because, without `-localaudio`, Sunshine moved
+the holder's sound into the stream and the device still playing went silent
+(observed on hardware, 2026-10-25). Explicit false emits no `-localaudio`.
+
+Except for codec, bitrate, host audio and display fallback, an unset path emits
+no argument. There are no ranges or live changes during a stream.
 
 ### Options with no typed setting
 

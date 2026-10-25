@@ -38,6 +38,9 @@ describe("Moonlight nested settings", () => {
     expect(leaves(schema)).toEqual(paths)
     expect(revision).not.toBe("")
     expect(schema.properties.video.properties?.codec.default).toBe("h264")
+    expect(schema.properties.audio.properties?.["play-on-host"].default).toBe(true)
+    expect(schema.properties.audio.properties?.["play-on-host"].description).toContain("holder")
+    expect(schema.properties.video.properties?.["bitrate-kbps"].description).toContain("twice")
   })
   test("renders every setting with the native flags", () => {
     const settings = {
@@ -84,17 +87,26 @@ describe("Moonlight nested settings", () => {
       "-debug",
     ])
   })
-  test("uses display fallback and h264, but leaves fps and bitrate to Moonlight", () => {
+  test("uses display fallback, h264, doubled native bitrate and host audio without forcing fps", () => {
     expect(render({}, { width: 640, height: 480 })).toEqual([
       "-width",
       "640",
       "-height",
       "480",
+      "-bitrate",
+      "6000",
       "-codec",
       "h264",
+      "-localaudio",
     ])
-    expect(render()).toEqual(["-codec", "h264"])
-    expect(render({}, { width: -1, height: 480 })).toEqual(["-codec", "h264"])
+    expect(render()).toEqual(["-bitrate", "20000", "-codec", "h264", "-localaudio"])
+    expect(render({}, { width: -1, height: 480 })).toEqual([
+      "-bitrate",
+      "20000",
+      "-codec",
+      "h264",
+      "-localaudio",
+    ])
   })
   test("renders positive switches, stereo, rotations, codecs and logging levels", () => {
     expect(
@@ -108,16 +120,25 @@ describe("Moonlight nested settings", () => {
         input: { "mouse-emulation": true },
         logging: { level: "info" },
       }),
-    ).toEqual(["-codec", "h264"])
+    ).toEqual(["-bitrate", "20000", "-codec", "h264"])
     expect(render({ audio: { channels: "7.1" }, logging: { level: "verbose" } })).toEqual([
+      "-bitrate",
+      "20000",
       "-codec",
       "h264",
       "-surround",
       "7.1",
+      "-localaudio",
       "-verbose",
     ])
     for (const codec of ["auto", "h264", "h265", "av1"])
-      expect(render({ video: { codec } })).toEqual(["-codec", codec])
+      expect(render({ video: { codec } })).toEqual([
+        "-bitrate",
+        "20000",
+        "-codec",
+        codec,
+        "-localaudio",
+      ])
     for (const rotation of [0, 90, 180, 270])
       expect(render({ video: { "rotation-degrees": rotation } })).toContain(String(rotation))
     for (const [choice, native] of [
@@ -126,11 +147,46 @@ describe("Moonlight nested settings", () => {
       ["off", "no"],
     ])
       expect(render({ network: { "remote-optimizations": choice } })).toEqual([
+        "-bitrate",
+        "20000",
         "-codec",
         "h264",
+        "-localaudio",
         "-remote",
         native,
       ])
+  })
+  test("doubles the pinned native bitrate table at every pixel-band boundary", () => {
+    for (const [width, height, bitrate] of [
+      [640, 360, 2000],
+      [641, 360, 3000],
+      [854, 480, 3000],
+      [855, 480, 10000],
+      [1366, 768, 10000],
+      [1367, 768, 20000],
+      [1920, 1200, 20000],
+      [1921, 1200, 40000],
+      [2560, 1600, 40000],
+      [2561, 1600, 80000],
+    ]) {
+      const args = render({ video: { resolution: { width, height }, fps: 30 } })
+      expect(args[args.indexOf("-bitrate") + 1]).toBe(String(bitrate))
+    }
+    const args = render({ video: { fps: 59 } }, { width: 640, height: 360 })
+    expect(args[args.indexOf("-bitrate") + 1]).toBe("3932")
+  })
+  test("uses explicit settings before display facts and leaves an explicit bitrate unchanged", () => {
+    const args = render(
+      { video: { resolution: { width: 640, height: 480 }, fps: 30 } },
+      { width: 1920, height: 1080 },
+    )
+    expect(args[args.indexOf("-bitrate") + 1]).toBe("3000")
+    expect(render({ video: { "bitrate-kbps": 1234 }, audio: { "play-on-host": false } })).toEqual([
+      "-bitrate",
+      "1234",
+      "-codec",
+      "h264",
+    ])
   })
   test("reports invalid leaves, sections, unknown paths and width/height pairing", () => {
     for (const resolution of [{ width: 640 }, { height: 480 }, { width: 0, height: 480 }]) {
