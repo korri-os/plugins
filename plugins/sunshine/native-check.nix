@@ -10,6 +10,10 @@ pkgs.runCommand "korri-sunshine-plugin-native-check"
       pkgs.gnugrep
       pkgs.jq
       pkgs.systemd
+      pkgs.bun
+      pkgs.typescript
+      pkgs.python3
+      pkgs.jq
     ];
   }
   ''
@@ -68,5 +72,17 @@ pkgs.runCommand "korri-sunshine-plugin-native-check"
     grep -qE '^SupplementaryGroups=(.* )?uinput( |$)' "$sunshine_unit"
 
     udevadm verify --resolve-names=never --no-style "$rules"
+    # ProtectSystem=strict makes /run read-only, not inaccessible. The service
+    # needs no write permission or extra mount for korrid's launch arguments.
+    grep -Fx 'ProtectSystem=strict' "$sunshine_unit"
+    ! grep -E '^(InaccessiblePaths|TemporaryFileSystem)=.*(/run|korri-launch-services)' "$sunshine_unit"
+    python3 ${./test-runtime.py} ${./runtime.sh}
+    mkdir settings-check
+    cp ${./plugin.ts} settings-check/plugin.ts
+    cp ${./settings.ts} settings-check/settings.ts
+    cp ${./settings.test.mts} settings-check/settings.test.ts
+    tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
+      --moduleResolution Bundler settings-check/plugin.ts
+    bun test ./settings-check/settings.test.ts
     touch "$out"
   ''

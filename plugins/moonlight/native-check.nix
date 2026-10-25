@@ -12,6 +12,8 @@ pkgs.runCommand "korri-moonlight-native-check"
       pkgs.python3
       pkgs.openssl
       pkgs.jq
+      pkgs.bun
+      pkgs.typescript
     ];
   }
   ''
@@ -37,5 +39,12 @@ pkgs.runCommand "korri-moonlight-native-check"
     grep -F -- '-autowindowresize' help
     grep -F -- 'v4l2m2m' help
     grep -F -- 'x11' help
+    mkdir settings-check
+    cp ${./plugin.ts} settings-check/plugin.ts
+    cp ${./settings.ts} settings-check/settings.ts
+    cp ${./settings.test.mts} settings-check/settings.test.ts
+    tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
+      --moduleResolution Bundler settings-check/plugin.ts
+    bun test ./settings-check/settings.test.ts
     touch "$out"
   ''

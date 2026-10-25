@@ -32,6 +32,7 @@ PrivateTmp=false
 PrivatePIDs=false
 PrivateDevices=false
 DevicePolicy=auto
+# /run/korri-launch-services stays readable; only korrid writes launch arguments.
 ProtectSystem=strict
 ProtectHome=read-only
 ProtectKernelTunables=true

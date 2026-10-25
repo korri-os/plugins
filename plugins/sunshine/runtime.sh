@@ -48,4 +48,22 @@ export PULSE_SERVER="unix:$runtime_dir/pulse/native"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime_dir/bus"
 
 @coreutils@/bin/mkdir -p /home/korri/.config/sunshine
-exec @sunshine@/bin/sunshine /home/korri/.config/sunshine/sunshine.conf log_path=/dev/null capture=kms encoder=auto capture_rt_priority=5 file_apps=@apps@
+set -- @sunshine@/bin/sunshine /home/korri/.config/sunshine/sunshine.conf log_path=/dev/null capture=kms capture_rt_priority=5 file_apps=@apps@
+
+# korrid atomically replaces this file before restarting the launch service.
+# Read each line as one argument, never as shell syntax.
+args_file=/run/korri-launch-services/korri-sunshine.args
+if [ -f "$args_file" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      *=*)
+        key=${line%%=*}
+        case "$key" in
+          ''|*[!a-z0-9_]*) continue ;;
+        esac
+        set -- "$@" "$line"
+        ;;
+    esac
+  done < "$args_file"
+fi
+exec "$@"
