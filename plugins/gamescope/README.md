@@ -1,7 +1,8 @@
 # Gamescope launch modifier
 
 `@korri:gamescope` contributes only `@korri:gamescope/gamescope` and the
-`launch.compose` handler. It changes an existing runner plan. It declares no
+`launch.compose`, `settings.describe`, and `settings.validate` handlers.
+It changes an existing runner plan. It declares no
 runner, system, service, or runtime effects. The first hardware acceptance
 target is Retroid Pocket Mini V2, nested inside Sway.
 
@@ -9,35 +10,45 @@ target is Retroid Pocket Mini V2, nested inside Sway.
 
 The handler receives the brief's camelCase `PluginComposeInput` and returns
 `PluginLaunchOutput`. The request type is local in `plugin.ts` until the pinned
-Korri contract exports it. The existing launch output and scalar types still
-come from the pinned generated contract. Do not advance Core to an unlanded
+Korri contract exports it. The launch output type
+comes from the pinned generated contract. Do not advance Core to an unlanded
 branch to obtain the new request type.
 
 The command is the manifest's named `files.gamescope`. Arguments are, in
 this fixed order:
 
 1. `--backend wayland --fullscreen --expose-wayland`.
-2. Typed settings, in the order of the table below. A setting appears only if
+2. Typed settings, in the order of the table below. A valid setting appears only if
    it has a value. `--force-composition` appears by default.
 3. Words from `config.append`.
 4. `--`, then the runner command and its arguments.
 
 ### Typed settings
 
-Each key is the exact Gamescope 3.16.31 long option name in
-`gamescope_options` (`src/main.cpp:60`). The korrid cascade merges `settings`
-key by key from device to runner to system to library item, so a later layer
-overrides one key and keeps the others. `config.append` does not merge: the
-last layer that sets it replaces all lower append text.
+Setting paths use ADR 0037's nested vocabulary. The native-option column maps
+each path to the exact Gamescope 3.16.31 long option in `gamescope_options`
+(`src/main.cpp:60`). Author nested objects, not dotted property names. Korrid
+merges one leaf at a time from device through the launch cascade, retaining
+siblings. `config.append` does not merge: the last place that sets it replaces
+all lower append text.
+
+`settings.describe({ id })` returns nested JSON Schema and revision `3.16.31`.
+Every object rejects additional properties. Leaves carry titles, descriptions,
+types, choices, numeric limits, and the existing force-composition default.
+`settings.validate({ values, revision })` reports diagnostics with path segments.
+An error diagnostic makes korrid skip the path and show a warning; it never
+rewrites authored values or stops the launch. `launch.compose` accepts only the
+nested vocabulary, and also skips bad paths defensively for direct callers.
 
 Kinds:
 
-- **integer**: a JSON integer inside the limits. Korri emits `--key N`.
-- **float**: a finite JSON number inside the limits. Korri emits `--key X`
+- **integer**: a JSON integer inside the limits. Korri emits the mapped native option and `N`.
+- **float**: a finite JSON number inside the limits. Korri emits the mapped native option and `X`
   with JavaScript's shortest decimal form, for example `1.5` or `1e-7`.
 - **choice**: one of the listed strings, with the exact spelling.
-- **boolean**: `true` adds the flag `--key`. `false` leaves it out. Any other
-  value refuses composition.
+- **boolean**: `true` adds the mapped native flag and `false` leaves it out,
+  except positive `video.color-management` and `debug.xres`: `false` adds the
+  native `--disable-*` flag. Other values produce diagnostics.
 - **path**: a string that starts with `/` and has no NUL byte.
 - **string**: a string with the syntax in the table.
 
@@ -50,51 +61,51 @@ Options that Gamescope reads with `atoi`/`atof` (the
 For those, Korri sets the limit given in the table. "Line" names the option's
 entry in `main.cpp` and the code that reads its value.
 
-| Key | Kind | Accepted values | When absent | Line |
-| --- | --- | --- | --- | --- |
-| `output-width` | integer | 1..2147483647, with `output-height` | Width of the `display` fact | 69; `parse_integer` 748 |
-| `output-height` | integer | 1..2147483647, with `output-width` | Height of the `display` fact | 70; `parse_integer` 751 |
-| `nested-width` | integer | 1..2147483647, with `nested-height` | Gamescope default | 63; `parse_integer` 734 |
-| `nested-height` | integer | 1..2147483647, with `nested-width` | Gamescope default | 64; `parse_integer` 737 |
-| `nested-refresh` | integer | 1..2147483 (Gamescope multiplies by 1000 in an `int`, `src/refresh_rate.h:7`) | Gamescope default | 65; `parse_integer` 740 |
-| `scaler` | choice | `auto`, `integer`, `fit`, `fill`, `stretch` | Gamescope default (`auto`) | 67; `parse_upscaler_scaler` 390 |
-| `filter` | choice | `linear`, `nearest`, `fsr`, `nis`, `pixel` (Gamescope 3.16.31 also accepts `sgsr`, `src/main.hpp:111`; Korri does not type it yet) | Gamescope default (`linear`) | 68; `parse_upscaler_filter` 408 |
-| `sharpness` | integer | 0..20 (`--help`: 0 is max, 20 is min) | Gamescope default (2) | 71; `parse_integer` 820 |
-| `framerate-limit` | integer | 0..2147483647; 0 disables | Gamescope default (0) | 97; `atoi`, steamcompmgr 9873 |
-| `max-scale` | float | `FLT_MIN`..`FLT_MAX` | Gamescope default (no limit) | 66; `parse_float` 757 |
-| `force-composition` | boolean | `true`, `false` | **`true`**: Korri adds `--force-composition` | 136; steamcompmgr 9835 |
-| `adaptive-sync` | boolean | `true`, `false` | Off | 78; 837 |
-| `rt` | boolean | `true`, `false`; acts only with `CAP_SYS_NICE` (881) | Off | 73; 823 |
-| `fade-out-duration` | integer | 0..2147483647 (milliseconds) | Gamescope default (0) | 139; `atoi`, steamcompmgr 9853 |
-| `force-windows-fullscreen` | boolean | `true`, `false` | Off | 142; steamcompmgr 9855 |
-| `hdr-enabled` | boolean | `true`, `false` | Off | 146; steamcompmgr 9857 |
-| `hdr-sdr-content-nits` | float | 1..10000 (the atom path treats below 1 as unset, steamcompmgr 693; 10000 nits is the PQ ceiling) | Gamescope default | 147; `atof`, steamcompmgr 9867 |
-| `hdr-itm-enabled` | boolean | `true`, `false` | Off | 148; steamcompmgr 9863 |
-| `hdr-itm-sdr-nits` | float | 1..1000 (the atom path clamps the same, steamcompmgr 7440) | Gamescope default (100) | 149; `atof`, steamcompmgr 9869 |
-| `hdr-itm-target-nits` | float | 1..10000 (atom clamp, steamcompmgr 7449) | Gamescope default (1000) | 150; `atof`, steamcompmgr 9871 |
-| `sdr-gamut-wideness` | float | 0..1 (`--help`) | Gamescope default | 145; `atof`, steamcompmgr 9865 |
-| `disable-color-management` | boolean | `true`, `false` | Off | 144; 797 |
-| `force-grab-cursor` | boolean | `true`, `false` | Off | 87; 833 |
-| `mouse-sensitivity` | float | `FLT_MIN`..`FLT_MAX` (multiplier; 0 and negative values are refused) | Gamescope default (1.0) | 76; `parse_float` 778 |
-| `default-touch-mode` | integer | 0..6: hover, left, right, middle, passthrough, disabled, trackpad (`src/backend.h:102`) | Gamescope default (1, left) | 94; `parse_integer` 812 |
-| `cursor` | path | Absolute path to an image file | Host cursor | 124; steamcompmgr 9849 |
-| `cursor-hotspot` | string | `X,Y`, each an integer 0..2147483647, no spaces (`sscanf "%d,%d"`) | 0,0 | 125; steamcompmgr 9851 |
-| `cursor-scale-height` | integer | 1..2147483647 | Off | 126; `parse_integer` 843 |
-| `hide-cursor-delay` | integer | 0..2147483647 (milliseconds) | Gamescope default (10000) | 130; `atoi`, steamcompmgr 9829 |
-| `prefer-vk-device` | string | `VENDOR:DEVICE`, 1..8 hex digits each, no `0x` (`sscanf "%X:%X"`) | First qualifying GPU | 74; 825 |
-| `reshade-effect` | string | A relative file name; no empty, `.` or `..` segment, no NUL | None | 155; steamcompmgr 9875 |
-| `reshade-technique-idx` | integer | 0..2147483647 | Gamescope default (0) | 156; `atoi`, steamcompmgr 9877 |
-| `xwayland-count` | integer | 1..2147483647 | Gamescope default (1) | 120; `parse_integer` 799 |
-| `steam` | boolean | `true`, `false` | Off | 135; 781 |
-| `virtual-connector-strategy` | choice | `SingleApplication`, `SteamControlled`, `PerAppId`, `PerWindow` | `SingleApplication`; `SteamControlled` with `steam` | 127; 851 |
-| `borderless` | boolean | `true`, `false` | Off | 84; 766 |
-| `disable-xres` | boolean | `true`, `false` | Off | 138; steamcompmgr 9838 |
-| `allow-deferred-backend` | boolean | `true`, `false` | Off | 161; 847 |
+| Setting path | Kind | Accepted values | When absent | Native option | Line |
+| --- | --- | --- | --- | --- | --- |
+| `video.output.width` | integer | 1..2147483647, with `video.output.height` | Width of the `display` fact | `--output-width` | 69; `parse_integer` 748 |
+| `video.output.height` | integer | 1..2147483647, with `video.output.width` | Height of the `display` fact | `--output-height` | 70; `parse_integer` 751 |
+| `video.nested.width` | integer | 1..2147483647, with `video.nested.height` | Gamescope default | `--nested-width` | 63; `parse_integer` 734 |
+| `video.nested.height` | integer | 1..2147483647, with `video.nested.width` | Gamescope default | `--nested-height` | 64; `parse_integer` 737 |
+| `video.nested.fps` | integer | 1..2147483 (Gamescope multiplies by 1000 in an `int`, `src/refresh_rate.h:7`) | Gamescope default | `--nested-refresh` | 65; `parse_integer` 740 |
+| `video.scaling.scaler` | choice | `auto`, `integer`, `fit`, `fill`, `stretch` | Gamescope default (`auto`) | `--scaler` | 67; `parse_upscaler_scaler` 390 |
+| `video.scaling.filter` | choice | `linear`, `nearest`, `fsr`, `nis`, `pixel` (Gamescope 3.16.31 also accepts `sgsr`, `src/main.hpp:111`; Korri does not type it yet) | Gamescope default (`linear`) | `--filter` | 68; `parse_upscaler_filter` 408 |
+| `video.scaling.sharpness` | integer | 0..20 (`--help`: 0 is max, 20 is min) | Gamescope default (2) | `--sharpness` | 71; `parse_integer` 820 |
+| `video.fps-limit` | integer | 0..2147483647; 0 disables | Gamescope default (0) | `--framerate-limit` | 97; `atoi`, steamcompmgr 9873 |
+| `video.scaling.max` | float | `FLT_MIN`..`FLT_MAX` | Gamescope default (no limit) | `--max-scale` | 66; `parse_float` 757 |
+| `video.force-composition` | boolean | `true`, `false` | **`true`**: Korri adds `--force-composition` | `--force-composition` | 136; steamcompmgr 9835 |
+| `video.adaptive-sync` | boolean | `true`, `false` | Off | `--adaptive-sync` | 78; 837 |
+| `scheduling.realtime` | boolean | `true`, `false`; acts only with `CAP_SYS_NICE` (881) | Off | `--rt` | 73; 823 |
+| `window.fade-out-ms` | integer | 0..2147483647 (milliseconds) | Gamescope default (0) | `--fade-out-duration` | 139; `atoi`, steamcompmgr 9853 |
+| `window.force-windows-fullscreen` | boolean | `true`, `false` | Off | `--force-windows-fullscreen` | 142; steamcompmgr 9855 |
+| `video.hdr.enable` | boolean | `true`, `false` | Off | `--hdr-enabled` | 146; steamcompmgr 9857 |
+| `video.hdr.sdr-content-nits` | float | 1..10000 (the atom path treats below 1 as unset, steamcompmgr 693; 10000 nits is the PQ ceiling) | Gamescope default | `--hdr-sdr-content-nits` | 147; `atof`, steamcompmgr 9867 |
+| `video.hdr.inverse-tone-mapping.enable` | boolean | `true`, `false` | Off | `--hdr-itm-enabled` | 148; steamcompmgr 9863 |
+| `video.hdr.inverse-tone-mapping.sdr-nits` | float | 1..1000 (the atom path clamps the same, steamcompmgr 7440) | Gamescope default (100) | `--hdr-itm-sdr-nits` | 149; `atof`, steamcompmgr 9869 |
+| `video.hdr.inverse-tone-mapping.target-nits` | float | 1..10000 (atom clamp, steamcompmgr 7449) | Gamescope default (1000) | `--hdr-itm-target-nits` | 150; `atof`, steamcompmgr 9871 |
+| `video.hdr.sdr-gamut-wideness` | float | 0..1 (`--help`) | Gamescope default | `--sdr-gamut-wideness` | 145; `atof`, steamcompmgr 9865 |
+| `video.color-management` | boolean | `true`, `false` (positive switch; `false` adds the native flag) | On (no disable flag) | `--disable-color-management` | 144; 797 |
+| `window.grab-cursor` | boolean | `true`, `false` | Off | `--force-grab-cursor` | 87; 833 |
+| `input.mouse-sensitivity` | float | `FLT_MIN`..`FLT_MAX` (multiplier; 0 and negative values are refused) | Gamescope default (1.0) | `--mouse-sensitivity` | 76; `parse_float` 778 |
+| `input.default-touch-mode` | choice | `hover`, `left`, `right`, `middle`, `passthrough`, `disabled`, `trackpad` (native 0..6, `src/backend.h:102`) | Gamescope default (`left`) | `--default-touch-mode` | 94; `parse_integer` 812 |
+| `cursor.image` | path | Absolute path to an image file | Host cursor | `--cursor` | 124; steamcompmgr 9849 |
+| `cursor.hotspot` | string | `X,Y`, each an integer 0..2147483647, no spaces (`sscanf "%d,%d"`) | 0,0 | `--cursor-hotspot` | 125; steamcompmgr 9851 |
+| `cursor.scale-height` | integer | 1..2147483647 | Off | `--cursor-scale-height` | 126; `parse_integer` 843 |
+| `cursor.hide-delay-ms` | integer | 0..2147483647 (milliseconds) | Gamescope default (10000) | `--hide-cursor-delay` | 130; `atoi`, steamcompmgr 9829 |
+| `backend.prefer-vk-device` | string | `VENDOR:DEVICE`, 1..8 hex digits each, no `0x` (`sscanf "%X:%X"`) | First qualifying GPU | `--prefer-vk-device` | 74; 825 |
+| `video.reshade.effect` | string | A relative file name; no empty, `.` or `..` segment, no NUL | None | `--reshade-effect` | 155; steamcompmgr 9875 |
+| `video.reshade.technique-index` | integer | 0..2147483647 | Gamescope default (0) | `--reshade-technique-idx` | 156; `atoi`, steamcompmgr 9877 |
+| `window.xwayland-count` | integer | 1..2147483647 | Gamescope default (1) | `--xwayland-count` | 120; `parse_integer` 799 |
+| `steam.enable` | boolean | `true`, `false` | Off | `--steam` | 135; 781 |
+| `steam.virtual-connector-strategy` | choice | `SingleApplication`, `SteamControlled`, `PerAppId`, `PerWindow` | `SingleApplication`; `SteamControlled` with `steam.enable` | `--virtual-connector-strategy` | 127; 851 |
+| `window.borderless` | boolean | `true`, `false` | Off | `--borderless` | 84; 766 |
+| `debug.xres` | boolean | `true`, `false` (positive switch; `false` adds the native flag) | On (no disable flag) | `--disable-xres` | 138; steamcompmgr 9838 |
+| `backend.allow-deferred` | boolean | `true`, `false` | Off | `--allow-deferred-backend` | 161; 847 |
 
-`steam` comes before `virtual-connector-strategy` in the order. `--steam`
+`steam.enable` comes before `steam.virtual-connector-strategy` in the order. `--steam`
 changes a `SingleApplication` strategy to `SteamControlled` (`main.cpp:781`),
 so an explicit strategy must come after it. Gamescope ignores an unknown
-strategy name (`main.cpp:851`); Korri refuses it.
+strategy name (`main.cpp:851`); Korri reports it and skips the path.
 
 Gamescope looks for `reshade-effect` in
 `$HOME/.local/share/gamescope/reshade/Shaders/` and then
@@ -103,16 +114,18 @@ This package ships no shaders. Gamescope reads `cursor` with `stbi_load`
 (`steamcompmgr.cpp:8774`). Gamescope is the main process of the game's session
 unit (Core ADR 0007), so it reads files with the same access as the game.
 
-Unknown settings, bad types, invalid values, and unpaired dimensions refuse
-composition with the code `gamescope-setting` or `gamescope-setting-pair`. If
-output dimensions are absent, both come from the logical `display` hardware
-fact. Without either source, composition refuses the launch.
+Unknown settings, bad types, invalid values, and unpaired dimensions produce
+`gamescope-setting` or `gamescope-setting-pair` validate diagnostics. Invalid
+width/height values also invalidate their mate. Korrid removes those error paths
+before composition. If output dimensions are absent, both come from the logical
+`display` hardware fact. Without either source, composition still refuses with
+`gamescope-output-size`: it cannot start Gamescope without an output size.
 
 ### Composition is on by default
 
 Korri adds `--force-composition` unless the merged settings set
-`force-composition` to `false`. The default is the constant
-`forceCompositionDefault` in `compose.ts`.
+`video.force-composition` to `false`. The default is the constant
+`forceCompositionDefault` in `compose.ts`; the schema exposes that same default.
 
 On the RG353M (Mali-G52, Mesa panvk), passthrough scan-out keeps buffers from
 vsynced X11 clients, and the clients do not get their 3 buffers back in time.
@@ -121,7 +134,7 @@ Man (Godot 2) at about 53 FPS. With `--force-composition` both held about 60
 FPS: RetroArch median 59.9, minimum 59.1; Mega Man median 59.7, minimum 58.1.
 Gamescope then used 12.5 to 17% of one core. The cost on other devices is not
 measured yet. To turn composition off for one device, runner, system or game,
-set `force-composition` to `false` in that layer.
+set `video.force-composition` to `false` in that layer.
 
 ### Options that are not typed
 
@@ -138,7 +151,7 @@ passes them to Gamescope. All 84 options are accounted for: 38 typed, 3 fixed,
 | `display-index`, `nested-unfocused-refresh` | Inert under `--backend wayland`; read only in `Backends/SDLBackend.cpp` (259, 856). SDL runs only if the Wayland backend cannot start (`main.cpp:1002`). |
 | `immediate-flips` | Inert under `--backend wayland`; tearing needs `SupportsTearing()` (`steamcompmgr.cpp:10577`), which is `false` for Wayland (`WaylandBackend.cpp:2311`). |
 | `grab` | Inert under `--backend wayland`; it only adds " (grabbed)" to the window title (`WaylandBackend.cpp:1262`). The keyboard grab is SDL-only (`SDLBackend.cpp:254`). |
-| `fsr-sharpness` | The same variable as `sharpness` (`main.cpp:820`). Two keys for one value would let argv order, not the cascade layer, choose the value. Use `sharpness`. |
+| `fsr-sharpness` | The same variable as `sharpness` (`main.cpp:820`). Two keys for one value would let argv order, not the cascade layer, choose the value. Use `video.scaling.sharpness`. |
 | `keep-alive` | Gamescope stays alive after the game exits (`main.cpp:849`). Gamescope is the session unit's main process, so the session would not end with the game (Core ADR 0007). |
 | `mangoapp` | Gamescope starts `mangoapp` from `PATH` (`steamcompmgr.cpp:9444`, 9607). This package ships no `mangoapp`. |
 | `mura-map` | Steam Deck panel calibration: a path prefix for `_red.png` and `_green.png` (`steamcompmgr.cpp:798`). No Korri device has a mura map. |
@@ -183,8 +196,8 @@ every choice, or the bare flag), exit 0 and print its usage. Gamescope parses
 `parse_integer`, `parse_float`, scaler and filter values before `--help`, so a
 value outside those parsers' range fails this check. It does not start a nested
 compositor or establish display, touch, controller, audio, or frame-rate
-acceptance on hardware. The current pinned Core predates modifier admission
-and execution. Host integration must be verified when Core lands that support.
+acceptance on hardware. Host integration with the nested-settings cut must be checked in Core; this
+repository deliberately does not advance its pinned Core input.
 
 `package.nix` asserts Gamescope 3.16.31, the version in nixpkgs
 `02c087f3fe673c9e317f206a627cb6b910336dbe` (nixos-unstable 2026-10-20). Its

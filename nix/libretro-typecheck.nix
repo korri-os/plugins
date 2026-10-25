@@ -51,6 +51,8 @@ pkgs.runCommand "korri-libretro-helper-typecheck"
     mkdir -p work/plugins/libretro work/contracts/generated
     ${generatedPlugins}
     cp ${helper} work/plugins/libretro/retroarch.ts
+    cp ${../plugins/retroarch/policy.ts} work/plugins/libretro/policy.ts
+    cp ${../plugins/retroarch/render-settings.ts} work/plugins/libretro/render-settings.ts
     cp ${settings}/settings.ts work/plugins/libretro/settings.ts
     cp ${contractSource} work/contracts/generated/korrid.ts
     cp ${tsconfig} work/tsconfig.json

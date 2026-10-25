@@ -1,13 +1,11 @@
-// Runs only inside settings-check.nix, which copies the RetroArch helper
-// here as ./plugin and writes the checked ./settings module beside it.
-// The local typecheck excludes this file for that reason.
+// Runs inside settings-check.nix against the selected program's evidence.
 import { afterAll, describe, expect, it } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { handlers } from "./plugin"
+import type { SettingSchema } from "./policy"
 
-// The test exercises the operation the host calls, through the same map.
 const launch = handlers["launch.prepare"]
 type PluginLaunchInput = Parameters<typeof launch>[0]
 
@@ -25,19 +23,22 @@ function input(overrides?: PluginLaunchInput["overrides"]): PluginLaunchInput {
     overrides,
   }
 }
-
 function content(overrides?: PluginLaunchInput["overrides"]): string {
-  return launch(input(overrides)).files![0].content
+  return launch(input(overrides)).files[0].content
 }
-
 const reserved = [
-  "cheevos_password", "cheevos_token", "network_cmd_password",
-  "netplay_password", "netplay_spectate_password", "kiosk_mode_enable",
-  "config_save_on_exit", "menu_driver",
+  "cheevos_password",
+  "cheevos_token",
+  "network_cmd_password",
+  "netplay_password",
+  "netplay_spectate_password",
+  "kiosk_mode_enable",
+  "config_save_on_exit",
+  "menu_driver",
 ]
 
-describe("RetroArch native configuration", () => {
-  it("keeps each game's saves together and preserves raw runner subfolders", () => {
+describe("RetroArch nested settings operations", () => {
+  it("keeps per-game saves, the core's state subfolder and the protected kiosk defaults", () => {
     const plan = launch(input())
     const root = input().saveRoot
     expect(plan.saveLocations).toEqual([
@@ -46,136 +47,240 @@ describe("RetroArch native configuration", () => {
       { key: "screenshots", kind: "screenshot", path: `${root}/screenshots` },
     ])
     expect(plan.directories).toEqual([
-      "/account/system", `${root}/saves`,
-      `${root}/states/@korri:mgba/mgba`, `${root}/screenshots`,
+      "/account/system",
+      `${root}/saves`,
+      `${root}/states/@korri:mgba/mgba`,
+      `${root}/screenshots`,
     ])
-    expect(plan.files![0].path).toBe("/account/retroarch.cfg")
-    expect(plan.files![0].content).toContain(`savefile_directory = "${root}/saves"`)
-    expect(plan.files![0].content).toContain(`savestate_directory = "${root}/states/@korri:mgba/mgba"`)
-    expect(plan.files![0].content).toContain(`screenshot_directory = "${root}/screenshots"`)
-    expect(plan.files![0].content).toContain('savestate_auto_save = "true"')
-    expect(plan.files![0].content).toContain('savestate_auto_load = "true"')
-    const other = launch({ ...input(), saveRoot: "/account/saves/other" })
-    expect(other.files![0].content).not.toContain(root)
+    expect(plan.files[0].path).toBe("/account/retroarch.cfg")
+    for (const pair of [
+      `savefile_directory = "${root}/saves"`,
+      `savestate_directory = "${root}/states/@korri:mgba/mgba"`,
+      `screenshot_directory = "${root}/screenshots"`,
+      'savestate_auto_save = "true"',
+      'savestate_auto_load = "true"',
+      'config_save_on_exit = "false"',
+      'menu_driver = "null"',
+      'kiosk_mode_enable = "true"',
+    ])
+      expect(plan.files[0].content).toContain(pair)
+    expect(launch({ ...input(), saveRoot: "/other" }).files[0].content).not.toContain(root)
   })
 
-  it("keeps managed save paths even when typed and raw overrides replace them", () => {
+  it("keeps managed saves even when raw config replaces them", () => {
     const root = input().saveRoot
-    const expected = {
+    for (const [key, path] of Object.entries({
       savefile_directory: `${root}/saves`,
       savestate_directory: `${root}/states/@korri:mgba/mgba`,
       screenshot_directory: `${root}/screenshots`,
-    }
-    for (const [key, path] of Object.entries(expected)) {
+    })) {
       const cfg = content({
-        settings: { [key]: "/custom/typed" },
         config: { prepend: `${key} = "/custom/prepend"`, append: `${key} = "/custom/append"` },
       })
       expect(cfg).toContain(`${key} = "${path}"`)
       expect(cfg).not.toContain("/custom/")
-      const reported = handlers["settings.validate"]({ values: { [key]: "/custom/typed" } })
-      expect(reported.diagnostics).toContainEqual({
-        code: "setting-managed", severity: "warning", path: [key],
-        message: `${key} is managed by Korri for save sync; an override has no effect`,
-      })
     }
   })
 
-  it("keeps the X11 context when a typed value names a key this build has not checked", () => {
-    // video_context_driver is not in the checked typed schema; raw config is the override.
-    const cfg = content({ settings: { video_context_driver: "wayland" } })
-    expect(cfg).toContain('video_context_driver = "x"\n')
-    expect(cfg).not.toContain('"wayland"')
-    expect(handlers["settings.validate"]({ values: { video_context_driver: "wayland" } }).diagnostics
-      .map((diagnostic) => diagnostic.code)).toEqual(["setting-unverified"])
+  it("accepts the nested launch tree and renders verbose argv plus native verbosity", () => {
+    const settings = {
+      drivers: { video: "vulkan" },
+      video: {
+        resolution: { width: 640, height: 480 },
+        scaling: { scaler: "integer", factor: 3 },
+        stats: { fps: true },
+      },
+      logging: { level: "verbose", "core-level": "warning" },
+      audio: { "volume-db": -3.5 },
+    }
+    const before = structuredClone(settings)
+    expect(handlers["settings.validate"]({ values: settings }).valid).toBe(true)
+    const plan = launch(input({ settings }))
+    expect(plan.args).toEqual(["-v", "--config", "/account/retroarch.cfg", "-L", "/core", "/rom"])
+    for (const pair of [
+      'video_driver = "vulkan"',
+      'video_scale_integer = "true"',
+      "video_scale = 3",
+      'fps_show = "true"',
+      "video_fullscreen_x = 640",
+      "video_fullscreen_y = 480",
+      "libretro_log_level = 2",
+      'log_verbosity = "true"',
+      "audio_volume = -3.5",
+    ])
+      expect(plan.files[0].content).toContain(pair)
+    expect(settings).toEqual(before)
+    const info = launch(
+      input({ settings: { logging: { level: "info" }, video: { scaling: { scaler: "auto" } } } }),
+    )
+    expect(info.args).not.toContain("-v")
+    expect(info.files[0].content).toContain('log_verbosity = "false"')
+    expect(info.files[0].content).toContain('video_scale_integer = "false"')
   })
 
-  it("refuses provider routes without a content file", () => {
-    expect(() => launch({ ...input(), contentPath: undefined, ref: "123" }))
-      .toThrow("requires a content file")
+  it("reports unknown, invalid, unsupported and Korri-owned paths without stopping launch", () => {
+    for (const [settings, path] of [
+      [{ video_driver: "vulkan" }, ["video_driver"]],
+      [{ video: { "refresh-rate-hz": -1 } }, ["video", "refresh-rate-hz"]],
+      [{ audio: { device: "secret" } }, ["audio", "device"]],
+      [{ paths: { "savefile-directory": "/custom" } }, ["paths"]],
+      [{ lifecycle: { "save-on-exit": true } }, ["lifecycle", "save-on-exit"]],
+      [{ drivers: { menu: "ozone" } }, ["drivers", "menu"]],
+      [{ video: { shader: { path: "secret" } } }, ["video", "shader", "path"]],
+      [
+        { input: { ports: { "1": { "joypad-index": 1 } } } },
+        ["input", "ports", "1", "joypad-index"],
+      ],
+    ] as const) {
+      const report = handlers["settings.validate"]({ values: settings })
+      expect(report.valid).toBe(false)
+      expect(
+        report.diagnostics.some(item => JSON.stringify(item.path) === JSON.stringify(path)),
+      ).toBe(true)
+      expect(JSON.stringify(report)).not.toContain("secret")
+      expect(() => content({ settings })).not.toThrow()
+    }
+    for (const scaler of ["fit", "fill", "stretch"]) {
+      const settings = { video: { scaling: { scaler }, "refresh-rate-hz": 60 } }
+      expect(handlers["settings.validate"]({ values: settings }).diagnostics[0].path).toEqual([
+        "video",
+        "scaling",
+        "scaler",
+      ])
+      expect(content({ settings })).not.toContain("video_scale_integer")
+      expect(content({ settings })).toContain("video_refresh_rate = 60")
+    }
   })
 
-  it("emits one assignment per key across baseline, typed and repeated raw values", () => {
+  it("reports bad pairs, nested malformed sections, limits and dotted names at their paths", () => {
+    for (const values of [
+      { video: { resolution: { width: 640 } } },
+      { video: { "stats.fps": true } },
+      { input: { "analog-deadzone": 2 } },
+      { video: false },
+      { video: { hdr: [] } },
+      { audio: null },
+    ]) {
+      const report = handlers["settings.validate"]({ values })
+      expect(report.valid).toBe(false)
+      expect(
+        report.diagnostics.every(
+          item => item.severity === "error" && item.path !== undefined && item.path.length > 0,
+        ),
+      ).toBe(true)
+    }
+  })
+
+  it("describes nested schema metadata, choices, limits and inherited safe defaults", () => {
+    const described = handlers["settings.describe"]({ id: input().runnerId })
+    expect(described.revision).toMatch(/^\d+\.\d+/)
+    function walk(schema: SettingSchema) {
+      expect(schema.title).toBeTruthy()
+      expect(schema.description).toBeTruthy()
+      if (schema.type === "object") {
+        expect(schema.additionalProperties).toBe(false)
+        for (const child of Object.values(schema.properties ?? {})) walk(child)
+      }
+    }
+    walk(described.schema)
+    const properties = described.schema.properties
+    expect(properties?.video.properties?.scaling.properties?.scaler.enum).toEqual([
+      "auto",
+      "integer",
+    ])
+    expect(properties?.logging.properties?.["core-level"].enum).toEqual([
+      "debug",
+      "info",
+      "warning",
+      "error",
+    ])
+    expect(properties?.lifecycle.properties?.["auto-overrides"].default).toBe(false)
+    expect(properties?.video.properties?.sync.properties?.["frame-delay-ms"].maximum).toBe(99)
+    for (const key of ["environment", "paths", "configFile", "video_driver"])
+      expect(properties?.[key]).toBeUndefined()
+    expect(properties?.audio.properties?.device).toBeUndefined()
+    expect(properties?.drivers.properties?.menu).toBeUndefined()
+    expect(properties?.lifecycle.properties?.["save-on-exit"]).toBeUndefined()
+    expect(
+      handlers["settings.validate"]({ values: {}, revision: "old" }).diagnostics[0].severity,
+    ).toBe("info")
+  })
+
+  it("emits one assignment per key with baseline < typed < prepend < append", () => {
     const cfg = content({
-      settings: { video_driver: "vulkan", audio_volume: -3.5 },
+      settings: { drivers: { video: "vulkan" }, audio: { "volume-db": -3.5 } },
       config: {
         prepend: '# ignored\nvideo_driver = "sdl2"\naudio_volume = -2',
         append: 'video_driver = "glcore"\nvideo_driver = "gl1" # final',
       },
     })
-    const keys = cfg.split("\n").filter((line) => line.includes(" = "))
-      .map((line) => line.split(" = ")[0])
+    const keys = cfg
+      .split("\n")
+      .filter(line => line.includes(" = "))
+      .map(line => line.split(" = ")[0])
     expect(new Set(keys).size).toBe(keys.length)
     expect(cfg).toContain('video_driver = "gl1" # final\n')
     expect(cfg).toContain("# generated by Korri\n")
-    expect(cfg).toContain("# RetroArch value 2 is L3 + R3.")
     expect(cfg).not.toContain("# ignored")
   })
 
-  it("never takes a reserved key from authored settings or raw config", () => {
+  it("never accepts a reserved native raw assignment, even if shadowed", () => {
     for (const key of reserved) {
-      // A typed reserved key is left out and reported, not rendered.
-      expect(content({ settings: { [key]: "sentinel-value" } })).not.toContain("sentinel-value")
-      const reported = handlers["settings.validate"]({ values: { [key]: "sentinel-value" } })
-      expect(reported.diagnostics.map((diagnostic) => diagnostic.path?.[0])).toContain(key)
-      expect(JSON.stringify(reported)).not.toContain("sentinel-value")
-      // Raw native text is still refused outright: it is not a typed value the
-      // runner can leave behind, it is an assignment aimed at the emulator.
-      for (const block of ["prepend", "append"] as const) {
-        expect(() => content({ config: { [block]: `${key} = false\n${key} = true` } }))
-          .toThrow(key)
-      }
-      expect(() => content({ settings: { [key]: false }, config: { append: `${key} = true` } }))
-        .toThrow(key)
+      for (const block of ["prepend", "append"] as const)
+        expect(() => content({ config: { [block]: `${key} = false\n${key} = true` } })).toThrow(key)
     }
+    expect(() => launch({ ...input(), contentPath: undefined, ref: "123" })).toThrow(
+      "requires a content file",
+    )
   })
 
-  it("describes the schema this build checked, without the reserved keys", () => {
-    const described = handlers["settings.describe"]()
-    expect(described.revision).toMatch(/^\d+\.\d+/)
-    expect(described.schema.additionalProperties).toBe(false)
-    expect(described.schema.properties.audio_device).toEqual({ type: "string" })
-    for (const key of reserved) expect(described.schema.properties[key]).toBeUndefined()
-    // A key the program's source does not declare is not offered either.
-    expect(described.schema.properties["absent_key"]).toBeUndefined()
-    expect(handlers["settings.validate"]({ values: { absent_key: true } }).diagnostics)
-      .toHaveLength(1)
-  })
-
-  it("retains raw comments, native values and config key validation rules", () => {
-    expect(content({ config: { prepend: '\n #include "not-loaded.cfg"\n Future_key9 = "a#b" # comment\n' } }))
-      .toContain('Future_key9 = "a#b" # comment\n')
-    for (const line of ["missing", "= value", "bad-key = value", "a b = value", "#skip\n[section]"]) {
+  it("keeps raw native syntax, rejects malformed assignments and replacement", () => {
+    expect(
+      content({
+        config: { prepend: '\n #include "not-loaded.cfg"\n Future_key9 = "a#b" # comment\n' },
+      }),
+    ).toContain('Future_key9 = "a#b" # comment\n')
+    for (const line of ["missing", "= value", "bad-key = value", "a b = value", "#skip\n[section]"])
       expect(() => content({ config: { append: line } })).toThrow("Invalid RetroArch")
-    }
-    // A key no checked schema declares cannot reach the file, whatever it is.
-    expect(content({ settings: { "bad-key": true } })).not.toContain("bad-key")
     expect(() => content({ config: { replace: "" } })).toThrow("replace")
-    for (const value of [NaN, Infinity, -Infinity]) {
-      expect(content({ settings: { audio_volume: value } })).not.toContain("audio_volume = NaN")
-      expect(handlers["settings.validate"]({ values: { audio_volume: value } }).diagnostics)
-        .toHaveLength(1)
+    expect(() =>
+      content({ config: { append: "cheevos-password = private-token-marker" } }),
+    ).toThrow(/^Invalid RetroArch overrides.config assignment$/)
+  })
+
+  it("warns and skips unsafe typed strings without logging their values, including shadowed values", () => {
+    for (const value of [
+      'device "quoted"',
+      '"leading',
+      'a"#unclosed',
+      'a"b#outside',
+      'é"x',
+      "a\nb",
+      "a\rb",
+      "a\0b",
+      "a\ud800b",
+      "a\udfffb",
+    ]) {
+      const settings = { menu: { wallpaper: value } }
+      const report = handlers["settings.validate"]({ values: settings })
+      expect(report.valid).toBe(false)
+      expect(report.diagnostics[0].path).toEqual(["menu", "wallpaper"])
+      expect(report.diagnostics[0].message).toBe(
+        "Unsupported RetroArch string setting: menu_wallpaper",
+      )
+      expect(content({ settings })).not.toContain("menu_wallpaper")
+      expect(content({ settings, config: { append: 'menu_wallpaper = "valid"' } })).toContain(
+        'menu_wallpaper = "valid"',
+      )
     }
   })
 
-  it("redacts raw assignment values from validation errors", () => {
-    expect(() => content({ config: { append: "cheevos-password = private-token-marker" } }))
-      .toThrow(/^Invalid RetroArch overrides.config assignment$/)
-  })
-
-  it("rejects unsupported typed strings without logging their values, including shadowed values", () => {
-    for (const value of ['device "quoted"', '"leading', 'a"#unclosed', 'a"b#outside', 'é"x', "a\nb", "a\rb", "a\0b", "a\ud800b", "a\udfffb"]) {
-      for (const config of [undefined, { append: 'audio_device = "valid"' }]) {
-        expect(() => content({ settings: { audio_device: value }, config }))
-          .toThrow(/^Unsupported RetroArch string setting: audio_device$/)
-      }
-    }
-  })
-
-  it("uses the same string safety for baseline directories and autoconfig", () => {
+  it("uses the same native string safety for generated directories and autoconfig", () => {
     for (const value of ['root "quoted"', "root\nnext", "root\0next"]) {
       expect(() => launch({ ...input(), accountRoot: value })).toThrow("system_directory")
-      expect(() => launch({ ...input(), files: { autoconfig: value } })).toThrow("joypad_autoconfig_dir")
+      expect(() => launch({ ...input(), files: { autoconfig: value } })).toThrow(
+        "joypad_autoconfig_dir",
+      )
     }
   })
 })
@@ -197,15 +302,18 @@ function parsed(cfg: string, keys: string[]): string[] {
 describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", () => {
   it("reads the per-game folders through the actual RetroArch parser", () => {
     const root = input().saveRoot
-    expect(parsed(content(), ["savefile_directory", "savestate_directory", "screenshot_directory"]))
-      .toEqual([`${root}/saves`, `${root}/states/@korri:mgba/mgba`, `${root}/screenshots`])
+    expect(
+      parsed(content(), ["savefile_directory", "savestate_directory", "screenshot_directory"]),
+    ).toEqual([`${root}/saves`, `${root}/states/@korri:mgba/mgba`, `${root}/screenshots`])
   })
 
   it("proves the parser keeps the first duplicate and does not JSON-decode strings", () => {
-    expect(parsed('video_driver = "gl"\nvideo_driver = "vulkan"\n', ["video_driver"]))
-      .toEqual(["gl"])
-    expect(parsed(`audio_device = ${JSON.stringify('device "quoted"')}\n`, ["audio_device"]))
-      .toEqual(["device \\"])
+    expect(parsed('video_driver = "gl"\nvideo_driver = "vulkan"\n', ["video_driver"])).toEqual([
+      "gl",
+    ])
+    expect(
+      parsed(`audio_device = ${JSON.stringify('device "quoted"')}\n`, ["audio_device"]),
+    ).toEqual(["device \\"])
   })
 
   it("prefers each Korri seat pad for its own player", () => {
@@ -213,14 +321,13 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
     // (input10 before input8), so default order put Seat P3 on player 1.
     // Preferred reservation (type 1) matches the device name and leaves the
     // default order on hosts that have no seat pads.
-    const keys = [1, 2, 3, 4].flatMap((player) => [
+    const keys = [1, 2, 3, 4].flatMap(player => [
       `input_player${player}_device_reservation_type`,
       `input_player${player}_reserved_device`,
     ])
-    expect(parsed(content(), keys)).toEqual([1, 2, 3, 4].flatMap((player) => [
-      "1",
-      `Korri Seat P${player}`,
-    ]))
+    expect(parsed(content(), keys)).toEqual(
+      [1, 2, 3, 4].flatMap(player => ["1", `Korri Seat P${player}`]),
+    )
   })
 
   it("selects the X11 GL context by default and lets raw config replace it", () => {
@@ -229,7 +336,10 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
     for (const [config, expected] of [
       [{ prepend: 'video_context_driver = "wayland"' }, "wayland"],
       [{ append: 'video_context_driver = "kms"' }, "kms"],
-      [{ prepend: 'video_context_driver = "wayland"', append: 'video_context_driver = "x_egl"' }, "x_egl"],
+      [
+        { prepend: 'video_context_driver = "wayland"', append: 'video_context_driver = "x_egl"' },
+        "x_egl",
+      ],
     ] as const) {
       const cfg = content({ config })
       expect(cfg.match(/^video_context_driver = /gm)).toHaveLength(1)
@@ -238,7 +348,7 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
   })
 
   it("applies baseline < typed < raw prepend < raw append in native lookups", () => {
-    const settings = { video_driver: "vulkan" }
+    const settings = { drivers: { video: "vulkan" } }
     const prepend = 'video_driver = "ignored"\nvideo_driver = "sdl2"'
     const append = 'video_driver = "glcore"\nvideo_driver = "gl1" # final'
     for (const [overrides, expected] of [
@@ -250,29 +360,64 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
     ] as const) {
       expect(parsed(content(overrides), ["video_driver"])).toEqual([expected])
     }
-    expect(parsed(content({ settings: { video_vsync: false, audio_volume: -3.5, video_fullscreen: true, audio_latency: 0 } }),
-      ["video_vsync", "audio_volume", "video_fullscreen", "audio_latency", "config_save_on_exit", "kiosk_mode_enable", "menu_driver"]))
-      .toEqual(["false", "-3.5", "true", "0", "false", "true", "null"])
+    expect(
+      parsed(
+        content({
+          settings: {
+            video: { vsync: false, fullscreen: true },
+            audio: { "volume-db": -3.5, "latency-ms": 0 },
+          },
+        }),
+        [
+          "video_vsync",
+          "audio_volume",
+          "video_fullscreen",
+          "audio_latency",
+          "config_save_on_exit",
+          "kiosk_mode_enable",
+          "menu_driver",
+        ],
+      ),
+    ).toEqual(["false", "-3.5", "true", "0", "false", "true", "null"])
   })
 
   it("normalizes raw separators before replacing a native assignment", () => {
-    for (const assignment of ['video_driver="vulkan"', 'video_driver ="vulkan"', 'video_driver= "vulkan"']) {
-      expect(parsed(content({ config: { append: assignment } }), ["video_driver"]))
-        .toEqual(["vulkan"])
+    for (const assignment of [
+      'video_driver="vulkan"',
+      'video_driver ="vulkan"',
+      'video_driver= "vulkan"',
+    ]) {
+      expect(parsed(content({ config: { append: assignment } }), ["video_driver"])).toEqual([
+        "vulkan",
+      ])
     }
   })
 
   it("round-trips native strings, literal backslashes, whitespace, hashes and Unicode", () => {
-    for (const value of ["", "device\\path\\n", "\\", " leading\tand trailing ", "a#b", "a=b", "café/🎮", 'hw:"quoted"', 'hw:"dev#1"']) {
-      expect(parsed(content({ settings: { audio_device: value } }), ["audio_device"]))
-        .toEqual([value])
+    for (const value of [
+      "device\\path\\n",
+      "\\",
+      " leading\tand trailing ",
+      "a#b",
+      "a=b",
+      "café/🎮",
+      'hw:"quoted"',
+      'hw:"dev#1"',
+    ]) {
+      expect(
+        parsed(content({ settings: { menu: { wallpaper: value } } }), ["menu_wallpaper"]),
+      ).toEqual([value])
     }
     const request = input()
     request.accountRoot = "/account\\literal"
     request.files.autoconfig = "/autoconfig\\literal"
-    expect(parsed(launch(request).files![0].content, ["system_directory", "joypad_autoconfig_dir"]))
-      .toEqual(["/account\\literal/system", "/autoconfig\\literal"])
-    expect(parsed(content({ config: { append: 'audio_device = "native\\path#1" # comment' } }), ["audio_device"]))
-      .toEqual(["native\\path#1"])
+    expect(
+      parsed(launch(request).files[0].content, ["system_directory", "joypad_autoconfig_dir"]),
+    ).toEqual(["/account\\literal/system", "/autoconfig\\literal"])
+    expect(
+      parsed(content({ config: { append: 'audio_device = "native\\path#1" # comment' } }), [
+        "audio_device",
+      ]),
+    ).toEqual(["native\\path#1"])
   })
 })

@@ -61,11 +61,10 @@ def check(table, source, reserved):
 
 
 def render_module(version, accepted):
-    """The same evidence as plugin source, so the runner owns its own schema.
+    """The selected program's cfg-key/type evidence as effect-free TS source.
 
-    korrid never parses this. The plugin imports it and answers
-    settings.describe and settings.validate from it, which is why the
-    generated text is a module and not another host-readable metadata file.
+    The runner renders its nested policy, then checks these native assignments.
+    korrid never parses this module or owns a second user-settings schema.
     """
     keys = "".join(
         f"  {key}: {json.dumps(kind)},\n" for key, kind in sorted(accepted.items())

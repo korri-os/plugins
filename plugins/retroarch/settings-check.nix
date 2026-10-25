@@ -32,10 +32,12 @@ program.overrideAttrs (old: {
       --version ${pkgs.lib.escapeShellArg program.version} \
       --output "$out/settings.json" \
       --module "$out/settings.ts"
-    # The runner answers settings.describe and settings.validate from the
-    # module written above, so the test runs against this program's real
-    # checked schema rather than a second table written by hand.
+    # The runner describes the nested policy and validates its rendered output
+    # against this exact program's source evidence, not a second frontend's
+    # evidence or a hand-maintained user-settings schema.
     cp ${../libretro/retroarch.ts} plugin.ts
+    cp ${./policy.ts} policy.ts
+    cp ${./render-settings.ts} render-settings.ts
     cp "$out/settings.ts" settings.ts
     cp ${./plugin.sandbox-test.ts} plugin.test.ts
     KORRI_TEST_RETROARCH_CONFIG_PARSER="$PWD/config-parser-probe" bun test ./plugin.test.ts

@@ -1,17 +1,18 @@
-import type {
-  LaunchSettingValue,
-  PluginLaunchOutput,
-} from "../../contracts/generated/korrid"
-import { composeLaunch } from "./compose"
+import type { PluginLaunchOutput } from "../../contracts/generated/korrid"
+import { composeLaunch, describeSettings, validateSettings } from "./compose"
 
 // Mirrors the launch.compose treaty. Move this type to the generated import
 // when the pinned Korri input includes PluginComposeInput; do not pin a branch.
+export interface SettingsTree {
+  [key: string]: string | number | boolean | SettingsTree
+}
+
 export interface PluginComposeInput {
   modifierId: string
   runnerId: string
   familyId?: string
   plan: PluginLaunchOutput
-  settings: Record<string, LaunchSettingValue>
+  settings: SettingsTree
   config: { append?: string }
   files: Record<string, string>
   display?: { width: number; height: number }
@@ -24,4 +25,8 @@ export const description = "Runs a game in nested Gamescope with scaling and a f
 export const modifiers = {
   gamescope: { id: "@korri:gamescope/gamescope" },
 }
-export const handlers = { "launch.compose": composeLaunch }
+export const handlers = {
+  "launch.compose": composeLaunch,
+  "settings.describe": describeSettings,
+  "settings.validate": validateSettings,
+}

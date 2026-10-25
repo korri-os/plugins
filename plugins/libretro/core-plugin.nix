@@ -85,12 +85,14 @@ let
   frontendKeys = lib.unique (lib.attrNames frontend.packages ++ lib.attrNames frontend.files);
 
   # Regular files, never symlinks: the builder refuses a symlinked source.
-  # settings.ts is the pinned program's own checked schema, carried as plugin
-  # source so the runner answers settings.describe and settings.validate
-  # itself. The host reads no settings metadata file.
+  # policy.ts owns the nested schema; render-settings.ts owns native output.
+  # settings.ts is the selected frontend's source-checked cfg-key/type evidence.
+  # All stay effect-free TS source. The host owns no parallel settings schema.
   source = pkgs.runCommand "korri-core-source-${name}" { } ''
     mkdir -p "$out"
     cp ${./retroarch.ts} "$out/retroarch.ts"
+    cp ${../retroarch/policy.ts} "$out/policy.ts"
+    cp ${../retroarch/render-settings.ts} "$out/render-settings.ts"
     cp ${frontend.packages.retroarch-settings}/settings.ts "$out/settings.ts"
     cp ${pluginSource} "$out/plugin.ts"
     chmod u+w "$out/retroarch.ts" "$out/settings.ts" "$out/plugin.ts"

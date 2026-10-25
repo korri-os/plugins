@@ -92,13 +92,12 @@ def run(package, core, content, external=False, korrid=None, architecture=None):
                 "artifacts": {},
                 "overrides": {
                     "settings": {
-                        "video_driver": "sdl2",
-                        "audio_driver": "null",
-                        "video_fullscreen": False,
-                        "input_driver": "sdl2",
-                        "input_joypad_driver": "sdl2",
-                        "savestate_auto_save": core == "pzretro",
-                        "savestate_auto_load": False,
+                        "drivers": {
+                            "video": "sdl2", "audio": "null",
+                            "input": "sdl2", "joypad": "sdl2",
+                        },
+                        "video": {"fullscreen": False},
+                        "saves": {"auto-save-state": core == "pzretro", "auto-load-state": False},
                     }
                 },
             }

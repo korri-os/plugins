@@ -1,75 +1,47 @@
 import type {
-  PluginLaunchInput,
+  PluginLaunchInput as PinnedLaunchInput,
   PluginLaunchOutput,
   SaveKind,
   SaveLocation,
 } from "../../contracts/generated/korrid"
 import { keys, version } from "./settings"
 
-type SettingValue = string | number | boolean
+import {
+  RetroArchPolicy,
+  decodeRetroArchPolicy,
+  isRecord,
+  titledSchema,
+  validatePolicy,
+  type Diagnostic,
+  type LaunchSettingValue,
+  type SettingSchema,
+} from "./policy"
+import { renderRetroArchSettings } from "./render-settings"
 
-// The sandbox ships source, not the generated treaty's runtime enums. Derive
-// their exact wire strings without adding a runtime import outside the plugin.
-type LaunchOutput = Omit<PluginLaunchOutput, "saveLocations"> & {
+// Mirrors the nested launch treaty until the pinned Korri input includes it.
+interface SettingsTree {
+  [key: string]: LaunchSettingValue | SettingsTree
+}
+type PluginLaunchInput = Omit<PinnedLaunchInput, "overrides"> & {
+  overrides?: Omit<NonNullable<PinnedLaunchInput["overrides"]>, "settings"> & {
+    settings?: SettingsTree
+  }
+}
+
+// The sandbox ships source, not the generated treaty's runtime enums.
+type LaunchOutput = Omit<PluginLaunchOutput, "saveLocations" | "files"> & {
+  files: NonNullable<PluginLaunchOutput["files"]>
   saveLocations: (Omit<SaveLocation, "kind"> & { kind: `${SaveKind}` })[]
 }
 
-interface Diagnostic {
-  code: string
-  severity: "error" | "warning" | "info"
-  message: string
-  path?: string[]
-}
-
 const jsonType = { Boolean: "boolean", Number: "number", String: "string" }
-const managedSaveKeys = ["savefile_directory", "savestate_directory", "screenshot_directory"]
 
-function actualType(value: SettingValue): string {
-  return typeof value === "boolean"
-    ? "boolean"
-    : typeof value === "number"
-    ? "number"
-    : "string"
-}
-
-// One rule, used by every operation: a setting is renderable when this exact
-// program build declares the key and the authored value carries its type.
-function unsupported(key: string, value: SettingValue): Diagnostic | undefined {
-  if (managedSaveKeys.includes(key)) {
-    return {
-      code: "setting-managed",
-      severity: "warning",
-      path: [key],
-      message: `${key} is managed by Korri for save sync; an override has no effect`,
-    }
-  }
+function unsupported(key: string, value: LaunchSettingValue): string | undefined {
   const expected = keys[key]
-  if (expected === undefined || reservedKeys.includes(key)) {
-    return {
-      code: "setting-unverified",
-      severity: "warning",
-      path: [key],
-      message:
-        `RetroArch ${version} does not accept ${key} from Korri, so it is not applied`,
-    }
-  }
-  if (actualType(value) !== jsonType[expected]) {
-    return {
-      code: "setting-type",
-      severity: "warning",
-      path: [key],
-      message:
-        `RetroArch ${version} reads ${key} as ${jsonType[expected]}, not ${actualType(value)}`,
-    }
-  }
-  if (typeof value === "number" && !Number.isFinite(value)) {
-    return {
-      code: "setting-value",
-      severity: "warning",
-      path: [key],
-      message: `RetroArch ${version} cannot read a non-finite ${key}`,
-    }
-  }
+  if (expected === undefined || reservedKeys.includes(key))
+    return `RetroArch ${version} does not accept ${key} from Korri, so it is not applied`
+  if (typeof value !== jsonType[expected])
+    return `RetroArch ${version} reads ${key} as ${jsonType[expected]}, not ${typeof value}`
   return undefined
 }
 
@@ -96,9 +68,11 @@ function quoteSetting(key: string, value: string): string {
     const nextQuote = value.indexOf('"', firstQuote + 1)
     const comment = value.indexOf("#")
     if (
-      firstQuote > 0 && /^[\x21-\x7e]+$/.test(value) &&
+      firstQuote > 0 &&
+      /^[\x21-\x7e]+$/.test(value) &&
       (comment < 0 || (firstQuote < comment && nextQuote > comment))
-    ) return value
+    )
+      return value
   }
   // Never put a setting value (which may be private) in the diagnostic.
   throw new Error(`Unsupported RetroArch string setting: ${key}`)
@@ -121,14 +95,10 @@ function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
   const configPath = `${root}/retroarch.cfg`
   const config = input.overrides?.config
   if (config?.replace !== undefined) {
-    throw new Error(
-      "RetroArch overrides.config does not support replace; use prepend/append",
-    )
+    throw new Error("RetroArch overrides.config does not support replace; use prepend/append")
   }
   // Preserve intended legacy precedence; native duplicate lookup is first-wins.
-  const raw = [config?.prepend, config?.append]
-    .filter((text) => text !== undefined)
-    .join("\n")
+  const raw = [config?.prepend, config?.append].filter(text => text !== undefined).join("\n")
   const lines: string[] = []
   for (const rawLine of raw.split("\n")) {
     const line = rawLine.trim()
@@ -144,16 +114,13 @@ function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
     // input contract accepts compact assignments. Preserve native value bytes.
     lines.push(`${key} = ${line.slice(separator + 1).trimStart()}`)
   }
-  // These are source-checked renderer outputs, not a flat policy schema.
-  // Booleans stay quoted and numbers bare; strings use native, not JSON, syntax.
-  // A key this build does not accept was already reported by settings.validate,
-  // so it is left out here rather than reported a second time.
-  const typed = Object.entries(input.overrides?.settings ?? {})
+  const policy = acceptedPolicy(input.overrides?.settings ?? {})
+  // Evidence belongs to the selected frontend. Never emit an unverified pair.
+  const typed = renderRetroArchSettings(policy)
     .filter(([key, value]) => unsupported(key, value) === undefined)
     .map(([key, value]) => {
-      const serialized = typeof value === "number"
-        ? String(value)
-        : quoteSetting(key, String(value))
+      const serialized =
+        typeof value === "number" ? String(value) : quoteSetting(key, String(value))
       return `${key} = ${serialized}`
     })
   const baseline = `# generated by Korri
@@ -224,18 +191,22 @@ video_context_driver = "x"`
   // A save declaration must name the folders the program actually writes.
   // Only these three settings are host-managed; all other precedence stays.
   for (const [key, path] of Object.entries(saveDirectories)) {
-    merged[positions.get(key)!] = `${key} = ${quoteSetting(key, path)}`
+    const position = positions.get(key)
+    if (position === undefined) throw new Error(`Missing managed RetroArch baseline key: ${key}`)
+    merged[position] = `${key} = ${quoteSetting(key, path)}`
   }
   const content = `${merged.join("\n")}\n`
   return {
     command: input.program,
-    args: ["--config", configPath, "-L", corePath, contentPath],
-    directories: [
-      `${root}/system`,
-      `${saveRoot}/saves`,
-      states,
-      `${saveRoot}/screenshots`,
+    args: [
+      ...(policy.logging?.level === "verbose" ? ["-v"] : []),
+      "--config",
+      configPath,
+      "-L",
+      corePath,
+      contentPath,
     ],
+    directories: [`${root}/system`, `${saveRoot}/saves`, states, `${saveRoot}/screenshots`],
     saveLocations: [
       { key: "saves", kind: "save", path: `${saveRoot}/saves` },
       { key: "states", kind: "savestate", path: `${saveRoot}/states` },
@@ -247,56 +218,96 @@ video_context_driver = "x"`
   }
 }
 
-// The schema is this build's own evidence, not a shape korrid keeps for it.
-// Local references only; the host validates values, it does not fetch schemas.
-function describeSettings() {
-  const properties: Record<string, { type: string }> = {}
-  for (const [key, kind] of Object.entries(keys)) {
-    if (!reservedKeys.includes(key) && !managedSaveKeys.includes(key))
-      properties[key] = { type: jsonType[kind] }
+function objectAt(path: readonly string[], value: unknown): unknown {
+  return path.reduceRight<unknown>((child, key) => ({ [key]: child }), value)
+}
+
+function evidenceDiagnostics(
+  values: unknown,
+  schema: SettingSchema = RetroArchPolicy,
+  path: string[] = [],
+): Diagnostic[] {
+  if (schema.type === "object") {
+    if (!isRecord(values)) return [] // shape errors are already reported
+    return Object.entries(values).flatMap(([key, value]) => {
+      const child = Object.hasOwn(schema.properties ?? {}, key)
+        ? schema.properties?.[key]
+        : Object.entries(schema.patternProperties ?? {}).find(([pattern]) =>
+            new RegExp(pattern).test(key),
+          )?.[1]
+      return child ? evidenceDiagnostics(value, child, [...path, key]) : []
+    })
   }
+  if (validatePolicy(values, schema, path).length) return []
+  // This partial policy comes from a validated schema leaf. The renderer does
+  // not require its width/height mate; pair validation happens on the tree.
+  const policy = objectAt(path, values) as RetroArchPolicy
+  const pairs = renderRetroArchSettings(policy, false)
+  return pairs.flatMap(([key, value]): Diagnostic[] => {
+    const message = unsupported(key, value)
+    if (message) return [{ code: "setting-unverified", severity: "error", path, message }]
+    if (typeof value === "string") {
+      try {
+        quoteSetting(key, value)
+      } catch {
+        return [
+          {
+            code: "setting-value",
+            severity: "error",
+            path,
+            message: `Unsupported RetroArch string setting: ${key}`,
+          },
+        ]
+      }
+    }
+    return []
+  })
+}
+
+function describeSettings(_input: { id: string }) {
   return {
     schema: {
       $schema: "https://json-schema.org/draft/2020-12/schema",
-      type: "object",
-      properties,
-      additionalProperties: false,
+      ...titledSchema(RetroArchPolicy),
     },
-    // A described set of choices is only valid for the build that declared it.
     revision: version,
   }
 }
 
-// Report what this build cannot apply. Never rewrite an authored value: the
-// person keeps what they wrote, and sees why it does not reach the emulator.
-function validateSettings(input: {
-  values?: Record<string, SettingValue>
-  revision?: string
-}) {
-  const diagnostics: Diagnostic[] = []
-  if (input.revision !== undefined && input.revision !== version) {
-    diagnostics.push({
+function validateSettings(input: { values?: unknown; revision?: string }) {
+  const values = input.values === undefined ? {} : input.values
+  const diagnostics: Diagnostic[] = [...validatePolicy(values), ...evidenceDiagnostics(values)]
+  if (input.revision !== undefined && input.revision !== version)
+    diagnostics.unshift({
       code: "settings-revision",
       severity: "info",
-      message:
-        `These values were chosen for RetroArch ${input.revision}; this build is ${version}`,
+      message: `These values were chosen for RetroArch ${input.revision}; this build is ${version}`,
     })
-  }
-  // Sorted, so one set of values always reports in one order. The host hands
-  // these over as an unordered map and a person reads the result as a list.
-  const values = input.values ?? {}
-  for (const key of Object.keys(values).sort()) {
-    const diagnostic = unsupported(key, values[key])
-    if (diagnostic !== undefined) diagnostics.push(diagnostic)
-  }
-  return {
-    valid: !diagnostics.some((diagnostic) => diagnostic.severity === "error"),
-    diagnostics,
+  return { valid: !diagnostics.some(item => item.severity === "error"), diagnostics }
+}
+
+function acceptedPolicy(values: unknown): RetroArchPolicy {
+  // Defence in depth for direct callers. Korrid normally removes error paths
+  // before launch.prepare. Work on a copy; never rewrite authored values.
+  let copy: unknown = JSON.parse(JSON.stringify(values))
+  for (;;) {
+    const diagnostics = validateSettings({ values: copy }).diagnostics.filter(
+      item => item.severity === "error",
+    )
+    if (!diagnostics.length) return decodeRetroArchPolicy(copy)
+    for (const diagnostic of diagnostics) {
+      const path = diagnostic.path ?? []
+      if (!path.length) {
+        copy = {}
+        continue
+      }
+      let parent = copy
+      for (const key of path.slice(0, -1)) parent = isRecord(parent) ? parent[key] : undefined
+      if (isRecord(parent)) delete parent[path[path.length - 1]]
+    }
   }
 }
 
-// The host names the operation it wants; every runner answers through the
-// same map, so a new operation adds a key rather than a new export contract.
 export const handlers = {
   "launch.prepare": prepareLaunch,
   "settings.describe": describeSettings,

@@ -1,480 +1,414 @@
-import { Schema } from "effect"
+// The legacy nested policy, renamed by ADR 0037 / the 2026-10-25 brief.
+// JSON Schema is the runtime source of truth: no Effect dependency is needed
+// in the empty plugin sandbox. Renderer types derive from this same schema.
+export type LaunchSettingValue = string | number | boolean
 
-import { validateNullableRetroArchHttpsUrl } from "./setting-policy"
+export interface SettingSchema {
+  readonly type: "object" | "string" | "number" | "integer" | "boolean"
+  readonly title?: string
+  readonly description?: string
+  readonly properties?: Readonly<Record<string, SettingSchema>>
+  readonly patternProperties?: Readonly<Record<string, SettingSchema>>
+  readonly additionalProperties?: false
+  readonly enum?: readonly string[]
+  readonly oneOf?: readonly { readonly const: string; readonly title: string }[]
+  readonly minimum?: number
+  readonly maximum?: number
+  readonly exclusiveMinimum?: number
+  readonly minLength?: number
+  readonly default?: LaunchSettingValue
+  readonly dependentRequired?: Readonly<Record<string, readonly string[]>>
+}
 
-const STRICT = { onExcessProperty: "error" } as const
+function section<const P extends Record<string, SettingSchema>>(
+  properties: P,
+  pairs: readonly (readonly [string, string])[] = [],
+) {
+  return {
+    type: "object",
+    properties,
+    additionalProperties: false,
+    ...(pairs.length
+      ? {
+          dependentRequired: Object.fromEntries(
+            pairs.flatMap(([a, b]) => [
+              [a, [b]],
+              [b, [a]],
+            ]),
+          ),
+        }
+      : {}),
+  } as const
+}
+const boolean = () => ({ type: "boolean" }) as const
+const text = () => ({ type: "string", minLength: 1 }) as const
+const number = (minimum?: number, maximum?: number, exclusive = false) =>
+  ({
+    type: "number",
+    ...(minimum === undefined ? {} : exclusive ? { exclusiveMinimum: minimum } : { minimum }),
+    ...(maximum === undefined ? {} : { maximum }),
+  }) as const
+const integer = (minimum: number) =>
+  ({ type: "integer", minimum, maximum: Number.MAX_SAFE_INTEGER }) as const
+const choice = <const E extends readonly string[]>(values: E) =>
+  ({
+    type: "string",
+    enum: values,
+    oneOf: values.map(value => ({
+      const: value,
+      title: value.replace(/-/g, " ").replace(/^./, c => c.toUpperCase()),
+    })),
+  }) as const
+const ports = <const S extends SettingSchema>(schema: S) =>
+  ({
+    type: "object",
+    patternProperties: { "^[1-9][0-9]*$": schema },
+    additionalProperties: false,
+  }) as const
 
-export const LaunchSettingValue = Schema.Union([
-  Schema.String,
-  Schema.Number,
-  Schema.Boolean,
-])
-export type LaunchSettingValue = Schema.Schema.Type<typeof LaunchSettingValue>
+type Values<S> = S extends { properties: infer P }
+  ? { readonly [K in keyof P]?: Values<P[K]> }
+  : S extends { patternProperties: infer P }
+    ? { readonly [key: string]: Values<P[keyof P]> }
+    : S extends { enum: readonly (infer E)[] }
+      ? E
+      : S extends { type: "boolean" }
+        ? boolean
+        : S extends { type: "number" | "integer" }
+          ? number
+          : string
 
-const finiteNumberRange = (min: number, max: number, label: string) =>
-  Schema.makeFilter<number>(value =>
-    Number.isFinite(value) && value >= min && value <= max
-      ? undefined
-      : `${label} between ${min} and ${max} required`,
-  )
-
-const positiveNumber = (label: string) =>
-  Schema.makeFilter<number>(value =>
-    Number.isFinite(value) && value > 0
-      ? undefined
-      : `${label} greater than 0 required`,
-  )
-
-const nonNegativeNumber = (label: string) =>
-  Schema.makeFilter<number>(value =>
-    Number.isFinite(value) && value >= 0
-      ? undefined
-      : `${label} greater than or equal to 0 required`,
-  )
-
-const EnvironmentKey = Schema.String.check(
-  Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_]*$/),
-)
-
-const EnvironmentOverlay = Schema.Record(
-  EnvironmentKey,
-  Schema.NullOr(Schema.String),
-)
-export type EnvironmentOverlay = Schema.Schema.Type<typeof EnvironmentOverlay>
-
-const PositiveNumber = (label: string) =>
-  Schema.Number.check(positiveNumber(label))
-const NonNegativeNumber = (label: string) =>
-  Schema.Number.check(nonNegativeNumber(label))
-const PositiveInteger = (label: string) =>
-  Schema.Int.check(positiveNumber(label))
-const NonNegativeInteger = (label: string) =>
-  Schema.Int.check(nonNegativeNumber(label))
-
-const NonEmptyString = (label: string) =>
-  Schema.String.pipe(
-    Schema.check(
-      Schema.isMinLength(1, {
-        message: `${label} must be non-empty`,
+export const RetroArchPolicy = section({
+  logging: section({
+    level: choice(["info", "verbose"]),
+    "core-level": choice(["debug", "info", "warning", "error"]),
+  }),
+  lifecycle: section({
+    "auto-overrides": { ...boolean(), default: false },
+    "auto-remaps": { ...boolean(), default: false },
+    "game-specific-options": { ...boolean(), default: false },
+    "auto-shaders": { ...boolean(), default: false },
+    "show-hidden-files": boolean(),
+    "load-dummy-on-core-shutdown": boolean(),
+    "history-list": boolean(),
+    "performance-counters": boolean(),
+    "all-users-control-menu": boolean(),
+    "suspend-screensaver": boolean(),
+    "sustained-performance-mode": boolean(),
+    "game-mode": boolean(),
+  }),
+  drivers: section({
+    input: text(),
+    joypad: text(),
+    video: text(),
+    audio: text(),
+    resampler: text(),
+    camera: text(),
+    location: text(),
+    record: text(),
+  }),
+  video: section({
+    fullscreen: boolean(),
+    "windowed-fullscreen": boolean(),
+    "refresh-rate-hz": number(0, undefined, true),
+    vsync: boolean(),
+    "aspect-ratio": choice(["config", "square", "core-provided", "custom", "full"]),
+    "aspect-ratio-value": number(0, undefined, true),
+    "force-aspect": boolean(),
+    "crop-overscan": boolean(),
+    smooth: boolean(),
+    shader: section({ enable: boolean(), path: text(), "watch-files": boolean() }),
+    hdr: section({
+      enable: boolean(),
+      "max-nits": number(0, undefined, true),
+      "paper-white-nits": number(0, undefined, true),
+      contrast: number(0, undefined, true),
+      "expand-gamut": boolean(),
+    }),
+    recording: section({
+      "post-filter": boolean(),
+      gpu: boolean(),
+    }),
+    "gpu-screenshot": boolean(),
+    sync: section({
+      "hard-sync": boolean(),
+      "hard-sync-frames": integer(0),
+      "frame-delay-ms": number(0, 99),
+      "frame-delay-auto": boolean(),
+    }),
+    resolution: section({ width: integer(0), height: integer(0) }, [["width", "height"]]),
+    scaling: section({ scaler: choice(["auto", "integer"]), factor: number(0, undefined, true) }),
+    stats: section({ fps: boolean(), memory: boolean(), "frame-count": boolean() }),
+  }),
+  audio: section({
+    enable: boolean(),
+    "menu-sounds": boolean(),
+    mute: boolean(),
+    "mixer-mute": boolean(),
+    "latency-ms": number(0),
+    "output-rate-hz": integer(1),
+    sync: boolean(),
+    "rate-control": section({ enable: boolean(), delta: number(0, undefined, true) }),
+    "max-timing-skew": number(0, undefined, true),
+    "volume-db": number(),
+    "mixer-volume-db": number(),
+    "resampler-quality": choice(["dont-care", "lowest", "lower", "normal", "higher", "highest"]),
+  }),
+  input: section({
+    autodetect: boolean(),
+    "max-users": integer(1),
+    "poll-type-behavior": choice(["early", "normal", "late"]),
+    "axis-threshold": number(0, 1),
+    "analog-deadzone": number(0, 1),
+    "analog-sensitivity": number(0, undefined, true),
+    "remap-binds": boolean(),
+    descriptors: section({
+      "label-show": boolean(),
+      "hide-unbound": boolean(),
+    }),
+    overlay: section({
+      enable: boolean(),
+      path: text(),
+      opacity: number(0, 1),
+      scale: number(0, undefined, true),
+      "behind-menu": boolean(),
+      "hide-in-menu": boolean(),
+    }),
+    "auto-game-focus": choice(["off", "on", "detect"]),
+    "menu-toggle-combo": choice([
+      "none",
+      "down-y-l-r",
+      "l3-r3",
+      "l1-r1-start-select",
+      "start-select",
+      "l3-r",
+      "l-r",
+      "hold-start",
+      "hold-select",
+      "down-select",
+      "l2-r2",
+    ]),
+    "quit-combo": choice([
+      "none",
+      "down-y-l-r",
+      "l3-r3",
+      "l1-r1-start-select",
+      "start-select",
+      "l3-r",
+      "l-r",
+      "hold-start",
+      "hold-select",
+      "down-select",
+      "l2-r2",
+    ]),
+    ports: ports(
+      section({
+        "libretro-device": integer(0),
+        "joypad-index": integer(0),
+        "analog-dpad-mode": choice([
+          "none",
+          "left-analog",
+          "right-analog",
+          "left-analog-forced",
+          "right-analog-forced",
+        ]),
       }),
     ),
+  }),
+  menu: section({
+    "show-start-screen": boolean(),
+    "pause-core": boolean(),
+    mouse: boolean(),
+    pointer: boolean(),
+    clock: boolean(),
+    "battery-level": boolean(),
+    "core-name": boolean(),
+    "dynamic-wallpaper": boolean(),
+    wallpaper: text(),
+    "screensaver-timeout-seconds": integer(0),
+  }),
+  saves: section({
+    "autosave-interval-seconds": integer(0),
+    "auto-load-state": boolean(),
+    "auto-save-state": boolean(),
+    "auto-index": boolean(),
+    "max-keep": integer(0),
+    thumbnail: boolean(),
+    "sort-savefiles": boolean(),
+    "sort-savestates": boolean(),
+    "block-sram-overwrite": boolean(),
+    "save-file-compression": boolean(),
+    "state-file-compression": boolean(),
+  }),
+  rewind: section({
+    enable: boolean(),
+    granularity: integer(1),
+    "buffer-size-mb": integer(1),
+    "buffer-size-step-mb": integer(1),
+    "auto-stride": boolean(),
+  }),
+  playback: section({
+    "pause-when-inactive": boolean(),
+    "pause-on-disconnect": boolean(),
+    "slowmotion-ratio": number(0, undefined, true),
+    "fastforward-ratio": number(0),
+    "fastforward-frameskip": boolean(),
+  }),
+  latency: section({
+    "run-ahead": section({
+      enable: boolean(),
+      frames: integer(0),
+      "secondary-instance": boolean(),
+      "hide-warnings": boolean(),
+    }),
+    "preemptive-frames": section({
+      enable: boolean(),
+      frames: integer(0),
+    }),
+  }),
+  achievements: section({
+    enable: boolean(),
+    username: text(),
+    hardcore: boolean(),
+    badges: boolean(),
+    "rich-presence": boolean(),
+    "test-unofficial": boolean(),
+  }),
+  haptics: section({
+    "vibrate-on-keypress": boolean(),
+    "device-vibration": boolean(),
+  }),
+  playlists: section({
+    "use-old-format": boolean(),
+  }),
+  privacy: section({
+    "camera-device": text(),
+    camera: boolean(),
+    location: boolean(),
+  }),
+  updater: section({
+    "show-online-updater": boolean(),
+    "show-core-updater": boolean(),
+    "auto-extract-archive": boolean(),
+  }),
+})
+
+export type RetroArchPolicy = Values<typeof RetroArchPolicy>
+
+export interface Diagnostic {
+  code: string
+  severity: "error" | "warning" | "info"
+  message: string
+  path?: string[]
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+// Invalid authored leaves stay in storage. Errors name paths, never values;
+// korrid skips those paths before launch. Renderers also defend this boundary.
+export function validatePolicy(
+  values: unknown,
+  schema: SettingSchema = RetroArchPolicy,
+  path: string[] = [],
+): Diagnostic[] {
+  const fail = (message: string): Diagnostic[] => [
+    { code: "setting-value", severity: "error", path, message },
+  ]
+  if (schema.type === "object") {
+    if (!isRecord(values)) return fail(`${path.join(".") || "Settings"} must be an object`)
+    const diagnostics: Diagnostic[] = []
+    for (const key of Object.keys(values).sort()) {
+      const child = Object.hasOwn(schema.properties ?? {}, key)
+        ? schema.properties?.[key]
+        : Object.entries(schema.patternProperties ?? {}).find(([pattern]) =>
+            new RegExp(pattern).test(key),
+          )?.[1]
+      if (!child || key.includes("."))
+        diagnostics.push({
+          code: "setting-unknown",
+          severity: "error",
+          path: [...path, key],
+          message: `Unknown RetroArch setting: ${[...path, key].join(".")}`,
+        })
+      else diagnostics.push(...validatePolicy(values[key], child, [...path, key]))
+    }
+    for (const [key, dependencies] of Object.entries(schema.dependentRequired ?? {})) {
+      if (
+        Object.hasOwn(values, key) &&
+        dependencies.some(
+          other =>
+            !Object.hasOwn(values, other) ||
+            diagnostics.some(
+              item => item.path?.length === path.length + 1 && item.path[path.length] === other,
+            ),
+        )
+      )
+        diagnostics.push({
+          code: "setting-pair",
+          severity: "error",
+          path: [...path, key],
+          message: `${[...path, key].join(".")} requires its width/height pair`,
+        })
+    }
+    return diagnostics
+  }
+  if (typeof values !== (schema.type === "integer" ? "number" : schema.type))
+    return fail(`${path.join(".")} must be ${schema.type}`)
+  if (
+    typeof values === "number" &&
+    (!Number.isFinite(values) ||
+      (schema.type === "integer" && !Number.isSafeInteger(values)) ||
+      (schema.minimum !== undefined && values < schema.minimum) ||
+      (schema.maximum !== undefined && values > schema.maximum) ||
+      (schema.exclusiveMinimum !== undefined && values <= schema.exclusiveMinimum))
   )
-
-const NullableNonEmptyString = (label: string) =>
-  Schema.NullOr(NonEmptyString(label))
-
-const NullableHttpsUrl = (label: string) =>
-  Schema.NullOr(
-    NonEmptyString(label).pipe(
-      Schema.check(
-        Schema.makeFilter(value =>
-          validateNullableRetroArchHttpsUrl(value, label),
-        ),
-      ),
-    ),
+    return fail(`${path.join(".")} is outside its numeric limits`)
+  if (
+    typeof values === "string" &&
+    ((schema.minLength !== undefined && values.length < schema.minLength) ||
+      (schema.enum !== undefined && !schema.enum.includes(values)))
   )
+    return fail(`${path.join(".")} must be ${schema.enum?.join(" | ") ?? "a non-empty string"}`)
+  return []
+}
 
-export const RetroArchAspectRatio = Schema.Literals([
-  "config",
-  "square",
-  "core-provided",
-  "custom",
-  "full",
-])
-export type RetroArchAspectRatio = Schema.Schema.Type<
-  typeof RetroArchAspectRatio
->
+export function decodeRetroArchPolicy(input: unknown): RetroArchPolicy {
+  const diagnostics = validatePolicy(input)
+  if (diagnostics.length) throw new Error(diagnostics.map(item => item.message).join("; "))
+  return input as RetroArchPolicy
+}
 
-export const RetroArchMenuToggleGamepadCombo = Schema.Literals([
-  "none",
-  "down-y-l-r",
-  "l3-r3",
-  "l1-r1-start-select",
-  "start-select",
-  "l3-r",
-  "l-r",
-  "hold-start",
-  "hold-select",
-  "down-select",
-  "l2-r2",
-])
-export type RetroArchMenuToggleGamepadCombo = Schema.Schema.Type<
-  typeof RetroArchMenuToggleGamepadCombo
->
-
-const RetroArchAppendConfigPath = NonEmptyString("configFile.append[]").check(
-  Schema.makeFilter(value =>
-    value.includes("|")
-      ? "configFile.append paths must not contain '|'"
-      : undefined,
-  ),
-)
-
-const RetroArchConfigFilePolicy = Schema.Struct({
-  mode: Schema.optional(Schema.Literal("generated")),
-  append: Schema.optional(Schema.Array(RetroArchAppendConfigPath)),
-})
-
-const RetroArchPathPolicy = Schema.Struct({
-  path: Schema.optional(NonEmptyString("path")),
-})
-
-const RetroArchLoggingPolicy = Schema.Struct({
-  verbose: Schema.optional(Schema.Boolean),
-  logFile: Schema.optional(NullableNonEmptyString("logging.logFile")),
-  verbosity: Schema.optional(Schema.Boolean),
-  libretroLogLevel: Schema.optional(NonEmptyString("logging.libretroLogLevel")),
-  fpsShow: Schema.optional(Schema.Boolean),
-  memoryShow: Schema.optional(Schema.Boolean),
-  framecountShow: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchLifecyclePolicy = Schema.Struct({
-  saveOnExit: Schema.optional(Schema.Boolean),
-  autoOverrides: Schema.optional(Schema.Boolean),
-  autoRemaps: Schema.optional(Schema.Boolean),
-  gameSpecificOptions: Schema.optional(Schema.Boolean),
-  autoShaders: Schema.optional(Schema.Boolean),
-  showHiddenFiles: Schema.optional(Schema.Boolean),
-  loadDummyOnCoreShutdown: Schema.optional(Schema.Boolean),
-  historyListEnable: Schema.optional(Schema.Boolean),
-  performanceCounters: Schema.optional(Schema.Boolean),
-  allUsersControlMenu: Schema.optional(Schema.Boolean),
-  suspendScreensaver: Schema.optional(Schema.Boolean),
-  sustainedPerformanceMode: Schema.optional(Schema.Boolean),
-  gameMode: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchDriversPolicy = Schema.Struct({
-  input: Schema.optional(NonEmptyString("drivers.input")),
-  joypad: Schema.optional(NonEmptyString("drivers.joypad")),
-  video: Schema.optional(NonEmptyString("drivers.video")),
-  audio: Schema.optional(NonEmptyString("drivers.audio")),
-  resampler: Schema.optional(NonEmptyString("drivers.resampler")),
-  menu: Schema.optional(NonEmptyString("drivers.menu")),
-  camera: Schema.optional(NonEmptyString("drivers.camera")),
-  location: Schema.optional(NonEmptyString("drivers.location")),
-  record: Schema.optional(NonEmptyString("drivers.record")),
-})
-
-const RetroArchNullablePath = (label: string) => NullableNonEmptyString(label)
-
-const RetroArchPathsPolicy = Schema.Struct({
-  systemDirectory: Schema.optional(NonEmptyString("paths.systemDirectory")),
-  savefileDirectory: Schema.optional(NonEmptyString("paths.savefileDirectory")),
-  savestateDirectory: Schema.optional(
-    NonEmptyString("paths.savestateDirectory"),
-  ),
-  screenshotDirectory: Schema.optional(
-    NonEmptyString("paths.screenshotDirectory"),
-  ),
-  contentDirectory: Schema.optional(
-    RetroArchNullablePath("paths.contentDirectory"),
-  ),
-  cacheDirectory: Schema.optional(
-    RetroArchNullablePath("paths.cacheDirectory"),
-  ),
-  assetsDirectory: Schema.optional(
-    RetroArchNullablePath("paths.assetsDirectory"),
-  ),
-  thumbnailsDirectory: Schema.optional(
-    RetroArchNullablePath("paths.thumbnailsDirectory"),
-  ),
-  playlistDirectory: Schema.optional(
-    RetroArchNullablePath("paths.playlistDirectory"),
-  ),
-  libretroDirectory: Schema.optional(
-    RetroArchNullablePath("paths.libretroDirectory"),
-  ),
-  libretroInfoPath: Schema.optional(
-    RetroArchNullablePath("paths.libretroInfoPath"),
-  ),
-  coreAssetsDirectory: Schema.optional(
-    RetroArchNullablePath("paths.coreAssetsDirectory"),
-  ),
-  coreOptionsPath: Schema.optional(
-    RetroArchNullablePath("paths.coreOptionsPath"),
-  ),
-  joypadAutoconfigDirectory: Schema.optional(
-    RetroArchNullablePath("paths.joypadAutoconfigDirectory"),
-  ),
-  inputRemappingDirectory: Schema.optional(
-    RetroArchNullablePath("paths.inputRemappingDirectory"),
-  ),
-  overlayDirectory: Schema.optional(
-    RetroArchNullablePath("paths.overlayDirectory"),
-  ),
-  videoShaderDirectory: Schema.optional(
-    RetroArchNullablePath("paths.videoShaderDirectory"),
-  ),
-  cheatDatabasePath: Schema.optional(
-    RetroArchNullablePath("paths.cheatDatabasePath"),
-  ),
-  contentDatabasePath: Schema.optional(
-    RetroArchNullablePath("paths.contentDatabasePath"),
-  ),
-  contentRuntimeLog: Schema.optional(Schema.Boolean),
-  recordingOutputDirectory: Schema.optional(
-    RetroArchNullablePath("paths.recordingOutputDirectory"),
-  ),
-})
-
-const RetroArchVideoSyncPolicy = Schema.Struct({
-  hardSync: Schema.optional(Schema.Boolean),
-  hardSyncFrames: Schema.optional(
-    NonNegativeInteger("video.sync.hardSyncFrames"),
-  ),
-  frameDelay: Schema.optional(
-    Schema.Number.check(finiteNumberRange(0, 99, "video.sync.frameDelay")),
-  ),
-  frameDelayAuto: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchVideoHdrPolicy = Schema.Struct({
-  enable: Schema.optional(Schema.Boolean),
-  maxNits: Schema.optional(PositiveNumber("video.hdr.maxNits")),
-  paperWhiteNits: Schema.optional(PositiveNumber("video.hdr.paperWhiteNits")),
-  contrast: Schema.optional(PositiveNumber("video.hdr.contrast")),
-  expandGamut: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchVideoRecordingPolicy = Schema.Struct({
-  postFilter: Schema.optional(Schema.Boolean),
-  gpu: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchVideoPolicy = Schema.Struct({
-  fullscreen: Schema.optional(Schema.Boolean),
-  windowedFullscreen: Schema.optional(Schema.Boolean),
-  fullscreenWidth: Schema.optional(NonNegativeInteger("video.fullscreenWidth")),
-  fullscreenHeight: Schema.optional(
-    NonNegativeInteger("video.fullscreenHeight"),
-  ),
-  refreshRate: Schema.optional(PositiveNumber("video.refreshRate")),
-  vsync: Schema.optional(Schema.Boolean),
-  aspectRatio: Schema.optional(RetroArchAspectRatio),
-  aspectRatioValue: Schema.optional(PositiveNumber("video.aspectRatioValue")),
-  forceAspect: Schema.optional(Schema.Boolean),
-  scale: Schema.optional(PositiveNumber("video.scale")),
-  integerScale: Schema.optional(Schema.Boolean),
-  cropOverscan: Schema.optional(Schema.Boolean),
-  smooth: Schema.optional(Schema.Boolean),
-  shader: Schema.optional(NullableNonEmptyString("video.shader")),
-  shaderEnable: Schema.optional(Schema.Boolean),
-  hdr: Schema.optional(RetroArchVideoHdrPolicy),
-  recording: Schema.optional(RetroArchVideoRecordingPolicy),
-  gpuScreenshot: Schema.optional(Schema.Boolean),
-  shaderWatchFiles: Schema.optional(Schema.Boolean),
-  sync: Schema.optional(RetroArchVideoSyncPolicy),
-})
-
-const RetroArchAudioPolicy = Schema.Struct({
-  enable: Schema.optional(Schema.Boolean),
-  menuEnable: Schema.optional(Schema.Boolean),
-  mute: Schema.optional(Schema.Boolean),
-  mixerMute: Schema.optional(Schema.Boolean),
-  latencyMs: Schema.optional(NonNegativeNumber("audio.latencyMs")),
-  outputRate: Schema.optional(PositiveInteger("audio.outputRate")),
-  device: Schema.optional(NullableNonEmptyString("audio.device")),
-  sync: Schema.optional(Schema.Boolean),
-  rateControl: Schema.optional(Schema.Boolean),
-  rateControlDelta: Schema.optional(PositiveNumber("audio.rateControlDelta")),
-  maxTimingSkew: Schema.optional(PositiveNumber("audio.maxTimingSkew")),
-  volumeDb: Schema.optional(Schema.Number),
-  mixerVolumeDb: Schema.optional(Schema.Number),
-  resamplerQuality: Schema.optional(
-    NonNegativeInteger("audio.resamplerQuality"),
-  ),
-})
-
-const RetroArchInputPortKey = Schema.String.check(
-  Schema.isPattern(/^[1-9][0-9]*$/),
-)
-
-const RetroArchInputOverlayPolicy = Schema.Struct({
-  enable: Schema.optional(Schema.Boolean),
-  path: Schema.optional(NullableNonEmptyString("input.overlay.path")),
-  opacity: Schema.optional(
-    Schema.Number.check(finiteNumberRange(0, 1, "input.overlay.opacity")),
-  ),
-  scale: Schema.optional(PositiveNumber("input.overlay.scale")),
-  behindMenu: Schema.optional(Schema.Boolean),
-  hideInMenu: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchInputDescriptorPolicy = Schema.Struct({
-  labelShow: Schema.optional(Schema.Boolean),
-  hideUnbound: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchInputPortPolicy = Schema.Struct({
-  libretroDevice: Schema.optional(
-    NonNegativeInteger("input.ports.libretroDevice"),
-  ),
-  joypadIndex: Schema.optional(NonNegativeInteger("input.ports.joypadIndex")),
-  analogDpadMode: Schema.optional(
-    NonNegativeInteger("input.ports.analogDpadMode"),
-  ),
-})
-
-const RetroArchInputPolicy = Schema.Struct({
-  autodetect: Schema.optional(Schema.Boolean),
-  maxUsers: Schema.optional(PositiveInteger("input.maxUsers")),
-  pollTypeBehavior: Schema.optional(
-    NonNegativeInteger("input.pollTypeBehavior"),
-  ),
-  axisThreshold: Schema.optional(
-    Schema.Number.check(finiteNumberRange(0, 1, "input.axisThreshold")),
-  ),
-  analogDeadzone: Schema.optional(
-    Schema.Number.check(finiteNumberRange(0, 1, "input.analogDeadzone")),
-  ),
-  analogSensitivity: Schema.optional(PositiveNumber("input.analogSensitivity")),
-  remapBinds: Schema.optional(Schema.Boolean),
-  descriptors: Schema.optional(RetroArchInputDescriptorPolicy),
-  overlay: Schema.optional(RetroArchInputOverlayPolicy),
-  autoGameFocus: Schema.optional(NonNegativeInteger("input.autoGameFocus")),
-  menuToggleGamepadCombo: Schema.optional(RetroArchMenuToggleGamepadCombo),
-  quitGamepadCombo: Schema.optional(RetroArchMenuToggleGamepadCombo),
-  ports: Schema.optional(
-    Schema.Record(RetroArchInputPortKey, RetroArchInputPortPolicy),
-  ),
-})
-
-const RetroArchMenuPolicy = Schema.Struct({
-  showStartScreen: Schema.optional(Schema.Boolean),
-  pauseLibretro: Schema.optional(Schema.Boolean),
-  mouseEnable: Schema.optional(Schema.Boolean),
-  pointerEnable: Schema.optional(Schema.Boolean),
-  timedateEnable: Schema.optional(Schema.Boolean),
-  batteryLevelEnable: Schema.optional(Schema.Boolean),
-  coreEnable: Schema.optional(Schema.Boolean),
-  dynamicWallpaper: Schema.optional(Schema.Boolean),
-  wallpaper: Schema.optional(NullableNonEmptyString("menu.wallpaper")),
-  screensaverTimeoutSeconds: Schema.optional(
-    NonNegativeInteger("menu.screensaverTimeoutSeconds"),
-  ),
-})
-
-const RetroArchSavesPolicy = Schema.Struct({
-  autosaveIntervalSeconds: Schema.optional(
-    NonNegativeInteger("saves.autosaveIntervalSeconds"),
-  ),
-  autoLoadState: Schema.optional(Schema.Boolean),
-  autoSaveState: Schema.optional(Schema.Boolean),
-  autoIndex: Schema.optional(Schema.Boolean),
-  maxKeep: Schema.optional(NonNegativeInteger("saves.maxKeep")),
-  thumbnailEnable: Schema.optional(Schema.Boolean),
-  sortSavefiles: Schema.optional(Schema.Boolean),
-  sortSavestates: Schema.optional(Schema.Boolean),
-  savefilesInContentDir: Schema.optional(Schema.Boolean),
-  savestatesInContentDir: Schema.optional(Schema.Boolean),
-  systemfilesInContentDir: Schema.optional(Schema.Boolean),
-  blockSramOverwrite: Schema.optional(Schema.Boolean),
-  saveFileCompression: Schema.optional(Schema.Boolean),
-  stateFileCompression: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchRewindPolicy = Schema.Struct({
-  enable: Schema.optional(Schema.Boolean),
-  granularity: Schema.optional(PositiveInteger("rewind.granularity")),
-  bufferSizeMb: Schema.optional(PositiveInteger("rewind.bufferSizeMb")),
-  bufferSizeStepMb: Schema.optional(PositiveInteger("rewind.bufferSizeStepMb")),
-  autoStride: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchPlaybackPolicy = Schema.Struct({
-  pauseNonactive: Schema.optional(Schema.Boolean),
-  pauseOnDisconnect: Schema.optional(Schema.Boolean),
-  slowmotionRatio: Schema.optional(PositiveNumber("playback.slowmotionRatio")),
-  fastforwardRatio: Schema.optional(
-    NonNegativeNumber("playback.fastforwardRatio"),
-  ),
-  fastforwardFrameskip: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchRunAheadPolicy = Schema.Struct({
-  enable: Schema.optional(Schema.Boolean),
-  frames: Schema.optional(NonNegativeInteger("latency.runAhead.frames")),
-  secondaryInstance: Schema.optional(Schema.Boolean),
-  hideWarnings: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchPreemptiveFramesPolicy = Schema.Struct({
-  enable: Schema.optional(Schema.Boolean),
-  frames: Schema.optional(
-    NonNegativeInteger("latency.preemptiveFrames.frames"),
-  ),
-})
-
-const RetroArchLatencyPolicy = Schema.Struct({
-  runAhead: Schema.optional(RetroArchRunAheadPolicy),
-  preemptiveFrames: Schema.optional(RetroArchPreemptiveFramesPolicy),
-})
-
-const RetroArchAchievementsPolicy = Schema.Struct({
-  enable: Schema.optional(Schema.Boolean),
-  username: Schema.optional(NonEmptyString("achievements.username")),
-  hardcoreMode: Schema.optional(Schema.Boolean),
-  badges: Schema.optional(Schema.Boolean),
-  richPresence: Schema.optional(Schema.Boolean),
-  testUnofficial: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchHapticsPolicy = Schema.Struct({
-  vibrateOnKeypress: Schema.optional(Schema.Boolean),
-  deviceVibration: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchPlaylistsPolicy = Schema.Struct({
-  useOldFormat: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchPrivacyPolicy = Schema.Struct({
-  cameraDevice: Schema.optional(NullableNonEmptyString("privacy.cameraDevice")),
-  cameraAllow: Schema.optional(Schema.Boolean),
-  locationAllow: Schema.optional(Schema.Boolean),
-})
-
-const RetroArchUpdaterPolicy = Schema.Struct({
-  showOnlineUpdater: Schema.optional(Schema.Boolean),
-  showCoreUpdater: Schema.optional(Schema.Boolean),
-  buildbotUrl: Schema.optional(NullableHttpsUrl("updater.buildbotUrl")),
-  buildbotAssetsUrl: Schema.optional(
-    NullableHttpsUrl("updater.buildbotAssetsUrl"),
-  ),
-  autoExtractArchive: Schema.optional(Schema.Boolean),
-})
-
-/**
- * Minimal typed RetroArch v1 launch/config policy. Generated mode is the only
- * supported config-file mode in v1; user-authored config paths/default mode are
- * intentionally omitted so strict decode rejects them.
- */
-export const RetroArchPolicy = Schema.Struct({
-  environment: Schema.optional(EnvironmentOverlay),
-  configFile: Schema.optional(RetroArchConfigFilePolicy),
-  core: Schema.optional(RetroArchPathPolicy),
-  content: Schema.optional(RetroArchPathPolicy),
-  logging: Schema.optional(RetroArchLoggingPolicy),
-  lifecycle: Schema.optional(RetroArchLifecyclePolicy),
-  drivers: Schema.optional(RetroArchDriversPolicy),
-  paths: Schema.optional(RetroArchPathsPolicy),
-  video: Schema.optional(RetroArchVideoPolicy),
-  audio: Schema.optional(RetroArchAudioPolicy),
-  input: Schema.optional(RetroArchInputPolicy),
-  menu: Schema.optional(RetroArchMenuPolicy),
-  saves: Schema.optional(RetroArchSavesPolicy),
-  rewind: Schema.optional(RetroArchRewindPolicy),
-  playback: Schema.optional(RetroArchPlaybackPolicy),
-  latency: Schema.optional(RetroArchLatencyPolicy),
-  achievements: Schema.optional(RetroArchAchievementsPolicy),
-  haptics: Schema.optional(RetroArchHapticsPolicy),
-  playlists: Schema.optional(RetroArchPlaylistsPolicy),
-  privacy: Schema.optional(RetroArchPrivacyPolicy),
-  updater: Schema.optional(RetroArchUpdaterPolicy),
-})
-export type RetroArchPolicy = Schema.Schema.Type<typeof RetroArchPolicy>
-
-export const decodeRetroArchPolicy = (input: unknown): RetroArchPolicy =>
-  Schema.decodeUnknownSync(RetroArchPolicy)(input, STRICT)
+// The runtime schema gets readable titles and descriptions at every node.
+// This supplies readable labels for every object and leaf without a second schema.
+export function titledSchema(schema: SettingSchema, title = "RetroArch"): SettingSchema {
+  return {
+    ...schema,
+    title,
+    description: schema.description ?? `${title} settings for RetroArch.`,
+    ...(schema.properties
+      ? {
+          properties: Object.fromEntries(
+            Object.entries(schema.properties).map(([key, child]) => [
+              key,
+              titledSchema(
+                child,
+                key.replace(/-/g, " ").replace(/^./, c => c.toUpperCase()),
+              ),
+            ]),
+          ),
+        }
+      : {}),
+    ...(schema.patternProperties
+      ? {
+          patternProperties: Object.fromEntries(
+            Object.entries(schema.patternProperties).map(([key, child]) => [
+              key,
+              titledSchema(child, "Input port"),
+            ]),
+          ),
+        }
+      : {}),
+  }
+}
