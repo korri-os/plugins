@@ -107,9 +107,9 @@ mgba-nightly = {
 
 Omit it and the core takes nixpkgs' RetroArch, which is what every entry does
 today. The override selects the **build**, never the protections: Korri's
-read-only patch and its compiled source regression still run against whatever
-is chosen, and a fork the patch cannot apply to fails the build rather than
-quietly losing the protection.
+read-only and launch-overlay patches and their native source regressions
+still run against whatever is chosen. A fork the patches cannot apply to fails
+the build rather than quietly losing those protections.
 
 The settings evidence follows the selected binary. A core answering
 `settings.describe` from the default build's schema while running a different
@@ -146,20 +146,33 @@ Reversed layouts (`Bottom/Top`, `Right/Left`) do not serve the first display
 arrangement case. Hybrid layouts remain outside this slice.
 
 When korrid supplies a layout, the handler provisions `melonds-layout.opt`
-beside its existing account-local `retroarch.cfg`. It sets the chosen layout
-and gap zero, then uses a native `#include` of the person's existing
-`~/.config/retroarch/config/melonDS/melonDS.opt`. First-wins native lookup
-preserves every other option without changing that file. A missing included
-file is allowed by the native parser.
+beside its existing account-local `retroarch.cfg`. That overlay contains only
+`melonds_screen_layout` and `melonds_screen_gap` (zero). The plan passes its
+path through the launch environment's `KORRI_RETROARCH_CORE_OPTIONS_OVERLAY`.
+Accepted layout ids come from the generated runner declaration.
 
-RetroArch 1.22.2's `runloop_init_core_options_path` normally prefers game and
-folder options, then per-core options over `core_options_path`. For a chosen
-layout only, the handler sets `global_core_options = "true"` and
-`game_specific_options = "false"` so RetroArch reads the provisioned file.
-Separate game/folder option files and global option files are not merged in
-this route; the existing per-core file is the source. Without a layout, the
-handler keeps its existing files, arguments and option precedence unchanged.
-The handler performs no reads or writes; korrid provisions its returned plan.
+The Korri-specific RetroArch patch applies the overlay in memory after native
+source selection and parsing. Native precedence stays unchanged: game-specific,
+then folder-specific options (when enabled), then the existing per-core file
+(when enabled), then `core_options_path` or `retroarch-core-options.cfg` beside
+the frontend configuration. A missing per-core file is initialized from the
+custom/global source. The native config-directory setting still applies.
+Every other option comes from exactly the source RetroArch normally selects;
+no lower-priority files are merged.
+
+For every overlaid key, the patch keeps the original native value, including
+its absence or invalid raw value. Exit flushes and menu saves use that original,
+not the overlay value, even if the menu changed that key during the launch.
+Other option edits save normally. The overlay file is never a save destination.
+Build-host tests compile the real option manager, parser and native source
+selector. They check all five source types, missing per-core initialization,
+legacy and v2 options, menu and exit saves, and compare no-overlay results and
+serialized files byte-for-byte against unpatched RetroArch.
+
+Without a layout, the handler keeps its existing plan byte-identical, and the
+patched frontend keeps native behavior without an overlay. The handler performs
+no reads or writes; korrid provisions its returned plan. Native builds and
+checks run on build hosts, never on a device.
 
 The local `LaunchInput` type is temporary until this repository advances its
 Core pin to the generated contract with `PluginLaunchInput.layout`. Remove
