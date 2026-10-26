@@ -1,7 +1,7 @@
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -1899,6 +1899,62 @@
+@@ -1904,6 +1904,62 @@
          }
        }
  
@@ -9,7 +9,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +      // Unknown modifiers, transforms and other formats keep the EGL path.
 +      bool copy_linear(const egl::surface_descriptor_t &sd, img_t &img) {
 +#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-+        if (capture_rotate_90 || sd.modifier != DRM_FORMAT_MOD_LINEAR ||
++        if (capture_transform || sd.modifier != DRM_FORMAT_MOD_LINEAR ||
 +            (sd.fourcc != DRM_FORMAT_XRGB8888 && sd.fourcc != DRM_FORMAT_ARGB8888) ||
 +            sd.fds[0] < 0 || sd.fds[1] >= 0 || sd.fds[2] >= 0 || sd.fds[3] >= 0 ||
 +            width <= 0 || height <= 0 || img_offset_x < 0 || img_offset_y < 0 ||
@@ -64,7 +64,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
        capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
  #ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
          auto capture_start = std::chrono::steady_clock::now();
-@@ -1913,23 +1969,6 @@
+@@ -1918,23 +1974,6 @@
            return status;
          }
  
@@ -88,11 +88,11 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          if (!pull_free_image_cb(img_out)) {
            return platf::capture_e::interrupted;
          }
-@@ -1937,19 +1976,37 @@
+@@ -1942,19 +1981,37 @@
  #ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
          auto readback_start = std::chrono::steady_clock::now();
  #endif
--        if (capture_rotate_90) {
+-        if (capture_transform) {
 -          gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, (*rotated_framebuffer)[0]);
 -          gl::ctx.Viewport(0, 0, width, height);
 -          gl::ctx.ActiveTexture(GL_TEXTURE0);
@@ -121,7 +121,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +          gl::ctx.GetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
 +          BOOST_LOG(debug) << "width and height: w "sv << w << " h "sv << h;
 +
-+          if (capture_rotate_90) {
++          if (capture_transform) {
 +            gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, (*rotated_framebuffer)[0]);
 +            gl::ctx.Viewport(0, 0, width, height);
 +            gl::ctx.ActiveTexture(GL_TEXTURE0);

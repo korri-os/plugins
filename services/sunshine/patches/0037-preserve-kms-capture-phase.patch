@@ -408,7 +408,7 @@ diff --git a/src/kms_vblank_wait.h b/src/kms_vblank_wait.h
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -35,6 +35,12 @@
+@@ -36,6 +36,12 @@
  #include "cuda.h"
  #include "graphics.h"
  #include "src/config.h"
@@ -421,7 +421,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  #include "src/nv12.h"
  #include "src/logging.h"
  #include "src/platform/common.h"
-@@ -1630,6 +1636,206 @@
+@@ -1631,6 +1637,206 @@
      /**
       * @brief KMS capture backend that copies frames into system memory.
       */
@@ -628,7 +628,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
      class display_ram_t: public display_t {
      public:
        /**
-@@ -1649,6 +1855,7 @@
+@@ -1650,6 +1856,7 @@
         * @return 0 on success; nonzero or negative platform status on failure.
         */
        int init(const std::string &display_name, const ::video::config_t &config) {
@@ -636,7 +636,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          if (!gbm::create_device) {
            BOOST_LOG(warning) << "libgbm not initialized"sv;
            return -1;
-@@ -1756,14 +1963,116 @@
+@@ -1760,14 +1967,116 @@
  
        capture_e capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) override {
          auto next_frame = std::chrono::steady_clock::now();

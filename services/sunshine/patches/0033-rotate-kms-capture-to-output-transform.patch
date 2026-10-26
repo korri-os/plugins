@@ -1,11 +1,67 @@
+diff --git a/src/kms_output_transform.h b/src/kms_output_transform.h
+--- /dev/null
++++ b/src/kms_output_transform.h
+@@ -0,0 +1,51 @@
++#pragma once
++
++#include <array>
++#include <optional>
++#include <string>
++#include <utility>
++
++namespace platf::kms {
++  // Destination-to-source normalized texture coordinates. wl_output defines
++  // CCW rotations in Cartesian (Y-up) coordinates, flip first, then rotate.
++  // GetTextureSubImage preserves texture row order; do not add a Y flip.
++  struct output_transform_t {
++    int xx, xy, x0, yx, yy, y0;
++
++    std::pair<int, int> size(int width, int height) const {
++      return xx == 0 ? std::pair {height, width} : std::pair {width, height};
++    }
++
++    // Invert the signed permutation used by the shader. Pixel centres turn
++    // normalized 1-u into extent-1-pixel, including off-screen cursor pixels.
++    std::pair<int, int> pixel(int x, int y, int width, int height) const {
++      x -= x0 * (width - 1);
++      y -= y0 * (height - 1);
++      return {xx * x + yx * y, xy * x + yy * y};
++    }
++
++    std::string sampler() const {
++      return "vec2(dot(vec3(tex, 1.0), vec3(" + std::to_string(xx) + ".0," + std::to_string(xy) + ".0," + std::to_string(x0) +
++             ".0)), dot(vec3(tex, 1.0), vec3(" + std::to_string(yx) + ".0," + std::to_string(yy) + ".0," + std::to_string(y0) + ".0)))";
++    }
++  };
++
++  inline std::optional<output_transform_t> output_transform(int value) {
++    // wl_output_transform values 0..7, in protocol order. The same affine
++    // map generates the GPU sampler and places software cursor pixels.
++    constexpr std::array<output_transform_t, 8> transforms {{
++      {1, 0, 0, 0, 1, 0},    // normal: tex
++      {0, 1, 0, -1, 0, 1},   // 90: (tex.y, 1-tex.x)
++      {-1, 0, 1, 0, -1, 1},  // 180: (1-tex.x, 1-tex.y)
++      {0, -1, 1, 1, 0, 0},   // 270: (1-tex.y, tex.x)
++      {-1, 0, 1, 0, 1, 0},   // flipped: (1-tex.x, tex.y)
++      {0, -1, 1, -1, 0, 1},  // flipped 90: (1-tex.y, 1-tex.x)
++      {1, 0, 0, 0, -1, 1},   // flipped 180: (tex.x, 1-tex.y)
++      {0, 1, 0, 1, 0, 0},    // flipped 270: (tex.y, tex.x)
++    }};
++    if (value < 0 || value >= int(transforms.size())) {
++      return std::nullopt;
++    }
++    return transforms[value];
++  }
++}  // namespace platf::kms
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -6,6 +6,11 @@
+@@ -6,6 +6,12 @@
  #include <errno.h>
  #include <fcntl.h>
  #include <filesystem>
 +#include <cstring>
++#include "src/kms_output_transform.h"
 +#include <vector>
 +#ifdef SUNSHINE_BUILD_WAYLAND
 +  #include <wayland-client-protocol.h>
@@ -13,7 +69,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  #include <future>
  #include <ranges>
  #include <stdexcept>
-@@ -394,6 +399,8 @@
+@@ -394,6 +400,8 @@
        // Monitor index in the global list
        std::uint32_t monitor_index;  ///< Monitor index.
  
@@ -22,7 +78,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
        platf::touch_port_t viewport;  ///< Viewport.
      };
  
-@@ -1160,6 +1167,8 @@
+@@ -1160,6 +1168,8 @@
              auto monitor = pos->crtc_to_monitor.find(plane->crtc_id);
              if (monitor != std::end(pos->crtc_to_monitor)) {
                auto &viewport = monitor->second.viewport;
@@ -31,7 +87,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  
                width = viewport.width;
                height = viewport.height;
-@@ -1599,6 +1608,8 @@
+@@ -1599,6 +1609,8 @@
  
        int img_width;  ///< Img width.
        int img_height;  ///< Img height.
@@ -40,7 +96,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
        int img_offset_x;  ///< Img offset x.
        int img_offset_y;  ///< Img offset y.
  
-@@ -1664,6 +1675,81 @@
+@@ -1664,6 +1676,84 @@
  
          ctx = std::move(*ctx_opt);
  
@@ -53,17 +109,19 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +        // Use the same wl_output that KMS already correlates for touch. Never
 +        // change the DMA-BUF/VAAPI/CUDA path or an untransformed RAM capture.
 +        auto plane_rotation = card.get_panel_orientation(plane_id);
++        auto transform = output_transform ? kms::output_transform(*output_transform) : std::nullopt;
++        auto chosen_transform = transform && plane_rotation == DRM_MODE_ROTATE_0 ? *output_transform : WL_OUTPUT_TRANSFORM_NORMAL;
 +        BOOST_LOG(info) << "KMS rotation probe decision: Wayland output="sv
 +                        << (output_name.empty() ? "<unmatched>" : output_name)
 +                        << " transform="sv << (output_transform ? std::to_string(*output_transform) : "<missing>")
-+                        << " expected_270="sv << (output_transform == WL_OUTPUT_TRANSFORM_270)
++                        << " chosen_transform="sv << chosen_transform
 +                        << " CRTC="sv << crtc_id << " plane="sv << plane_id
 +                        << " DRM rotation="sv << plane_rotation
 +                        << " expected_rotate_0="sv << (plane_rotation == DRM_MODE_ROTATE_0)
 +                        << " raw="sv << img_width << 'x' << img_height
 +                        << " capture="sv << width << 'x' << height
 +                        << " offset="sv << img_offset_x << ',' << img_offset_y;
-+        if (output_transform == WL_OUTPUT_TRANSFORM_270 && plane_rotation == DRM_MODE_ROTATE_0) {
++        if (chosen_transform != WL_OUTPUT_TRANSFORM_NORMAL) {
 +          if (width <= 0 || height <= 0 || width != img_width || height != img_height || img_offset_x || img_offset_y) {
 +            BOOST_LOG(error) << "KMS rotation probe requires a full-size, uncropped framebuffer"sv;
 +            return -1;
@@ -78,13 +136,12 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +  tex = vec2(float(gl_VertexID >> 1) * 2.0, float(gl_VertexID & 1) * 2.0);
 +}
 +)", GL_VERTEX_SHADER);
-+          auto fragment = gl::shader_t::compile(R"(#version 300 es
++          auto fragment = gl::shader_t::compile(std::string(R"(#version 300 es
 +precision mediump float;
 +uniform sampler2D image;
 +in vec2 tex;
 +layout(location = 0) out vec4 color;
-+void main() { color = texture(image, vec2(1.0 - tex.y, tex.x)); }
-+)", GL_FRAGMENT_SHADER);
++void main() { color = texture(image, )") + transform->sampler() + "); }", GL_FRAGMENT_SHADER);
 +          if (vertex.has_right() || fragment.has_right()) {
 +            BOOST_LOG(error) << "Couldn't compile the KMS rotation probe shaders"sv;
 +            return -1;
@@ -97,7 +154,8 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +          rotated_program = std::move(linked.left());
 +          rotated_texture = gl::tex_t::make(1);
 +          gl::ctx.BindTexture(GL_TEXTURE_2D, (*rotated_texture)[0]);
-+          gl::ctx.TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, height, width);
++          auto [output_width, output_height] = transform->size(width, height);
++          gl::ctx.TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, output_width, output_height);
 +          gl::ctx.TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 +          gl::ctx.TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 +          gl::ctx.TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -110,30 +168,32 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +            BOOST_LOG(error) << "Couldn't allocate the KMS rotation probe framebuffer"sv;
 +            return -1;
 +          }
-+          std::swap(width, height);
-+          capture_rotate_90 = true;
++          width = output_width;
++          height = output_height;
++          capture_transform = transform;
 +          BOOST_LOG(info) << "KMS RAM capture rotation probe: Wayland output="sv << output_name
 +                          << " CRTC="sv << crtc_id << " plane="sv << plane_id
 +                          << " raw="sv << img_width << 'x' << img_height
 +                          << " output="sv << width << 'x' << height
-+                          << " wl_output transform="sv << *output_transform;
++                          << " wl_output transform="sv << *output_transform << " rotated=1"sv;
 +        }
 +#endif
          return 0;
        }
  
-@@ -1785,7 +1871,38 @@
+@@ -1785,7 +1875,39 @@
         * @param cursor Cursor image or visibility state to composite.
         * @return Capture status reported to the streaming pipeline.
         */
 +      void blend_rotated_cursor(img_t &img) {
-+        // Only visit cursor pixels. The image shader maps a raw source pixel
-+        // (x, y) to (source_height - 1 - y, x) in top-left image coordinates.
++        // Only visit cursor pixels. Invert the same sampler used by the
++        // image shader, so cursor and image stay aligned for every transform.
 +        auto *pixels = reinterpret_cast<std::uint32_t *>(img.data);
 +        for (std::uint32_t y = 0; y < captured_cursor.src_h; ++y) {
 +          for (std::uint32_t x = 0; x < captured_cursor.src_w; ++x) {
-+            auto target_x = img.width - 1 - (captured_cursor.y - img_offset_y + static_cast<std::int32_t>(y));
-+            auto target_y = captured_cursor.x - img_offset_x + static_cast<std::int32_t>(x);
++            auto [target_x, target_y] = capture_transform->pixel(
++              captured_cursor.x - img_offset_x + static_cast<std::int32_t>(x),
++              captured_cursor.y - img_offset_y + static_cast<std::int32_t>(y), img_width, img_height);
 +            if (target_x < 0 || target_x >= img.width || target_y < 0 || target_y >= img.height) {
 +              continue;
 +            }
@@ -161,7 +221,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          file_t fb_fd[4];
  
          egl::surface_descriptor_t sd;
-@@ -1817,14 +1934,41 @@
+@@ -1817,14 +1939,41 @@
            return platf::capture_e::interrupted;
          }
  
@@ -170,7 +230,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +        auto readback_start = std::chrono::steady_clock::now();
 +#endif
-+        if (capture_rotate_90) {
++        if (capture_transform) {
 +          gl::ctx.BindFramebuffer(GL_FRAMEBUFFER, (*rotated_framebuffer)[0]);
 +          gl::ctx.Viewport(0, 0, width, height);
 +          gl::ctx.ActiveTexture(GL_TEXTURE0);
@@ -195,7 +255,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 -          blend_cursor(*img_out);
 -        }
 -
-+          if (capture_rotate_90) {
++          if (capture_transform) {
 +            blend_rotated_cursor(*img_out);
 +          } else {
 +            blend_cursor(*img_out);
@@ -208,11 +268,11 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          return capture_e::ok;
        }
  
-@@ -1857,6 +2001,28 @@
+@@ -1857,6 +2006,28 @@
        gbm::gbm_t gbm;  ///< GBM device used for buffer allocation.
        egl::display_t display;  ///< EGL display created from the GBM device.
        egl::ctx_t ctx;  ///< EGL context used to copy KMS frames into RAM.
-+      bool capture_rotate_90 {false};
++      std::optional<kms::output_transform_t> capture_transform;
 +      std::optional<gl::tex_t> rotated_texture;
 +      std::optional<gl::frame_buf_t> rotated_framebuffer;
 +      std::optional<gl::program_t> rotated_program;
@@ -229,7 +289,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +        BOOST_LOG(info) << "KMS rotation probe "sv << stage << " ms p50="sv << samples[150]
 +                        << " p95="sv << samples[285] << " p99="sv << samples[297]
 +                        << " max="sv << samples.back() << " budget-overruns="sv << overruns
-+                        << "/300 (not missed delivery deadlines) rotated="sv << capture_rotate_90;
++                        << "/300 (not missed delivery deadlines) rotated="sv << bool(capture_transform);
 +        samples.clear();
 +      }
 +#endif
@@ -237,7 +297,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
      };
  
      /**
-@@ -2268,6 +2434,14 @@
+@@ -2268,6 +2439,14 @@
            if (monitor_descriptor.index == index && monitor_descriptor.type == type) {
              monitor_descriptor.viewport.offset_x = monitor->viewport.offset_x;
              monitor_descriptor.viewport.offset_y = monitor->viewport.offset_y;
@@ -252,7 +312,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
              monitor_descriptor.viewport.logical_width = monitor->viewport.logical_width;
              monitor_descriptor.viewport.logical_height = monitor->viewport.logical_height;
  
-@@ -2281,6 +2455,8 @@
+@@ -2281,6 +2460,8 @@
                  << monitor_descriptor.viewport.width << 'x' << monitor_descriptor.viewport.height
                  << " vs "sv
                  << monitor->viewport.width << 'x' << monitor->viewport.height;

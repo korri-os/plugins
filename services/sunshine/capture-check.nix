@@ -24,6 +24,8 @@ pkgs.stdenv.mkDerivation {
     $CXX -std=c++17 -O2 -Wall -Wextra -Werror -I${source}/src \
       ${./row-pair-test.cpp} -o row-pair-test -lyuv
     $CXX -std=c++17 -O2 -Wall -Wextra -Werror -I${source}/src \
+      ${./output-transform-test.cpp} -o output-transform-test
+    $CXX -std=c++17 -O2 -Wall -Wextra -Werror -I${source}/src \
       ${./capture-scheduling-test.cpp} -o capture-scheduling-test
     $CXX -std=c++17 -O2 -Wall -Wextra -Werror -I${source}/src \
       ${./kms-pacing-test.cpp} -o kms-pacing-test
@@ -45,6 +47,7 @@ pkgs.stdenv.mkDerivation {
     sed -n '/class wlr_vram_t:/,$p' ${source}/src/platform/linux/wlgrab.cpp \
       | grep -F 'make_unique<rkmpp_wl_t>'
     ./row-pair-test
+    ./output-transform-test
     ./capture-scheduling-test
     ./kms-pacing-test
     ./kms-rt-guard-test

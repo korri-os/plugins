@@ -73,7 +73,7 @@ diff --git a/src/platform/common.h b/src/platform/common.h
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
-@@ -35,6 +35,7 @@
+@@ -36,6 +36,7 @@
  #include "cuda.h"
  #include "graphics.h"
  #include "src/config.h"
@@ -81,7 +81,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  #include "src/logging.h"
  #include "src/platform/common.h"
  #include "src/round_robin.h"
-@@ -1902,6 +1903,10 @@
+@@ -1907,6 +1908,10 @@
        // Only byte-compatible BGR0 layouts with an explicit linear modifier.
        // Unknown modifiers, transforms and other formats keep the EGL path.
        bool copy_linear(const egl::surface_descriptor_t &sd, img_t &img) {
@@ -90,9 +90,9 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
 +        img.nv12_valid = false;
 +        auto &nv12 = img.nv12_data;
  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-         if (capture_rotate_90 || sd.modifier != DRM_FORMAT_MOD_LINEAR ||
+         if (capture_transform || sd.modifier != DRM_FORMAT_MOD_LINEAR ||
              (sd.fourcc != DRM_FORMAT_XRGB8888 && sd.fourcc != DRM_FORMAT_ARGB8888) ||
-@@ -1919,6 +1924,12 @@
+@@ -1924,6 +1929,12 @@
          if (size < 0 || bytes > std::uint64_t(size) || bytes > SIZE_MAX) {
            return false;
          }
@@ -105,7 +105,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          auto map = mmap(nullptr, bytes, PROT_READ, MAP_SHARED, sd.fds[0], 0);
          if (map == MAP_FAILED) {
            return false;
-@@ -1936,8 +1947,10 @@
+@@ -1941,8 +1952,10 @@
          const auto *src = static_cast<const std::uint8_t *>(map) + sd.offsets[0] +
                            std::uint64_t(img_offset_y) * sd.pitches[0] + std::uint64_t(img_offset_x) * 4;
          const size_t row_bytes = size_t(width) * 4;
@@ -118,7 +118,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
            std::memcpy(img.data, src, row_bytes * height);
          } else {
            for (int y = 0; y < height; ++y) {
-@@ -1948,6 +1961,12 @@
+@@ -1953,6 +1966,12 @@
          if (drmIoctl(sd.fds[0], DMA_BUF_IOCTL_SYNC, &sync) < 0) {
            BOOST_LOG(warning) << "KMS direct readback END sync failed: "sv << strerror(errno);
            return false;
@@ -131,12 +131,12 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          }
          return true;
  #else
-@@ -2058,6 +2077,7 @@
+@@ -2063,6 +2082,7 @@
        gbm::gbm_t gbm;  ///< GBM device used for buffer allocation.
        egl::display_t display;  ///< EGL display created from the GBM device.
        egl::ctx_t ctx;  ///< EGL context used to copy KMS frames into RAM.
 +      std::vector<std::uint8_t> row_pair_scratch;
-       bool capture_rotate_90 {false};
+       std::optional<kms::output_transform_t> capture_transform;
        std::optional<gl::tex_t> rotated_texture;
        std::optional<gl::frame_buf_t> rotated_framebuffer;
 diff --git a/src/video.cpp b/src/video.cpp

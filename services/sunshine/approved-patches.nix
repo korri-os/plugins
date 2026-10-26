@@ -4,18 +4,27 @@ rec {
   approvedDeviceBaseDerivation = "/nix/store/832s1aqgsrkcawmf5pcff634mla3a03r-sunshine-2026.914.233613.drv";
   approvedDeviceBaseDerivations = {
     "x86_64-linux-cuda" = "/nix/store/832s1aqgsrkcawmf5pcff634mla3a03r-sunshine-2026.914.233613.drv";
-    "aarch64-linux-software" = "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv";
+    "aarch64-linux-software" =
+      "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv";
     "aarch64-linux-rkmpp" = "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv";
   };
   approvedBaseDerivationsByProfile = {
     # Korri plugins nixpkgs revision 02c087f3fe673c9e317f206a627cb6b910336dbe.
-    "x86_64-linux-cuda" = [ "/nix/store/832s1aqgsrkcawmf5pcff634mla3a03r-sunshine-2026.914.233613.drv" ];
-    "aarch64-linux-software" = [ "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv" ];
+    "x86_64-linux-cuda" = [
+      "/nix/store/832s1aqgsrkcawmf5pcff634mla3a03r-sunshine-2026.914.233613.drv"
+    ];
+    "aarch64-linux-software" = [
+      "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv"
+    ];
     # Same reviewed CUDA-free upstream recipe; RKMPP is added only downstream.
-    "aarch64-linux-rkmpp" = [ "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv" ];
+    "aarch64-linux-rkmpp" = [
+      "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv"
+    ];
     # Both encoder patches change the downstream static FFmpeg, not this
     # reviewed upstream Sunshine derivation.
-    "aarch64-linux-rkmpp-v4l2m2m" = [ "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv" ];
+    "aarch64-linux-rkmpp-v4l2m2m" = [
+      "/nix/store/302q240fw26629y5d9099cp86yl0b670-sunshine-2026.914.233613.drv"
+    ];
   };
   approvedBaseDerivations = builtins.concatLists (
     builtins.attrValues approvedBaseDerivationsByProfile
@@ -105,7 +114,6 @@ rec {
     sha256 = "11639b5df70d46bee1358b765cb9d202f36734eaefc2b1120d53f4a350c67557";
   };
 
-
   # Applied after the zero-copy patch, only for the aarch64-linux-rkmpp
   # profile. wlroots compositors expose no KMS scanout framebuffer, so the
   # KMS zero-copy route never runs on a Wayland host. This hands the
@@ -171,7 +179,7 @@ rec {
   rotationPatch = {
     name = "0033-rotate-kms-capture-to-output-transform.patch";
     path = ./patches/0033-rotate-kms-capture-to-output-transform.patch;
-    sha256 = "bcdaa3f1a0401f9a88f2c47d6b08e6b0201695a4a255c51af1fe5cf646648b03";
+    sha256 = "d94b4d5d1102c318c7b65c334188036b10d3342ddc9a3d676d87630599a71f03";
   };
   rotationCropPatch = {
     name = "0034-crop-encoded-sps-to-visible-size.patch";
@@ -182,19 +190,19 @@ rec {
   kmsLinearPatch = {
     name = "0035-read-linear-kms-dmabuf.patch";
     path = ./patches/0035-read-linear-kms-dmabuf.patch;
-    sha256 = "965f8ef9f7d66c656c6ce4385cbd43fb01969731da35f88ffdf05710ec327afd";
+    sha256 = "50e8cbdc3bdd8a4a68fb8a925053db72fa464089150e064b270811a748d5fa7a";
   };
 
   kmsNv12Patch = {
     name = "0036-convert-kms-row-pairs-to-nv12.patch";
     path = ./patches/0036-convert-kms-row-pairs-to-nv12.patch;
-    sha256 = "dc76392269aa18672ce9836b904724b6486d16c57abf57b30e76ba93570bbb65";
+    sha256 = "696e434c4951a737eb655a415c44a3a18a08e393132f9609dff4ee830219a214";
   };
 
   kmsPacingPatch = {
     name = "0037-preserve-kms-capture-phase.patch";
     path = ./patches/0037-preserve-kms-capture-phase.patch;
-    sha256 = "cc3fb70f3886f98c7cbe230d92620e3a6feae7604c3a3ebd192a4939f9a2faf1";
+    sha256 = "6355c56747c60c6fc66a636d7323b43058f4caf4fb7eb8b9c740d43cd8c24fe8";
   };
 
   rkmppPatches = [
@@ -215,5 +223,5 @@ rec {
 
   # Ordered digest of 8 base patches ++ 13 rkmppPatches. Bump after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "ae6a595de56dc7e5e37f399d6c3f61dd0320a099c30481d67b6ba169a90d01a0";
+  rkmppPatchSetSha256 = "c6e94f764e3d177615fec2bb233b924a3682102279936a6223efc427f62b60dd";
 }
