@@ -4,9 +4,30 @@ Branch `sunshine/upstream-v2026.914`, rebased on main `071bbd7`. Devices tested 
 the owner's direction: AYN Odin 2 Portal and Retroid Pocket Mini V2. The RG35XX
 Pro and RG353M were set aside for now.
 
-**Result: the Odin passes. The Mini delivers fewer frames, and most of the gap is
-an upstream behaviour fix, not a port fault. A smaller capture-rate gap on the
-Mini remains open.**
+**Result: the Odin passes, with a correct picture apart from a sideways
+orientation that the published build has too (korri-os/korri#273). The Mini
+cannot be judged: decoded recordings show that Sunshine's capture on the Mini
+returns black frames on the published 2025.924 build as well as on 2026.914,
+with both KMS and `capture=wlr` (korri-os/korri#272). The frame counts below
+were measured before any picture was decoded and do not show this.**
+
+## Picture check (2026-10-26)
+
+Recorded 20 s streams were decoded with FFmpeg and checked frame by frame.
+
+| Device | Build | Decoded frames | Blank frames | Notes |
+|---|---|---|---|---|
+| Odin | 2025.924 | 1639, 0 errors | 14 (one burst) | sideways picture |
+| Odin | 2026.914 | 1618, 0 errors | 5 (one burst) | sideways picture |
+| Mini | 2025.924, KMS | 4 runs: 0, 291, 0, 11 blank | | later sessions mostly black |
+| Mini | 2026.914, KMS | 4 runs: 924, 787, 1, 1 blank | | later 871-944 of ~1000 |
+| Mini | both, `capture=wlr` | 8 runs | all frames black | |
+
+On the Mini, simultaneous `grim` screenshots always showed the correct
+picture. The black starts at the EGL import of the compressed scanout buffer
+(XR24, modifier `0x500000000000001`); dma-buf fences were already signalled
+and `glFinish` did not help. Every Mini frame also has a 14-row green band at
+the bottom on both builds (Iris alignment, korri-os/korri#53).
 
 ## Method
 
