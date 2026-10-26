@@ -1,0 +1,10 @@
+StorePath: /nix/store/yvz09b86mv6f4n2ynw7i6jbbk5idzp4q-solarus-2.1.4-lib
+URL: https://github.com/korri-os/plugins/releases/download/build-57de061520cc-settings-vocabulary/0xhacq84w28cxdqsqi0fqdhhqis6nzmkgxbq1q9yjqm6lk19fhzx.nar.xz
+Compression: xz
+FileHash: sha256:0xhacq84w28cxdqsqi0fqdhhqis6nzmkgxbq1q9yjqm6lk19fhzx
+FileSize: 1476864
+NarHash: sha256:1dvr6khim473k7fqy4nckil8q260yq7hmbpxp30cc0z45mzc27an
+NarSize: 7955984
+References: 1is93yf8zc0b1ifw9hq9wzsnhljsjyv7-libmodplug-0.8.9.0 9qkvx8c89fqsz63f4z9gngk9hpi00ss4-sdl2-compat-2.32.74 gz5023a2a79zbahzzvzhvlxv8n4g9p60-libvorbis-1.3.7 iwddpsasasqp9nwr8d7jr7xjwvbsrvdm-SDL2_ttf-2.24.0 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 nhrkwapk0zzzmc8x1f2k24qpyz9gy5qb-gcc-16.2.0-lib nlq01yakdl9j7pk85zdhjqy58nc25r6l-luajit-2.1.1785763465 ppkhiz423fr5p6mfq139wszmwplqwg52-SDL2_image-2.8.12 rg6lncy5sbymv21jr4a78dznqq3s5jp3-openal-soft-1.24.3 x3r3cjnph560q1plgkg3a1ayhj92mklx-physfs-3.2.0 yvz09b86mv6f4n2ynw7i6jbbk5idzp4q-solarus-2.1.4-lib znv7nj2gsls3bc937kdc4jhw2jv82z74-libogg-1.3.6
+Deriver: 2s6r77bln02ns07r0kywv0pv7nsi2fqi-solarus-2.1.4.drv
+Sig: korri-plugins-1:LLdG20Zthk4+qZGqbaRaBsMRGzXBjJETx1YDxmRq5O1bqfv/C4CFYYpGkKW1AAgROGwlQz/+NkkYxqF8awbBBQ==

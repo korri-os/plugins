@@ -1,0 +1,10 @@
+StorePath: /nix/store/7isiaqzb4gxfq1864rp95ic5dls2933w-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-57de061520cc-settings-vocabulary/1ckw7y8vrl7cbfnzmxfyid1rvpdvah6hwkw2pi1q7h31dmq1vz5z.nar.xz
+Compression: xz
+FileHash: sha256:1ckw7y8vrl7cbfnzmxfyid1rvpdvah6hwkw2pi1q7h31dmq1vz5z
+FileSize: 12588
+NarHash: sha256:1x8hkbnky4d5f595kxb05dnmi87lygxdc3pn1n7zx17glz84lnjm
+NarSize: 53512
+References: h4kfbgii6y8z641wvsggp1s4rva90ixy-retroarch-source-checked-settings-1.22.2 h9cf8kjsfrfhx5dm7cmk9f5q2g92kvw7-libretro-mednafen-ngp-0-unstable-2026-06-14 hzbvxyx0h7z5iw7ddsr97n412g955dvf-retroarch-bare-1.22.2 r2jfkg289bjbpylmdw1w3ajrm1l7qi6l-korri-inputplumber-retroarch-autoconfig-1.22.0
+Deriver: xyjbwc8s4g50k1z4zan13g15hrdv3kgd-korri-plugin.drv
+Sig: korri-plugins-1:Mx2vvjKn92+RzFyZ59lgiilHYYLLBsTljqgN41mpS00aa6x0sN2hzliA/oIAWNFcgh6i41Mxc30YEQ2GipgDBQ==

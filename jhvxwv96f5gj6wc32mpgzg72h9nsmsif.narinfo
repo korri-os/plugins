@@ -1,0 +1,10 @@
+StorePath: /nix/store/jhvxwv96f5gj6wc32mpgzg72h9nsmsif-zquest-classic-launcher-unstable-2026-06-18-public3
+URL: https://github.com/korri-os/plugins/releases/download/build-57de061520cc-settings-vocabulary/17ayhmm057n6b399v5ixwxzik04l9gygc1aag272pja0bpgarmxn.nar.xz
+Compression: xz
+FileHash: sha256:17ayhmm057n6b399v5ixwxzik04l9gygc1aag272pja0bpgarmxn
+FileSize: 3344
+NarHash: sha256:1h04fgz7gnabz2z2v740f6z4j8qzazgvyh2nwljp740jh507b452
+NarSize: 8640
+References: 5nf73v0vnhwaq8jqpawc3w292q3b2hfb-zquest-classic-software-midi fn4klqvcskypkba640cd6ffcxgrb5787-zquest-classic-unstable-2026-06-18-public3 xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8
+Deriver: 5bkhrw0bf9kd3psppzirv4v05w4j4qa7-zquest-classic-launcher-unstable-2026-06-18-public3.drv
+Sig: korri-plugins-1:osnZvbkfifLqZ1yROYNxEz4o9TobKJ8tmzDTPAKgBV6cJ7RS1O4roXJGVvj1igKGXWXaUEZhvcuLGfefKMwwBw==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/ig6p237y8648x0psmbzr7il1190x3f9c-zquest-classic-unstable-2026-06-18-public3
+URL: https://github.com/korri-os/plugins/releases/download/build-57de061520cc-settings-vocabulary/1pz13bk4r2y47qs6p7cc4lpblfmmmssclh1zpj2hgdnlc0nnbq56.nar.xz
+Compression: xz
+FileHash: sha256:1pz13bk4r2y47qs6p7cc4lpblfmmmssclh1zpj2hgdnlc0nnbq56
+FileSize: 10022524
+NarHash: sha256:19f1c4xan0jwy8ix6lqidxihd3hysaw4jlx7pxa7dwxmn3g5ljrn
+NarSize: 26683320
+References: 05dfcd15vny15c7s8ni9gfkpa3i3i9wm-libxinerama-1.1.6 1wy8vcyw4h529h6l3rjxi1c3ds5hrhc3-gdk-pixbuf-2.44.8 3h6mqsv06zbafhpd4rp9s1i2bn70s8z9-cairo-1.18.4 3sjdz6k9glvhg4rnia05i0vs8l9i69vh-glu-9.0.3 809amx8c34956qvrglm3pyi7chrnnr7a-libxext-1.3.7 85yqf7kr2h481yrw3j5ihq2xqh4953i4-glib-2.88.3 9drcxizh69156rz75arx94jk4qsr0djn-alsa-lib-1.2.16.1 bk9lbwva20l1lv6ldrircc05gzgly41r-libxrandr-1.5.5 cafkxb7dghfxilvv471n64qy1bix0h6f-at-spi2-core-2.60.6 cgkb2rrqpimj60nlgjx1pi73amr2pvs0-libglvnd-1.7.0 dz0p9ia06a5wl9viyl80mm4b4d4z1xnp-libxi-1.8.3 fswvlms7shl7g7zz6akl26h0h9v32hp5-libpulseaudio-17.0 ig6p237y8648x0psmbzr7il1190x3f9c-zquest-classic-unstable-2026-06-18-public3 jm7s9l8x0f55w1rjs0cfbrifs9zlfmjv-libice-1.1.2 m4jb1z3jsdhsmjvnmf4pfxp7hg51d0pk-gtk+3-3.24.52 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 nhrkwapk0zzzmc8x1f2k24qpyz9gy5qb-gcc-16.2.0-lib nw9zbfc171gdsali7fcgl6rayfy5ykkx-zlib-1.3.2 qc13nlgyqiksw1frxkyah6lld92ma531-pango-1.57.1 r5w60683qmv7p1lzdj6xd9i0lms8b42i-curl-8.22.0 rpaw5y66fc9vdizh6nzcc2igfj80z1fi-libxcursor-1.2.3 sml1rkd20h09hl95l1rn0r7xd957dqf0-harfbuzz-14.5.1 x8741cfs9yfhgvsm1nqwhyri8qa9lssv-libsm-1.2.6 yll8jid7z53niibrabd32lyqrzakad8q-util-linux-2.42.4-lib z3zmyjnprxn412i0hsrbxdczwxjbam0p-libx11-1.8.13
+Deriver: d7dsc0dji0lwhx7qrs0sl7z020wq1vyg-zquest-classic-unstable-2026-06-18-public3.drv
+Sig: korri-plugins-1:KRpZd6YtHetDBdpU9Ti4a1PVGJQlHjt6X7igoVKdh2CedLxOazHfyghOEwCaHqHAJASjk07Jtg+Q0hyNFM9XAg==

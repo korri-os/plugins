@@ -1,0 +1,10 @@
+StorePath: /nix/store/gkkf4zd2jdwynrb16dvp7yc6mz4gd22d-libretro-fbneo-0-unstable-2026-09-23
+URL: https://github.com/korri-os/plugins/releases/download/build-57de061520cc-settings-vocabulary/1jc337nwi6983w85kfpfjv0m0v7x80s141d5yh3sj9krbcyhqb3z.nar.xz
+Compression: xz
+FileHash: sha256:1jc337nwi6983w85kfpfjv0m0v7x80s141d5yh3sj9krbcyhqb3z
+FileSize: 14417432
+NarHash: sha256:09k21ppd2k9vbxb84z51djbk4slmhcnaa76qwphhaq43mj10gh4f
+NarSize: 92411376
+References: czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 gkkf4zd2jdwynrb16dvp7yc6mz4gd22d-libretro-fbneo-0-unstable-2026-09-23 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 nhrkwapk0zzzmc8x1f2k24qpyz9gy5qb-gcc-16.2.0-lib w3gjn3lyhpiraaxvg17xjy3cwnsn59d3-retroarch-bare-1.22.2
+Deriver: 3hwsyx3ara009wpd1nji6hxbqmdmy126-libretro-fbneo-0-unstable-2026-09-23.drv
+Sig: korri-plugins-1:fORiHOtQLXXqi3DfrlVEZFWVp5kVGkPj1wsWLeDJJkYwlai0bedE9XK517FxAjvbFOZ6mLZkF7ox69kPzbSvDg==

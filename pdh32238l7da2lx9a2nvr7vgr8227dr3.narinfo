@@ -1,0 +1,10 @@
+StorePath: /nix/store/pdh32238l7da2lx9a2nvr7vgr8227dr3-libretro-genesis-plus-gx-0-unstable-2026-10-16
+URL: https://github.com/korri-os/plugins/releases/download/build-57de061520cc-settings-vocabulary/15q07ng9i2ak7c7gm74dwp7sngmvahy4w7j5a0l0bxybl2kliahb.nar.xz
+Compression: xz
+FileHash: sha256:15q07ng9i2ak7c7gm74dwp7sngmvahy4w7j5a0l0bxybl2kliahb
+FileSize: 834120
+NarHash: sha256:0k5zh3712nb0hql7i3xdag2xyl05aj6zyisrabia88is5ckp8c0l
+NarSize: 12962336
+References: nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20 pdh32238l7da2lx9a2nvr7vgr8227dr3-libretro-genesis-plus-gx-0-unstable-2026-10-16 pqyiidz5mi73wv5f91d48s9plcqyj5bz-glibc-2.44-57 v2mg01p24gdh147xarlng9533waqnq6a-retroarch-bare-1.22.2
+Deriver: 270h0979x4nz5wpjbdy17scfrild12x4-libretro-genesis-plus-gx-0-unstable-2026-10-16.drv
+Sig: korri-plugins-1:iAqkmHmMuuLHLAZlksGX1zI2DTrpQwojUsxcuTIrPkpPtO8NDZRR5p4SMa8qmJm2A6fYZLDJKn3jehjy1CEYAg==

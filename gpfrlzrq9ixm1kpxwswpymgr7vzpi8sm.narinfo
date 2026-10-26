@@ -1,0 +1,10 @@
+StorePath: /nix/store/gpfrlzrq9ixm1kpxwswpymgr7vzpi8sm-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-57de061520cc-settings-vocabulary/0xb2mbmhwh9m1wkfwpjyqrph7izhl56gd0pgzkqlqrw184n57k7p.nar.xz
+Compression: xz
+FileHash: sha256:0xb2mbmhwh9m1wkfwpjyqrph7izhl56gd0pgzkqlqrw184n57k7p
+FileSize: 1224
+NarHash: sha256:024fzjs90cg367pzjwvd9a4sxxyfy19x10qqhpk5n7giwr6fzfsc
+NarSize: 2808
+References: izf2b5vs5ydc9gs18hhq9558xyyl8r42-solarus-2.1.4
+Deriver: 6nfh9ihacpnjy7igv93crqv1jqjgfnwl-korri-plugin.drv
+Sig: korri-plugins-1:lkihnl4ozKiy5RpcYVrPQIb2jAVtas+a+ThKUaGlOuOi82bDjGxS62v6qYu1mkOoxS/SkepoG/l6eOWwETEyBA==
