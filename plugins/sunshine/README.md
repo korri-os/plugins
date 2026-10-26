@@ -52,7 +52,7 @@ shell syntax. An absent or empty file adds nothing. There is no hard-coded
 service write permission. korrid owns file creation and restart authority.
 
 Grounding: the approved settings-vocabulary brief and Sunshine
-`v2025.924.154138` `docs/configuration.md` / `src/config.cpp`; patch 0037 adds
+`v2026.914.233613` `docs/configuration.md` / `src/config.cpp`; patch 0037 adds
 the vblank offset and patches 0021/0022 add the ARM encoder names. All settings
 are optional; an unset path emits nothing and Sunshine keeps its native
 behavior. No plugin schema defaults replace Sunshine's own defaults.
@@ -61,10 +61,10 @@ behavior. No plugin schema defaults replace Sunshine's own defaults.
 |---|---|---|
 | `logging.level` | none, fatal, error, warning, info, debug, verbose | `min_log_level` |
 | `input.controller` | boolean | `controller` |
-| `input.gamepad` | auto, ds5, switch, xone | `gamepad` |
+| `input.gamepad` | auto, generic, x360, xone, xseries, ds4, ds5, switch | `gamepad` |
 | `input.motion-as-ds4` | boolean | `motion_as_ds4` |
 | `input.touchpad-as-ds4` | boolean | `touchpad_as_ds4` |
-| `input.ds5-random-mac` | boolean | `ds5_inputtino_randomize_mac` |
+| `input.ds5-random-mac` | boolean; randomizes the MAC of PlayStation-style (DS4 and DS5) virtual controllers | `virtualhid_randomize_mac` |
 | `input.back-button-timeout-ms` | integer ≥ -1; -1 disables Guide emulation | `back_button_timeout` |
 | `input.keyboard` | boolean | `keyboard` |
 | `input.key-repeat.delay-ms` | integer ≥ 0 | `key_repeat_delay` |
@@ -76,7 +76,7 @@ behavior. No plugin schema defaults replace Sunshine's own defaults.
 | `audio.enable` | boolean | `stream_audio` |
 | `video.max-bitrate-kbps` | integer ≥ 0; 0 uses the client's request | `max_bitrate` |
 | `video.minimum-fps` | integer 0..1000; 0 uses half the stream's fps | `minimum_fps_target` |
-| `video.encoder.name` | nvenc, quicksync, amdvce, vaapi, software, v4l2m2m, rkmpp | `encoder` |
+| `video.encoder.name` | nvenc, quicksync, amdvce, vaapi, vulkan, software, v4l2m2m, rkmpp | `encoder` |
 | `video.encoder.fec-percent` | integer 1..255 | `fec_percentage` |
 | `video.encoder.qp` | integer ≥ 0 | `qp` |
 | `video.encoder.min-threads` | integer ≥ 1 | `min_threads` |

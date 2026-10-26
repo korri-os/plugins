@@ -159,7 +159,7 @@ const codes = (key: string, names: readonly string[]) => (value: SettingValue) =
 ]
 const codecModes = ["auto", "off", "main", "main10"]
 const encryptionModes = ["off", "supported", "required"]
-// Sunshine v2025.924.154138 docs/configuration.md / src/config.cpp.
+// Sunshine v2026.914.233613 docs/configuration.md / src/config.cpp.
 // Patch 0037 adds offset 0..1000; patches 0021/0022 add ARM encoders.
 const rules: Record<string, Rule> = {
   "logging.level": {
@@ -167,10 +167,13 @@ const rules: Record<string, Rule> = {
     args: native("min_log_level"),
   },
   "input.controller": { schema: boolean(), args: native("controller") },
-  "input.gamepad": { schema: choice(["auto", "ds5", "switch", "xone"]), args: native("gamepad") },
+  "input.gamepad": {
+    schema: choice(["auto", "generic", "x360", "xone", "xseries", "ds4", "ds5", "switch"]),
+    args: native("gamepad"),
+  },
   "input.motion-as-ds4": { schema: boolean(), args: native("motion_as_ds4") },
   "input.touchpad-as-ds4": { schema: boolean(), args: native("touchpad_as_ds4") },
-  "input.ds5-random-mac": { schema: boolean(), args: native("ds5_inputtino_randomize_mac") },
+  "input.ds5-random-mac": { schema: boolean(), args: native("virtualhid_randomize_mac") },
   "input.back-button-timeout-ms": {
     schema: {
       ...integer(-1),
@@ -201,7 +204,7 @@ const rules: Record<string, Rule> = {
   },
   "video.minimum-fps": { schema: integer(0, 1000), args: native("minimum_fps_target") },
   "video.encoder.name": {
-    schema: choice(["nvenc", "quicksync", "amdvce", "vaapi", "software", "v4l2m2m", "rkmpp"]),
+    schema: choice(["nvenc", "quicksync", "amdvce", "vaapi", "vulkan", "software", "v4l2m2m", "rkmpp"]),
     args: native("encoder"),
   },
   "video.encoder.fec-percent": { schema: integer(1, 255), args: native("fec_percentage") },
