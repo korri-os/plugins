@@ -95,6 +95,10 @@ the branch about 49.32 (3.4% fewer). The bottleneck is the rotated
 old, 5.9 ms new; p95 25.7 ms old, 29.0 ms new). The DRM worker thread used
 0.6% CPU. This difference is not isolated and comes from single sessions.
 
+These Mini numbers count delivered frames only. The later picture check found
+many of those frames black on both builds (see "Picture check"), so they do not
+show a working stream.
+
 ## Not tested on hardware
 
 - Controller input through the protected input seat. Its authority comes from a
