@@ -62,7 +62,7 @@ nix build --no-link .#checks.x86_64-linux.korri-itchio-plugin \
   .#checks.aarch64-linux.korri-itchio-plugin
 ```
 
-The publisher pins Core `37c12fc04baca4d3f1e008f0f134f7e54b56b210`. Core
+The publisher pins Core `5f4f89e2bc876ba3029cbadfcc0b8641299c90fd`. Core
 `1e5f6b8b432d3970b9814884769503827d0c8629` first provided request-turn form
 POSTs. That pin was a consumed contract change, not an unrelated dependency
 update. No developer-path override is needed. Tests use
