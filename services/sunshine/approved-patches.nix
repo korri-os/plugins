@@ -43,12 +43,12 @@ rec {
   v4l2m2mPatchSetSha256 = "4aeb0e1fcd2602fca166659fcff9ad74c37abb6d27797ba4eda0c2ef0b7cdf2e";
   reviewedNvencApiMajor = 13;
   reviewedNvencApiMinor = 1;
-  patchSetSha256 = "480077e8a76fa390a4e122053882d1605e9e2b23226f09bbb92cb0aa3c3bd484";
+  patchSetSha256 = "285b03701ecf4d59fbe26da071c6bca64ae39a349188f522982a65556e258e61";
   patches = [
     {
       name = "0015-add-korri-input-seat-event-mirror.patch";
       path = ./patches/0015-add-korri-input-seat-event-mirror.patch;
-      sha256 = "ef17f7585ae23e869a0b8de932bd094d9f705a4c0629219e4b11b53be00ed2b6";
+      sha256 = "419457b66c4e11be7fab01cabfad0e984850b68dadb704dafe5558065300e94e";
     }
     {
       name = "0017-use-wayland-ram-capture-for-cuda.patch";
@@ -215,5 +215,5 @@ rec {
 
   # Ordered digest of 8 base patches ++ 13 rkmppPatches. Bump after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "0ddf3a31bc2c7a76988784646b1aeb95e1f5825240f524806da123a16c6e4975";
+  rkmppPatchSetSha256 = "ae6a595de56dc7e5e37f399d6c3f61dd0320a099c30481d67b6ba169a90d01a0";
 }
