@@ -4,8 +4,9 @@ Branch `sunshine/upstream-v2026.914`, rebased on main `071bbd7`. Devices tested 
 the owner's direction: AYN Odin 2 Portal and Retroid Pocket Mini V2. The RG35XX
 Pro and RG353M were set aside for now.
 
-**Result: the Odin passes, with a correct picture apart from a sideways
-orientation that the published build has too (korri-os/korri#273). The Mini
+**Result: the Odin passes. Its picture was sideways on both builds
+(korri-os/korri#273); `834f473` fixes that, and the Odin now streams upright
+(see `output-transform-acceptance.md`). The Mini
 cannot be judged: decoded recordings show that Sunshine's capture on the Mini
 returns black frames on the published 2025.924 build as well as on 2026.914,
 with both KMS and `capture=wlr` (korri-os/korri#272). The frame counts below
