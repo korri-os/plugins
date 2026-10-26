@@ -48,7 +48,10 @@ jobs:
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    # A Core pin that no binary cache holds yet builds korrid and the plugin
+    # host from source in the validation step (73 min on 2026-10-26, run
+    # 40261317841), leaving too little of 90 min to build and sign a batch.
+    timeout-minutes: 150
     environment: plugin-release
     permissions:
       contents: read
