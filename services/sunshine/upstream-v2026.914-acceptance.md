@@ -1,8 +1,9 @@
 # Sunshine v2026.914 device acceptance — 2026-10-24 to 2026-10-26
 
 Branch `sunshine/upstream-v2026.914`, rebased on main `071bbd7`. Devices tested at
-the owner's direction: AYN Odin 2 Portal and Retroid Pocket Mini V2. The RG35XX
-Pro and RG353M were set aside for now.
+the owner's direction: AYN Odin 2 Portal and Retroid Pocket Mini V2. The RG353M
+was added on 2026-10-26, after its RKVENC kernel driver was restored. The
+RG35XX Pro was set aside for now.
 
 **Result: the Odin passes. Its picture was sideways on both builds
 (korri-os/korri#273); `834f473` fixes that, and the Odin now streams upright
@@ -10,7 +11,8 @@ Pro and RG353M were set aside for now.
 cannot be judged: decoded recordings show that Sunshine's capture on the Mini
 returns black frames on the published 2025.924 build as well as on 2026.914,
 with both KMS and `capture=wlr` (korri-os/korri#272). The frame counts below
-were measured before any picture was decoded and do not show this.**
+were measured before any picture was decoded and do not show this.
+The RG353M passes on its RKMPP encoder (see "RG353M").**
 
 ## Picture check (2026-10-26)
 
@@ -100,16 +102,61 @@ These Mini numbers count delivered frames only. The later picture check found
 many of those frames black on both builds (see "Picture check"), so they do not
 show a working stream.
 
+## RG353M (h264_rkmpp, zero-copy KMS DRM_PRIME, 640x480) — 2026-10-26
+
+The device runs the kernel generation from korri-os/korri
+`docs/acceptance/rg353m-rkmpp-kernel-2026-10-24.md`: `mpp_rkvenc` binds
+`fdf40000.rkvenc` at boot and `/dev/mpp_service` exists. This is the first run
+of the 2026.914 RKMPP pacer on RKMPP hardware.
+
+Compared builds (aarch64): main `57de061`, plugin
+`znzzy4dg34rfdlci52wy65zglccsx2hc` (unchanged from `071bbd7`), Sunshine
+`s1075aipggxqhkd8ilyh6yic74dpgmyd`; branch `0585c7e`, plugin
+`8nxfgikp1yld31fbf7i5ypvx4jfkld20`, Sunshine
+`zrdgnndckg0wya1na1qa8x5za1cwqmh7`. Same method as above, but 640x480 and
+over the RG353M USB link. Every stream was also dumped and decoded in full.
+
+| Run | Build | Received fps | Missing frames | Sunshine CPU |
+|---|---|---|---|---|
+| 30-1 | main 2025.924 | 30.008 | 0 | 37.3% |
+| 30-1 | 2026.914 | 29.995 | 0 | 37.6% |
+| 30-2 | main 2025.924 | 30.015 | 0 | 37.2% |
+| 30-2 | 2026.914 | 29.998 | 0 | 37.4% |
+| 60-1 | main 2025.924 | 60.010 | 0 | 42.7% |
+| 60-1 | 2026.914 | 56.356 | 272 | 43.2% |
+| 60-2 | 2026.914 | 59.971 | 0 | 42.9% |
+| 60-2 | main 2025.924 | 60.014 | 0 | 42.6% |
+| 60-3 | main 2025.924 | 60.020 | 0 | 42.8% |
+| 60-3 | 2026.914 | 59.994 | 0 | 43.1% |
+| 60-4 | 2026.914 | 59.977 | 0 | 43.1% |
+| 60-4 | main 2025.924 | 60.014 | 0 | 42.9% |
+
+- Both builds selected `h264_rkmpp` and logged `Using zero-copy KMS DRM_PRIME
+  capture for RKMPP` for the session. All 12 recordings decoded at 640x480
+  with 0 FFmpeg errors, and the pictures of the two builds match.
+- The 2026.914 pacer holds the negotiated rate at 30 and 60 fps. Sunshine CPU
+  is within 0.5 points of main.
+- 60-1 on 2026.914 lost 272 frames as 16 bursts of exactly 17. Each burst
+  followed a client `Video decode unit queue overflow` and an IDR request.
+  The three repeat runs, which alternated the build order, lost none. The
+  pacer cannot cause a burst of that size: after a stall it emits at most one
+  or two catch-up frames, and it is the same schedule as main's, renamed. The
+  cause is not isolated; treat it as one unexplained event.
+- Server log lines matching "error" fell from 26 to 20; all are encoder-probe
+  output before the session. Both builds report `Executing [Desktop]`, as on
+  the Odin.
+
 ## Not tested on hardware
 
 - Controller input through the protected input seat. Its authority comes from a
   korrid-published launch sidecar that a direct test client does not create.
   `sunshine-korri-input-seat-patch` runs the patched binary in a root VM (x86
   locally; aarch64 in CI).
-- RG35XX Pro and RG353M (set aside); x86 NVENC.
+- RG35XX Pro (set aside); x86 NVENC.
 
 ## Device state afterwards
 
+- RG353M: installed Sunshine (2025.924) active, no drop-in, no pairing state.
 - Odin: installed Sunshine plugin active, no drop-in, no pairing state.
 - Mini: `@korri:sunshine` was installed for this test through `korri-plugin`
   from the bound publisher cache. It is now Disabled. `korri-plugin remove`
