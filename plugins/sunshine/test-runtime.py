@@ -59,16 +59,16 @@ class RuntimeArguments(unittest.TestCase):
         for contents in [None, ""]:
             with self.subTest(contents=contents):
                 args, root = self.run_runtime(contents)
-                self.assertEqual(args, [f"{root}/home/.config/sunshine/sunshine.conf", "log_path=/dev/null", "capture=kms", "capture_rt_priority=5", f"file_apps={root}/apps.json"])
+                self.assertEqual(args, [f"{root}/home/.config/sunshine/sunshine.conf", "log_path=/dev/null", "capture=kms", "capture_rt_priority=5", "system_tray=disabled", f"file_apps={root}/apps.json"])
 
     def test_only_valid_lines_are_appended_as_single_arguments_in_order(self):
         args, _ = self.run_runtime("encoder=v4l2m2m\nmin_log_level=debug\n\nBad_key=ignored\nbad-key=ignored\n=empty-key\nmissing-equals\n key=space\nkey name=space\nexternal_ip=has spaces = and \\\\backslash\ncontroller=disabled\nkey=\n0_ok=value\nsw_tune=$(touch /should-not-run)\nqp=31")
-        self.assertEqual(args[5:], ["encoder=v4l2m2m", "min_log_level=debug", "external_ip=has spaces = and \\\\backslash", "controller=disabled", "key=", "0_ok=value", "sw_tune=$(touch /should-not-run)", "qp=31"])
+        self.assertEqual(args[6:], ["encoder=v4l2m2m", "min_log_level=debug", "external_ip=has spaces = and \\\\backslash", "controller=disabled", "key=", "0_ok=value", "sw_tune=$(touch /should-not-run)", "qp=31"])
         self.assertNotIn("encoder=auto", args)
 
     def test_newline_cannot_be_part_of_an_argument(self):
         args, _ = self.run_runtime("encoder=rkmpp\ncontinuation without equals\nqp=28\n")
-        self.assertEqual(args[5:], ["encoder=rkmpp", "qp=28"])
+        self.assertEqual(args[6:], ["encoder=rkmpp", "qp=28"])
         self.assertTrue(all("\n" not in arg for arg in args))
 
 
