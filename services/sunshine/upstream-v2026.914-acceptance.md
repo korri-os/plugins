@@ -142,9 +142,10 @@ over the RG353M USB link. Every stream was also dumped and decoded in full.
   pacer cannot cause a burst of that size: after a stall it emits at most one
   or two catch-up frames, and it is the same schedule as main's, renamed. The
   cause is not isolated; treat it as one unexplained event.
-- Server log lines matching "error" fell from 26 to 20; all are encoder-probe
-  output before the session. Both builds report `Executing [Desktop]`, as on
-  the Odin.
+- Server log lines matching "error" fell from 26 to 20. After the client
+  connects, each build logs only one: `GPU driver doesn't support universal
+  planes: /dev/dri/card0` (Panfrost, while KMS looks for the display
+  controller). Both builds report `Executing [Desktop]`, as on the Odin.
 
 ## Not tested on hardware
 
