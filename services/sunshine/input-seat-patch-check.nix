@@ -49,7 +49,7 @@ let
     (check "the sidecar path is fixed below one stable runtime directory" (
       contains "KORRI_INPUT_SEAT_RUNTIME_DIR" patch
       && contains ''KORRI_INPUT_SEAT_SIDECAR_NAME = "sunshine-active-launch.json"sv'' patch
-      && contains "::open(runtime_dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)" patch
+      && contains "::open(runtime_dir, O_PATH | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)" patch
       && contains "::openat(dir_fd, KORRI_INPUT_SEAT_SIDECAR_NAME.data(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW)" patch
       && !(contains "KORRI_INPUT_SEAT_LAUNCH_ID" patch)
     ))
