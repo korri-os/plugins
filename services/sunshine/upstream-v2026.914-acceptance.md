@@ -147,6 +147,28 @@ over the RG353M USB link. Every stream was also dumped and decoded in full.
   planes: /dev/dri/card0` (Panfrost, while KMS looks for the display
   controller). Both builds report `Executing [Desktop]`, as on the Odin.
 
+### RKMPP buffer failure no longer crashes Sunshine (korri-os/korri#28)
+
+The RG353M kept 23 Sunshine core dumps from 2026-10-24 04:46-04:48 UTC, taken
+while `system_heap` was not loaded. All share one stack: `probe_encoders`,
+`av_hwframe_get_buffer`, `rkmpp_drm_pool_alloc`, `av_log`, `SEGV_MAPERR`.
+`rkmpp_drm_pool_alloc` logged an MPP buffer failure against the RKMPP device
+context, which has no `AVClass`. `867da69` logs it against the frames context.
+
+Reproduced by moving `/dev/dma_heap` aside, so MPP 1.1.0 falls back to its DRM
+allocator and every allocation fails (`drm_alloc failed ret -1`). Hiding only
+`/dev/dma_heap/system`, or removing its group access, makes buffer-group
+creation fail earlier and does not reach this path.
+
+| Build, 45 s with `/dev/dma_heap` hidden | SEGV core dumps | Result |
+|---|---|---|
+| main 2025.924 (`s1075aipg`) | 8, every 7 s, same stack | crash loop |
+| branch `867da69` (plugin `nyiw8z3c`) | 0 | `Failed to get MPP buffer: -1`, no working encoder, clean exit |
+
+After `/dev/dma_heap` was restored, the fixed build found `h264_rkmpp` with no
+restart. The device was restored to its installed Sunshine, with no drop-in
+and no pairing state.
+
 ## Not tested on hardware
 
 - Controller input through the protected input seat. Its authority comes from a
