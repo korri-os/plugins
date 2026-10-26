@@ -1,0 +1,15 @@
+diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
+--- a/src/platform/linux/kmsgrab.cpp
++++ b/src/platform/linux/kmsgrab.cpp
+@@ -1866,7 +1866,10 @@ namespace platf {
+           return -1;
+         }
+ 
+-        gbm.reset(gbm::create_device(card.fd.el));
++        // Import scanout buffers on the render node. On msm, an EGL display
++        // made on the primary node reads exported scanout buffers back as
++        // zero for some frames.
++        gbm.reset(gbm::create_device(card.render_fd.el));
+         if (!gbm) {
+           BOOST_LOG(error) << "Couldn't create GBM device: ["sv << util::hex(eglGetError()).to_string_view() << ']';
+           return -1;

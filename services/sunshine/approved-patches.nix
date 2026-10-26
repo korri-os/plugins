@@ -205,6 +205,15 @@ rec {
     sha256 = "6355c56747c60c6fc66a636d7323b43058f4caf4fb7eb8b9c740d43cd8c24fe8";
   };
 
+  # The KMS RAM path must import scanout buffers on the render node. On the
+  # RP Mini V2 (msm, Adreno 650), an EGL display made on the primary node read
+  # many exported scanout frames back as zero (korri-os/korri#272).
+  kmsRenderNodePatch = {
+    name = "0040-import-kms-frames-on-the-render-node.patch";
+    path = ./patches/0040-import-kms-frames-on-the-render-node.patch;
+    sha256 = "681cedf30a61710c0f4dec6baf71dddfae566d7f3f4945c2c8bb2e7d01c9fbf3";
+  };
+
   rkmppPatches = [
     rkmppPatch
     rkmppZeroCopyPatch
@@ -219,9 +228,10 @@ rec {
     kmsLinearPatch
     kmsNv12Patch
     kmsPacingPatch
+    kmsRenderNodePatch
   ];
 
-  # Ordered digest of 8 base patches ++ 13 rkmppPatches. Bump after reviewing the
+  # Ordered digest of 8 base patches ++ 14 rkmppPatches. Bump after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "3e28b1fc9e876bfd7396b2b3498c155e138e2d8e546a8df244a80ee7c9598ef9";
+  rkmppPatchSetSha256 = "2a674e4962387bf88b5f96de049e2acc5af6d02309413adcb4ee762051e91dd8";
 }
