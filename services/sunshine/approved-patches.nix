@@ -179,7 +179,7 @@ rec {
   rotationPatch = {
     name = "0033-rotate-kms-capture-to-output-transform.patch";
     path = ./patches/0033-rotate-kms-capture-to-output-transform.patch;
-    sha256 = "d94b4d5d1102c318c7b65c334188036b10d3342ddc9a3d676d87630599a71f03";
+    sha256 = "90a9fd47dc5ee20e6e6222e877deb0f70fea221d5b5ac0fdc721897880c7e5f6";
   };
   rotationCropPatch = {
     name = "0034-crop-encoded-sps-to-visible-size.patch";
@@ -223,5 +223,5 @@ rec {
 
   # Ordered digest of 8 base patches ++ 13 rkmppPatches. Bump after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "c6e94f764e3d177615fec2bb233b924a3682102279936a6223efc427f62b60dd";
+  rkmppPatchSetSha256 = "3e28b1fc9e876bfd7396b2b3498c155e138e2d8e546a8df244a80ee7c9598ef9";
 }

@@ -38,14 +38,14 @@ diff --git a/src/kms_output_transform.h b/src/kms_output_transform.h
 +    // wl_output_transform values 0..7, in protocol order. The same affine
 +    // map generates the GPU sampler and places software cursor pixels.
 +    constexpr std::array<output_transform_t, 8> transforms {{
-+      {1, 0, 0, 0, 1, 0},    // normal: tex
-+      {0, 1, 0, -1, 0, 1},   // 90: (tex.y, 1-tex.x)
++      {1, 0, 0, 0, 1, 0},  // normal: tex
++      {0, 1, 0, -1, 0, 1},  // 90: (tex.y, 1-tex.x)
 +      {-1, 0, 1, 0, -1, 1},  // 180: (1-tex.x, 1-tex.y)
-+      {0, -1, 1, 1, 0, 0},   // 270: (1-tex.y, tex.x)
-+      {-1, 0, 1, 0, 1, 0},   // flipped: (1-tex.x, tex.y)
++      {0, -1, 1, 1, 0, 0},  // 270: (1-tex.y, tex.x)
++      {-1, 0, 1, 0, 1, 0},  // flipped: (1-tex.x, tex.y)
 +      {0, -1, 1, -1, 0, 1},  // flipped 90: (1-tex.y, 1-tex.x)
-+      {1, 0, 0, 0, -1, 1},   // flipped 180: (tex.x, 1-tex.y)
-+      {0, 1, 0, 1, 0, 0},    // flipped 270: (tex.y, tex.x)
++      {1, 0, 0, 0, -1, 1},  // flipped 180: (tex.x, 1-tex.y)
++      {0, 1, 0, 1, 0, 0},  // flipped 270: (tex.y, tex.x)
 +    }};
 +    if (value < 0 || value >= int(transforms.size())) {
 +      return std::nullopt;
