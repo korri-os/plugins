@@ -138,7 +138,7 @@ screenshot_directory = ${quoteSetting("screenshot_directory", saveDirectories.sc
 input_driver = "udev"
 input_joypad_driver = "udev"
 joypad_autoconfig_dir = ${quoteSetting("joypad_autoconfig_dir", input.files.autoconfig)}
-input_autodetect_enable = "true"
+${input.files["core-info"] === undefined ? "" : `libretro_directory = ${quoteSetting("libretro_directory", corePath.slice(0, corePath.lastIndexOf("/")))}\nlibretro_info_path = ${quoteSetting("libretro_info_path", input.files["core-info"])}\n`}input_autodetect_enable = "true"
 input_max_users = "4"
 input_player1_joypad_index = "0"
 # Korri inputd routes every controller to a persistent seat pad. udev lists

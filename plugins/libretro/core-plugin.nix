@@ -135,11 +135,17 @@ assert lib.assertMsg (!lib.elem name frontendKeys) (
   plugin =
     { pkgs }:
     {
+      # RetroArch 1.22.2's GET_STATUS reads the current core's info record and
+      # dereferences its system_id. Without an info directory that record has
+      # none, so korrid's status readback (open menu, netplay hosting) crashed
+      # RetroArch on the Mini V2 on 2026-10-27. Ship the pinned core info.
       packages = frontend.packages // {
         ${name} = spec.core;
+        core-info = pkgs.libretro-core-info;
       };
       files = frontend.files // {
         ${name} = spec.coreFile;
+        core-info = "${pkgs.libretro-core-info}/share/retroarch/cores";
       };
     };
 }).overrideAttrs
