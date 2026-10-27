@@ -174,11 +174,10 @@ patched frontend keeps native behavior without an overlay. The handler performs
 no reads or writes; korrid provisions its returned plan. Native builds and
 checks run on build hosts, never on a device.
 
-The local `LaunchInput` type is temporary until this repository advances its
-Core pin to the generated contract with `PluginLaunchInput.layout`. Remove
-the local type in that pin update. Host admission also needs Core's panes and
-layouts parser; building this package alone does not establish admission on
-an older host.
+The pinned Core contract supplies `PluginLaunchInput.layout` directly. The
+`korri-melonds-admission` check runs that Core's typed registry parser against
+the actual packaged plugin and evaluates each layout through its real sandbox.
+Older hosts without the panes/layouts parser cannot admit this candidate.
 
 ## The runner owns its settings
 

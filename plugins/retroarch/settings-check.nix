@@ -32,12 +32,10 @@ program.overrideAttrs (old: {
       --version ${pkgs.lib.escapeShellArg program.version} \
       --output "$out/settings.json" \
       --module "$out/settings.ts"
-    # Validate the current nested policy and use the producer's layout ids.
+    # The nested schema stays in policy.ts; settings.ts is this frontend's
+    # source evidence. Bind the producer's layout ids in the test wrapper.
     cp ${./policy.ts} policy.ts
     cp ${./render-settings.ts} render-settings.ts
-    # The runner answers settings.describe and settings.validate from the
-    # module written above, so the test runs against this program's real
-    # checked schema rather than a second table written by hand.
     cp ${../libretro/retroarch.ts} retroarch.ts
     # Use the producer's declaration, never a second accepted-layout list.
     cat > plugin.ts <<'EOF'

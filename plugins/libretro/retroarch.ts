@@ -1,5 +1,5 @@
 import type {
-  PluginLaunchInput as PinnedLaunchInput,
+  PluginLaunchInput,
   PluginLaunchOutput,
   SaveKind,
   SaveLocation,
@@ -17,19 +17,6 @@ import {
   type SettingSchema,
 } from "./policy"
 import { renderRetroArchSettings } from "./render-settings"
-// Remove this local type when the Core pin includes PluginLaunchInput.layout.
-type LaunchInput = PluginLaunchInput & { layout?: string }
-
-
-// Mirrors the nested launch treaty until the pinned Korri input includes it.
-interface SettingsTree {
-  [key: string]: LaunchSettingValue | SettingsTree
-}
-type PluginLaunchInput = Omit<PinnedLaunchInput, "overrides"> & {
-  overrides?: Omit<NonNullable<PinnedLaunchInput["overrides"]>, "settings"> & {
-    settings?: SettingsTree
-  }
-}
 
 // The sandbox ships source, not the generated treaty's runtime enums.
 type LaunchOutput = Omit<PluginLaunchOutput, "saveLocations" | "files"> & {
@@ -89,7 +76,7 @@ function quoteSetting(key: string, value: string): string {
 
 type RunnerDeclarations = Record<string, { id: string; layouts?: object }>
 
-function prepareLaunch(input: LaunchInput, runners: RunnerDeclarations): LaunchOutput {
+function prepareLaunch(input: PluginLaunchInput, runners: RunnerDeclarations): LaunchOutput {
   const root = input.accountRoot
   const saveRoot = input.saveRoot
   if (!input.corePath) throw new Error("RetroArch runner requires a core path")
@@ -350,9 +337,8 @@ function acceptedPolicy(values: unknown): RetroArchPolicy {
 // same map, so a new operation adds a key rather than a new export contract.
 export function createHandlers(runners: RunnerDeclarations) {
   return {
-    "launch.prepare": (input: LaunchInput) => prepareLaunch(input, runners),
+    "launch.prepare": (input: PluginLaunchInput) => prepareLaunch(input, runners),
     "settings.describe": describeSettings,
     "settings.validate": validateSettings,
   }
-
 }

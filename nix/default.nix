@@ -446,6 +446,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           core = libretro.catalogue.fake08.core;
           contract = korri.lib.${system}.pluginContract;
         };
+        korri-melonds-admission = import ../plugins/libretro/melonds-admission.nix {
+          coreSource = korri;
+          package = libretro.packages.korri-plugin-melonds;
+          korridPackage = korri.packages.${system}.korrid;
+        };
         korri-fake08-admission =
           pkgs.runCommand "korri-fake08-admission" { nativeBuildInputs = [ pkgs.jq ]; }
             ''
