@@ -1,0 +1,10 @@
+StorePath: /nix/store/yl4h1acz09yhpdl0xm507wqnd8kybxx9-ffmpeg-9.0.2-bin
+URL: https://github.com/korri-os/plugins/releases/download/build-39fad980be48-moonlight-perf/19bqr6j1p89g5770jylhh30r50hafhn00m5bj56hhxvbkm1g557a.nar.xz
+Compression: xz
+FileHash: sha256:19bqr6j1p89g5770jylhh30r50hafhn00m5bj56hhxvbkm1g557a
+FileSize: 300044
+NarHash: sha256:1a3k0mnx650d8b0qpg6ivj1cxfgg3a4xhdpsirbplyv2vfv487g5
+NarSize: 1103280
+References: 3qsagbvxpfdicf3vz1pwb1mm1n8jpnld-ffmpeg-9.0.2-data 7a2cjhcgzyym5zaz6m4fksw47qvm150w-gcc-16.2.0-lib 8pr35af429l2zlmlga9sx7ibbh11qcvx-ffmpeg-9.0.2-lib p26sgw6f8a56cy4jaawm15vmjgln78yq-sdl2-compat-2.32.74 pqyiidz5mi73wv5f91d48s9plcqyj5bz-glibc-2.44-57
+Deriver: ksgp9i4bw9h1rwvzcx349zilb00pcflc-ffmpeg-9.0.2.drv
+Sig: korri-plugins-1:kiJVDDbEv9QSbqIPpWFwmrcUYnq7QWTAui9RqrCzH9yaZLBLrGFuDDiA7J+nD6UZyQDsFPmY4Vq98Y31dgM0Dg==

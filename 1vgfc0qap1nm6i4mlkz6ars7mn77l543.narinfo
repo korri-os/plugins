@@ -1,0 +1,10 @@
+StorePath: /nix/store/1vgfc0qap1nm6i4mlkz6ars7mn77l543-libopus-1.6.1-dev
+URL: https://github.com/korri-os/plugins/releases/download/build-39fad980be48-moonlight-perf/0km7gvzvh4p6xm9mmzrps7civmidywrjla2jgcvcb4smcxzm8y1x.nar.xz
+Compression: xz
+FileHash: sha256:0km7gvzvh4p6xm9mmzrps7civmidywrjla2jgcvcb4smcxzm8y1x
+FileSize: 22932
+NarHash: sha256:03ja21xkkgqpi3x8gf00nn8dx7krflc48688xiasg3knf7zfr264
+NarSize: 177200
+References: 1vgfc0qap1nm6i4mlkz6ars7mn77l543-libopus-1.6.1-dev h9qbcz1xnvmgc9ss15qfmp068ira786k-libopus-1.6.1
+Deriver: wccha2rgl2w634nv64rh4m235flx6x8s-libopus-1.6.1.drv
+Sig: korri-plugins-1:ob+KZ3215aH7HQhqk2g1zE/k/aUZOQNf89gsybqKB3y0kqhdRZ+o4la2JH+0adw5QEca0s6Y+iwEgVdV3+z0Dw==
