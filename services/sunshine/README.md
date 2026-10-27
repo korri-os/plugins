@@ -49,6 +49,12 @@ The cost is one separately built static FFmpeg/CBS package, two FFmpeg patches, 
 
 Physical probe and Moonlight results, including unresolved Wi-Fi packet loss, are recorded in [the Portal acceptance report](https://github.com/korri-os/korri/blob/f6597dd6fd8cd1452f5f75803672b33a8cfd6225/docs/acceptance/sunshine-korri-v4l2m2m-portal-2026-09-05.md). These results do not establish a production-ready host session or a sustained moving-content frame rate.
 
+The Mini V2's right/bottom green bands require an Iris gen1 kernel geometry
+fix, not another FFmpeg patch. The raw OUTPUT storage includes aligned padding;
+firmware must encode the visible crop. See [the Mini evidence and probe
+instructions](mini-green-band-acceptance.md). The probe checks both codecs at
+1240x1080, 1280x720 and 1920x1080, including pixel coordinates to detect squeeze.
+
 ### Input-seat event mirror patch
 
 `0015-add-korri-input-seat-event-mirror.patch` adds a native Sunshine event-source seam for Korri input seats. Sunshine remains an event source. It mirrors sanitized controller packets to a local Korri socket. A protected receiver must own emulator-visible virtual seats.

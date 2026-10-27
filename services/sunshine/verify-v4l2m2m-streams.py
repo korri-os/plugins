@@ -1,6 +1,6 @@
 #!/usr/bin/env nix-shell
 #!nix-shell -i python3 -p python3 ffmpeg
-"""Verify the four physical V4L2 probe outputs, including recovery IDRs."""
+"""Verify six physical V4L2 probe outputs, visible pixels and recovery IDRs."""
 import json
 from pathlib import Path
 import re
@@ -33,9 +33,29 @@ def decode(path, width, height, frames):
     )
 
 
+def verify_pattern(path, width, height):
+    # The probe's first NV12 source has Y=16+(x+y)%220 and neutral chroma.
+    # Check actual decoded coordinates, not just SPS dimensions. A squeezed
+    # padded input can have correct dimensions and still show green edges.
+    pixels = subprocess.check_output([
+        "ffmpeg", "-v", "error", "-xerror", "-i", str(path),
+        "-frames:v", "1", "-pix_fmt", "yuv420p", "-f", "rawvideo", "-",
+    ])
+    size = width * height
+    assert len(pixels) == size * 3 // 2, (path, len(pixels))
+    luma_error = sum(
+        abs(value - (16 + (offset % width + offset // width) % 220))
+        for offset, value in enumerate(pixels[:size])
+    ) / size
+    chroma_error = sum(abs(value - 128) for value in pixels[size:]) / (size // 2)
+    assert luma_error < 3, (path, "squeezed or damaged pattern", luma_error)
+    assert chroma_error < 0.5, (path, "non-neutral padding in picture", chroma_error)
+    print(f"PASS {path.name}: visible pattern Y MAE={luma_error:.3f}, UV MAE={chroma_error:.3f}")
+
+
 def verify(directory):
     for codec in ("h264", "hevc"):
-        for width, height in ((1280, 720), (1920, 1080)):
+        for width, height in ((1240, 1080), (1280, 720), (1920, 1080)):
             path = directory / f"{width}x{height}.{codec}"
             log = path.with_suffix(path.suffix + ".log").read_text()
             packets = [tuple(map(int, match)) for match in re.findall(
@@ -49,6 +69,7 @@ def verify(directory):
             data = path.read_bytes()
             assert sum(size for _, size, _ in packets) == len(data), path
             decode(path, width, height, 120)
+            verify_pattern(path, width, height)
             offset = 0
             with tempfile.TemporaryDirectory() as temp:
                 for pts, size, key in packets:
