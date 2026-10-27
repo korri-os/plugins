@@ -28,6 +28,22 @@
   libX11,
 }:
 
+let
+  # Stateless V4L2 decoders (Hantro, Cedrus, rkvdec) need FFmpeg's V4L2
+  # Request API hwaccel, which upstream FFmpeg does not carry. The patch is
+  # Jonas Karlman's series as LibreELEC ships it for FFmpeg 9.0.2:
+  # LibreELEC.tv e9e6b8531df13bc9058ca1771dab5f0c4fd5e98e,
+  # packages/multimedia/ffmpeg/patches/v4l2-request/0001-v4l2-request.patch.
+  # Stateful h264_v4l2m2m (Qualcomm) is unchanged by it.
+  ffmpegV4l2Request = ffmpeg.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./patches/ffmpeg/0001-v4l2-request.patch ];
+    configureFlags = (old.configureFlags or [ ]) ++ [
+      "--enable-libudev"
+      "--enable-v4l2-request"
+    ];
+    buildInputs = (old.buildInputs or [ ]) ++ [ systemdMinimal ];
+  });
+in
 stdenv.mkDerivation rec {
   pname = "moonlight-embedded-korri";
   version = "2.7.1-korri";
@@ -50,6 +66,8 @@ stdenv.mkDerivation rec {
     ./patches/0015-crop-coded-alignment-padding-on-present.patch
     # New Korri security patch, not a legacy harvest: pin the broker's certificate.
     ./patches/0020-pin-broker-authorized-server-certificate.patch
+    # Korri: stateless decoders through FFmpeg's V4L2 Request hwaccel.
+    ./patches/0021-add-v4l2request-stateless-platform.patch
   ];
 
   nativeBuildInputs = [
@@ -63,7 +81,7 @@ stdenv.mkDerivation rec {
     avahi
     curl
     expat
-    ffmpeg
+    ffmpegV4l2Request
     libcec
     libevdev
     libpulseaudio
@@ -122,7 +140,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = {
-    description = "Moonlight Embedded with DRM PRIME, V4L2 M2M and Korri viewer patches";
+    description = "Moonlight Embedded with DRM PRIME, V4L2 M2M, V4L2 Request and Korri viewer patches";
     homepage = "https://github.com/moonlight-stream/moonlight-embedded";
     license = lib.licenses.gpl3Plus;
     mainProgram = "moonlight";
