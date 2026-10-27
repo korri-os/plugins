@@ -30,12 +30,77 @@ const reserved = [
   "cheevos_password",
   "cheevos_token",
   "network_cmd_password",
+  "network_cmd_enable",
+  "network_cmd_port",
   "netplay_password",
+  "netplay_ip_port",
+  "netplay_public_announce",
+  "netplay_nat_traversal",
+  "netplay_use_mitm_server",
   "netplay_spectate_password",
   "kiosk_mode_enable",
   "config_save_on_exit",
   "menu_driver",
 ]
+
+describe("RetroArch netplay launch", () => {
+  for (const netplay of [
+    { role: "host", passwordConfig: "/run/netplay/password.cfg" },
+    {
+      role: "client",
+      address: "127.0.0.1",
+      port: 42001,
+      player: 2,
+      passwordConfig: "/run/netplay/password.cfg",
+    },
+  ] as const) {
+    it(`prepares the ${netplay.role} without reading the password file or exposing a secret`, () => {
+      // This path does not exist. The effect-free handler must only pass it on.
+      const plan = launch({ ...input(), netplay })
+      expect(plan.args).toEqual([
+        "--config",
+        "/account/retroarch.cfg",
+        ...(netplay.role === "client" ? ["--connect", "127.0.0.1", "--port", "42001"] : []),
+        "--appendconfig",
+        netplay.passwordConfig,
+        "-L",
+        "/core",
+        "/rom",
+      ])
+      expect(plan.files).toHaveLength(1)
+      expect(plan.files[0].content).not.toContain("netplay_password")
+      expect(plan.args).not.toContain("netplay_password")
+      expect(plan.files[0].content).toContain('network_cmd_enable = "true"')
+      expect(plan.files[0].content).toContain('network_cmd_port = "55355"')
+      expect(plan.files[0].content).toContain('netplay_ip_port = "55435"')
+      for (const key of [
+        "netplay_public_announce",
+        "netplay_nat_traversal",
+        "netplay_use_mitm_server",
+      ])
+        expect(plan.files[0].content).toContain(`${key} = "false"`)
+    })
+  }
+
+  it("never puts the password file's contents in the declaration", () => {
+    const root = mkdtempSync(join(tmpdir(), "korri-netplay-"))
+    try {
+      const passwordConfig = join(root, "password.cfg")
+      const password = "netplay-test-secret-do-not-expose"
+      writeFileSync(passwordConfig, `netplay_password = "${password}"\n`, { mode: 0o600 })
+      for (const netplay of [
+        { role: "host", passwordConfig },
+        { role: "client", address: "127.0.0.1", port: 42001, player: 2, passwordConfig },
+      ] as const) {
+        const plan = launch({ ...input(), netplay })
+        expect(JSON.stringify(plan)).not.toContain(password)
+        expect(plan.args).toContain(passwordConfig)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
 
 describe("RetroArch nested settings operations", () => {
   it("keeps per-game saves, the core's state subfolder and the protected kiosk defaults", () => {
@@ -300,6 +365,19 @@ function parsed(cfg: string, keys: string[]): string[] {
 }
 
 describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", () => {
+  it("keeps federation-only transport ready when hosting starts during ordinary play", () => {
+    expect(
+      parsed(content(), [
+        "network_cmd_enable",
+        "network_cmd_port",
+        "netplay_ip_port",
+        "netplay_public_announce",
+        "netplay_nat_traversal",
+        "netplay_use_mitm_server",
+      ]),
+    ).toEqual(["true", "55355", "55435", "false", "false", "false"])
+  })
+
   it("reads the per-game folders through the actual RetroArch parser", () => {
     const root = input().saveRoot
     expect(

@@ -22,7 +22,14 @@ import { renderRetroArchSettings } from "./render-settings"
 interface SettingsTree {
   [key: string]: LaunchSettingValue | SettingsTree
 }
-type PluginLaunchInput = Omit<PinnedLaunchInput, "overrides"> & {
+// Mirrors the netplay launch treaty (ADR 0040) until the pinned contract includes it.
+// Only the path crosses the sandbox; korrid owns the file and its secret.
+type NetplayLaunch =
+  | { role: "host"; passwordConfig: string }
+  | { role: "client"; address: string; port: number; player: number; passwordConfig: string }
+
+type PluginLaunchInput = Omit<PinnedLaunchInput, "overrides" | "netplay"> & {
+  netplay?: NetplayLaunch
   overrides?: Omit<NonNullable<PinnedLaunchInput["overrides"]>, "settings"> & {
     settings?: SettingsTree
   }
@@ -50,7 +57,13 @@ const reservedKeys = [
   "cheevos_password",
   "cheevos_token",
   "network_cmd_password",
+  "network_cmd_enable",
+  "network_cmd_port",
   "netplay_password",
+  "netplay_ip_port",
+  "netplay_public_announce",
+  "netplay_nat_traversal",
+  "netplay_use_mitm_server",
   "netplay_spectate_password",
   "kiosk_mode_enable",
   "config_save_on_exit",
@@ -156,6 +169,14 @@ quit_press_twice = "false"
 
 kiosk_mode_enable = "true"
 menu_driver = "null"
+network_cmd_enable = "true"
+network_cmd_port = "55355"
+# Netplay travels only through korrid's federation forward, including when
+# hosting starts during play. Never announce to a lobby or ask a router to map it.
+netplay_ip_port = "55435"
+netplay_public_announce = "false"
+netplay_nat_traversal = "false"
+netplay_use_mitm_server = "false"
 input_overlay_enable = "false"
 # Preserve legacy launch-spec: PNG cartridges belong to the selected core,
 # not RetroArch's built-in image viewer.
@@ -202,6 +223,10 @@ video_context_driver = "x"`
       ...(policy.logging?.level === "verbose" ? ["-v"] : []),
       "--config",
       configPath,
+      ...(input.netplay?.role === "client"
+        ? ["--connect", input.netplay.address, "--port", String(input.netplay.port)]
+        : []),
+      ...(input.netplay ? ["--appendconfig", input.netplay.passwordConfig] : []),
       "-L",
       corePath,
       contentPath,

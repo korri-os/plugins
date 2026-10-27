@@ -290,12 +290,44 @@ escapes. NUL, CR, LF, unpaired UTF-16 surrogates and other quote-bearing strings
 produce path diagnostics; they are skipped even when raw text would shadow them.
 Generated baseline paths use the same safety rules and fail if invalid.
 
+## Netplay launch treaty
+
+The shared helper accepts optional `netplay` from korrid. A host supplies
+`{ role: "host", passwordConfig }`. A client supplies
+`{ role: "client", address, port, player, passwordConfig }`. The local
+`NetplayLaunch` type mirrors ADR 0040's launch treaty while the pinned Core
+contract lacks it. No new user settings are exposed.
+
+Both roles pass the native config path with `--appendconfig`. The helper never
+reads that file or receives its password. A client also passes `--connect` and
+`--port`; its requested seat is in korrid's config file, not argv. A host does
+not pass `--host`: korrid starts hosting through the network command interface,
+including for a game that was already running.
+
+The baseline enables the network command interface on UDP 55355 and keeps
+netplay on TCP 55435. Both ports are reserved against raw overrides. Lobby
+announcement, NAT traversal and the RetroArch relay are disabled and reserved,
+so only korrid's federation forward carries netplay. These defaults apply to
+ordinary launches too, because hosting can start during play. `netplay_password`
+remains reserved. The native config key for a requested seat is
+`netplay_request_device_p<player>` (RetroArch 1.22.2 `configuration.c`).
+
+RetroArch binds these listeners to wildcard addresses. The device firewall must
+block off-device access; the plugin grants no firewall ports. A source firewall
+check is not proof of the firewall on a running device. Verify the deployed
+firewall before device acceptance. On 2026-10-26 the evaluated SP and Pro
+product configurations both enable the firewall, allow global TCP 39217 and
+USB-interface UDP 67 only, and trust only loopback. Neither port 55355 nor 55435
+is opened, including by a port range or an extra input rule. This check did not
+inspect a running device.
+
 ## Focused build-machine checks
 
 ```sh
 nix run .#korri-retroarch-check
 nix build --no-link .#checks.x86_64-linux.korri-retroarch-package
 nix build --no-link .#checks.x86_64-linux.korri-retroarch-settings
+nix build --no-link .#checks.x86_64-linux.korri-libretro-netplay
 nix build --no-link .#checks.x86_64-linux.korri-libretro-typecheck
 ```
 
