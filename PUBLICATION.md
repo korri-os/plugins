@@ -528,9 +528,9 @@ Refresh those snapshots from the committed producer, never from a working tree.
 The acquisition port is grounded in Core base
 `129e4381154622579e38819852ee935195ab8161` (ADR 0012). The tool-name check also
 needs Core's `korri-publish declaration` command. The committed Core input is
-`github:korri-os/korri/8166648d49f47014a5c2f0cd99a36d4717c4f010`
-("feat(plugin-host): expose closed declaration metadata to builders"), which
-provides that command and the current launch contract. Run the checks against
+`github:korri-os/korri/3047c2af14069381fa97e423fc147a1b639196bd`
+which provides that command, the current launch contract and netplay runner
+declarations. Run the checks against
 the checked-in lock, without an input override:
 
 ```sh
