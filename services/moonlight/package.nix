@@ -29,13 +29,21 @@
 }:
 
 let
+  # Opus custom modes make every opus_decoder_get_size() call build a CELT
+  # mode, which runs opus_select_arch() and so reads /proc/cpuinfo on ARM.
+  # opus_multistream_decode() calls it for each stream of each packet: on the
+  # RG353M that was about 60% of Moonlight's audio thread. Moonlight decodes
+  # standard Opus multistream only, so build without custom modes, the
+  # upstream default that nixpkgs overrides.
+  opusStandardModes = libopus.override { withCustomModes = false; };
+
   # Stateless V4L2 decoders (Hantro, Cedrus, rkvdec) need FFmpeg's V4L2
   # Request API hwaccel, which upstream FFmpeg does not carry. The patch is
   # Jonas Karlman's series as LibreELEC ships it for FFmpeg 9.0.2:
   # LibreELEC.tv e9e6b8531df13bc9058ca1771dab5f0c4fd5e98e,
   # packages/multimedia/ffmpeg/patches/v4l2-request/0001-v4l2-request.patch.
   # Stateful h264_v4l2m2m (Qualcomm) is unchanged by it.
-  ffmpegV4l2Request = ffmpeg.overrideAttrs (old: {
+  ffmpegV4l2Request = (ffmpeg.override { libopus = opusStandardModes; }).overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./patches/ffmpeg/0001-v4l2-request.patch ];
     configureFlags = (old.configureFlags or [ ]) ++ [
       "--enable-libudev"
@@ -90,7 +98,7 @@ stdenv.mkDerivation rec {
     libva
     libvdpau
     libxcb
-    libopus
+    opusStandardModes
     json_c
     SDL2
     systemdMinimal
