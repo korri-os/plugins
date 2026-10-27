@@ -242,11 +242,16 @@ def main():
         # The caller owns pkgs. Change real compiler flags only for OpenSSH,
         # which plugins/ssh/plugin.nix consumes, not the whole native toolchain.
         # withCFlags is the pinned nixpkgs stdenv adapter on both architectures.
+        # Sunshine builds on this shared nixpkgs and its recipe refuses any base
+        # derivation it has not approved. Its fetchSubmodules source reaches
+        # OpenSSH, so the fixture holds Sunshine at the unmodified package set,
+        # as packageSet already does for CI's Git-config variant.
         replace(toolchain / 'nix/default.nix', 'config.allowUnfree = true;', '''config.allowUnfree = true;
       overlays = [ (_: prev: {
         openssh = prev.openssh.override {
           stdenv = prev.withCFlags [ "-fno-omit-frame-pointer" ] prev.stdenv;
         };
+        sunshine = (import source { inherit system; config.allowUnfree = true; }).sunshine;
       }) ];''')
         for system in systems:
             start = time.monotonic()
@@ -266,9 +271,12 @@ def main():
             # fetchSubmodules, a git fetch whose build closure holds OpenSSH.
             # Core bb6da05b5 preinstalled Moonlight on every device, which put
             # it in this selection.
+            # Sunshine's held base keeps its approved drv (see the fixture
+            # overlay above), but the plugin's other build inputs reach the
+            # same fetch graph, so only its drv changes.
             fetch_graph_plugins = {
                 'korri-plugin-gamescope', 'korri-plugin-solarus', 'korri-plugin-steam',
-                'korri-plugin-moonlight',
+                'korri-plugin-moonlight', 'korri-plugin-sunshine',
             } & set(baseline['packages'])
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),
@@ -307,8 +315,11 @@ def main():
                     expected_declared = {key for key in baseline['declared_packages']
                                          if key.split(':')[0] in runtime_plugins
                                          and not key.endswith((':autoconfig', ':fake08'))}
+                    # The fixture holds Sunshine's approved package itself, so
+                    # only the plugin around it reaches the fetch graph.
                     expected_declared |= {key for key in baseline['declared_packages']
-                                          if key.split(':')[0] in fetch_graph_plugins}
+                                          if key.split(':')[0] in fetch_graph_plugins
+                                          and key != 'korri-plugin-sunshine:sunshine'}
                     expected_declared.add('korri-plugin-ssh:openssh')
                 if declared_changes != expected_declared:
                     raise AssertionError(
