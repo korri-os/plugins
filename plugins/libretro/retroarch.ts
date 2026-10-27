@@ -22,14 +22,7 @@ import { renderRetroArchSettings } from "./render-settings"
 interface SettingsTree {
   [key: string]: LaunchSettingValue | SettingsTree
 }
-// Mirrors the netplay launch treaty (ADR 0040) until the pinned contract includes it.
-// Only the path crosses the sandbox; korrid owns the file and its secret.
-type NetplayLaunch =
-  | { role: "host"; passwordConfig: string }
-  | { role: "client"; address: string; port: number; player: number; passwordConfig: string }
-
-type PluginLaunchInput = Omit<PinnedLaunchInput, "overrides" | "netplay"> & {
-  netplay?: NetplayLaunch
+type PluginLaunchInput = Omit<PinnedLaunchInput, "overrides"> & {
   overrides?: Omit<NonNullable<PinnedLaunchInput["overrides"]>, "settings"> & {
     settings?: SettingsTree
   }

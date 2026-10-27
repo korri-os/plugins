@@ -294,9 +294,10 @@ Generated baseline paths use the same safety rules and fail if invalid.
 
 The shared helper accepts optional `netplay` from korrid. A host supplies
 `{ role: "host", passwordConfig }`. A client supplies
-`{ role: "client", address, port, player, passwordConfig }`. The local
-`NetplayLaunch` type mirrors ADR 0040's launch treaty while the pinned Core
-contract lacks it. No new user settings are exposed.
+`{ role: "client", address, port, player, passwordConfig }`. The helper inherits
+`PluginLaunchNetplay` through the pinned Core's generated `PluginLaunchInput`.
+The nested `SettingsTree` mirror remains because the pinned settings contract
+still permits only a flat record. No new user settings are exposed.
 
 Both roles pass the native config path with `--appendconfig`. The helper never
 reads that file or receives its password. A client also passes `--connect` and

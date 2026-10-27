@@ -20,6 +20,7 @@ function input(overrides?: PluginLaunchInput["overrides"]): PluginLaunchInput {
     saveRoot: "/account/saves/wario-land-4",
     cacheRoot: "/cache",
     files: { autoconfig: "/autoconfig" },
+    artifacts: {},
     overrides,
   }
 }
