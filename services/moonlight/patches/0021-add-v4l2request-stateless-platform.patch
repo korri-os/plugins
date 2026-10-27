@@ -1,0 +1,278 @@
+From e99cbd220d2c63cf090229ccf92bb3f90fe9f826 Mon Sep 17 00:00:00 2001
+From: "Simon W. Jackson" <simon@simonwjackson.io>
+Date: Mon, 26 Oct 2026 20:13:29 -0600
+Subject: [PATCH] Add v4l2request platform: stateless V4L2 Request decode with
+ SDL NV12 presentation
+
+Stateless decoders (Hantro, Cedrus, rkvdec) have no stateful M2M wrapper, so h264_v4l2m2m cannot open them. The v4l2request platform uses FFmpeg's native H.264/HEVC parser with the V4L2 Request API hwaccel (AV_HWDEVICE_TYPE_V4L2REQUEST), maps each DRM_PRIME frame to CPU-readable NV12 and presents it through the existing SDL NV12 path. It prefers H.264 only.
+---
+ src/main.c          |   2 +-
+ src/platform.c      |   7 +++
+ src/platform.h      |   2 +-
+ src/video/v4l2m2m.c | 137 +++++++++++++++++++++++++++++++++++++++++++-
+ src/video/video.h   |   1 +
+ 5 files changed, 144 insertions(+), 5 deletions(-)
+
+diff --git a/src/main.c b/src/main.c
+index 737f33b..227c138 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -210,7 +210,7 @@ static void help() {
+   printf("\t-surround <5.1/7.1>\t\tStream 5.1 or 7.1 surround sound\n");
+   printf("\t-keydir <directory>\tLoad encryption keys from directory\n");
+   printf("\t-mapping <file>\t\tUse <file> as gamepad mappings configuration file\n");
+-  printf("\t-platform <system>\tSpecify system used for audio, video and input: pi/imx/aml/rk/ffmpeg_drm/v4l2m2m/x11/x11_vdpau/sdl/fake (default auto)\n");
++  printf("\t-platform <system>\tSpecify system used for audio, video and input: pi/imx/aml/rk/ffmpeg_drm/v4l2m2m/v4l2request/x11/x11_vdpau/sdl/fake (default auto)\n");
+   printf("\t-nounsupported\t\tDon't stream if resolution is not officially supported by the server\n");
+   printf("\t-quitappafter\t\tSend quit app request to remote after quitting session\n");
+   printf("\t-viewonly\t\tDisable all input processing (view-only mode)\n");
+diff --git a/src/platform.c b/src/platform.c
+index 0fb6ae3..a7f371c 100644
+--- a/src/platform.c
++++ b/src/platform.c
+@@ -73,6 +73,8 @@ enum platform platform_check(char* name) {
+   #ifdef HAVE_V4L2M2M
+   if (std || strcmp(name, "v4l2m2m") == 0)
+     return V4L2M2M;
++  if (strcmp(name, "v4l2request") == 0)
++    return V4L2REQUEST;
+   #endif
+   #ifdef HAVE_ROCKCHIP
+   if (std || strcmp(name, "rk") == 0) {
+@@ -191,6 +193,8 @@ DECODER_RENDERER_CALLBACKS* platform_get_video(enum platform system) {
+   #ifdef HAVE_V4L2M2M
+   case V4L2M2M:
+     return &decoder_callbacks_v4l2m2m;
++  case V4L2REQUEST:
++    return &decoder_callbacks_v4l2request;
+   #endif
+   }
+   return NULL;
+@@ -206,6 +210,7 @@ AUDIO_RENDERER_CALLBACKS* platform_get_audio(enum platform system, char* audio_d
+   #endif
+   #ifdef HAVE_V4L2M2M
+   case V4L2M2M:
++  case V4L2REQUEST:
+     /* Our v4l2m2m platform already pulls in SDL2 for the display GL
+      * context. Reusing SDL audio means SDL_AUDIODRIVER=dummy works
+      * uniformly across both -platform sdl and -platform v4l2m2m,
+@@ -272,6 +277,8 @@ char* platform_name(enum platform system) {
+     return "FFmpeg V4L2 + DRM PRIME";
+   case V4L2M2M:
+     return "V4L2 M2M + SDL NV12 (SM8550)";
++  case V4L2REQUEST:
++    return "V4L2 Request (stateless) + SDL NV12";
+   case X11:
+     return "X Window System (software decoding)";
+   case X11_VAAPI:
+diff --git a/src/platform.h b/src/platform.h
+index dbd8faa..95b7cf7 100644
+--- a/src/platform.h
++++ b/src/platform.h
+@@ -26,7 +26,7 @@
+ 
+ #define IS_EMBEDDED(SYSTEM) SYSTEM != SDL
+ 
+-enum platform { NONE, SDL, X11, X11_VDPAU, X11_VAAPI, PI, MMAL, IMX, AML, RK, FFMPEG_DRM, V4L2M2M, FAKE };
++enum platform { NONE, SDL, X11, X11_VDPAU, X11_VAAPI, PI, MMAL, IMX, AML, RK, FFMPEG_DRM, V4L2M2M, V4L2REQUEST, FAKE };
+ enum codecs { CODEC_UNSPECIFIED, CODEC_H264, CODEC_HEVC, CODEC_AV1 };
+ 
+ enum platform platform_check(char*);
+diff --git a/src/video/v4l2m2m.c b/src/video/v4l2m2m.c
+index 0b4ebfc..6bcec7f 100644
+--- a/src/video/v4l2m2m.c
++++ b/src/video/v4l2m2m.c
+@@ -49,6 +49,8 @@
+ 
+ #include <libavcodec/avcodec.h>
+ #include <libavutil/avutil.h>
++#include <libavutil/error.h>
++#include <libavutil/hwcontext.h>
+ #include <libavutil/hwcontext_drm.h>
+ #include <libavutil/pixdesc.h>
+ #include <libavutil/pixfmt.h>
+@@ -717,6 +719,61 @@ static enum AVPixelFormat get_drm_prime_fmt(AVCodecContext *ctx,
+   return AV_PIX_FMT_NONE;
+ }
+ 
++/* Stateless decoders (Hantro, Cedrus, rkvdec) have no stateful M2M
++ * wrapper. FFmpeg drives them through its native parser and the V4L2
++ * Request API hwaccel, which returns DRM_PRIME frames. */
++static bool request_api = false;
++
++static const AVCodec *find_request_decoder(int videoFormat) {
++  enum AVCodecID id;
++  if (videoFormat & VIDEO_FORMAT_MASK_H264)
++    id = AV_CODEC_ID_H264;
++  else if (videoFormat & VIDEO_FORMAT_MASK_H265)
++    id = AV_CODEC_ID_HEVC;
++  else
++    return NULL;
++  return avcodec_find_decoder(id);
++}
++
++/* Map a V4L2 Request DRM_PRIME frame to CPU-readable NV12 for the SDL
++ * NV12 presenter. The mapped frame holds a reference to the source
++ * buffer, so the decoder cannot reuse it until the presenter frees the
++ * mapping. A capture format that cannot be mapped is copied instead. */
++static AVFrame *request_frame_to_nv12(const AVFrame *src) {
++  static bool logged = false;
++  AVFrame *dst = av_frame_alloc();
++  if (!dst)
++    return NULL;
++  dst->format = AV_PIX_FMT_NV12;
++  int ret = av_hwframe_map(dst, src, AV_HWFRAME_MAP_READ);
++  const char *how = "map";
++  if (ret < 0) {
++    av_frame_unref(dst);
++    dst->format = AV_PIX_FMT_NV12;
++    ret = av_hwframe_transfer_data(dst, src, 0);
++    how = "copy";
++  }
++  if (ret < 0) {
++    if (!logged) {
++      LOG("request: cannot read DRM_PRIME frame as NV12: %s", av_err2str(ret));
++      logged = true;
++    }
++    av_frame_free(&dst);
++    return NULL;
++  }
++  dst->width = src->width;
++  dst->height = src->height;
++  dst->crop_top = src->crop_top;
++  dst->crop_bottom = src->crop_bottom;
++  dst->crop_left = src->crop_left;
++  dst->crop_right = src->crop_right;
++  if (!logged) {
++    LOG("request: presenting DRM_PRIME frames as NV12 by %s", how);
++    logged = true;
++  }
++  return dst;
++}
++
+ static const AVCodec *find_v4l2m2m_decoder(int videoFormat) {
+   const char *name = NULL;
+   if (videoFormat & VIDEO_FORMAT_MASK_H264)
+@@ -1595,6 +1652,45 @@ static int v4l2m2m_setup(int videoFormat, int width, int height,
+     LOG("setup: using experimental direct V4L2 decoder path");
+     if (direct_v4l2_setup(videoFormat, width, height) != 0)
+       return -1;
++  } else if (request_api) {
++  codec = (AVCodec *) find_request_decoder(videoFormat);
++  if (!codec)
++    return -1;
++
++  codec_ctx = avcodec_alloc_context3(codec);
++  if (!codec_ctx)
++    return -1;
++  codec_ctx->flags       |= AV_CODEC_FLAG_LOW_DELAY | AV_CODEC_FLAG_OUTPUT_CORRUPT;
++  codec_ctx->flags2      |= AV_CODEC_FLAG2_SHOW_ALL;
++  codec_ctx->thread_count = 1;
++  codec_ctx->width        = width;
++  codec_ctx->height       = height;
++  codec_ctx->get_format   = get_drm_prime_fmt;
++  /* A NULL device lets FFmpeg probe every media device for a stateless
++   * decoder that accepts this codec. */
++  AVBufferRef *hw_dev = NULL;
++  int hw_ret = av_hwdevice_ctx_create(&hw_dev, AV_HWDEVICE_TYPE_V4L2REQUEST,
++                                      NULL, NULL, 0);
++  if (hw_ret < 0) {
++    LOG("setup: av_hwdevice_ctx_create(V4L2REQUEST) failed: %s",
++        av_err2str(hw_ret));
++    avcodec_free_context(&codec_ctx);
++    return -1;
++  }
++  codec_ctx->hw_device_ctx = hw_dev;
++  LOG("setup: attached AV_HWDEVICE_TYPE_V4L2REQUEST device");
++
++  if (avcodec_open2(codec_ctx, codec, NULL) < 0) {
++    LOG("avcodec_open2 failed for %s with V4L2 Request", codec->name);
++    avcodec_free_context(&codec_ctx);
++    return -1;
++  }
++
++  pkt = av_packet_alloc();
++  if (!pkt) {
++    avcodec_free_context(&codec_ctx);
++    return -1;
++  }
+   } else {
+   codec = (AVCodec *) find_v4l2m2m_decoder(videoFormat);
+   if (!codec)
+@@ -1726,8 +1822,9 @@ static int v4l2m2m_setup(int videoFormat, int width, int height,
+     return -1;
+   }
+ 
+-  LOG("setup: decoder=%s presenter=%s %dx%d",
++  LOG("setup: decoder=%s%s presenter=%s %dx%d",
+       direct_v4l2 ? "direct_v4l2" : codec->name,
++      request_api ? " (v4l2request)" : "",
+       direct_dmabuf_present ? "direct-dmabuf" : "sdl-nv12",
+       width, height);
+   return 0;
+@@ -1811,7 +1908,16 @@ static int v4l2m2m_submit(PDECODE_UNIT du) {
+      * MMAP'd plane data alive until the display thread finishes the
+      * glTexSubImage2D upload (otherwise FFmpeg could recycle the V4L2
+      * buffer while the GL driver is still reading it). */
+-    if (f->format == AV_PIX_FMT_DRM_PRIME || f->format == AV_PIX_FMT_NV12) {
++    if (request_api && f->format == AV_PIX_FMT_DRM_PRIME) {
++      AVFrame *mapped = request_frame_to_nv12(f);
++      if (mapped) {
++        pthread_mutex_lock(&disp_mtx);
++        if (disp_pending) av_frame_free(&disp_pending);  /* drop if display lagging */
++        disp_pending = mapped;
++        pthread_cond_signal(&disp_cond);
++        pthread_mutex_unlock(&disp_mtx);
++      }
++    } else if (f->format == AV_PIX_FMT_DRM_PRIME || f->format == AV_PIX_FMT_NV12) {
+       AVFrame *clone = av_frame_clone(f);
+       if (clone) {
+         pthread_mutex_lock(&disp_mtx);
+@@ -1828,8 +1934,33 @@ static int v4l2m2m_submit(PDECODE_UNIT du) {
+   return (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) ? DR_OK : DR_NEED_IDR;
+ }
+ 
++static int v4l2m2m_stateful_setup(int videoFormat, int width, int height,
++                                  int redrawRate, void *context, int drFlags) {
++  request_api = false;
++  return v4l2m2m_setup(videoFormat, width, height, redrawRate, context, drFlags);
++}
++
++static int v4l2request_setup(int videoFormat, int width, int height,
++                             int redrawRate, void *context, int drFlags) {
++  /* The experimental direct paths drive a stateful decoder themselves. */
++  if (getenv("MOONLIGHT_V4L2M2M_DIRECT") &&
++      strcmp(getenv("MOONLIGHT_V4L2M2M_DIRECT"), "0") != 0) {
++    LOG("setup: MOONLIGHT_V4L2M2M_DIRECT does not apply to v4l2request");
++    return -1;
++  }
++  request_api = true;
++  return v4l2m2m_setup(videoFormat, width, height, redrawRate, context, drFlags);
++}
++
+ DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2m2m = {
+-  .setup            = v4l2m2m_setup,
++  .setup            = v4l2m2m_stateful_setup,
++  .cleanup          = v4l2m2m_cleanup,
++  .submitDecodeUnit = v4l2m2m_submit,
++  .capabilities     = CAPABILITY_DIRECT_SUBMIT,
++};
++
++DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2request = {
++  .setup            = v4l2request_setup,
+   .cleanup          = v4l2m2m_cleanup,
+   .submitDecodeUnit = v4l2m2m_submit,
+   .capabilities     = CAPABILITY_DIRECT_SUBMIT,
+diff --git a/src/video/video.h b/src/video/video.h
+index f7e6920..d431019 100644
+--- a/src/video/video.h
++++ b/src/video/video.h
+@@ -53,4 +53,5 @@ extern DECODER_RENDERER_CALLBACKS decoder_callbacks_ffmpeg_drm;
+ #endif
+ #ifdef HAVE_V4L2M2M
+ extern DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2m2m;
++extern DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2request;
+ #endif
+-- 
+2.53.0
+
