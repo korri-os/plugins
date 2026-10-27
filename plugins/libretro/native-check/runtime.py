@@ -62,7 +62,8 @@ def run(package, core, content, external=False, korrid=None, architecture=None):
         [sys.executable, str(HERE / "core-probe.py"), native, str(source)],
         check=False,
         env=probe_env,
-        timeout=35,
+        # Loaded CI runners took longer than 35 s (run 40512977042).
+        timeout=120,
         capture_output=True,
         text=True,
     )
@@ -113,7 +114,7 @@ def run(package, core, content, external=False, korrid=None, architecture=None):
                     check=False,
                     capture_output=True,
                     text=True,
-                    timeout=15,
+                    timeout=60,
                 )
             except subprocess.TimeoutExpired:
                 raise AssertionError(
@@ -151,7 +152,8 @@ def run(package, core, content, external=False, korrid=None, architecture=None):
                     env=environment,
                     capture_output=True,
                     text=True,
-                    timeout=35,
+                    # --max-frames bounds the run; this only catches a hang.
+                    timeout=120,
                 )
             except subprocess.TimeoutExpired:
                 raise AssertionError(
