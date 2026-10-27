@@ -1,0 +1,10 @@
+StorePath: /nix/store/hszqjs9rsslhdip0rfikj1yhv2h9h5dx-libretro-snes9x2010-0-unstable-2026-09-21
+URL: https://github.com/korri-os/plugins/releases/download/build-6fd3cc9bbe66-netplay/1k6rzl054qq3g1v0v9mxd0b6slr9gfg44d1zifd2ax7cpnx5hycz.nar.xz
+Compression: xz
+FileHash: sha256:1k6rzl054qq3g1v0v9mxd0b6slr9gfg44d1zifd2ax7cpnx5hycz
+FileSize: 671184
+NarHash: sha256:1fmjzllzn2nzrsjwjjzr503ka4k8rbix5wwgii1acfk7v7a4bkla
+NarSize: 2810552
+References: czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 hszqjs9rsslhdip0rfikj1yhv2h9h5dx-libretro-snes9x2010-0-unstable-2026-09-21 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 w3gjn3lyhpiraaxvg17xjy3cwnsn59d3-retroarch-bare-1.22.2
+Deriver: 13ya03y0vkzbw2xg4nc8gvpwvwz5f56z-libretro-snes9x2010-0-unstable-2026-09-21.drv
+Sig: korri-plugins-1:8wGasB/VIZVLG+ulkNXqrOrzP6kuyukYC1Tt5lQoo7lIPynDLyQxdxKswPa8qbCgu9cEH/ZG+NYrTlLI2xUYCg==
