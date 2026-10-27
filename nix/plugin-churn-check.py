@@ -312,9 +312,10 @@ def main():
                     # through GTK/SDL preserves game outputs, not drv files.
                     # The custom FAKE-08 core has no GTK/SDL native dependency;
                     # only its frontend and settings use that fetch graph.
+                    # libretro-core-info is data fetched without OpenSSH.
                     expected_declared = {key for key in baseline['declared_packages']
                                          if key.split(':')[0] in runtime_plugins
-                                         and not key.endswith((':autoconfig', ':fake08'))}
+                                         and not key.endswith((':autoconfig', ':fake08', ':core-info'))}
                     # The fixture holds Sunshine's approved package itself, so
                     # only the plugin around it reaches the fetch graph.
                     expected_declared |= {key for key in baseline['declared_packages']
