@@ -1,0 +1,792 @@
+From 560e67c5e37776d5c0c5bf769103b8bd7cddf3cd Mon Sep 17 00:00:00 2001
+From: "Simon W. Jackson" <simon@simonwjackson.io>
+Date: Mon, 26 Oct 2026 20:14:45 -0600
+Subject: [PATCH] Add v4l2request platform: stateless V4L2 decode with DRM
+ PRIME GL presentation
+
+FFmpeg's h264/hevc decoder drives a stateless V4L2 decoder (Allwinner
+Cedrus, Rockchip Hantro) through the V4L2 Request API hwaccel. Frames
+arrive as AV_PIX_FMT_DRM_PRIME; the display thread imports the capture
+buffer's Y (R8) and UV (GR88) planes into the SDL window's GLES context
+once per buffer and draws them with the NV12 shader. The last presented
+frame stays referenced until the next one is drawn, so the decoder
+cannot reuse a buffer the GPU still reads.
+
+EGL bring-up on the H700 takes several seconds, longer than the host
+waits for the first ping while setup() blocks the video stream start,
+so this platform creates its window and GLES context on the display
+thread and returns from setup() at once. Its window is fullscreen: the
+H700 handhelds have one screen, and a tiling compositor would otherwise
+split it with the portal.
+
+The NV12 shader takes its matrix and range from uniforms. Other paths
+keep BT.709 limited range; this platform uses the frame's colorspace
+and range when the stream states them, and otherwise the colorspace the
+host reports with each decode unit and limited range.
+
+Requires FFmpeg built with --enable-v4l2-request. The platform refuses
+streams the hwaccel cannot take instead of decoding them in software.
+---
+ src/main.c          |   2 +-
+ src/platform.c      |   7 +
+ src/platform.h      |   2 +-
+ src/video/v4l2m2m.c | 525 ++++++++++++++++++++++++++++++++++++++------
+ src/video/video.h   |   1 +
+ 5 files changed, 466 insertions(+), 71 deletions(-)
+
+diff --git a/src/main.c b/src/main.c
+index 737f33b..227c138 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -210,7 +210,7 @@ static void help() {
+   printf("\t-surround <5.1/7.1>\t\tStream 5.1 or 7.1 surround sound\n");
+   printf("\t-keydir <directory>\tLoad encryption keys from directory\n");
+   printf("\t-mapping <file>\t\tUse <file> as gamepad mappings configuration file\n");
+-  printf("\t-platform <system>\tSpecify system used for audio, video and input: pi/imx/aml/rk/ffmpeg_drm/v4l2m2m/x11/x11_vdpau/sdl/fake (default auto)\n");
++  printf("\t-platform <system>\tSpecify system used for audio, video and input: pi/imx/aml/rk/ffmpeg_drm/v4l2m2m/v4l2request/x11/x11_vdpau/sdl/fake (default auto)\n");
+   printf("\t-nounsupported\t\tDon't stream if resolution is not officially supported by the server\n");
+   printf("\t-quitappafter\t\tSend quit app request to remote after quitting session\n");
+   printf("\t-viewonly\t\tDisable all input processing (view-only mode)\n");
+diff --git a/src/platform.c b/src/platform.c
+index 0fb6ae3..d862164 100644
+--- a/src/platform.c
++++ b/src/platform.c
+@@ -73,6 +73,8 @@ enum platform platform_check(char* name) {
+   #ifdef HAVE_V4L2M2M
+   if (std || strcmp(name, "v4l2m2m") == 0)
+     return V4L2M2M;
++  if (strcmp(name, "v4l2request") == 0)
++    return V4L2REQUEST;
+   #endif
+   #ifdef HAVE_ROCKCHIP
+   if (std || strcmp(name, "rk") == 0) {
+@@ -191,6 +193,8 @@ DECODER_RENDERER_CALLBACKS* platform_get_video(enum platform system) {
+   #ifdef HAVE_V4L2M2M
+   case V4L2M2M:
+     return &decoder_callbacks_v4l2m2m;
++  case V4L2REQUEST:
++    return &decoder_callbacks_v4l2request;
+   #endif
+   }
+   return NULL;
+@@ -211,6 +215,7 @@ AUDIO_RENDERER_CALLBACKS* platform_get_audio(enum platform system, char* audio_d
+      * uniformly across both -platform sdl and -platform v4l2m2m,
+      * which matters on substrates where pulse/alsa are broken
+      * (operators get a video-only smoke posture without patching). */
++  case V4L2REQUEST:
+     return &audio_callbacks_sdl;
+   #endif
+   #ifdef HAVE_PI
+@@ -272,6 +277,8 @@ char* platform_name(enum platform system) {
+     return "FFmpeg V4L2 + DRM PRIME";
+   case V4L2M2M:
+     return "V4L2 M2M + SDL NV12 (SM8550)";
++  case V4L2REQUEST:
++    return "V4L2 Request + DRM PRIME GL (stateless decoders)";
+   case X11:
+     return "X Window System (software decoding)";
+   case X11_VAAPI:
+diff --git a/src/platform.h b/src/platform.h
+index dbd8faa..95b7cf7 100644
+--- a/src/platform.h
++++ b/src/platform.h
+@@ -26,7 +26,7 @@
+ 
+ #define IS_EMBEDDED(SYSTEM) SYSTEM != SDL
+ 
+-enum platform { NONE, SDL, X11, X11_VDPAU, X11_VAAPI, PI, MMAL, IMX, AML, RK, FFMPEG_DRM, V4L2M2M, FAKE };
++enum platform { NONE, SDL, X11, X11_VDPAU, X11_VAAPI, PI, MMAL, IMX, AML, RK, FFMPEG_DRM, V4L2M2M, V4L2REQUEST, FAKE };
+ enum codecs { CODEC_UNSPECIFIED, CODEC_H264, CODEC_HEVC, CODEC_AV1 };
+ 
+ enum platform platform_check(char*);
+diff --git a/src/video/v4l2m2m.c b/src/video/v4l2m2m.c
+index 0b4ebfc..fe1e835 100644
+--- a/src/video/v4l2m2m.c
++++ b/src/video/v4l2m2m.c
+@@ -49,6 +49,7 @@
+ 
+ #include <libavcodec/avcodec.h>
+ #include <libavutil/avutil.h>
++#include <libavutil/hwcontext.h>
+ #include <libavutil/hwcontext_drm.h>
+ #include <libavutil/pixdesc.h>
+ #include <libavutil/pixfmt.h>
+@@ -78,6 +79,31 @@ static size_t        nal_size   = 0;
+ static bool direct_v4l2 = false;
+ static bool direct_dmabuf_present = false;
+ 
++/* v4l2request platform: FFmpeg's software h264/hevc decoder drives a
++ * stateless V4L2 decoder (Allwinner Cedrus, Rockchip Hantro) through the
++ * V4L2 Request API hwaccel and emits AV_PIX_FMT_DRM_PRIME frames. The
++ * display thread imports each capture buffer's Y and UV planes into the
++ * SDL window's GLES context; no frame touches the CPU. */
++static bool request_mode = false;
++
++#define PRIME_CACHE_SIZE 32
++
++typedef struct PrimeCacheEntry {
++  int fd;
++  int width;
++  int height;
++  int pitch;
++  int uv_offset;
++  EGLImageKHR img_y;
++  EGLImageKHR img_uv;
++  GLuint tex_y;
++  GLuint tex_uv;
++} PrimeCacheEntry;
++
++static PrimeCacheEntry prime_cache[PRIME_CACHE_SIZE];
++static int prime_cache_count = 0;
++static const void *prime_cache_frames = NULL;
++
+ #define DIRECT_OUT_BUFS 32
+ #define DIRECT_CAP_BUFS 12
+ 
+@@ -160,6 +186,28 @@ static GLuint         gl_texture_y    = 0;
+ static GLuint         gl_texture_uv   = 0;
+ static GLint          gl_uloc_y_nv12  = -1;
+ static GLint          gl_uloc_uv_nv12 = -1;
++static GLint          gl_uloc_range_nv12 = -1;
++static GLint          gl_uloc_coef_nv12 = -1;
++static int            gl_nv12_colorspace = -1;
++static int            gl_nv12_full_range = -1;
++/* Colorspace of the decode units the host sends (COLORSPACE_REC_*). */
++static volatile int   stream_colorspace = COLORSPACE_REC_601;
++
++/* Load the YUV->RGB matrix and range into the bound NV12 program. */
++static void set_nv12_color(int colorspace, bool full_range) {
++  if (colorspace == gl_nv12_colorspace && (int) full_range == gl_nv12_full_range)
++    return;
++  if (full_range)
++    glUniform3f(gl_uloc_range_nv12, 0.0f, 1.0f, 1.0f);
++  else
++    glUniform3f(gl_uloc_range_nv12, 16.0f / 255.0f, 255.0f / 219.0f, 255.0f / 224.0f);
++  if (colorspace == COLORSPACE_REC_601)
++    glUniform4f(gl_uloc_coef_nv12, 1.402f, 0.344136f, 0.714136f, 1.772f);
++  else
++    glUniform4f(gl_uloc_coef_nv12, 1.5748f, 0.1873f, 0.4681f, 1.8556f);
++  gl_nv12_colorspace = colorspace;
++  gl_nv12_full_range = full_range;
++}
+ static int            gl_nv12_width   = 0;
+ static int            gl_nv12_height  = 0;
+ static bool           gl_nv12_inited  = false;
+@@ -732,6 +780,68 @@ static const AVCodec *find_v4l2m2m_decoder(int videoFormat) {
+   return c;
+ }
+ 
++static enum AVPixelFormat get_request_fmt(AVCodecContext *ctx,
++                                          const enum AVPixelFormat *fmts) {
++  (void) ctx;
++  for (const enum AVPixelFormat *p = fmts; *p != AV_PIX_FMT_NONE; p++) {
++    if (*p == AV_PIX_FMT_DRM_PRIME)
++      return *p;
++  }
++  /* No V4L2 Request hwaccel for this stream. Refuse rather than decode
++   * in software: this platform only presents dma-buf frames, and a
++   * silent software fallback would hide the failure. */
++  LOG("v4l2request: decoder did not offer AV_PIX_FMT_DRM_PRIME -- "
++      "no capable stateless V4L2 decoder for this stream");
++  return AV_PIX_FMT_NONE;
++}
++
++static int request_decoder_setup(int videoFormat, int width, int height) {
++  enum AVCodecID id;
++  if (videoFormat & VIDEO_FORMAT_MASK_H264)
++    id = AV_CODEC_ID_H264;
++  else if (videoFormat & VIDEO_FORMAT_MASK_H265)
++    id = AV_CODEC_ID_HEVC;
++  else {
++    LOG("v4l2request: unsupported video format 0x%x", videoFormat);
++    return -1;
++  }
++  codec = (AVCodec *) avcodec_find_decoder(id);
++  if (!codec)
++    return -1;
++  codec_ctx = avcodec_alloc_context3(codec);
++  if (!codec_ctx)
++    return -1;
++  codec_ctx->flags       |= AV_CODEC_FLAG_LOW_DELAY | AV_CODEC_FLAG_OUTPUT_CORRUPT;
++  codec_ctx->flags2      |= AV_CODEC_FLAG2_SHOW_ALL;
++  codec_ctx->thread_count = 1;
++  codec_ctx->width        = width;
++  codec_ctx->height       = height;
++  codec_ctx->get_format   = get_request_fmt;
++
++  AVBufferRef *hw_dev = NULL;
++  int err = av_hwdevice_ctx_create(&hw_dev, AV_HWDEVICE_TYPE_V4L2REQUEST,
++                                   NULL, NULL, 0);
++  if (err < 0) {
++    LOG("v4l2request: av_hwdevice_ctx_create failed: %s", av_err2str(err));
++    avcodec_free_context(&codec_ctx);
++    return -1;
++  }
++  codec_ctx->hw_device_ctx = hw_dev;
++
++  if (avcodec_open2(codec_ctx, codec, NULL) < 0) {
++    LOG("avcodec_open2 failed for %s", codec->name);
++    avcodec_free_context(&codec_ctx);
++    return -1;
++  }
++  pkt = av_packet_alloc();
++  if (!pkt) {
++    avcodec_free_context(&codec_ctx);
++    return -1;
++  }
++  LOG("setup: v4l2request hwaccel on FFmpeg %s decoder", codec->name);
++  return 0;
++}
++
+ /* ------------------------------------------------------------------ */
+ /* GL setup (runs on the display thread)                              */
+ /* ------------------------------------------------------------------ */
+@@ -790,6 +900,8 @@ static const char *fragment_shader_src_nv12 =
+   "precision mediump float;\n"
+   "uniform sampler2D u_tex_y;\n"
+   "uniform sampler2D u_tex_uv;\n"
++  "uniform vec3 u_range;\n"
++  "uniform vec4 u_coef;\n"
+   "in vec2 v_uv;\n"
+   "out vec4 fragColor;\n"
+   "void main() {\n"
+@@ -799,13 +911,15 @@ static const char *fragment_shader_src_nv12 =
+   "  //   Y' = (Y - 16/255) * (255/219)\n"
+   "  //   Cb = (Cb - 128/255) * (255/224) -- the - 128/255 is the\n"
+   "  //   - vec2(0.5) above (we sampled 8-bit GL_RG into [0,1]).\n"
+-  "  float yp = (y - 16.0/255.0) * (255.0/219.0);\n"
+-  "  float cb = uv.x * (255.0/224.0);\n"
+-  "  float cr = uv.y * (255.0/224.0);\n"
++  "  // u_range = (Y offset, Y scale, chroma scale); u_coef = (R/Cr,\n"
++  "  // G/Cb, G/Cr, B/Cb). gl_init_nv12 sets BT.709 limited range.\n"
++  "  float yp = (y - u_range.x) * u_range.y;\n"
++  "  float cb = uv.x * u_range.z;\n"
++  "  float cr = uv.y * u_range.z;\n"
+   "  vec3  rgb;\n"
+-  "  rgb.r = yp + 1.5748 * cr;\n"
+-  "  rgb.g = yp - 0.1873 * cb - 0.4681 * cr;\n"
+-  "  rgb.b = yp + 1.8556 * cb;\n"
++  "  rgb.r = yp + u_coef.x * cr;\n"
++  "  rgb.g = yp - u_coef.y * cb - u_coef.z * cr;\n"
++  "  rgb.b = yp + u_coef.w * cb;\n"
+   "  fragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);\n"
+   "}\n";
+ 
+@@ -1031,6 +1145,12 @@ static int gl_init_nv12(int width, int height) {
+   }
+   gl_uloc_y_nv12  = glGetUniformLocation(gl_program_nv12, "u_tex_y");
+   gl_uloc_uv_nv12 = glGetUniformLocation(gl_program_nv12, "u_tex_uv");
++  gl_uloc_range_nv12 = glGetUniformLocation(gl_program_nv12, "u_range");
++  gl_uloc_coef_nv12 = glGetUniformLocation(gl_program_nv12, "u_coef");
++  gl_nv12_colorspace = -1;
++  gl_nv12_full_range = -1;
++  glUseProgram(gl_program_nv12);
++  set_nv12_color(COLORSPACE_REC_709, false);
+ 
+   /* Y plane texture: single-channel 8-bit, full resolution. */
+   glGenTextures(1, &gl_texture_y);
+@@ -1379,6 +1499,7 @@ static void draw_frame_nv12(AVFrame *frame);
+ static void draw_frame_direct_dmabuf(AVFrame *frame);
+ 
+ static int stream_width, stream_height;
++static int create_window(int width, int height);
+ 
+ static int visible_from_hint(int coded, int hint, int max_pad) {
+   return (hint > 0 && hint <= coded && coded - hint <= max_pad) ? hint : coded;
+@@ -1468,13 +1589,200 @@ static void draw_frame_nv12(AVFrame *frame) {
+   SDL_RenderCopy(sdl_renderer, sdl_nv12_texture, &(SDL_Rect){(int)frame->crop_left, (int)frame->crop_top, frame_visible_width(frame), frame_visible_height(frame)}, &sdl_dst_rect);
+   SDL_RenderPresent(sdl_renderer);
+ }
++static void prime_cache_clear(void) {
++  for (int i = 0; i < prime_cache_count; i++) {
++    PrimeCacheEntry *e = &prime_cache[i];
++    if (e->tex_y) glDeleteTextures(1, &e->tex_y);
++    if (e->tex_uv) glDeleteTextures(1, &e->tex_uv);
++    if (e->img_y != EGL_NO_IMAGE_KHR) egl_destroy_image(egl_dpy, e->img_y);
++    if (e->img_uv != EGL_NO_IMAGE_KHR) egl_destroy_image(egl_dpy, e->img_uv);
++  }
++  memset(prime_cache, 0, sizeof prime_cache);
++  prime_cache_count = 0;
++  prime_cache_frames = NULL;
++}
++
++static EGLImageKHR prime_import_plane(int fd, uint32_t fourcc, int width,
++                                      int height, int offset, int pitch) {
++  EGLint attribs[] = {
++    EGL_WIDTH, width,
++    EGL_HEIGHT, height,
++    EGL_LINUX_DRM_FOURCC_EXT, (EGLint) fourcc,
++    EGL_DMA_BUF_PLANE0_FD_EXT, fd,
++    EGL_DMA_BUF_PLANE0_OFFSET_EXT, offset,
++    EGL_DMA_BUF_PLANE0_PITCH_EXT, pitch,
++    EGL_NONE
++  };
++  EGLImageKHR img = egl_create_image(egl_dpy, EGL_NO_CONTEXT,
++                                     EGL_LINUX_DMA_BUF_EXT,
++                                     (EGLClientBuffer) NULL, attribs);
++  if (img == EGL_NO_IMAGE_KHR)
++    LOG("v4l2request: plane import failed err=0x%04x fourcc=0x%08x fd=%d "
++        "size=%dx%d offset=%d pitch=%d",
++        eglGetError(), fourcc, fd, width, height, offset, pitch);
++  return img;
++}
++
++static GLuint prime_bind_texture(EGLImageKHR img) {
++  GLuint tex = 0;
++  glGenTextures(1, &tex);
++  glBindTexture(GL_TEXTURE_2D, tex);
++  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
++  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
++  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
++  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
++  gl_image_target_texture(GL_TEXTURE_2D, img);
++  return tex;
++}
++
++/* Return the cached textures for this capture buffer, importing it on
++ * first sight. FFmpeg's V4L2 Request frames pool keeps each capture
++ * buffer, and so its dma-buf fd, for the life of the frames context, so
++ * the fd identifies the buffer until the context changes. */
++static PrimeCacheEntry *prime_cache_lookup(const AVFrame *frame,
++                                           const AVDRMFrameDescriptor *desc,
++                                           int import_w, int import_h) {
++  const void *frames = frame->hw_frames_ctx ? frame->hw_frames_ctx->data : NULL;
++  if (frames != prime_cache_frames) {
++    if (prime_cache_count)
++      LOG("v4l2request: frames context changed, dropping %d cached buffers",
++          prime_cache_count);
++    prime_cache_clear();
++    prime_cache_frames = frames;
++  }
++
++  const AVDRMLayerDescriptor *layer = &desc->layers[0];
++  int fd = desc->objects[layer->planes[0].object_index].fd;
++  int uv_fd = desc->objects[layer->planes[1].object_index].fd;
++  int pitch = (int) layer->planes[0].pitch;
++  int uv_offset = (int) layer->planes[1].offset;
++  for (int i = 0; i < prime_cache_count; i++) {
++    PrimeCacheEntry *e = &prime_cache[i];
++    if (e->fd == fd && e->width == import_w && e->height == import_h &&
++        e->pitch == pitch && e->uv_offset == uv_offset)
++      return e;
++  }
++  if (prime_cache_count == PRIME_CACHE_SIZE) {
++    LOG("v4l2request: more than %d capture buffers, rebuilding cache",
++        PRIME_CACHE_SIZE);
++    prime_cache_clear();
++    prime_cache_frames = frames;
++  }
++
++  EGLImageKHR img_y = prime_import_plane(fd, DRM_FORMAT_R8, import_w, import_h,
++                                         (int) layer->planes[0].offset, pitch);
++  EGLImageKHR img_uv = prime_import_plane(uv_fd, DRM_FORMAT_GR88,
++                                          import_w / 2, import_h / 2,
++                                          uv_offset, (int) layer->planes[1].pitch);
++  if (img_y == EGL_NO_IMAGE_KHR || img_uv == EGL_NO_IMAGE_KHR) {
++    if (img_y != EGL_NO_IMAGE_KHR) egl_destroy_image(egl_dpy, img_y);
++    if (img_uv != EGL_NO_IMAGE_KHR) egl_destroy_image(egl_dpy, img_uv);
++    return NULL;
++  }
++  PrimeCacheEntry *e = &prime_cache[prime_cache_count++];
++  e->fd = fd;
++  e->width = import_w;
++  e->height = import_h;
++  e->pitch = pitch;
++  e->uv_offset = uv_offset;
++  e->img_y = img_y;
++  e->img_uv = img_uv;
++  e->tex_y = prime_bind_texture(img_y);
++  e->tex_uv = prime_bind_texture(img_uv);
++  GLenum glerr = glGetError();
++  if (glerr != GL_NO_ERROR) {
++    LOG("v4l2request: glEGLImageTargetTexture2DOES error=0x%04x fd=%d", glerr, fd);
++    prime_cache_count--;
++    glDeleteTextures(1, &e->tex_y);
++    glDeleteTextures(1, &e->tex_uv);
++    egl_destroy_image(egl_dpy, img_y);
++    egl_destroy_image(egl_dpy, img_uv);
++    memset(e, 0, sizeof *e);
++    return NULL;
++  }
++  if (prime_cache_count <= 2)
++    LOG("v4l2request: imported capture buffer fd=%d import=%dx%d pitch=%d uv_offset=%d",
++        fd, import_w, import_h, pitch, uv_offset);
++  return e;
++}
++
+ static void draw_frame_drm_prime(AVFrame *frame) {
+-  (void) frame;
+   static bool warned = false;
+-  if (!warned) {
+-    LOG("draw_frame: DRM_PRIME frame received but SDL renderer path is active; frame discarded");
+-    warned = true;
++  if (!request_mode || !gl_ctx) {
++    if (!warned) {
++      LOG("draw_frame: DRM_PRIME frame received but SDL renderer path is active; frame discarded");
++      warned = true;
++    }
++    return;
++  }
++  const AVDRMFrameDescriptor *desc = (const AVDRMFrameDescriptor *) frame->data[0];
++  const AVDRMLayerDescriptor *layer = desc ? &desc->layers[0] : NULL;
++  uint64_t modifier = desc ? desc->objects[0].format_modifier : 0;
++  if (!desc || desc->nb_layers != 1 || layer->format != DRM_FORMAT_NV12 ||
++      layer->nb_planes != 2 || layer->planes[0].pitch <= 0 ||
++      (modifier != DRM_FORMAT_MOD_LINEAR && modifier != DRM_FORMAT_MOD_INVALID)) {
++    if (!warned) {
++      LOG("v4l2request: unsupported DRM_PRIME frame layers=%d fourcc=0x%08x planes=%d "
++          "modifier=0x%" PRIx64 "; only linear NV12 is presented",
++          desc ? desc->nb_layers : -1, layer ? layer->format : 0,
++          layer ? layer->nb_planes : -1, modifier);
++      warned = true;
++    }
++    return;
+   }
++
++  /* The capture buffer holds the coded size and the UV plane starts
++   * after the coded rows. FFmpeg crops hwaccel frames by reducing
++   * width and height, so importing exactly the frame's size shows only
++   * the visible picture. */
++  int import_w = frame->width & ~1;
++  int import_h = frame->height & ~1;
++  if (import_w <= 0 || import_h <= 0 || import_w > (int) layer->planes[0].pitch)
++    return;
++
++  if (gl_init_nv12(import_w, import_h) != 0)
++    return;
++  PrimeCacheEntry *e = prime_cache_lookup(frame, desc, import_w, import_h);
++  if (!e)
++    return;
++
++  direct_update_dmabuf_quad_if_needed(frame, import_h);
++
++  glViewport(0, 0, gl_viewport_w, gl_viewport_h);
++  glClear(GL_COLOR_BUFFER_BIT);
++  glUseProgram(gl_program_nv12);
++  /* Sunshine's hardware encoders often omit the VUI, so the frame's
++   * colorspace is usually unspecified: use the colorspace the host
++   * reports with each decode unit, and the frame's range when the
++   * stream states it (Moonlight requests limited range). */
++  set_nv12_color(frame->colorspace == AVCOL_SPC_BT709 ? COLORSPACE_REC_709 :
++                 frame->colorspace == AVCOL_SPC_SMPTE170M ||
++                 frame->colorspace == AVCOL_SPC_BT470BG ? COLORSPACE_REC_601 :
++                 stream_colorspace,
++                 frame->color_range == AVCOL_RANGE_JPEG);
++  glActiveTexture(GL_TEXTURE0);
++  glBindTexture(GL_TEXTURE_2D, e->tex_y);
++  glUniform1i(gl_uloc_y_nv12, 0);
++  glActiveTexture(GL_TEXTURE1);
++  glBindTexture(GL_TEXTURE_2D, e->tex_uv);
++  glUniform1i(gl_uloc_uv_nv12, 1);
++  glBindBuffer(GL_ARRAY_BUFFER, gl_vbo);
++  glEnableVertexAttribArray(0);
++  glEnableVertexAttribArray(1);
++  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void *)0);
++  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void *)(2 * sizeof(GLfloat)));
++  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
++  GLenum glerr = glGetError();
++  if (glerr != GL_NO_ERROR) {
++    static bool logged_draw_error = false;
++    if (!logged_draw_error) {
++      LOG("v4l2request: glDrawArrays error=0x%04x", glerr);
++      logged_draw_error = true;
++    }
++  }
++  glDisableVertexAttribArray(0);
++  glDisableVertexAttribArray(1);
++  SDL_GL_SwapWindow(window);
+ }
+ /* ------------------------------------------------------------------ */
+ /* Display thread                                                     */
+@@ -1483,6 +1791,16 @@ static void draw_frame_drm_prime(AVFrame *frame) {
+ static void *display_loop(void *arg) {
+   (void) arg;
+ 
++  if (request_mode && create_window(stream_width, stream_height) != 0) {
++    LOG("v4l2request: window creation failed; no frames will be shown");
++    pthread_mutex_lock(&disp_mtx);
++    disp_setup_rc = -1;
++    disp_ready = true;
++    pthread_cond_signal(&disp_cond);
++    pthread_mutex_unlock(&disp_mtx);
++    return NULL;
++  }
++
+ 
+   int out_w = 0, out_h = 0;
+   if (direct_dmabuf_present) {
+@@ -1545,6 +1863,10 @@ static void *display_loop(void *arg) {
+   pthread_cond_signal(&disp_cond);
+   pthread_mutex_unlock(&disp_mtx);
+ 
++  /* Request mode samples the decoder's capture buffer directly. Keep
++   * the last presented frame referenced until the next one is drawn so
++   * the decoder cannot reuse that buffer while the GPU still reads it. */
++  AVFrame *shown = NULL;
+   for (;;) {
+     AVFrame *frame = NULL;
+ 
+@@ -1564,8 +1886,16 @@ static void *display_loop(void *arg) {
+     pthread_mutex_unlock(&disp_mtx);
+ 
+     draw_frame(frame);
+-    av_frame_free(&frame);
++    if (request_mode) {
++      av_frame_free(&shown);
++      shown = frame;
++    } else {
++      av_frame_free(&frame);
++    }
+   }
++  av_frame_free(&shown);
++  if (request_mode && egl_destroy_image)
++    prime_cache_clear();
+   direct_destroy_all_dmabuf_caches();
+   return NULL;
+ }
+@@ -1574,6 +1904,69 @@ static void *display_loop(void *arg) {
+ /* Moonlight callbacks                                                */
+ /* ------------------------------------------------------------------ */
+ 
++static int create_window(int width, int height) {
++  /* SDL2 GL window. The stream size and the compositor-visible window
++   * size are separate concerns. Create an initially-hidden, resizable
++   * GL surface, choose an initial display size from SDL's display bounds,
++   * then let runtime window/display events keep the viewport correct.
++   *
++   * MOONLIGHT_DISPLAY_INDEX can force a display for dual-screen devices
++   * like AYN Thor. Without it, SDL's default display selection is used
++   * and subsequent compositor moves/resizes are handled dynamically. */
++  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
++    LOG("SDL_Init: %s", SDL_GetError());
++    return -1;
++  }
++  int display_index = 0;
++  const char *display_env = getenv("MOONLIGHT_DISPLAY_INDEX");
++  if (display_env && *display_env) {
++    char *endptr = NULL;
++    long parsed = strtol(display_env, &endptr, 10);
++    if (endptr && *endptr == '\0' && parsed >= 0 && parsed < SDL_GetNumVideoDisplays())
++      display_index = (int) parsed;
++    else
++      LOG("setup: ignoring invalid MOONLIGHT_DISPLAY_INDEX=%s", display_env);
++  }
++
++  SDL_Rect bounds = {0, 0, width, height};
++  if (SDL_GetDisplayUsableBounds(display_index, &bounds) != 0 ||
++      bounds.w <= 0 || bounds.h <= 0) {
++    LOG("SDL_GetDisplayUsableBounds(%d) failed, falling back to stream size: %s",
++        display_index, SDL_GetError());
++    bounds.x = 0;
++    bounds.y = 0;
++    bounds.w = width;
++    bounds.h = height;
++  }
++  LOG("setup: stream=%dx%d display[%d]_bounds=%dx%d@%d,%d displays=%d",
++      width, height, display_index, bounds.w, bounds.h, bounds.x, bounds.y,
++      SDL_GetNumVideoDisplays());
++
++  window = SDL_CreateWindow("Moonlight",
++                            bounds.x, bounds.y,
++                            bounds.w, bounds.h,
++                            SDL_WINDOW_BORDERLESS |
++                            SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN |
++                            (direct_dmabuf_present ? SDL_WINDOW_OPENGL : 0));
++  if (window) {
++    /* Ensure SDL's surface size starts at the selected display bounds even
++     * if the compositor adjusted placement during creation. */
++    SDL_SetWindowPosition(window, bounds.x, bounds.y);
++    SDL_SetWindowSize(window, bounds.w, bounds.h);
++    SDL_ShowWindow(window);
++    /* Request mode targets single-screen handhelds whose tiling
++     * compositor would otherwise split the screen with the portal. */
++    if (request_mode &&
++        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP) != 0)
++      LOG("v4l2request: fullscreen request failed: %s", SDL_GetError());
++  }
++  if (!window) {
++    LOG("SDL_CreateWindow: %s", SDL_GetError());
++    return -1;
++  }
++  return 0;
++}
++
+ static int v4l2m2m_setup(int videoFormat, int width, int height,
+                          int redrawRate, void *context, int drFlags) {
+   stream_width = width;
+@@ -1584,6 +1977,15 @@ static int v4l2m2m_setup(int videoFormat, int width, int height,
+                 strcmp(getenv("MOONLIGHT_V4L2M2M_DIRECT"), "0") != 0;
+   direct_dmabuf_present = direct_v4l2 && getenv("MOONLIGHT_V4L2M2M_DMABUF") &&
+                           strcmp(getenv("MOONLIGHT_V4L2M2M_DMABUF"), "0") != 0;
++  if (request_mode) {
++    /* Request-mode frames are dma-bufs: present them through the GLES
++     * context, never through the SDL renderer. */
++    direct_v4l2 = false;
++    direct_dmabuf_present = true;
++    /* dma-buf import needs an EGL display. Under X11 (Xwayland) SDL
++     * would otherwise create the GLES context through GLX. */
++    SDL_SetHint(SDL_HINT_VIDEO_X11_FORCE_EGL, "1");
++  }
+   if (direct_dmabuf_present) {
+     LOG("setup: using experimental direct V4L2 dma-buf GL presentation path");
+     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+@@ -1591,7 +1993,10 @@ static int v4l2m2m_setup(int videoFormat, int width, int height,
+     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+   }
+-  if (direct_v4l2) {
++  if (request_mode) {
++    if (request_decoder_setup(videoFormat, width, height) != 0)
++      return -1;
++  } else if (direct_v4l2) {
+     LOG("setup: using experimental direct V4L2 decoder path");
+     if (direct_v4l2_setup(videoFormat, width, height) != 0)
+       return -1;
+@@ -1653,63 +2058,22 @@ static int v4l2m2m_setup(int videoFormat, int width, int height,
+   }
+   }
+ 
+-  /* SDL2 GL window. The stream size and the compositor-visible window
+-   * size are separate concerns. Create an initially-hidden, resizable
+-   * GL surface, choose an initial display size from SDL's display bounds,
+-   * then let runtime window/display events keep the viewport correct.
+-   *
+-   * MOONLIGHT_DISPLAY_INDEX can force a display for dual-screen devices
+-   * like AYN Thor. Without it, SDL's default display selection is used
+-   * and subsequent compositor moves/resizes are handled dynamically. */
+-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+-    LOG("SDL_Init: %s", SDL_GetError());
+-    return -1;
+-  }
+-  int display_index = 0;
+-  const char *display_env = getenv("MOONLIGHT_DISPLAY_INDEX");
+-  if (display_env && *display_env) {
+-    char *endptr = NULL;
+-    long parsed = strtol(display_env, &endptr, 10);
+-    if (endptr && *endptr == '\0' && parsed >= 0 && parsed < SDL_GetNumVideoDisplays())
+-      display_index = (int) parsed;
+-    else
+-      LOG("setup: ignoring invalid MOONLIGHT_DISPLAY_INDEX=%s", display_env);
+-  }
+-
+-  SDL_Rect bounds = {0, 0, width, height};
+-  if (SDL_GetDisplayUsableBounds(display_index, &bounds) != 0 ||
+-      bounds.w <= 0 || bounds.h <= 0) {
+-    LOG("SDL_GetDisplayUsableBounds(%d) failed, falling back to stream size: %s",
+-        display_index, SDL_GetError());
+-    bounds.x = 0;
+-    bounds.y = 0;
+-    bounds.w = width;
+-    bounds.h = height;
+-  }
+-  LOG("setup: stream=%dx%d display[%d]_bounds=%dx%d@%d,%d displays=%d",
+-      width, height, display_index, bounds.w, bounds.h, bounds.x, bounds.y,
+-      SDL_GetNumVideoDisplays());
+-
+-  window = SDL_CreateWindow("Moonlight",
+-                            bounds.x, bounds.y,
+-                            bounds.w, bounds.h,
+-                            SDL_WINDOW_BORDERLESS |
+-                            SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN |
+-                            (direct_dmabuf_present ? SDL_WINDOW_OPENGL : 0));
+-  if (window) {
+-    /* Ensure SDL's surface size starts at the selected display bounds even
+-     * if the compositor adjusted placement during creation. */
+-    SDL_SetWindowPosition(window, bounds.x, bounds.y);
+-    SDL_SetWindowSize(window, bounds.w, bounds.h);
+-    SDL_ShowWindow(window);
+-  }
+-  if (!window) {
+-    LOG("SDL_CreateWindow: %s", SDL_GetError());
+-    return -1;
+-  }
+   disp_eos    = false;
+   disp_ready  = false;
+   disp_setup_rc = 0;
++  if (request_mode) {
++    /* EGL bring-up on the H700 takes several seconds, longer than the
++     * host waits for the client's first ping while setup() blocks the
++     * video stream start. Create the window and GLES context on the
++     * display thread instead and return at once; frames that arrive
++     * before it is ready are replaced by newer ones and never shown. */
++    pthread_create(&disp_thread, NULL, display_loop, NULL);
++    LOG("setup: decoder=v4l2request presenter=prime-gl %dx%d (display starts in background)",
++        width, height);
++    return 0;
++  }
++  if (create_window(width, height) != 0)
++    return -1;
+   pthread_create(&disp_thread, NULL, display_loop, NULL);
+ 
+   /* Block setup() until the display thread has either finished GL
+@@ -1727,8 +2091,8 @@ static int v4l2m2m_setup(int videoFormat, int width, int height,
+   }
+ 
+   LOG("setup: decoder=%s presenter=%s %dx%d",
+-      direct_v4l2 ? "direct_v4l2" : codec->name,
+-      direct_dmabuf_present ? "direct-dmabuf" : "sdl-nv12",
++      direct_v4l2 ? "direct_v4l2" : request_mode ? "v4l2request" : codec->name,
++      request_mode ? "prime-gl" : direct_dmabuf_present ? "direct-dmabuf" : "sdl-nv12",
+       width, height);
+   return 0;
+ }
+@@ -1741,6 +2105,9 @@ static void v4l2m2m_cleanup(void) {
+   pthread_cond_signal(&disp_cond);
+   pthread_mutex_unlock(&disp_mtx);
+   pthread_join(disp_thread, NULL);
++  /* The display thread may have exited early (request mode window or
++   * GL failure) and left a submitted frame behind. */
++  if (disp_pending) av_frame_free(&disp_pending);
+ 
+   if (sdl_nv12_texture) { SDL_DestroyTexture(sdl_nv12_texture); sdl_nv12_texture = NULL; sdl_tex_w = sdl_tex_h = 0; }
+   if (sdl_renderer)     { SDL_DestroyRenderer(sdl_renderer); sdl_renderer = NULL; }
+@@ -1768,6 +2135,7 @@ static void v4l2m2m_cleanup(void) {
+ }
+ 
+ static int v4l2m2m_submit(PDECODE_UNIT du) {
++  stream_colorspace = du->colorspace;
+   if (direct_v4l2)
+     return direct_v4l2_submit(du);
+ 
+@@ -1828,8 +2196,27 @@ static int v4l2m2m_submit(PDECODE_UNIT du) {
+   return (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) ? DR_OK : DR_NEED_IDR;
+ }
+ 
++static int v4l2m2m_setup_stateful(int videoFormat, int width, int height,
++                                  int redrawRate, void *context, int drFlags) {
++  request_mode = false;
++  return v4l2m2m_setup(videoFormat, width, height, redrawRate, context, drFlags);
++}
++
++static int v4l2request_setup(int videoFormat, int width, int height,
++                             int redrawRate, void *context, int drFlags) {
++  request_mode = true;
++  return v4l2m2m_setup(videoFormat, width, height, redrawRate, context, drFlags);
++}
++
+ DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2m2m = {
+-  .setup            = v4l2m2m_setup,
++  .setup            = v4l2m2m_setup_stateful,
++  .cleanup          = v4l2m2m_cleanup,
++  .submitDecodeUnit = v4l2m2m_submit,
++  .capabilities     = CAPABILITY_DIRECT_SUBMIT,
++};
++
++DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2request = {
++  .setup            = v4l2request_setup,
+   .cleanup          = v4l2m2m_cleanup,
+   .submitDecodeUnit = v4l2m2m_submit,
+   .capabilities     = CAPABILITY_DIRECT_SUBMIT,
+diff --git a/src/video/video.h b/src/video/video.h
+index f7e6920..d431019 100644
+--- a/src/video/video.h
++++ b/src/video/video.h
+@@ -53,4 +53,5 @@ extern DECODER_RENDERER_CALLBACKS decoder_callbacks_ffmpeg_drm;
+ #endif
+ #ifdef HAVE_V4L2M2M
+ extern DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2m2m;
++extern DECODER_RENDERER_CALLBACKS decoder_callbacks_v4l2request;
+ #endif
+-- 
+2.53.0
+

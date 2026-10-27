@@ -11,6 +11,7 @@
   curl,
   expat,
   ffmpeg,
+  systemdLibs,
   libcec,
   libevdev,
   libpulseaudio,
@@ -28,6 +29,11 @@
   libX11,
 }:
 
+let
+  # Moonlight links an FFmpeg with the V4L2 Request hwaccel so the
+  # v4l2request platform can drive stateless decoders (H700 Cedrus).
+  ffmpegV4l2Request = import ./ffmpeg-v4l2-request.nix { inherit ffmpeg systemdLibs; };
+in
 stdenv.mkDerivation rec {
   pname = "moonlight-embedded-korri";
   version = "2.7.1-korri";
@@ -50,6 +56,7 @@ stdenv.mkDerivation rec {
     ./patches/0015-crop-coded-alignment-padding-on-present.patch
     # New Korri security patch, not a legacy harvest: pin the broker's certificate.
     ./patches/0020-pin-broker-authorized-server-certificate.patch
+    ./patches/0021-add-v4l2request-platform.patch
   ];
 
   nativeBuildInputs = [
@@ -63,7 +70,7 @@ stdenv.mkDerivation rec {
     avahi
     curl
     expat
-    ffmpeg
+    ffmpegV4l2Request
     libcec
     libevdev
     libpulseaudio
