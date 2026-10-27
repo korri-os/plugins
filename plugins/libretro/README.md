@@ -57,6 +57,39 @@ SNES, and the GBA logo evidence. Systems without an explicit layout use Core's
 `**/{title}.{ext}` default. Content rules identify files without requiring an
 enabled runner.
 
+## Netplay metadata
+
+`core-plugin.nix` matches each `coreFile` basename to its upstream info file in
+`pkgs.libretro-core-info`, pinned through the publisher's Nixpkgs lock. The
+current source is libretro-core-info **v1.22.2**, with Nixpkgs' fixed source hash.
+Only `savestate_features = "deterministic"` grants a runner `netplay`.
+Missing info, a missing flag, and other flag values grant none. There is no
+hand-written eligibility list.
+
+`generate-netplay.py` loads the built core on the native build machine and calls
+`retro_get_system_info`, without initializing the core or running content. It
+writes only `{ library, version }` from `library_name` and `library_version`.
+It does not use `display_version` or the plugin version. A missing symbol,
+unloadable library, or empty name/version fails the deterministic core's build.
+Installed plugins remain effect-free TypeScript source. Cross builds that cannot
+execute the core's architecture are refused; publication uses native builders.
+
+```sh
+nix build --no-link .#checks.x86_64-linux.korri-libretro-netplay
+```
+
+This focused gate imports the installed Snes9x 2010 and FAKE-08 declarations.
+An independent C probe reads Snes9x 2010's actual `.so` and compares both facts;
+FAKE-08's upstream `serialized` flag produces no `netplay`. It also tests generator
+boundaries and typechecks both generated modules and the helper against the
+pinned launch contract. The RetroArch settings gate tests both launch roles and
+keeps password-file contents out of argv and generated files.
+
+Generating declarations now needs the core artifacts, including for the broad
+catalogue typecheck. Run this focused gate for netplay work instead of building
+all cores merely to test the shared helper. No test here proves device gameplay
+or determinism across CPU types.
+
 ## Naming a different frontend
 
 An entry may add `frontend` to choose the RetroArch build that core runs:

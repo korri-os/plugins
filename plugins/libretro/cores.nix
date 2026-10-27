@@ -6,6 +6,8 @@
 # beetle-pce-fast ships mednafen_pce_fast_libretro.so.
 #
 # Content rules live in systems.nix. Each core names only the systems it runs.
+# core-plugin.nix matches each coreFile basename to the pinned libretro-core-info
+# file. Its deterministic savestate flag gates build-time netplay ABI probing.
 { pkgs }:
 let
   fake08 = pkgs.callPackage ./fake08/package.nix { };

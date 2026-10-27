@@ -16,6 +16,7 @@ export const runners = {
     program: "retroarch",
     core: "mgba",
     systems: ["gba"],
+    netplay: {"library": "mGBA", "version": "0.11-dev"},
   },
 }
 export const controls = {

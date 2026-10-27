@@ -538,6 +538,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           fake08Plugin = libretro.packages.korri-plugin-fake08;
           hostPackage = korri.packages.${system}.korri-plugin-host;
         };
+        korri-libretro-netplay = import ../plugins/libretro/netplay-check.nix {
+          inherit pkgs;
+          plugins = libretro.packages;
+          contract = korri.lib.${system}.pluginContract;
+        };
         korri-libretro-example = import ../plugins/libretro/example-check.nix {
           inherit pkgs mkPlugin;
         };
