@@ -1,0 +1,10 @@
+StorePath: /nix/store/84cqgpjixgcf1a96g6gpgqvvpr475xfg-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-dbb0917a5b58-moonlight-h700-gl/1wzah2dfpd0c3jv8apyv7hmy36rail5yq07fmy9p0z9krir92i5y.nar.xz
+Compression: xz
+FileHash: sha256:1wzah2dfpd0c3jv8apyv7hmy36rail5yq07fmy9p0z9krir92i5y
+FileSize: 3644
+NarHash: sha256:1kian4087l3vbbyhzhhbwmnyi6vhhxgf52vj43k07r9qikfwckgy
+NarSize: 11792
+References: bg8sbhlz9crqsgkirbkcavdgg80h5jiy-moonlight-identity-bootstrap g4sm5cpc1ligk0zfd0n9rwjbv7avp8pi-moonlight-embedded-korri-2.7.1-korri yp29vicq9lrv02rbr73rfx5jj9a0md8d-korri-moonlight-setup.service
+Deriver: vvvl9cj2h7hxx5q9xwahazlvww51i3a4-korri-plugin.drv
+Sig: korri-plugins-1:DuQx31aLuFHbHz7NMKTwWQ+wff1HPyxJYAXUBIr301e81BbYBvCnGiwgbpKM1Q6Z9dbV7P2t3r4rUDTbknsGCw==
