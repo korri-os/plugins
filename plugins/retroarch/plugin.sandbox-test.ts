@@ -519,9 +519,9 @@ describe("melonDS chosen layout", () => {
   it("does not change existing behavior without a layout", () => {
     const plan = launch({ ...input(), runnerId: "@korri:melonds/melonds" })
     expect(plan.files).toHaveLength(1)
-    expect(plan.files![0].content).not.toContain("core_options_path")
-    expect(plan.files![0].content).not.toContain("global_core_options")
-    expect(plan.files![0].content).not.toContain("game_specific_options")
+    expect(plan.files![0].path).toBe("/account/retroarch.cfg")
+    expect(plan.files![0].content).not.toContain("melonds_screen_")
+    expect(plan.env).toEqual({})
   })
 
   it("refuses layouts it cannot apply", () => {
@@ -529,6 +529,25 @@ describe("melonDS chosen layout", () => {
     for (const layout of ["invalid", 'Top Only"\nmelonds_screen_gap = "10']) {
       expect(() => launch({ ...input(), runnerId: "@korri:melonds/melonds", layout })).toThrow("layout")
     }
+  })
+
+  it("keeps nested settings and netplay arguments when Core also chooses a layout", () => {
+    const request: PluginLaunchInput = {
+      ...input({ settings: {
+        drivers: { video: "vulkan" },
+        logging: { level: "verbose" },
+        audio: { "volume-db": -3.5 },
+      } }),
+      runnerId: "@korri:melonds/melonds",
+      netplay: { role: "host", passwordConfig: "/run/netplay/password.cfg" },
+    }
+    const original = launch(request)
+    const layout = launch({ ...request, layout: "Top/Bottom" })
+    expect(layout.args).toEqual(original.args)
+    expect(layout.files[0]).toEqual(original.files[0])
+    expect(layout.files[0].content).toContain('video_driver = "vulkan"')
+    expect(layout.files[0].content).toContain("audio_volume = -3.5")
+    expect(layout.env).toEqual({ KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: layout.files[1].path })
   })
 
   it("keeps all native option routing settings unchanged", () => {

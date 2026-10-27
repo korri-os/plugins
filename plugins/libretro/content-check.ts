@@ -40,7 +40,7 @@ for (const [core, systemIds] of Object.entries(expected)) {
   const request = {
     runnerId: plugin.runners[core].id, program: "/program", corePath: "/core",
     contentPath: "/rom", accountRoot: "/account", saveRoot: "/saves", cacheRoot: "/cache",
-    files: { autoconfig: "/autoconfig" },
+    files: { autoconfig: "/autoconfig" }, artifacts: {},
   }
   const launch = plugin.handlers["launch.prepare"]
   const original = launch(request)
