@@ -128,6 +128,19 @@ fi
             git("--git-dir", self.remote, "rev-list", "--count", "cache-index"), "2"
         )
 
+    def test_different_deriver_keeps_first_record(self):
+        first = self.note("first")
+        first.write_text(first.read_text() + "Deriver: aaaa-first.drv\n")
+        publisher.push_metadata(str(self.remote), "cache-index", [first])
+        second = self.note("second", url="https://example.org/second.nar")
+        second.write_text(second.read_text() + "Deriver: bbbb-second.drv\n")
+        expected = publisher.push_metadata(str(self.remote), "cache-index", [second])
+        self.assertEqual(expected, {first.name: first.read_bytes()})
+        self.assertEqual(self.stored(first.name), first.read_text())
+        self.assertEqual(
+            git("--git-dir", self.remote, "rev-list", "--count", "cache-index"), "2"
+        )
+
     def test_different_signed_fields_refuse_entire_commit(self):
         first = self.note("first")
         publisher.push_metadata(str(self.remote), "cache-index", [first])

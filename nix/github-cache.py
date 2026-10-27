@@ -415,8 +415,9 @@ def equivalent_metadata(repo, asset, path):
         or not 0 < asset.get("size", 0) <= 64 * 1024
     ):
         return False
-    # Keep the first published URL for shared dependencies. Signatures and
-    # every other Nix field must match. This is not a new approval or key grant.
+    # Keep the first published URL and Deriver for shared dependencies.
+    # Signatures and every signed Nix field must match. This is not a new
+    # approval or key grant.
     data = subprocess.check_output(
         [
             "gh",
@@ -445,8 +446,13 @@ def equivalent_metadata_bytes(data, path):
     if len(remote_urls) != 1:
         return False
     https_base(remote_urls[0])
-    return [line for line in remote if not line.startswith("URL: ")] == [
-        line for line in local if not line.startswith("URL: ")
+    # URL and Deriver are outside Nix's signed fingerprint. The same output can
+    # come from different derivations (for example, equal fixed-output sources
+    # fetched differently), so a later batch may name another Deriver. Every
+    # other line, including Sig, must match; the first record is kept as is.
+    unsigned = ("URL: ", "Deriver: ")
+    return [line for line in remote if not line.startswith(unsigned)] == [
+        line for line in local if not line.startswith(unsigned)
     ]
 
 
