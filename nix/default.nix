@@ -425,6 +425,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           definition = retroarchDefinition;
         };
         korri-retroarch-settings = retroarchDefinition.packages.retroarch-settings;
+        korri-retroarch-netplay-password = import ../plugins/retroarch/patches/retroarch-netplay-config-password-check.nix {
+          inherit pkgs;
+          program = retroarchDefinition.packages.retroarch;
+        };
         korri-fake08-package = import ../plugins/libretro/fake08/check.nix {
           inherit pkgs;
           package = libretro.packages.korri-plugin-fake08;

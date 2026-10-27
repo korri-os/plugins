@@ -1,7 +1,7 @@
 # `base` is the frontend build a core may choose: nixpkgs' RetroArch by
 # default, or a pinned fork or overrideAttrs derivation named by a catalogue
 # entry. It selects the build, never whether Korri's protections apply — the
-# read-only patch and its compiled source regression run against whatever is
+# read-only and non-interactive netplay patches run against whatever is
 # chosen, and the settings evidence is derived from that exact binary.
 {
   pkgs,
@@ -16,7 +16,10 @@ let
         readOnlyPatch = retroarchReadOnlyPatch;
       };
   retroarch = base.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ retroarchReadOnlyPatch ];
+    patches = (old.patches or [ ]) ++ [
+      retroarchReadOnlyPatch
+      ./patches/retroarch-netplay-config-password.patch
+    ];
     # Keep the actual packaged emulator behind the compiled source regression.
     postPatch = (old.postPatch or "") + ''
       test -e ${retroarchUdevReadOnlyCheck}
