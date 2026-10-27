@@ -38,6 +38,7 @@ pkgs.runCommand "korri-moonlight-native-check"
     ${plugin.files.moonlight} -help >help 2>&1 || true
     grep -F -- '-autowindowresize' help
     grep -F -- 'v4l2m2m' help
+    grep -F -- 'v4l2request' help
     grep -F -- 'x11' help
     mkdir settings-check
     cp ${./plugin.ts} settings-check/plugin.ts
