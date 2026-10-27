@@ -19,6 +19,39 @@ from pathlib import Path
 HERE = Path(__file__).parent
 
 
+def wait_for_window(process, timeout=60):
+    deadline = time.monotonic() + timeout
+    while True:
+        status = process.poll()
+        assert status is None, f"Pyxel exited before mapping its window: {status}"
+        visible = subprocess.run(
+            ["xdotool", "search", "--onlyvisible", "--pid", str(process.pid)],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        if visible.returncode == 0 and visible.stdout.splitlines():
+            return visible.stdout.splitlines()[0]
+        assert visible.returncode in (0, 1), visible.stderr
+        if time.monotonic() >= deadline:
+            # Distinguish no X window from an existing but unmapped window. The
+            # old --sync timeout hid this evidence and ignored frontend exits.
+            windows = subprocess.run(
+                ["xdotool", "search", "--pid", str(process.pid)],
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+            raise AssertionError(
+                f"No visible Pyxel window after {timeout}s; process {process.pid} "
+                f"is alive; all matching X windows: {windows.stdout.strip() or 'none'}; "
+                f"xdotool: {visible.stderr.strip()}"
+            )
+        time.sleep(0.05)
+
+
 def runtime(package, external=None, expected_hash=None, start_probe=None, korrid=None):
     package = Path(package)
     manifest = json.loads((package / "manifest.json").read_text())
@@ -150,22 +183,7 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
             )
             try:
                 # Core's unmodified no-hook plan execs the native program in place.
-                native_pid = process.pid
-                window = subprocess.run(
-                    [
-                        "xdotool",
-                        "search",
-                        "--sync",
-                        "--onlyvisible",
-                        "--pid",
-                        str(native_pid),
-                    ],
-                    text=True,
-                    capture_output=True,
-                    # Loaded CI runners took longer than 15 s to map it.
-                    timeout=60,
-                    check=True,
-                ).stdout.splitlines()[0]
+                window = wait_for_window(process)
                 subprocess.run(
                     ["xdotool", "windowfocus", "--sync", window], check=True, timeout=5
                 )
@@ -230,6 +248,15 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                         and "BITSY_TEST_START_UP" in stderr
                     ), stderr
                 return root
+            except (AssertionError, subprocess.TimeoutExpired) as error:
+                if process.poll() is None:
+                    process.kill()
+                stdout, stderr = process.communicate()
+                # Include native output in the final error, so Nix's short log
+                # tail cannot discard it above the Python traceback.
+                raise AssertionError(
+                    f"{error}\nNative Pyxel output:\n{stdout}{stderr}"
+                ) from None
             finally:
                 if process.poll() is None:
                     process.kill()

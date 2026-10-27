@@ -52,6 +52,11 @@ pkgs.writeShellApplication {
         xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id" && break
         sleep 0.05
       done
+      if ! kill -0 "$wm" 2>/dev/null || ! xprop -root _NET_SUPPORTING_WM_CHECK | grep -q "window id"; then
+        cat "$XDG_RUNTIME_DIR/openbox.log" >&2
+        echo "Openbox did not claim the Xvfb display before Pyxel" >&2
+        exit 1
+      fi
       python3 ${source}/plugins/pyxel/runtime.py "$@"
     ' probe "$@"
   '';

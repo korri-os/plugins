@@ -17,6 +17,9 @@ pkgs.runCommand "korri-pyxel-native-check"
       pkgs.typescript
       pkgs.pkg-config
       pkgs.stdenv.cc
+      pkgs.python3
+      pkgs.xvfb-run
+      pkgs.xdotool
     ];
     buildInputs = [ pkgs.SDL2 ];
   }
@@ -35,6 +38,7 @@ pkgs.runCommand "korri-pyxel-native-check"
     cc -shared -fPIC ${../bitsybox/start-button-probe.c} \
       $(pkg-config --cflags sdl2) -Wl,--no-as-needed $(pkg-config --libs sdl2) -pthread -ldl -o "$PWD/start-probe.so"
     export KORRI_START_PROBE="$PWD/start-probe.so"
+    xvfb-run -a python3 ${./.}/window.test.py
     ${probe}/bin/korri-pyxel-native-probe ${package}
     test -s "$KORRI_NATIVE_PROOF_DIR/pyxel.png"
     touch "$out"
