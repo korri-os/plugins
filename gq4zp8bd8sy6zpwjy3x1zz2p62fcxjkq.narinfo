@@ -1,0 +1,10 @@
+StorePath: /nix/store/gq4zp8bd8sy6zpwjy3x1zz2p62fcxjkq-ffmpeg-9.0.2-bin
+URL: https://github.com/korri-os/plugins/releases/download/build-b65ce7b266b4-moonlight-v4l2request/1c23hpf2jiqi1nm47dfi39rqwb87lhcf88pcb9qhbqfs9j5camhx.nar.xz
+Compression: xz
+FileHash: sha256:1c23hpf2jiqi1nm47dfi39rqwb87lhcf88pcb9qhbqfs9j5camhx
+FileSize: 271932
+NarHash: sha256:18d42d490z4z5xycb22hcpp096w7x9d53axbz1i7sqx8y7yairp6
+NarSize: 1110800
+References: 9qkvx8c89fqsz63f4z9gngk9hpi00ss4-sdl2-compat-2.32.74 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 r4as4jvkgvca8kdi2rcl092chgczyfxd-ffmpeg-9.0.2-lib z5was9gcwrsqhmc7bzghyapmhz0bqcwh-ffmpeg-9.0.2-data
+Deriver: 7k8s093dc8p8gg19sn9f16zzx72my310-ffmpeg-9.0.2.drv
+Sig: korri-plugins-1:m5oKfX2KXzwH5Hiz26BDjIhGBhGEGC3DVEMOu3s2hQ1MQwero4F15N01IW9AZtdvyC/bw2vlNy9ev2xdOuDqCA==
