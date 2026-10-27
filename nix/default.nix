@@ -360,6 +360,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         program = "${retroarchCheck}/bin/korri-retroarch-check";
       };
     };
+    publicationChecks = import ./publication-checks.nix {
+      inherit (pkgs) lib;
+      libretroPackages = libretro.packages;
+      sunshineChecks = sunshine.checks;
+      sunshinePackages = sunshine.packages;
+    };
     checks =
       sunshine.checks
       // integration.checks

@@ -40,7 +40,7 @@ jobs:
   build:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - system: x86_64-linux
@@ -105,52 +105,20 @@ jobs:
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           nix run ".#ci.packages.$SYSTEM.korri-cache" -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --index-branch "$INDEX_BRANCH"
           test_output=$(nix build --no-link --print-out-paths ".#ci.checks.$SYSTEM.korri-github-cache")
-          nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
-          # Authenticated source failures are fatal; never retry an HTTP 403.
-          checks=(
-            ".#ci.checks.$SYSTEM.korri-device-cache"
-            ".#ci.checks.$SYSTEM.korri-plugin-builder"
-            ".#ci.checks.$SYSTEM.korri-tailscale-package"
-            ".#ci.checks.$SYSTEM.korri-retroarch-package"
-            ".#ci.checks.$SYSTEM.korri-retroarch-settings"
-            ".#ci.checks.$SYSTEM.korri-libretro-example"
-            ".#ci.checks.$SYSTEM.korri-fake08-package"
-            ".#ci.checks.$SYSTEM.korri-fake08-admission"
-            ".#ci.checks.$SYSTEM.korri-solarus-plugin"
-            ".#ci.checks.$SYSTEM.korri-cemu-package"
-            ".#ci.checks.$SYSTEM.korri-cemu-admission"
-            ".#ci.checks.$SYSTEM.korri-gamescope-plugin"
-            ".#ci.checks.$SYSTEM.korri-starter-pack-package"
-            ".#ci.checks.$SYSTEM.korri-starter-pack-admission"
-            ".#ci.checks.$SYSTEM.korri-starter-pack-solarus-runtime"
-            ".#ci.checks.$SYSTEM.korri-libretro-frontend-override"
-            ".#ci.checks.$SYSTEM.korri-libretro-typecheck"
-            ".#ci.checks.$SYSTEM.korri-pico8-plugin"
-            ".#ci.checks.$SYSTEM.korri-tic80gallery-plugin"
-            ".#ci.checks.$SYSTEM.korri-wasm4gallery-plugin"
-            ".#ci.checks.$SYSTEM.korri-lowresnxgallery-plugin"
-            ".#ci.checks.$SYSTEM.korri-puzzlescript-plugin"
-            ".#ci.checks.$SYSTEM.korri-pyxelgallery-plugin"
-            ".#ci.checks.$SYSTEM.korri-native-fantasy-runners"
-            ".#ci.checks.$SYSTEM.korri-pyxel-native"
-            ".#ci.checks.$SYSTEM.korri-fantasy-runner-admission"
-            ".#ci.checks.$SYSTEM.korri-homebrewhub-plugin"
-            ".#ci.checks.$SYSTEM.korri-retrobrews-plugin"
-            ".#ci.checks.$SYSTEM.korri-ssh-upstream"
-            ".#ci.checks.$SYSTEM.korri-ssh-host-support"
-            ".#ci.checks.$SYSTEM.korri-sunshine-plugin-admission"
-            ".#ci.checks.$SYSTEM.korri-sunshine-plugin-native"
-            ".#ci.checks.$SYSTEM.sunshine-korri-package"
-            ".#ci.checks.$SYSTEM.sunshine-korri-certificate-control"
-            ".#ci.checks.$SYSTEM.sunshine-korri-v4l2m2m"
-            ".#ci.checks.$SYSTEM.sunshine-offline-retirement"
-          )
-          nix build --no-link "${checks[@]}"
-          # This check boots an emulated VM. ARM runners have no KVM. Beside the
-          # parallel builds above, its guest never finished booting in 60 min
-          # (run 38840426871, attempts 2 and 3). Alone on the runner it boots in
-          # about 2 min (run 38983221358). Build it last, with live output.
-          nix build --no-link --print-build-logs ".#ci.checks.$SYSTEM.sunshine-korri-input-seat-patch"
+          # Scope gates to this batch. Full regression coverage runs separately
+          # in plugin-checks.yml and cannot cancel a publication architecture.
+          python3 nix/publication-checks-test.py
+          read -ra selected_outputs <<< "$PACKAGES"
+          python3 nix/publication-checks.py --system "$SYSTEM" "${selected_outputs[@]}" > "$RUNNER_TEMP/publication-checks.txt"
+          cat "$RUNNER_TEMP/publication-checks.txt"
+          if grep -q '\.korri-retroarch-package$' "$RUNNER_TEMP/publication-checks.txt"; then
+            nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
+          fi
+          # Run runtime/VM gates alone, not beside other check builds. Native
+          # startup deadlines still catch a frontend that never starts.
+          while IFS= read -r check; do
+            nix build --no-link --print-build-logs --max-jobs 1 "$check"
+          done < "$RUNNER_TEMP/publication-checks.txt"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool ".#ci.packages.$SYSTEM.korri-cache"
       - name: Build the selected packages without a signing key

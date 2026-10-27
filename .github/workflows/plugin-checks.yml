@@ -1,0 +1,64 @@
+name: Check all plugins
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Regression runs must neither share publication's concurrency group nor have
+# access to its environment/signing key. A failed runtime does not cancel a batch.
+concurrency:
+  group: plugin-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-24.04
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
+      - name: Read existing signed publisher cache
+        run: python3 .github/workflows/trust-plugin-caches.py
+      - name: Configure scoped read-only GitHub source authentication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: sudo --preserve-env=GITHUB_TOKEN,GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py setup --nix "$(command -v nix)"
+      - name: Verify publication scope
+        run: python3 nix/publication-checks-test.py
+      - name: Full regression checks without competing check builds
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
+          nix eval --json ".#ci.checks.$SYSTEM" --apply builtins.attrNames > "$RUNNER_TEMP/check-names.json"
+          python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))))' "$RUNNER_TEMP/check-names.json" > "$RUNNER_TEMP/check-names.txt"
+          # In particular, VM boot and native window tests must not compete with
+          # unrelated Nix builds on the same small hosted runner.
+          failed=0
+          while IFS= read -r check; do
+            if ! nix build --no-link --print-build-logs --max-jobs 1 ".#ci.checks.$SYSTEM.$check"; then
+              failed=1
+            fi
+          done < "$RUNNER_TEMP/check-names.txt"
+          test "$failed" = 0
+      - name: Remove source credentials
+        if: always()
+        run: sudo --preserve-env=GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py cleanup

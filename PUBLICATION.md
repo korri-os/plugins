@@ -84,6 +84,82 @@ successful Core test grants neither. Independent closures can retain old depende
 more disk. A Core dependency update does not update those plugin dependencies;
 security updates to them still require deliberate plugin publication.
 
+## Publication validation scope (#267)
+
+Publication validates its selected outputs, not every native frontend in this
+repository. `nix/publication-checks.nix` lists the existing package consumers
+that gate each output. The libretro entries come from the actual catalogue;
+composed Steam and starter-pack entries retain their dependency gates. The
+selector rejects unknown outputs. Its regression test checks coverage and valid
+check names against both real architecture output sets. Add reviewed gates when
+adding a package; do not silently fall back to no tests.
+
+The publisher tests, signed-cache configuration, scoped source authentication,
+churn regression and cold-host lifecycle acceptance still gate every batch.
+Matching native/admission/package checks also gate the batch. In particular,
+publishing Pyxel still runs its native window check; publishing the four fantasy
+runners still runs their native frontend check. Publishing SNES cores and
+RetroArch does not run Pyxel or Cemu. Neither signing nor source pinning changes.
+
+`plugin-checks.yml` runs **all** `ci.checks` on both architectures for pushes to
+main, pull requests and manual checks. It has no publication environment or
+signing key and is not a dependency of `publish`. Both workflows run one check
+build at a time with `--max-jobs 1`, so unrelated compilations cannot compete
+with window startup or emulated VM boot in that job. Dependency tests inside a
+single derivation can still run in parallel. Architecture failures no longer
+cancel the other architecture; both must still pass before publication.
+
+Cost: full regression CI consumes a separate pair of runners, and unrelated
+regressions no longer block release of a different package. The package-to-gate
+mapping needs review when dependencies change. Serial checks can take longer
+when the runner has spare capacity. This is not a claim that every graphical
+check is now reliable on hosted hardware.
+
+### Evidence from 2026-10-27
+
+The failed job logs, rather than only the run summaries, show:
+
+| Run / attempt | Failed job | Actual failure |
+| --- | --- | --- |
+| 40506803721 / 1 | 122198073004, x86 | Pyxel visible-window search expired after **15 s** |
+| 40519385709 / 1 | 122288734345, x86 | The same search expired after 60 s at `554884f` |
+| 40549543073 / 1 | 122349417989, ARM | SDL 3.4.18 **`testrwlock`** exceeded its 20 s CTest deadline; Cemu and its package check then failed as dependencies |
+| 40549543073 / 2 | 122393841811, x86 | The same Pyxel search expired after 60 s |
+
+`test.util` is the failed build target, not the SDL test name. The SDL source
+creates six reader threads and one writer. Readers hold the lock for one
+second, then pause for 10 ms; the source explicitly warns about starvation.
+The writer can remain inside its blocking lock call and miss the test's own
+10-second shutdown condition. On this build machine, the exact-version nixpkgs
+installed test timed out at 20 s once without competing workers and once with
+six CPU workers; two other loaded runs passed in 12.11 s and 12.19 s. All four
+runs were restricted to two CPUs. This proves scheduling sensitivity, not a
+Cemu frontend fault or a simple need for more CPU. SDL's tests remain enabled.
+
+Pyxel's exact hosted failure is **not proved**. Its probe already forces
+llvmpipe software GL, opens a real GLX connection before launch, starts Openbox,
+and waits for its root property. Software GL is therefore not unique to CI,
+and an initial Xvfb startup race is not supported by these failures. A local
+no-window-manager experiment still found Pyxel with `--onlyvisible`: SDL maps
+its own window. Three unchanged probe runs restricted to two CPUs with six
+competing workers passed. The revised complete native check, including the
+Start-event probe, also passed with that load (50.71 s for the entire check,
+not window startup alone). These experiments do not reproduce hosted Pyxel
+failure, so no longer timeout or GPU claim is justified.
+
+The window wait now fails immediately if the frontend exits, reports whether
+any matching (possibly hidden) X windows exist on expiry, and includes native
+output in Nix's final error tail. The display setup explicitly refuses a missing
+or dead window manager instead of continuing after its readiness loop. A live
+process that never maps a window still fails at the unchanged 60-second bound;
+real-process regression tests cover both early exit and no window.
+
+These workflow, test and diagnostic changes do not require publishing game
+plugins. Compare package output paths before landing. A future batch still
+needs a new pinned-source dry run at its own tested SHA; an old dry run does not
+approve publication from this branch. No hosted run was dispatched or retried
+as part of this investigation.
+
 ## Starter pack
 
 `korri-plugin-starter-pack` builds `@korri:starter-pack` with the title
