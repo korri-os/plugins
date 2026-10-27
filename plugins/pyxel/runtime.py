@@ -162,17 +162,27 @@ def runtime(package, external=None, expected_hash=None, start_probe=None, korrid
                     ],
                     text=True,
                     capture_output=True,
-                    timeout=15,
+                    # Loaded CI runners took longer than 15 s to map it.
+                    timeout=60,
                     check=True,
                 ).stdout.splitlines()[0]
                 subprocess.run(
                     ["xdotool", "windowfocus", "--sync", window], check=True, timeout=5
                 )
-                time.sleep(0.25)  # Allow the window manager to apply native fullscreen.
                 # Test the actual native SDL window state, not wrapper text.
-                state = subprocess.check_output(
-                    ["xprop", "-id", window, "_NET_WM_STATE"], text=True
-                )
+                # The window manager applies native fullscreen asynchronously;
+                # a fixed 0.25 s wait failed on a loaded CI runner.
+                deadline = time.monotonic() + 10
+                while True:
+                    state = subprocess.check_output(
+                        ["xprop", "-id", window, "_NET_WM_STATE"], text=True
+                    )
+                    if (
+                        "_NET_WM_STATE_FULLSCREEN" in state
+                        or time.monotonic() >= deadline
+                    ):
+                        break
+                    time.sleep(0.05)
                 assert "_NET_WM_STATE_FULLSCREEN" in state, state
                 before_frame = -1
                 if original:
