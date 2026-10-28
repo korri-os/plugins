@@ -525,6 +525,8 @@ describe("melonDS compositor touch", () => {
   it("keeps 54 other-core launch plans byte-identical to candidate 2f5aedc", () => {
     // Golden SHA-256 of the entire serialized plans from the previous candidate,
     // including native cfg bytes, custom input drivers, option routing and netplay.
+    // Rebased once: the shared cfg now sets input_quit_gamepad_combo = "0" so
+    // inputd's L1 + R1 + Start + Select hold is the only kill chord.
     const plans = []
     for (const runnerId of ["@korri:mgba/mgba", "@korri:snes9x/snes9x", "@korri:gambatte/gambatte"]) {
       for (const files of [{ autoconfig: "/autoconfig" }, { autoconfig: "/autoconfig", "core-info": "/core-info" }]) {
@@ -541,7 +543,7 @@ describe("melonDS compositor touch", () => {
     }
     expect(plans).toHaveLength(54)
     expect(createHash("sha256").update(JSON.stringify(plans)).digest("hex"))
-      .toBe("f9f21248466c91778ffcda7e22caf61ab746ea577ac118a0511fe79689e2ff79")
+      .toBe("b4a2732e711453a59fc9762a80965e8c57e34e98b6cd528f206ac9e6c8ca24fd")
   })
 })
 

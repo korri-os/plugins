@@ -26,7 +26,7 @@ for (const [core, path] of Object.entries(packages)) {
   assert.deepEqual(output.args, ["--config", `${input.accountRoot}/retroarch.cfg`,
     "-L", input.corePath, input.contentPath])
   const config = output.files.find((f: {path: string}) => f.path.endsWith("retroarch.cfg")).content
-  assert.ok(config.includes('input_quit_gamepad_combo = "4"'))
+  assert.ok(config.includes('input_quit_gamepad_combo = "0"'))
   assert.ok(config.includes('input_menu_toggle_gamepad_combo = "2"'))
   assert.ok(config.includes(`savefile_directory = "${input.saveRoot}/saves"`))
   assert.ok(output.directories.every((d: string) => !d.startsWith("/media")))
