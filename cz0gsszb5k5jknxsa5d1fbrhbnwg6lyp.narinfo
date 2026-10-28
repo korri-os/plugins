@@ -1,0 +1,10 @@
+StorePath: /nix/store/cz0gsszb5k5jknxsa5d1fbrhbnwg6lyp-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-823ea4985fe7-melonds-panes-2/1jjqi15axpqj62yvi4xp6b8vl7x9j0cdnm4pla5pmhqxv333lrqg.nar.xz
+Compression: xz
+FileHash: sha256:1jjqi15axpqj62yvi4xp6b8vl7x9j0cdnm4pla5pmhqxv333lrqg
+FileSize: 576
+NarHash: sha256:1xgdpndfap8mf91baw04px0rhrxvvaicqizr9qfxvv5sj7546rmn
+NarSize: 1480
+References: krdg5j17x6gmn5zbflhxrq5r41ndys7x-retroarch-source-checked-settings-1.22.2 l89g3s78vz0ipdwfbqn1pq28cmhjl423-retroarch-bare-1.22.2 sbp6xbds1dcrs41xqraip3yagvdw1fgp-korri-inputplumber-retroarch-autoconfig-1.22.0
+Deriver: 9ydx1zvp80zbr1lx5xk51jz3fsmf4xk6-korri-plugin.drv
+Sig: korri-plugins-1:8DRLzDaR5aj0UuA8v891vOvL7onN1Kg9bkA5HpWs8wOYDADT2PPYWXT9KxKun88K586jrROYAFrYg9RP8YQPDg==
