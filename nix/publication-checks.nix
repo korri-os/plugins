@@ -11,6 +11,7 @@ let
   retroarch = [
     "korri-retroarch-package"
     "korri-retroarch-settings"
+    "korri-retroarch-core-options-overlay"
     "korri-libretro-example"
     "korri-libretro-frontend-override"
     "korri-libretro-typecheck"
@@ -71,6 +72,7 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
 // {
   korri-plugin-fake08 = fake08;
   korri-plugin-retroarch = retroarch;
+  korri-plugin-melonds = retroarch ++ [ "korri-melonds-admission" ];
   korri-tailscale = [ "korri-tailscale-package" ];
   korri-plugin-ssh = [
     "korri-ssh-upstream"

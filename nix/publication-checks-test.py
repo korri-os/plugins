@@ -59,6 +59,24 @@ class PublicationChecksTest(unittest.TestCase):
             ):
                 self.assertNotIn(unrelated, checks)
 
+    def test_melonds_batch_keeps_pane_overlay_and_netplay_gates(self):
+        for mapping in self.mappings.values():
+            checks = selection.select_checks(
+                mapping, ["korri-plugin-melonds", "korri-plugin-retroarch"]
+            )
+            for gate in (
+                "korri-melonds-admission",
+                "korri-retroarch-core-options-overlay",
+                "korri-retroarch-netplay-password",
+                "korri-retroarch-netplay-host-during-play",
+            ):
+                self.assertIn(gate, checks)
+            self.assertNotIn("korri-pyxel-native", checks)
+            self.assertNotIn(
+                "korri-melonds-admission",
+                selection.select_checks(mapping, ["korri-plugin-retroarch"]),
+            )
+
     def test_native_gates_still_apply_to_their_packages(self):
         for mapping in self.mappings.values():
             for package, gate in (

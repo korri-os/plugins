@@ -107,9 +107,9 @@ mgba-nightly = {
 
 Omit it and the core takes nixpkgs' RetroArch, which is what every entry does
 today. The override selects the **build**, never the protections: Korri's
-read-only and launch-overlay patches and their native source regressions
-still run against whatever is chosen. A fork the patches cannot apply to fails
-the build rather than quietly losing those protections.
+read-only, non-interactive netplay and launch-overlay patches and their native
+regressions still run against whatever is chosen. A fork the patches cannot
+apply to fails the build rather than quietly losing those protections.
 
 The settings evidence follows the selected binary. A core answering
 `settings.describe` from the default build's schema while running a different
@@ -178,6 +178,8 @@ The pinned Core contract supplies `PluginLaunchInput.layout` directly. The
 `korri-melonds-admission` check runs that Core's typed registry parser against
 the actual packaged plugin and evaluates each layout through its real sandbox.
 Older hosts without the panes/layouts parser cannot admit this candidate.
+Publication scopes the overlay gate to RetroArch packages and adds typed Core
+admission when the selected package is melonDS.
 
 ## The runner owns its settings
 
