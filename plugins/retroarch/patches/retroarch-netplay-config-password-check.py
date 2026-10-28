@@ -61,10 +61,25 @@ netplay_request_device_p2 = "true"
             log = directory / f"{role}.log"
             output = log.open("w")
             files.append(output)
-            args = ["--host"] if role == "host" else ["--connect", "127.0.0.1", "--port", str(port)]
+            args = (
+                ["--host"]
+                if role == "host"
+                else ["--connect", "127.0.0.1", "--port", str(port)]
+            )
             process = subprocess.Popen(
-                [program, "-v", "--config", str(config), "-L", core, *args, str(content)],
-                stdout=output, stderr=subprocess.STDOUT, env={**os.environ, "HOME": str(directory)},
+                [
+                    program,
+                    "-v",
+                    "--config",
+                    str(config),
+                    "-L",
+                    core,
+                    *args,
+                    str(content),
+                ],
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                env={**os.environ, "HOME": str(directory)},
             )
             processes.append(process)
             if role == "host":
@@ -72,17 +87,22 @@ netplay_request_device_p2 = "true"
         host_log = directory / "host.log"
         client_log = directory / "client.log"
         if accepted:
-            wait_for(client_log, '[Netplay] Connected to', processes[1])
-            wait_for(client_log, 'netplay-check synced=', processes[1])
+            wait_for(client_log, "[Netplay] Connected to", processes[1])
+            wait_for(client_log, "netplay-check synced=", processes[1])
             time.sleep(5)
-            frames = [int(n) for n in re.findall(r"netplay-check frame=(\d+)", client_log.read_text())]
+            frames = [
+                int(n)
+                for n in re.findall(
+                    r"netplay-check frame=(\d+)", client_log.read_text()
+                )
+            ]
             assert len(set(frames)) >= 2, client_log.read_text()
             assert all(p.poll() is None for p in processes), client_log.read_text()
             assert "wrong password" not in host_log.read_text()
             print(f"Configured headless password accepted; client advanced: {frames}")
         else:
             wait_for(host_log, "wrong password", processes[0])
-            assert '[Netplay] Connected to' not in client_log.read_text()
+            assert "[Netplay] Connected to" not in client_log.read_text()
             print("Wrong headless password refused by the native host handshake")
     finally:
         for process in processes:

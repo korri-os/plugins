@@ -2,7 +2,11 @@
 { pkgs, program }:
 pkgs.runCommand "retroarch-netplay-config-password-check"
   {
-    nativeBuildInputs = [ pkgs.stdenv.cc pkgs.python3 pkgs.xvfb-run ];
+    nativeBuildInputs = [
+      pkgs.stdenv.cc
+      pkgs.python3
+      pkgs.xvfb-run
+    ];
   }
   ''
     $CC -std=c99 -shared -fPIC -Wall -Wextra -Werror \
