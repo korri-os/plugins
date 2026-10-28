@@ -1,0 +1,10 @@
+StorePath: /nix/store/04lcy26k3q4wq58912xxk2vv2c9z8has-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-7dfc18b9390f-netplay/0nkqlrz5n9iyjxf31rxh4kvhp68vyy68khq71hyg85kscgwlbpzc.nar.xz
+Compression: xz
+FileHash: sha256:0nkqlrz5n9iyjxf31rxh4kvhp68vyy68khq71hyg85kscgwlbpzc
+FileSize: 576
+NarHash: sha256:0lbbfcmqwr8f1p96y1kpjjixydl8d3rq7vi1fiqljm2539s3icv3
+NarSize: 1480
+References: ajn9h7vdp9r6dk9xipsidw4jxl8n1di4-retroarch-bare-1.22.2 fdhj5as9wa1p9s26yyppvklhjyv7jli1-retroarch-source-checked-settings-1.22.2 sbp6xbds1dcrs41xqraip3yagvdw1fgp-korri-inputplumber-retroarch-autoconfig-1.22.0
+Deriver: nfdhm6r3jip46jr3a9325j1vgjcr2crm-korri-plugin.drv
+Sig: korri-plugins-1:1E5nxuMxuz20cIak9UhQ5GSZUHkQamhqJoAl3CpEkJvcGf4YRlw97j97kRisC/81LYa3DYJ+/CjtqXY2COhIAA==

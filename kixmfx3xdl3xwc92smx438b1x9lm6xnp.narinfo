@@ -1,0 +1,10 @@
+StorePath: /nix/store/kixmfx3xdl3xwc92smx438b1x9lm6xnp-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-7dfc18b9390f-netplay/1g4pqxc63pacixaapvqjh9cryiqsvd8k81rxn4jmb4ahaigr4xxc.nar.xz
+Compression: xz
+FileHash: sha256:1g4pqxc63pacixaapvqjh9cryiqsvd8k81rxn4jmb4ahaigr4xxc
+FileSize: 13016
+NarHash: sha256:0bv3miadlsysxyawdw224d4fy3qy7z2l49kvjvck4fh9hqrki3vr
+NarSize: 54816
+References: 7fmg8lgg5wv5msb0hlqbh5v54jqd6c4j-libretro-core-info-1.22.2 hszqjs9rsslhdip0rfikj1yhv2h9h5dx-libretro-snes9x2010-0-unstable-2026-09-21 hzbvxyx0h7z5iw7ddsr97n412g955dvf-retroarch-bare-1.22.2 pi14p6a8wzabjrsp58fqnh81155dgbq4-retroarch-source-checked-settings-1.22.2 r2jfkg289bjbpylmdw1w3ajrm1l7qi6l-korri-inputplumber-retroarch-autoconfig-1.22.0
+Deriver: 2iil34vsxm3k1gmhs0n9nsh18lrr3gj8-korri-plugin.drv
+Sig: korri-plugins-1:pLcULui6af4MDnsIPmtbloghns6EAgSMrAQLK+bxaJwVers2MelyOMgRJuzcxYifhQFsGvCukSV32sEHKt2JBA==

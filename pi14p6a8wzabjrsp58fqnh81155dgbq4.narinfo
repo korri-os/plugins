@@ -1,0 +1,10 @@
+StorePath: /nix/store/pi14p6a8wzabjrsp58fqnh81155dgbq4-retroarch-source-checked-settings-1.22.2
+URL: https://github.com/korri-os/plugins/releases/download/build-7dfc18b9390f-netplay/011fkh0p3rvz25n9s5cc5qfgm0i2k2xiwxcgsid2mli80pl40fd5.nar.xz
+Compression: xz
+FileHash: sha256:011fkh0p3rvz25n9s5cc5qfgm0i2k2xiwxcgsid2mli80pl40fd5
+FileSize: 1908
+NarHash: sha256:1kkx1z4rp30a9n92k3nb35ip6hcqadjcqi1ql06ghzmydr7kryqy
+NarSize: 9752
+References: hzbvxyx0h7z5iw7ddsr97n412g955dvf-retroarch-bare-1.22.2
+Deriver: cy2zgbshqrdvzd4p84g33w8rhdca7jh9-retroarch-source-checked-settings-1.22.2.drv
+Sig: korri-plugins-1:AI5T1NUQsGf/TD2B7SMuvmL7+5fbKs6+bxuQljA9YDzBZr4jMvYQHliWlNYe++zF/hCS5x+zOlZqVmIJrurBCA==
