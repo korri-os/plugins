@@ -516,7 +516,7 @@ describe("melonDS compositor touch", () => {
       expect(plan.files[0].content).not.toContain('input_driver = "linuxraw"')
       expect(plan.files[0].content).toContain('input_joypad_driver = "udev"\n')
       expect(plan.files[0].content).toContain('config_save_on_exit = "false"\n')
-      expect(plan.files[1]).toEqual({ path: "/account/melonds-layout.opt", content: 'melonds_touch_mode = "Touch"\n' })
+      expect(plan.files[1]).toEqual({ path: "/account/melonds-layout.opt", content: 'melonds_threaded_renderer = "enabled"\nmelonds_touch_mode = "Touch"\n' })
       expect(plan.env).toEqual({ KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files[1].path })
       expect(plan.files[0].content).not.toContain("melonds_touch_mode")
     }
@@ -554,7 +554,7 @@ describe("melonDS chosen layout", () => {
       expect(plan.args).toEqual(unchanged.args)
       expect(plan.files).toHaveLength(2)
       expect(plan.files![0]).toEqual(unchanged.files![0])
-      expect(plan.files![1].content).toBe(`melonds_screen_layout = "${layout}"\nmelonds_screen_gap = "0"\nmelonds_touch_mode = "Touch"\n`)
+      expect(plan.files![1].content).toBe(`melonds_screen_layout = "${layout}"\nmelonds_screen_gap = "0"\nmelonds_threaded_renderer = "enabled"\nmelonds_touch_mode = "Touch"\n`)
       expect(plan.env).toEqual({ KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files![1].path })
     })
   }
@@ -564,7 +564,7 @@ describe("melonDS chosen layout", () => {
     expect(plan.files).toHaveLength(2)
     expect(plan.files[0].path).toBe("/account/retroarch.cfg")
     expect(plan.files[0].content).not.toContain("melonds_screen_")
-    expect(plan.files[1].content).toBe('melonds_touch_mode = "Touch"\n')
+    expect(plan.files[1].content).toBe('melonds_threaded_renderer = "enabled"\nmelonds_touch_mode = "Touch"\n')
     expect(plan.env).toEqual({ KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files[1].path })
   })
 
@@ -608,7 +608,7 @@ describe("melonDS chosen layout", () => {
       const layout = launch({ ...request, layout: "Top/Bottom" })
       expect(layout.files![0]).toEqual(original.files![0])
       expect(layout.args).toEqual(original.args)
-      expect(layout.files![1].content).toBe('melonds_screen_layout = "Top/Bottom"\nmelonds_screen_gap = "0"\nmelonds_touch_mode = "Touch"\n')
+      expect(layout.files![1].content).toBe('melonds_screen_layout = "Top/Bottom"\nmelonds_screen_gap = "0"\nmelonds_threaded_renderer = "enabled"\nmelonds_touch_mode = "Touch"\n')
     }
   })
 })
@@ -619,8 +619,8 @@ describe.skipIf(!parser)("melonDS overlay through the pinned native parser", () 
       const plan = launch({ ...input(), runnerId: "@korri:melonds/melonds", layout })
       expect(parsed(plan.files[0].content, ["input_driver", "input_joypad_driver", "config_save_on_exit"]))
         .toEqual(["x", "udev", "false"])
-      expect(parsed(plan.files![1].content, ["melonds_screen_layout", "melonds_screen_gap", "melonds_touch_mode"]))
-        .toEqual([layout, "0", "Touch"])
+      expect(parsed(plan.files![1].content, ["melonds_screen_layout", "melonds_screen_gap", "melonds_threaded_renderer", "melonds_touch_mode"]))
+        .toEqual([layout, "0", "enabled", "Touch"])
     }
   })
 })

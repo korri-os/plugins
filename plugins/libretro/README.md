@@ -161,7 +161,12 @@ settings, and `config_save_on_exit` remains false. Other cores retain their
 existing input-driver behavior.
 
 The handler provisions `melonds-layout.opt` beside that configuration with
-`melonds_touch_mode = "Touch"`. When korrid supplies a layout, the same overlay
+`melonds_threaded_renderer = "enabled"` and `melonds_touch_mode = "Touch"`.
+The core's default single-threaded renderer cannot keep the DS rate (59.9 fps)
+on the RG DS. Measured unthrottled on 2026-10-28 with GL output across both
+displays at 1.992 GHz, the core ran at 45 fps without the render thread and 62 fps
+with it (korri-os/korri#340). Like the other overlay keys, it applies to one
+launch and is never saved to the person's options file. When korrid supplies a layout, the same overlay
 also contains `melonds_screen_layout` and `melonds_screen_gap` (zero). The plan
 passes its path through `KORRI_RETROARCH_CORE_OPTIONS_OVERLAY`. Accepted layout
 ids come from the generated runner declaration.

@@ -117,7 +117,7 @@ fn packaged_melonds_panes_layouts_and_launch() {
         assert_eq!(
             overlay.content,
             format!(
-                "melonds_screen_layout = \"{layout}\"\nmelonds_screen_gap = \"0\"\nmelonds_touch_mode = \"Touch\"\n"
+                "melonds_screen_layout = \"{layout}\"\nmelonds_screen_gap = \"0\"\nmelonds_threaded_renderer = \"enabled\"\nmelonds_touch_mode = \"Touch\"\n"
             )
         );
         let config = plan

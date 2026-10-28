@@ -215,7 +215,9 @@ video_context_driver = "x"`
     overlay = `melonds_screen_layout = ${quoteSetting("melonds_screen_layout", input.layout)}\nmelonds_screen_gap = "0"\n`
   }
   // Absolute pointer input must not inherit a saved Mouse/Joystick mode.
-  if (isMelonds) overlay += 'melonds_touch_mode = "Touch"\n'
+  // The core's default single-threaded renderer cannot hold 59.9 fps on the
+  // RG DS (RK3568, 1.992 GHz A55): 45 fps with GL output, 62 fps threaded (#340).
+  if (isMelonds) overlay += 'melonds_threaded_renderer = "enabled"\nmelonds_touch_mode = "Touch"\n'
   if (overlay !== "") {
     const optionsPath = `${root}/melonds-layout.opt`
     // The patched frontend applies this in memory AFTER native source
