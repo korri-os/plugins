@@ -1,0 +1,10 @@
+StorePath: /nix/store/519kir3clvhicwmylh3lay3al9ij2nsq-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-823ea4985fe7-melonds-touch/1lm9vpi0i231kx6j5ykldcxgrkrjcpxbp0c8ax6n3xqs1sf2snjk.nar.xz
+Compression: xz
+FileHash: sha256:1lm9vpi0i231kx6j5ykldcxgrkrjcpxbp0c8ax6n3xqs1sf2snjk
+FileSize: 13492
+NarHash: sha256:1mqxarizlwfik8vb22yjyxgpvdiimg3j8pd0kfd6099wrq4arkf7
+NarSize: 56344
+References: 16a7v7lvjpvxl93mq5b2za8w64r7gzjy-retroarch-source-checked-settings-1.22.2 40ivspybssmn1a9iv49i7vy8xy6gwj99-libretro-core-info-1.22.2 hmr844sminsh5mpzfqyy8vkb17zrqima-retroarch-bare-1.22.2 sbp6xbds1dcrs41xqraip3yagvdw1fgp-korri-inputplumber-retroarch-autoconfig-1.22.0 zq324x1qpxqc7p1mls9xnvahqbzq3lc1-libretro-melonds-0-unstable-2026-07-19
+Deriver: yxdc464llr450pdf6h2f6fl0qviw1v3z-korri-plugin.drv
+Sig: korri-plugins-1:SlX3vVZZs4M0YHu3nXrW8wqBIs7emOLGBlU8B+rLLskILkdV3peomZ0mKC3awOa+1I4MD+kdpH0Q6Wcav7g/BQ==
