@@ -1,0 +1,10 @@
+StorePath: /nix/store/awjs2j8h3nk5zwffkbkaa8lgbc4c95xa-korri-sunshine-apps
+URL: https://github.com/korri-os/plugins/releases/download/build-2f5aedc9c21e-sunshine-render/0k0lr49daz1bmy6znmngxvxcnyi0ymm62k5h0z4ysk78anvqk1hd.nar.xz
+Compression: xz
+FileHash: sha256:0k0lr49daz1bmy6znmngxvxcnyi0ymm62k5h0z4ysk78anvqk1hd
+FileSize: 252
+NarHash: sha256:0nr6y1a4snf10zrfr6q62941svf5h3xarf4hap04gixak33jyagz
+NarSize: 712
+References: 
+Deriver: hpsjl69rgykk40rld6sr4wip21cjrl77-korri-sunshine-apps.drv
+Sig: korri-plugins-1:lhk01cRwPCYKzpZzEgEU/8R+7eh9rkjq2Q32yKJ0nYk4oygKjilaL9OlCm6siWZXOLxc5gZHrLY5bfQyyJJeCA==

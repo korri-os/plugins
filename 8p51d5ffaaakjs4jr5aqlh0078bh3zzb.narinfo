@@ -1,0 +1,10 @@
+StorePath: /nix/store/8p51d5ffaaakjs4jr5aqlh0078bh3zzb-korri-korri-sunshine-certificate-control.socket
+URL: https://github.com/korri-os/plugins/releases/download/build-2f5aedc9c21e-sunshine-render/0qdnf3yw1rmjl8n4qi2f96v43374c3zml4np3nn0wyzrbpa1fkbi.nar.xz
+Compression: xz
+FileHash: sha256:0qdnf3yw1rmjl8n4qi2f96v43374c3zml4np3nn0wyzrbpa1fkbi
+FileSize: 432
+NarHash: sha256:0f82jddgs2xhwmfjjzpshhg06wnilzs9bc7ibr84vw63bfp0jmgd
+NarSize: 1232
+References: 
+Deriver: 82rmkwgz7apyw35pj4lmgdwvb45ik1ms-korri-korri-sunshine-certificate-control.socket.drv
+Sig: korri-plugins-1:hX3cmRmqfFbkcufhxI3HSL3xMBNdi0pIY3CwalK4iUksw+VIqJAGJNM4aNtaS7JacI6ZW8hCkaZi9dLU8vToCw==

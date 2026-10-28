@@ -1,0 +1,10 @@
+StorePath: /nix/store/d2xfs7lrf1znr0jjlhn94gbyj0p832sb-rockchip-mpp-1.1.0
+URL: https://github.com/korri-os/plugins/releases/download/build-2f5aedc9c21e-sunshine-render/0iycan8901ywhh7fl19n5q0fqc6qwb8kxnfs3qgbf16ljss54rw3.nar.xz
+Compression: xz
+FileHash: sha256:0iycan8901ywhh7fl19n5q0fqc6qwb8kxnfs3qgbf16ljss54rw3
+FileSize: 1446048
+NarHash: sha256:1s13cfniwdf2razwnvf31pw59xndm3zgijrrdcq3930xw0xy981l
+NarSize: 9029816
+References: d2xfs7lrf1znr0jjlhn94gbyj0p832sb-rockchip-mpp-1.1.0 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 nhrkwapk0zzzmc8x1f2k24qpyz9gy5qb-gcc-16.2.0-lib
+Deriver: 7rx4sn7hpaw47v9pvv6x0xnlgmj597sm-rockchip-mpp-1.1.0.drv
+Sig: korri-plugins-1:bNNdRnOk75NFYKXHQgYYegIUX6gzACb2oHbYMOANbB61+2HvHcV891sgyimJ7/tBPZo/StNfUhGPUj/mpGHeAQ==
