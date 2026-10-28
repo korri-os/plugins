@@ -16,6 +16,7 @@ let
     "korri-libretro-typecheck"
     "korri-libretro-netplay"
     "korri-retroarch-netplay-password"
+    "korri-retroarch-netplay-host-during-play"
   ];
   fantasy = [
     "korri-native-fantasy-runners"

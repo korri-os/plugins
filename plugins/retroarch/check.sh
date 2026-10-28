@@ -9,4 +9,5 @@ bun test
 system="$(nix eval --impure --raw --expr builtins.currentSystem)"
 nix build --no-link \
   "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-settings" \
-  "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-netplay-password"
+  "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-netplay-password" \
+  "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-netplay-host-during-play"

@@ -19,6 +19,7 @@ let
     patches = (old.patches or [ ]) ++ [
       retroarchReadOnlyPatch
       ./patches/retroarch-netplay-config-password.patch
+      ./patches/retroarch-netplay-host-in-place.patch
     ];
     # Keep the actual packaged emulator behind the compiled source regression.
     postPatch = (old.postPatch or "") + ''

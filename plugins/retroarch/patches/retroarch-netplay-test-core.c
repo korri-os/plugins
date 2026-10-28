@@ -68,7 +68,12 @@ void retro_cheat_reset(void) {}
 void retro_cheat_set(unsigned index, bool enabled, const char *code) {
    (void)index; (void)enabled; (void)code;
 }
-bool retro_load_game(const struct retro_game_info *game) { (void)game; return true; }
+bool retro_load_game(const struct retro_game_info *game) {
+   (void)game;
+   /* A fresh load starts at frame 0, so a content reload is visible. */
+   frame = 0;
+   return true;
+}
 bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t n) {
    (void)type; (void)info; (void)n; return false;
 }
