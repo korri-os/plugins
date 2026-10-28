@@ -15,6 +15,7 @@ let
     "korri-libretro-frontend-override"
     "korri-libretro-typecheck"
     "korri-libretro-netplay"
+    "korri-retroarch-netplay-password"
   ];
   fantasy = [
     "korri-native-fantasy-runners"
