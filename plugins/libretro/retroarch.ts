@@ -79,6 +79,7 @@ type RunnerDeclarations = Record<string, { id: string; layouts?: object }>
 function prepareLaunch(input: PluginLaunchInput, runners: RunnerDeclarations): LaunchOutput {
   const root = input.accountRoot
   const saveRoot = input.saveRoot
+  const isMelonds = input.runnerId === "@korri:melonds/melonds"
   if (!input.corePath) throw new Error("RetroArch runner requires a core path")
   const corePath = input.corePath
   // Provider-ref routes carry no file. RetroArch always loads one.
@@ -194,26 +195,32 @@ video_context_driver = "x"`
       merged[position] = line
     }
   }
-  // A save declaration must name the folders the program actually writes.
-  // Only these three settings are host-managed; all other precedence stays.
-  for (const [key, path] of Object.entries(saveDirectories)) {
+  // Save declarations must match the native folders. melonDS also needs
+  // compositor pointer coordinates: the game cannot read physical touch evdev.
+  // This rendered cfg is launch-owned and config_save_on_exit stays false;
+  // never change the person's policy or the shared-seat joypad driver.
+  const managed = { ...saveDirectories, ...(isMelonds ? { input_driver: "x" } : {}) }
+  for (const [key, value] of Object.entries(managed)) {
     const position = positions.get(key)
     if (position === undefined) throw new Error(`Missing managed RetroArch baseline key: ${key}`)
-    merged[position] = `${key} = ${quoteSetting(key, path)}`
+    merged[position] = `${key} = ${quoteSetting(key, value)}`
   }
   const files: NonNullable<LaunchOutput["files"]> = []
   const env: Record<string, string> = {}
+  let overlay = ""
   if (input.layout !== undefined) {
     const runner = Object.values(runners).find(runner => runner.id === input.runnerId)
     if (!runner?.layouts || !Object.hasOwn(runner.layouts, input.layout))
       throw new Error("Unsupported runner layout")
+    overlay = `melonds_screen_layout = ${quoteSetting("melonds_screen_layout", input.layout)}\nmelonds_screen_gap = "0"\n`
+  }
+  // Absolute pointer input must not inherit a saved Mouse/Joystick mode.
+  if (isMelonds) overlay += 'melonds_touch_mode = "Touch"\n'
+  if (overlay !== "") {
     const optionsPath = `${root}/melonds-layout.opt`
     // The patched frontend applies this in memory AFTER native source
     // selection. No routing settings change, and no overlay value is saved.
-    files.push({
-      path: optionsPath,
-      content: `melonds_screen_layout = ${quoteSetting("melonds_screen_layout", input.layout)}\nmelonds_screen_gap = "0"\n`,
-    })
+    files.push({ path: optionsPath, content: overlay })
     env.KORRI_RETROARCH_CORE_OPTIONS_OVERLAY = optionsPath
   }
   const content = `${merged.join("\n")}\n`

@@ -145,11 +145,26 @@ melonDS source (`66b5d2634cd0a79030562811e6e05f5532f800ba`,
 Reversed layouts (`Bottom/Top`, `Right/Left`) do not serve the first display
 arrangement case. Hybrid layouts remain outside this slice.
 
-When korrid supplies a layout, the handler provisions `melonds-layout.opt`
-beside its existing account-local `retroarch.cfg`. That overlay contains only
-`melonds_screen_layout` and `melonds_screen_gap` (zero). The plan passes its
-path through the launch environment's `KORRI_RETROARCH_CORE_OPTIONS_OVERLAY`.
-Accepted layout ids come from the generated runner declaration.
+Every melonDS launch uses `input_driver = "x"` in the existing launch-owned
+`retroarch.cfg`, while `input_joypad_driver` stays `udev` for Korri's shared
+controller seats. On the RG DS, the game user cannot open the physical Goodix
+touchscreens; Xwayland supplies compositor-routed pointer input without new
+input permissions. The owner's verified `x` + `Mouse` launch had offset taps;
+`x` + `Touch` hit the tapped location. The latter is melonDS's absolute pointer
+mode (`melonds_touch_mode` in the same pinned core-options header).
+
+The handler uses its existing rendered configuration, not another append file:
+it emits one assignment per key and does not alter netplay's password-config
+arguments or native duplicate-key ordering. The launch requires the `x` driver
+even if authored settings name another input driver. It does not edit those
+settings, and `config_save_on_exit` remains false. Other cores retain their
+existing input-driver behavior.
+
+The handler provisions `melonds-layout.opt` beside that configuration with
+`melonds_touch_mode = "Touch"`. When korrid supplies a layout, the same overlay
+also contains `melonds_screen_layout` and `melonds_screen_gap` (zero). The plan
+passes its path through `KORRI_RETROARCH_CORE_OPTIONS_OVERLAY`. Accepted layout
+ids come from the generated runner declaration.
 
 The Korri-specific RetroArch patch applies the overlay in memory after native
 source selection and parsing. Native precedence stays unchanged: game-specific,
@@ -169,10 +184,14 @@ selector. They check all five source types, missing per-core initialization,
 legacy and v2 options, menu and exit saves, and compare no-overlay results and
 serialized files byte-for-byte against unpatched RetroArch.
 
-Without a layout, the handler keeps its existing plan byte-identical, and the
-patched frontend keeps native behavior without an overlay. The handler performs
-no reads or writes; korrid provisions its returned plan. Native builds and
-checks run on build hosts, never on a device.
+Without a layout, melonDS still gets absolute touch but does not override native
+layout or gap. Other cores keep their plans byte-identical; the regression
+compares 54 complete serialized plans with candidate `2f5aedc`, including custom
+input drivers, option routing and netplay. The native regression also proves
+that `Touch` never replaces the original saved `Mouse`, missing or invalid raw
+value. Without an overlay, the patched frontend keeps native behavior.
+The handler performs no reads or writes; korrid provisions its returned plan.
+Native builds and checks run on build hosts, never on a device.
 
 The pinned Core contract supplies `PluginLaunchInput.layout` directly. The
 `korri-melonds-admission` check runs that Core's typed registry parser against

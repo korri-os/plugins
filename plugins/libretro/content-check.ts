@@ -45,14 +45,20 @@ for (const [core, systemIds] of Object.entries(expected)) {
   const launch = plugin.handlers["launch.prepare"]
   const original = launch(request)
   if (core === "melonds") {
+    assert.ok(original.files[0].content.includes('input_driver = "x"\n'))
+    assert.ok(original.files[0].content.includes('input_joypad_driver = "udev"\n'))
+    assert.equal(original.files[1].content, 'melonds_touch_mode = "Touch"\n')
     for (const layout of ["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"]) {
       const plan = launch({ ...request, layout })
       assert.deepEqual(plan.files[0], original.files[0])
-      assert.equal(plan.files[1].content, `melonds_screen_layout = "${layout}"\nmelonds_screen_gap = "0"\n`)
+      assert.equal(plan.files[1].content, `melonds_screen_layout = "${layout}"\nmelonds_screen_gap = "0"\nmelonds_touch_mode = "Touch"\n`)
       assert.deepEqual(plan.env, { KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files[1].path })
     }
     assert.throws(() => launch({ ...request, layout: "not-declared" }), /layout/)
   } else {
+    assert.equal(original.files.length, 1)
+    assert.deepEqual(original.env, {})
+    assert.ok(original.files[0].content.includes('input_driver = "udev"\n'))
     assert.throws(() => launch({ ...request, layout: "Top/Bottom" }), /layout/)
   }
   for (const id of systemIds) {

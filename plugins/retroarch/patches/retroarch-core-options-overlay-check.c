@@ -43,6 +43,7 @@ static const struct retro_variable variables[] = {
    { "melonds_screen_layout", "Layout; Top/Bottom|Left/Right|Top Only|Bottom Only" },
    { "melonds_screen_gap", "Gap; 0|64" },
    { "melonds_threaded_renderer", "Threads; disabled|enabled" },
+   { "melonds_touch_mode", "Touch mode; Mouse|Touch" },
    { NULL, NULL },
 };
 static struct retro_core_option_v2_definition definitions[] = {
@@ -56,6 +57,9 @@ static struct retro_core_option_v2_definition definitions[] = {
    { .key = "melonds_threaded_renderer", .desc = "Threads", .values = {
       { "disabled", NULL }, { "enabled", NULL }, { NULL, NULL },
    }, .default_value = "disabled" },
+   { .key = "melonds_touch_mode", .desc = "Touch mode", .values = {
+      { "Mouse", NULL }, { "Touch", NULL }, { NULL, NULL },
+   }, .default_value = "Mouse" },
    { .key = NULL },
 };
 static const struct retro_core_options_v2 options = { NULL, definitions };
@@ -86,6 +90,9 @@ static void verify_saved(const char *path, bool overlay, unsigned native_kind)
          ? (native_kind == 1 ? NULL : native_kind == 2 ? "invalid-native" : "64")
          : "64");
    expect_value(conf, "melonds_threaded_renderer", "disabled");
+   expect_value(conf, "melonds_touch_mode", overlay
+         ? (native_kind == 1 ? NULL : native_kind == 2 ? "invalid-native" : "Mouse")
+         : "Mouse");
    config_file_free(conf);
    /* Include exact saved bytes in the no-overlay differential proof. */
    FILE *file = fopen(path, "rb");
@@ -104,9 +111,9 @@ static void scenario(unsigned route, bool legacy, bool overlay,
    const char *native = native_kind == 1
          ? "melonds_threaded_renderer = \"enabled\"\n"
          : native_kind == 2
-         ? "melonds_screen_layout = \"invalid-native\"\nmelonds_screen_gap = \"invalid-native\"\nmelonds_threaded_renderer = \"enabled\"\n"
-         : "melonds_screen_layout = \"Bottom Only\"\nmelonds_screen_gap = \"64\"\nmelonds_threaded_renderer = \"enabled\"\n";
-   const char *lower = "melonds_screen_layout = \"Top Only\"\nmelonds_screen_gap = \"0\"\nmelonds_threaded_renderer = \"disabled\"\n";
+         ? "melonds_screen_layout = \"invalid-native\"\nmelonds_screen_gap = \"invalid-native\"\nmelonds_touch_mode = \"invalid-native\"\nmelonds_threaded_renderer = \"enabled\"\n"
+         : "melonds_screen_layout = \"Bottom Only\"\nmelonds_screen_gap = \"64\"\nmelonds_touch_mode = \"Mouse\"\nmelonds_threaded_renderer = \"enabled\"\n";
+   const char *lower = "melonds_screen_layout = \"Top Only\"\nmelonds_screen_gap = \"0\"\nmelonds_touch_mode = \"Touch\"\nmelonds_threaded_renderer = \"disabled\"\n";
    char text[512];
    core_option_manager_t *manager;
    config_file_t *menu;
@@ -126,7 +133,7 @@ static void scenario(unsigned route, bool legacy, bool overlay,
    chosen = route == 0 ? game : route == 1 ? folder : route == 2 ? per_core
          : (route == 3 || route == 5) ? custom : global;
    write_text(chosen, native);
-   snprintf(text, sizeof(text), "melonds_screen_layout = \"%s\"\nmelonds_screen_gap = \"0\"\n",
+   snprintf(text, sizeof(text), "melonds_screen_layout = \"%s\"\nmelonds_screen_gap = \"0\"\nmelonds_touch_mode = \"Touch\"\n",
          definitions[0].values[layout].value);
    write_text(overlay_path, text);
    if (overlay) assert(setenv("KORRI_RETROARCH_CORE_OPTIONS_OVERLAY", overlay_path, 1) == 0);
@@ -148,11 +155,13 @@ static void scenario(unsigned route, bool legacy, bool overlay,
          ? definitions[0].values[layout].value : native_kind ? "Top/Bottom" : "Bottom Only"));
    assert(!strcmp(core_option_manager_get_val(manager, 1), overlay || native_kind ? "0" : "64"));
    assert(!strcmp(core_option_manager_get_val(manager, 2), "enabled"));
+   assert(!strcmp(core_option_manager_get_val(manager, 3), overlay ? "Touch" : "Mouse"));
    /* Exercise menu edits, followed by both menu Save As and exit flush.
     * Overlay keys must retain their ORIGINAL values in every destination. */
    core_option_manager_set_val(manager, 0, 1, false);
    core_option_manager_set_val(manager, 1, 1, false);
    core_option_manager_set_val(manager, 2, 0, false);
+   core_option_manager_set_val(manager, 3, 0, false);
    menu = config_file_new_alloc();
    assert(menu);
    core_option_manager_flush(manager, menu);
@@ -168,6 +177,7 @@ static void scenario(unsigned route, bool legacy, bool overlay,
    config_file_t *overlay_conf = config_file_new_from_path_to_string(overlay_path);
    expect_value(overlay_conf, "melonds_screen_layout", definitions[0].values[layout].value);
    expect_value(overlay_conf, "melonds_screen_gap", "0");
+   expect_value(overlay_conf, "melonds_touch_mode", "Touch");
    config_file_free(overlay_conf);
    core_option_manager_free(manager);
    assert(unsetenv("KORRI_RETROARCH_CORE_OPTIONS_OVERLAY") == 0);
@@ -175,7 +185,10 @@ static void scenario(unsigned route, bool legacy, bool overlay,
    manager = core_option_manager_new(per_core_enabled && route >= 5 ? per_core : chosen, NULL, &options, false);
    assert(manager);
    if (overlay && native_kind == 0)
+   {
       assert(!strcmp(core_option_manager_get_val(manager, 0), "Bottom Only"));
+      assert(!strcmp(core_option_manager_get_val(manager, 3), "Mouse"));
+   }
    core_option_manager_free(manager);
 }
 

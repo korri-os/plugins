@@ -1,5 +1,6 @@
 // Runs inside settings-check.nix against the selected program's evidence.
 import { afterAll, describe, expect, it } from "bun:test"
+import { createHash } from "node:crypto"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -502,6 +503,48 @@ describe.skipIf(!parser)("pinned config_file_new/config_get_string semantics", (
 })
 
 
+describe("melonDS compositor touch", () => {
+  it("uses the compositor for pointer input without changing the shared-seat joypad driver", () => {
+    for (const overrides of [
+      undefined,
+      { settings: { drivers: { input: "udev" } } },
+      { config: { append: 'input_driver = "linuxraw"' } },
+    ]) {
+      const plan = launch({ ...input(overrides), runnerId: "@korri:melonds/melonds" })
+      expect(plan.files[0].content).toContain('input_driver = "x"\n')
+      expect(plan.files[0].content).not.toContain('input_driver = "udev"')
+      expect(plan.files[0].content).not.toContain('input_driver = "linuxraw"')
+      expect(plan.files[0].content).toContain('input_joypad_driver = "udev"\n')
+      expect(plan.files[0].content).toContain('config_save_on_exit = "false"\n')
+      expect(plan.files[1]).toEqual({ path: "/account/melonds-layout.opt", content: 'melonds_touch_mode = "Touch"\n' })
+      expect(plan.env).toEqual({ KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files[1].path })
+      expect(plan.files[0].content).not.toContain("melonds_touch_mode")
+    }
+  })
+
+  it("keeps 54 other-core launch plans byte-identical to candidate 2f5aedc", () => {
+    // Golden SHA-256 of the entire serialized plans from the previous candidate,
+    // including native cfg bytes, custom input drivers, option routing and netplay.
+    const plans = []
+    for (const runnerId of ["@korri:mgba/mgba", "@korri:snes9x/snes9x", "@korri:gambatte/gambatte"]) {
+      for (const files of [{ autoconfig: "/autoconfig" }, { autoconfig: "/autoconfig", "core-info": "/core-info" }]) {
+        for (const overrides of [undefined, {
+          settings: { drivers: { input: "sdl2", joypad: "sdl2", video: "vulkan" }, audio: { "volume-db": -3.5 } },
+        }, { config: { append: 'input_driver = "linuxraw"\ncore_options_path = "/person/custom.opt"\nglobal_core_options = "true"' } }]) {
+          for (const netplay of [undefined, { role: "host", passwordConfig: "/run/password.cfg" }, {
+            role: "client", address: "127.0.0.1", port: 42001, passwordConfig: "/run/password.cfg",
+          }] satisfies (PluginLaunchInput["netplay"])[]) {
+            plans.push(launch({ ...input(overrides), runnerId, files, netplay }))
+          }
+        }
+      }
+    }
+    expect(plans).toHaveLength(54)
+    expect(createHash("sha256").update(JSON.stringify(plans)).digest("hex"))
+      .toBe("f9f21248466c91778ffcda7e22caf61ab746ea577ac118a0511fe79689e2ff79")
+  })
+})
+
 describe("melonDS chosen layout", () => {
   for (const layout of ["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"]) {
     it(`provisions ${layout} without changing the launch command`, () => {
@@ -511,17 +554,18 @@ describe("melonDS chosen layout", () => {
       expect(plan.args).toEqual(unchanged.args)
       expect(plan.files).toHaveLength(2)
       expect(plan.files![0]).toEqual(unchanged.files![0])
-      expect(plan.files![1].content).toBe(`melonds_screen_layout = "${layout}"\nmelonds_screen_gap = "0"\n`)
+      expect(plan.files![1].content).toBe(`melonds_screen_layout = "${layout}"\nmelonds_screen_gap = "0"\nmelonds_touch_mode = "Touch"\n`)
       expect(plan.env).toEqual({ KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files![1].path })
     })
   }
 
-  it("does not change existing behavior without a layout", () => {
+  it("enables touch without forcing a layout when Core did not choose one", () => {
     const plan = launch({ ...input(), runnerId: "@korri:melonds/melonds" })
-    expect(plan.files).toHaveLength(1)
-    expect(plan.files![0].path).toBe("/account/retroarch.cfg")
-    expect(plan.files![0].content).not.toContain("melonds_screen_")
-    expect(plan.env).toEqual({})
+    expect(plan.files).toHaveLength(2)
+    expect(plan.files[0].path).toBe("/account/retroarch.cfg")
+    expect(plan.files[0].content).not.toContain("melonds_screen_")
+    expect(plan.files[1].content).toBe('melonds_touch_mode = "Touch"\n')
+    expect(plan.env).toEqual({ KORRI_RETROARCH_CORE_OPTIONS_OVERLAY: plan.files[1].path })
   })
 
   it("refuses layouts it cannot apply", () => {
@@ -564,17 +608,19 @@ describe("melonDS chosen layout", () => {
       const layout = launch({ ...request, layout: "Top/Bottom" })
       expect(layout.files![0]).toEqual(original.files![0])
       expect(layout.args).toEqual(original.args)
-      expect(layout.files![1].content).toBe('melonds_screen_layout = "Top/Bottom"\nmelonds_screen_gap = "0"\n')
+      expect(layout.files![1].content).toBe('melonds_screen_layout = "Top/Bottom"\nmelonds_screen_gap = "0"\nmelonds_touch_mode = "Touch"\n')
     }
   })
 })
 
 describe.skipIf(!parser)("melonDS overlay through the pinned native parser", () => {
-  it("contains only the chosen layout and zero gap for each layout", () => {
+  it("contains the chosen layout, zero gap and absolute touch for each layout", () => {
     for (const layout of ["Top/Bottom", "Left/Right", "Top Only", "Bottom Only"]) {
       const plan = launch({ ...input(), runnerId: "@korri:melonds/melonds", layout })
-      expect(parsed(plan.files![1].content, ["melonds_screen_layout", "melonds_screen_gap"]))
-        .toEqual([layout, "0"])
+      expect(parsed(plan.files[0].content, ["input_driver", "input_joypad_driver", "config_save_on_exit"]))
+        .toEqual(["x", "udev", "false"])
+      expect(parsed(plan.files![1].content, ["melonds_screen_layout", "melonds_screen_gap", "melonds_touch_mode"]))
+        .toEqual([layout, "0", "Touch"])
     }
   })
 })

@@ -1,7 +1,7 @@
 //! Actual producer manifest, locked Core registry parser, and sandbox callback.
 //! This check never installs a selection or starts an emulator.
 use korrid::{
-    launcher::plugin_launch::{evaluate_snapshot, PluginLaunchInput},
+    launcher::plugin_launch::{PluginLaunchInput, evaluate_snapshot},
     plugin::PluginRegistry,
     plugin_installation::EnabledPackage,
     script::source::SourceSnapshot,
@@ -116,7 +116,32 @@ fn packaged_melonds_panes_layouts_and_launch() {
             .unwrap();
         assert_eq!(
             overlay.content,
-            format!("melonds_screen_layout = \"{layout}\"\nmelonds_screen_gap = \"0\"\n")
+            format!(
+                "melonds_screen_layout = \"{layout}\"\nmelonds_screen_gap = \"0\"\nmelonds_touch_mode = \"Touch\"\n"
+            )
+        );
+        let config = plan
+            .files
+            .iter()
+            .find(|file| file.path == "/account/retroarch.cfg")
+            .unwrap();
+        assert!(
+            config
+                .content
+                .lines()
+                .any(|line| line == "input_driver = \"x\"")
+        );
+        assert!(
+            config
+                .content
+                .lines()
+                .any(|line| line == "input_joypad_driver = \"udev\"")
+        );
+        assert!(
+            config
+                .content
+                .lines()
+                .any(|line| line == "config_save_on_exit = \"false\"")
         );
     }
 }
