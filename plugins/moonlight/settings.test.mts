@@ -33,7 +33,7 @@ function leaves(schema: Schema, prefix = ""): string[] {
 
 describe("Moonlight nested settings", () => {
   test("declares a non-local runner and exactly the 15 approved leaves", () => {
-    expect(runners.moonlight).toEqual({ id, program: "moonlight" })
+    expect(runners.moonlight).toEqual({ program: "moonlight" })
     const { schema, revision } = handlers["settings.describe"]({ id })
     expect(leaves(schema)).toEqual(paths)
     expect(revision).not.toBe("")
