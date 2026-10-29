@@ -696,3 +696,47 @@ second-SIGTERM cleanup and daemon-read-access fixes.
 Native package checks are not device or deployment proof. This batch performs
 no publication, VM tests, device tests, deployment, or operational cache reset.
 ADR 0012's cache reset remains an operator action in a later coordinated window.
+
+## Plugin-direction republish verification (2026-10-29)
+
+This batch republishes only the 33 plugin outputs pinned in Core's
+`nix/product/published-plugins.nix`. Standalone tools and every other plugin
+output are excluded. Bitsybox also retains its separate eligibility and
+redistribution block.
+
+The code was checked at `7dd7daaa3e1aa6147f014799bf134bb5d87311e0` against
+Core `3c103bdae02ac65e751599e49d3f5fb870401b5e`. The publication revision also
+carries these batch notes; its exact SHA is recorded in `revision.txt` and the
+workflow's `expected_source_sha` input.
+
+The approved gate for this batch is:
+
+- All **66 x86 checks**, including the cold-host lifecycle VM.
+- The other **65 ARM checks** on fuji/yari. ZQuest's first X-server capture
+  failure passed its isolated retry.
+- Core's own `korri-plugin-check` VM at `3c103bdae`, reported passed by the
+  Core integration verification.
+
+The ARM `korri-runtime-plugin-host` VM is an explicit exception, **not a passing
+check**. Both its first local run and its isolated retry failed with
+`Shell did not start in time` before plugin assertions. Neither configured ARM
+builder exposes `/dev/kvm`; QEMU reported KVM initialization failure and used
+software emulation.
+
+This gate gap predates this batch. The previous five `plugin-checks.yml` pushes
+to main all failed the ARM cold-host VM because the hosted ARM runner lacked
+its required `kvm` system feature:
+
+| Source commit | CI run |
+| --- | --- |
+| `764de30` | [40623650164](https://github.com/korri-os/plugins/actions/runs/40623650164) |
+| `d3c7f98` | [40755126482](https://github.com/korri-os/plugins/actions/runs/40755126482) |
+| `be4eaa9` | [40781948136](https://github.com/korri-os/plugins/actions/runs/40781948136) |
+| `25759b1` | [40795348076](https://github.com/korri-os/plugins/actions/runs/40795348076) |
+| `6281afe` | [40813067698](https://github.com/korri-os/plugins/actions/runs/40813067698) |
+
+[korri-os/korri#346](https://github.com/korri-os/korri/issues/346) tracks the ARM
+VM gap. Earlier batches were published with the same gap. This exception does
+not weaken signatures, publisher trust, permission approval, or the existing
+raw-cache checks. It does not establish ARM cold-host lifecycle acceptance or
+physical-device acceptance. Images and devices are a separate cut-over.
