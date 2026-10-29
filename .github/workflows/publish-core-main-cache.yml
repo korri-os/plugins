@@ -1,0 +1,274 @@
+# TEMPORARY until the plugin-direction cut-over (derived contribution IDs,
+# Core feat/plugin-direction 3c103bd, plugins 99df2e0). Delete this file when
+# devices run that Core.
+#
+# Devices run Core main, which refuses plugins built at 99df2e0 or later
+# ("missing field `id`"). This workflow publishes a plugin source that still
+# pins a Core-main revision, for example 25759b1, to the raw Nix cache only.
+# plugin-repository.yml cannot: it now runs `korri-publish repository` and
+# `korri-cache combine --archive-base-url`, which those sources lack.
+# This is plugin-repository.yml as of 25759b1, with a longer lifecycle limit.
+name: TEMPORARY Publish Nix cache for Core-main plugin sources
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_source_sha:
+        description: "Full 40-character SHA of the tested source; all jobs check out this exact commit"
+        required: true
+        type: string
+      packages:
+        description: "Package output names separated by spaces; one or more per batch"
+        required: true
+        default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine
+        type: string
+      tag:
+        description: "Batch tag, not a plugin version; must already point at expected_source_sha"
+        required: true
+        type: string
+      publish:
+        description: "Publish verified NAR assets and append signed cache metadata"
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+# All batches share cache metadata. Never cancel an in-flight publication.
+concurrency:
+  group: plugin-binary-cache
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+  NAR_TAG: ${{ inputs.tag }}
+  INDEX_BRANCH: cache-index
+  CACHE_URL: https://korri-os.github.io/plugins/
+  PACKAGES: ${{ inputs.packages }}
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-24.04
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    # A Core pin that no binary cache holds yet builds korrid and the plugin
+    # host from source in the validation step (73 min on 2026-10-26, run
+    # 40261317841), leaving too little of 90 min to build and sign a batch.
+    timeout-minutes: 150
+    environment: plugin-release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          # Match verified local tooling; newer Nix needs a separate CI check.
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
+      - name: Read the existing signed publisher cache
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          python3 .github/workflows/trust-plugin-caches.py
+      - name: Configure scoped read-only GitHub source authentication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          sudo --preserve-env=GITHUB_TOKEN,GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py setup --nix "$(command -v nix)"
+      - name: Verify daemon-sandboxed source authentication
+        run: nix shell --inputs-from . nixpkgs#python3 nixpkgs#git nixpkgs#acl -c python3 .github/workflows/test-source-auth.py --integration
+      - name: Test the effective signed-cache configuration
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          python3 nix/ci-cache-config-test.py
+      - name: Check plugin paths and scoped input invalidation
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          nix run ".#ci.packages.$SYSTEM.korri-plugin-churn-check" -- --system "$SYSTEM"
+      - name: Validate the destination and test the publisher
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          nix run ".#ci.packages.$SYSTEM.korri-cache" -- validate --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --index-branch "$INDEX_BRANCH"
+          test_output=$(nix build --no-link --print-out-paths ".#ci.checks.$SYSTEM.korri-github-cache")
+          # Scope gates to this batch. Full regression coverage runs separately
+          # in plugin-checks.yml and cannot cancel a publication architecture.
+          python3 nix/publication-checks-test.py
+          read -ra selected_outputs <<< "$PACKAGES"
+          python3 nix/publication-checks.py --system "$SYSTEM" "${selected_outputs[@]}" > "$RUNNER_TEMP/publication-checks.txt"
+          cat "$RUNNER_TEMP/publication-checks.txt"
+          if grep -q '\.korri-retroarch-package$' "$RUNNER_TEMP/publication-checks.txt"; then
+            nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
+          fi
+          # Run runtime/VM gates alone, not beside other check builds. Native
+          # startup deadlines still catch a frontend that never starts.
+          while IFS= read -r check; do
+            nix build --no-link --print-build-logs --max-jobs 1 "$check"
+          done < "$RUNNER_TEMP/publication-checks.txt"
+          python3 nix/github-cache-export-test.py "$test_output"
+          nix build --out-link cache-tool ".#ci.packages.$SYSTEM.korri-cache"
+      - name: Build the selected packages without a signing key
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          nix eval --json ".#packages.$SYSTEM" \
+            --apply 'packages: builtins.attrNames packages' \
+            >/dev/null
+          read -ra selected_outputs <<< "$PACKAGES"
+          ./cache-tool/bin/korri-cache build --ci-source-auth --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
+      - name: Sign and prepare the Nix cache without content-address conversion
+        env:
+          SIGNING_KEY: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
+          PUBLISH: ${{ inputs.publish }}
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          umask 077
+          key="$RUNNER_TEMP/cache-key"
+          trap 'rm -f "$key"' EXIT
+          if [ -n "$SIGNING_KEY" ]; then
+            printf '%s\n' "$SIGNING_KEY" > "$key"
+          elif [ "$PUBLISH" = true ]; then
+            echo 'NIX_CACHE_SIGNING_KEY is required before publication' >&2
+            exit 1
+          else
+            nix-store --generate-binary-cache-key ci-test-only "$key" "$RUNNER_TEMP/cache-public-key"
+          fi
+          unset SIGNING_KEY
+          mapfile -t paths < "$RUNNER_TEMP/paths.txt"
+          ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
+          ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org
+          cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
+          printf '%s\n' "$EXPECTED_SOURCE_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
+      - name: Refuse credential-bearing publication artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # Match this job's actual token and its Basic encoding, not only
+          # known prefixes: token formats change.
+          basic=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          if grep -aFrq -e "$GITHUB_TOKEN" -e "$basic" "$RUNNER_TEMP/prepared" ||
+            grep -aErq 'ghs_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|eC1hY2Nlc3MtdG9rZW46' "$RUNNER_TEMP/prepared"; then
+            echo 'Source credential marker found in prepared artifacts' >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cache-${{ matrix.system }}
+          path: ${{ runner.temp }}/prepared/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Remove source credentials
+        if: always()
+        run: sudo --preserve-env=GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py cleanup
+
+  lifecycle:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
+    runs-on: ubuntu-24.04
+    # Core 823ea49's korrid is not in the Core cache, so this job compiles it
+    # (80 min in run 40770462052). Pages HTTP 429 retries can add 20 min more.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
+      - name: Read the existing signed Core and publisher caches
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          python3 .github/workflows/trust-plugin-caches.py --include-core
+      - name: Configure scoped read-only GitHub source authentication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          sudo --preserve-env=GITHUB_TOKEN,GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py setup --nix "$(command -v nix)"
+      - name: Existing cold-host lifecycle acceptance
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          nix build --no-link .#ci.checks.x86_64-linux.korri-runtime-plugin-host .#ci.checks.x86_64-linux.sunshine-korri-input-presence
+
+      - name: Remove source credentials
+        if: always()
+        run: sudo --preserve-env=GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py cleanup
+
+  # Only this non-matrix job may create the batch release. Build jobs prepare
+  # local artifacts without release-write permission; manual drafts are reused.
+  publish:
+    needs: [build, lifecycle]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson' && inputs.publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: plugin-release
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: cache-*
+          path: artifacts
+      - name: Prepare the tool before exposing a write token
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          nix build --out-link cache-tool .#korri-cache
+          ./cache-tool/bin/korri-cache combine prepared artifacts/cache-x86_64-linux artifacts/cache-aarch64-linux
+      - name: Publish the batch then append cache metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --index-branch "$INDEX_BRANCH" --cache-url "$CACHE_URL" --revision "$EXPECTED_SOURCE_SHA"
