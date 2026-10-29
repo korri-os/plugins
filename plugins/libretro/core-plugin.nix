@@ -32,7 +32,7 @@ let
 
   systemEntries = lib.concatMapStringsSep "\n" (
     id:
-    "  ${json id}: { id: ${json id}, title: ${json systems.${id}.title}, "
+    "  ${json id}: { title: ${json systems.${id}.title}, "
     + "content: ${json systems.${id}.content}"
     + lib.optionalString (
       systems.${id} ? panes
@@ -54,7 +54,6 @@ let
     ${lib.optionalString (groups != { }) "export const groups = ${json groups}"}
     export const runners = {
       ${json name}: {
-        id: ${json runnerId},
         family: "@korri:retroarch",
         program: "retroarch",
         core: ${json name},

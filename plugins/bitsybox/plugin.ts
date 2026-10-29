@@ -11,7 +11,6 @@ export const description =
 // doc/MANUAL.txt names Bitsy and its native text-data extension.
 export const systems = {
   bitsy: {
-    id: "bitsy",
     title: "Bitsy",
     content: { extensions: ["bitsy"] },
   },
@@ -19,14 +18,13 @@ export const systems = {
 
 export const runners = {
   bitsybox: {
-    id: "@korri:bitsybox/bitsybox",
     program: "bitsybox",
     systems: ["bitsy"],
   },
 }
 
 function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
-  if (input.runnerId !== runners.bitsybox.id) {
+  if (input.runnerId !== "@korri:bitsybox/bitsybox") {
     throw new Error("Unknown Bitsybox runner")
   }
   if (input.corePath !== undefined) {

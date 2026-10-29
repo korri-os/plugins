@@ -5,7 +5,7 @@ export const title = "Moonlight stream viewer"
 export const services = ["korri-moonlight-setup"]
 
 export const runners = {
-  moonlight: { id: "@korri:moonlight/moonlight", program: "moonlight" },
+  moonlight: { program: "moonlight" },
 }
 
 export const handlers = {

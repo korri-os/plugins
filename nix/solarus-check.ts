@@ -26,10 +26,10 @@ assert.deepEqual(manifest.ports, {})
 accessSync(manifest.files.solarus, constants.X_OK)
 assert.equal(name, "solarus")
 assert.deepEqual(systems, {
-  solarus: { id: "solarus", title: "Solarus", content: { extensions: ["solarus"] } },
+  solarus: { title: "Solarus", content: { extensions: ["solarus"] } },
 })
 assert.deepEqual(runners, {
-  solarus: { id: "@korri:solarus/solarus", program: "solarus", systems: ["solarus"] },
+  solarus: { program: "solarus", systems: ["solarus"] },
 })
 assert.deepEqual(Object.keys(handlers), ["launch.prepare"])
 
@@ -53,7 +53,7 @@ try {
     "/library/unpacked quest/data",
   ]) {
     const input: PluginLaunchInput = {
-      runnerId: runners.solarus.id,
+      runnerId: "@korri:solarus/solarus",
       program: recordArguments,
       contentPath,
       accountRoot,

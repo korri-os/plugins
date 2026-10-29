@@ -18,6 +18,8 @@ pkgs.runCommand "korri-github-cache-check"
     cp ${./pages-cache.test.py} pages-cache.test.py
     python3 github-cache-test.py
     python3 pages-cache.test.py
+    cp ${./plugin-repository.test.py} plugin-repository.test.py
+    python3 plugin-repository.test.py
     cp ${./metadata-migration.test.py} metadata-migration.test.py
     python3 metadata-migration.test.py
     actionlint ${../.github/workflows/plugin-repository.yml} ${../.github/workflows/cache-pages.yml}

@@ -10,7 +10,6 @@ export const description = "Runs Solarus quests with saves in Korri account stor
 // Retain the Solarus identity from legacy's app integration and system example.
 export const systems = {
   solarus: {
-    id: "solarus",
     title: "Solarus",
     // Upstream's quest archive suffix. Do not claim every general ZIP file.
     content: { extensions: ["solarus"] },
@@ -19,14 +18,13 @@ export const systems = {
 
 export const runners = {
   solarus: {
-    id: "@korri:solarus/solarus",
     program: "solarus",
     systems: ["solarus"],
   },
 }
 
 function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
-  if (input.runnerId !== runners.solarus.id) {
+  if (input.runnerId !== "@korri:solarus/solarus") {
     throw new Error("Unknown Solarus runner")
   }
   if (input.corePath !== undefined) {

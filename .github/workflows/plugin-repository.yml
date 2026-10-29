@@ -1,4 +1,4 @@
-name: Publish Nix cache
+name: Publish plugin repository and Nix cache
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ on:
         required: true
         type: string
       publish:
-        description: "Publish verified NAR assets and append signed cache metadata"
+        description: "Publish signed plugin catalog, archives and existing Nix cache"
         default: false
         type: boolean
 
@@ -121,6 +121,7 @@ jobs:
           done < "$RUNNER_TEMP/publication-checks.txt"
           python3 nix/github-cache-export-test.py "$test_output"
           nix build --out-link cache-tool ".#ci.packages.$SYSTEM.korri-cache"
+          nix build --out-link publisher-tool ".#ci.packages.$SYSTEM.korri-plugin-host"
       - name: Build the selected packages without a signing key
         env:
           SYSTEM: ${{ matrix.system }}
@@ -133,10 +134,9 @@ jobs:
             >/dev/null
           read -ra selected_outputs <<< "$PACKAGES"
           ./cache-tool/bin/korri-cache build --ci-source-auth --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
-      - name: Sign and prepare the Nix cache without content-address conversion
+      - name: Prepare signed plugin repository and the unchanged Nix cache
         env:
           SIGNING_KEY: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
-          PUBLISH: ${{ inputs.publish }}
           SYSTEM: ${{ matrix.system }}
         run: |
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -145,18 +145,17 @@ jobs:
           umask 077
           key="$RUNNER_TEMP/cache-key"
           trap 'rm -f "$key"' EXIT
-          if [ -n "$SIGNING_KEY" ]; then
-            printf '%s\n' "$SIGNING_KEY" > "$key"
-          elif [ "$PUBLISH" = true ]; then
-            echo 'NIX_CACHE_SIGNING_KEY is required before publication' >&2
+          if [ -z "$SIGNING_KEY" ]; then
+            echo 'NIX_CACHE_SIGNING_KEY is required for dry runs and publication' >&2
             exit 1
-          else
-            nix-store --generate-binary-cache-key ci-test-only "$key" "$RUNNER_TEMP/cache-public-key"
           fi
+          printf '%s\n' "$SIGNING_KEY" > "$key"
+          test "${SIGNING_KEY%%:*}" = korri-plugins-1
           unset SIGNING_KEY
           mapfile -t paths < "$RUNNER_TEMP/paths.txt"
           ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
           ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org
+          ./publisher-tool/bin/korri-publish repository --secret-key "$key" --release "$NAR_TAG" --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --platform "$SYSTEM" "$RUNNER_TEMP/prepared/repository" "${paths[@]}"
           cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
           printf '%s\n' "$EXPECTED_SOURCE_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
       - name: Refuse credential-bearing publication artifacts
@@ -225,7 +224,7 @@ jobs:
   # local artifacts without release-write permission; manual drafts are reused.
   publish:
     needs: [build, lifecycle]
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson' && inputs.publish
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment: plugin-release
@@ -251,8 +250,16 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           nix build --out-link cache-tool .#korri-cache
-          ./cache-tool/bin/korri-cache combine prepared artifacts/cache-x86_64-linux artifacts/cache-aarch64-linux
+          ./cache-tool/bin/korri-cache combine --archive-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" prepared artifacts/cache-x86_64-linux artifacts/cache-aarch64-linux
+          sha256sum prepared/repository/catalog.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: merged-catalog
+          path: prepared/repository/catalog.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish the batch then append cache metadata
+        if: inputs.publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

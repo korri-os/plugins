@@ -11,7 +11,6 @@ export const description =
 // Retain the system and runner names from Korri legacy's producer.
 export const systems = {
   "zelda-classic": {
-    id: "zelda-classic",
     title: "Zelda Classic Quest",
     // Native unpacked quest files only; packed quest archives are not claimed.
     content: { extensions: ["qst"] },
@@ -19,7 +18,6 @@ export const systems = {
 }
 export const runners = {
   zplayer: {
-    id: "@korri:zquest-classic/zplayer",
     program: "zplayer",
     systems: ["zelda-classic"],
   },

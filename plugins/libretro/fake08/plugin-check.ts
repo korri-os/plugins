@@ -9,7 +9,7 @@ const plugin = await import(resolve(packagePath, manifest.entry))
 assert.equal(manifest.publisher.namespace, "@korri")
 assert.equal(`${manifest.publisher.namespace}:${plugin.name}`, "@korri:fake08")
 assert.deepEqual(plugin.systems, {
-  pico8: { id: "pico8", title: "PICO-8", content: { extensions: ["p8", "p8.png"] } },
+  pico8: { title: "PICO-8", content: { extensions: ["p8", "p8.png"] } },
 })
 assert.ok(!("discovery" in plugin))
 assert.ok(!("sessionControls" in plugin))

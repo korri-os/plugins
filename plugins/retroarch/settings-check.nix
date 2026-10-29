@@ -42,7 +42,6 @@ program.overrideAttrs (old: {
     import { createHandlers } from "./retroarch"
     export const handlers = createHandlers({
       melonds: {
-        id: "@korri:melonds/melonds",
         layouts: ${builtins.toJSON (import ../libretro/cores.nix { inherit pkgs; }).melonds.layouts},
       },
     })

@@ -349,6 +349,18 @@ class SignedCache(unittest.TestCase):
             (folder / "paths-x86_64-linux.txt").write_text("\n".join(paths) + "\n")
 
         record_batch(prepared)
+        repository = prepared / "repository"
+        repository.mkdir()
+        archive = repository / "source-any.tar"
+        archive.write_bytes(b"signed archive transport fixture")
+        (repository / "catalog.json").write_text(json.dumps({
+            "records": [{
+                "plugin_id": "@korri:source", "release_version": "build-1", "platform": "any",
+                "store_path": paths[0], "archive_url": base + "build-1/" + archive.name,
+                "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                "publicKey": "korri-plugins-1:" + "A" * 43 + "=",
+            }], "latest": {"@korri:source": "build-1"},
+        }))
 
         def upload(part, folder=prepared, tag="build-1", succeeds=True):
             return run(
@@ -450,10 +462,10 @@ class SignedCache(unittest.TestCase):
             len([r for r in state["releases"] if r["tag_name"] == "build-1"]), 1
         )
         batch_assets = {a["name"]: a for a in state["assets"] if a["release"] == 1}
-        for name in ("revision.txt", "paths-x86_64-linux.txt"):
+        for name in ("revision.txt", "paths-x86_64-linux.txt", "catalog.json", "source-any.tar"):
             self.assertEqual(
                 (fixture / str(batch_assets[name]["id"])).read_bytes(),
-                (prepared / name).read_bytes(),
+                (repository / name if name in ("catalog.json", "source-any.tar") else prepared / name).read_bytes(),
             )
         self.assertFalse(
             any(
@@ -461,6 +473,10 @@ class SignedCache(unittest.TestCase):
                 and (a["name"].startswith("paths-") or a["name"] == "revision.txt")
                 for a in state["assets"]
             )
+        )
+        self.assertEqual(
+            run("git", "--git-dir", str(remote), "show", "cache-index:catalog.json", env=env).stdout.strip(),
+            (repository / "catalog.json").read_text().strip(),
         )
         before = fixture_state.read_bytes()
         upload("metadata")

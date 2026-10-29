@@ -462,7 +462,7 @@ def push_metadata(remote, branch, paths):
     """Append metadata, retaining the first URL and refusing signed-field changes."""
     for path in paths:
         regular(path)
-        if path.name != "nix-cache-info" and not re.fullmatch(
+        if path.name not in ("nix-cache-info", "catalog.json") and not re.fullmatch(
             r"[0-9abcdfghijklmnpqrsvwxyz]{32}\.narinfo", path.name
         ):
             raise ValueError("invalid metadata filename")
@@ -498,7 +498,10 @@ def push_metadata(remote, branch, paths):
                 target = checkout / path.name
                 if target.exists() or target.is_symlink():
                     data = regular(target).read_bytes()
-                    if data != path.read_bytes() and not equivalent_metadata_bytes(
+                    if path.name == "catalog.json":
+                        data = path.read_bytes()
+                        target.write_bytes(data)
+                    elif data != path.read_bytes() and not equivalent_metadata_bytes(
                         data, path
                     ):
                         raise ValueError(
@@ -677,6 +680,95 @@ def batch_files(prepared, required=False):
     return [revision, *listings]
 
 
+def repository_files(prepared, base=None):
+    """Check transport invariants on Core-produced catalogs, not plugin semantics.
+
+    Core owns the catalog schema and signature checks. This publisher only
+    merges architecture artifacts and checks exactly which bytes it will host.
+    Raw Nix-cache operations need not carry a plugin repository.
+    """
+    directory = prepared / "repository"
+    if not directory.exists() and not directory.is_symlink():
+        return []
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError("invalid plugin repository directory")
+    catalog_path = regular(directory / "catalog.json")
+    if catalog_path.stat().st_size > 4 * 1024 * 1024:
+        raise ValueError("catalog exceeds 4 MiB")
+    catalog = json.loads(catalog_path.read_text())
+    if set(catalog) != {"records", "latest"} or not catalog["records"]:
+        raise ValueError("expected publisher catalog records and latest marks")
+    files = {"catalog.json": catalog_path}
+    identities = set()
+    platforms = {}
+    for record in catalog["records"]:
+        identity = tuple(record[key] for key in ("plugin_id", "release_version", "platform"))
+        if identity in identities:
+            raise ValueError("duplicate catalog record")
+        identities.add(identity)
+        platforms.setdefault(identity[:2], set()).add(identity[2])
+        if identity[2] not in ("x86_64-linux", "aarch64-linux", "any"):
+            raise ValueError("unsupported catalog platform")
+        if not record.get("publicKey", "").startswith("korri-plugins-1:"):
+            raise ValueError("official catalog must use korri-plugins-1")
+        url = record["archive_url"]
+        https_base(url)
+        name = url.rsplit("/", 1)[-1]
+        if not re.fullmatch(r"[A-Za-z0-9+._-]+\.tar", name):
+            raise ValueError("invalid plugin archive asset name")
+        if base is not None and url != base + name:
+            raise ValueError("plugin archive destination differs from the selected release")
+        archive = regular(directory / name)
+        if digest(archive) != record["archive_sha256"]:
+            raise ValueError(f"plugin archive hash mismatch: {name}")
+        if archive.stat().st_size >= 2 * 1024**3:
+            raise ValueError("GitHub Release assets must be smaller than 2 GiB")
+        files[name] = archive
+    if any("any" in values and len(values) > 1 for values in platforms.values()):
+        raise ValueError("ambiguous any-architecture record")
+    for plugin, release_label in catalog["latest"].items():
+        if (plugin, release_label) not in platforms:
+            raise ValueError("latest mark names a missing release")
+    if set(path.name for path in directory.iterdir()) != set(files):
+        raise ValueError("unexpected plugin repository payload")
+    return [files[name] for name in sorted(files)]
+
+
+def combine_repositories(staged, inputs):
+    if not any((source / "repository").exists() for source in inputs):
+        return
+    directory = staged / "repository"
+    directory.mkdir()
+    records, latest = {}, {}
+    for source in inputs:
+        files = repository_files(source)
+        if not files:
+            raise ValueError("every architecture must carry a plugin catalog")
+        catalog = json.loads((source / "repository/catalog.json").read_text())
+        for plugin, release_label in catalog["latest"].items():
+            if plugin in latest and latest[plugin] != release_label:
+                raise ValueError(f"conflicting latest mark: {plugin}")
+            latest[plugin] = release_label
+        for record in catalog["records"]:
+            identity = tuple(record[key] for key in ("plugin_id", "release_version", "platform"))
+            if identity in records and records[identity] != record:
+                raise ValueError(f"conflicting catalog record: {identity}")
+            records[identity] = record
+        for path in files:
+            if path.name == "catalog.json":
+                continue
+            target = directory / path.name
+            if target.exists() and digest(target) != digest(path):
+                raise ValueError(f"conflicting plugin archive: {path.name}")
+            if not target.exists():
+                shutil.copyfile(path, target)
+    (directory / "catalog.json").write_text(json.dumps({
+        "records": [records[key] for key in sorted(records)],
+        "latest": latest,
+    }, indent=2, sort_keys=True) + "\n")
+    repository_files(staged)
+
+
 def upload(prepared, repo, tag, index_branch, cache_url, part):
     validate_destination(repo, tag, index_branch)
     cache_url = https_base(cache_url)
@@ -706,7 +798,8 @@ def upload(prepared, repo, tag, index_branch, cache_url, part):
             else f"offline-metadata-{system}.tar.gz"
         )
         offline.append(regular(prepared / name))
-    payloads = [*sorted(nars.values()), *offline, *batch]
+    repository = repository_files(prepared, base)
+    payloads = [*sorted(nars.values()), *offline, *batch, *repository]
     if part == "nars":
         upload_files(repo, tag, payloads)
     else:
@@ -724,7 +817,8 @@ def upload(prepared, repo, tag, index_branch, cache_url, part):
         expected = push_metadata(
             f"https://github.com/{repo}.git",
             index_branch,
-            [prepared / "metadata" / "nix-cache-info", *records],
+            [prepared / "metadata" / "nix-cache-info", *records,
+             *[path for path in repository if path.name == "catalog.json"]],
         )
         # GITHUB_TOKEN pushes do not trigger other workflows. Dispatch Pages
         # explicitly, then verify serving, including on idempotent retries.
@@ -732,7 +826,7 @@ def upload(prepared, repo, tag, index_branch, cache_url, part):
         wait_visible(cache_url, expected)
 
 
-def combine(output, inputs):
+def combine(output, inputs, archive_base_url=None):
     if output.exists() or not inputs:
         raise ValueError("supply input caches and a new output directory")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -766,6 +860,11 @@ def combine(output, inputs):
                 if target.exists() and digest(target) != digest(path):
                     raise ValueError(f"conflicting prepared file: {path.name}")
                 shutil.copyfile(path, target)
+        combine_repositories(staged, inputs)
+        if archive_base_url is not None:
+            https_base(archive_base_url)
+            if not repository_files(staged, archive_base_url):
+                raise ValueError("prepared batch must carry a plugin catalog")
         staged.rename(output)
 
 
@@ -796,7 +895,7 @@ def publish(prepared, repo, tag, index_branch, cache_url, revision):
                 "--title",
                 tag,
                 "--notes",
-                f"Prebuilt Nix cache payloads from {revision}. Exact package paths are in this release's paths-SYSTEM.txt assets; revision.txt records the source commit.",
+                f"Signed plugin catalog, content-addressed archives and prebuilt Nix cache payloads from {revision}. Exact package paths are in this release's paths-SYSTEM.txt assets; revision.txt records the source commit.",
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             # A manual creator can win the race, or GitHub can accept a request
@@ -972,6 +1071,7 @@ def main():
         help="omit paths verified in this trusted upstream cache (repeatable)",
     )
     combine_parser = commands.add_parser("combine")
+    combine_parser.add_argument("--archive-base-url")
     combine_parser.add_argument("output", type=Path)
     combine_parser.add_argument("inputs", type=Path, nargs="+")
     publish_parser = commands.add_parser("publish")
@@ -1006,7 +1106,7 @@ def main():
     elif args.command == "prepare":
         prepare(args.cache, args.output, args.nar_base_url, args.upstream_cache)
     elif args.command == "combine":
-        combine(args.output, args.inputs)
+        combine(args.output, args.inputs, args.archive_base_url)
     elif args.command == "publish":
         publish(
             args.prepared,

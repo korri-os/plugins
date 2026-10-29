@@ -19,11 +19,10 @@ assert.deepEqual(manifest.files, {
 assert.deepEqual(manifest.services, {})
 assert.deepEqual(manifest.ports, {})
 assert.deepEqual(systems, {
-  bitsy: { id: "bitsy", title: "Bitsy", content: { extensions: ["bitsy"] } },
+  bitsy: { title: "Bitsy", content: { extensions: ["bitsy"] } },
 })
 assert.deepEqual(runners, {
   bitsybox: {
-    id: "@korri:bitsybox/bitsybox",
     program: "bitsybox",
     systems: ["bitsy"],
   },
@@ -43,7 +42,7 @@ const work = mkdtempSync(join(tmpdir(), "bitsy-launch-"))
 try {
   const accountRoot = join(work, "Player One '; $(exit 21)")
   const input: PluginLaunchInput = {
-    runnerId: runners.bitsybox.id,
+    runnerId: "@korri:bitsybox/bitsybox",
     program: record,
     contentPath: `/media/${"long path/".repeat(40)}Selected '; $(exit 19).bitsy`,
     accountRoot,

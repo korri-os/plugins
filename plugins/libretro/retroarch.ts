@@ -74,7 +74,7 @@ function quoteSetting(key: string, value: string): string {
   throw new Error(`Unsupported RetroArch string setting: ${key}`)
 }
 
-type RunnerDeclarations = Record<string, { id: string; layouts?: object }>
+type RunnerDeclarations = Record<string, object & { layouts?: object }>
 
 function prepareLaunch(input: PluginLaunchInput, runners: RunnerDeclarations): LaunchOutput {
   const root = input.accountRoot
@@ -211,7 +211,7 @@ video_context_driver = "x"`
   const env: Record<string, string> = {}
   let overlay = ""
   if (input.layout !== undefined) {
-    const runner = Object.values(runners).find(runner => runner.id === input.runnerId)
+    const runner = runners[input.runnerId.slice(input.runnerId.lastIndexOf("/") + 1)]
     if (!runner?.layouts || !Object.hasOwn(runner.layouts, input.layout))
       throw new Error("Unsupported runner layout")
     overlay = `melonds_screen_layout = ${quoteSetting("melonds_screen_layout", input.layout)}\nmelonds_screen_gap = "0"\n`

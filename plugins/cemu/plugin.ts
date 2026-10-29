@@ -15,16 +15,16 @@ export const title = "Cemu"
 export const description = "Runs Wii U games with account-local Cemu data and game saves."
 export const systems = {
   wiiu: {
-    id: "wiiu", title: "Wii U",
+    title: "Wii U",
     content: { extensions: ["wua", "wud", "wux", "rpx", "wuhb"] },
   },
 }
 export const runners = {
-  cemu: { id: "@korri:cemu/cemu", program: "cemu", systems: ["wiiu"] },
+  cemu: { program: "cemu", systems: ["wiiu"] },
 }
 
 function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
-  if (input.runnerId !== runners.cemu.id) throw new Error("Unknown Cemu runner")
+  if (input.runnerId !== "@korri:cemu/cemu") throw new Error("Unknown Cemu runner")
   if (input.corePath !== undefined || input.ref !== undefined) {
     throw new Error("Cemu requires a game file, not a core or provider reference")
   }

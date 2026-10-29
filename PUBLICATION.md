@@ -1,8 +1,21 @@
-# Signed Nix cache publication
+# Signed plugin repository and Nix cache publication
 
-The publisher uses Nix's file-cache format. It does not convert store paths to
-content-addressed paths, pack closure tarballs, or produce Korri catalog records.
-Nix owns signatures and verifies downloaded contents.
+Each batch publishes two independent forms from the same tested source:
+
+- `korri-publish repository` converts complete plugin closures to
+  content-addressed store paths, signs them with the existing `korri-plugins-1`
+  key, and produces complete archives plus Core's catalog. Nix rewrites exact
+  `requires` paths with the rest of each closure. Plugins keep their exact
+  requirements; publication adds no floating requirements.
+- The existing signed Nix cache keeps the original input-addressed outputs,
+  metadata, path lists and offline proofs unchanged for current devices and
+  rollback. No cache record or old release is removed.
+
+Core at `3c103bdae02ac65e751599e49d3f5fb870401b5e` supplies the catalog schema,
+content-address conversion and in-archive signatures (ADRs 0042–0049). Nix owns
+signatures and verifies downloaded contents. Catalogs contain per-record
+`publicKey`, `archive_url` and `archive_sha256`, plus explicit `latest` marks.
+Publication grants neither device-owner approval nor automatic installation.
 
 ## Hosting setup
 
@@ -10,8 +23,8 @@ Use GitHub Pages for metadata and GitHub Releases for payloads:
 
 | Location | Contents | Change policy |
 |---|---|---|
-| `build-*` release | Compressed NAR files, architecture path lists, offline metadata and full source revision. | Upload while draft, then publish. Never replace existing assets. |
-| `cache-index` branch, served by Pages | `nix-cache-info` and signed `.narinfo` files. | Append only. Keep the first NAR URL. Reject conflicting signed fields. |
+| `build-*` release | `catalog.json`, signed plugin closure archives, compressed raw-cache NAR files, architecture path lists, offline metadata and full source revision. | Upload while draft, then publish. Never replace existing assets. |
+| `cache-index` branch, served by Pages | Moving `catalog.json`, `nix-cache-info` and signed `.narinfo` files. | Replace only the catalog. Cache metadata stays append-only: keep the first NAR URL and reject conflicting signed fields. |
 
 The cache URL is `https://korri-os.github.io/plugins/`. NAR URLs still name
 absolute GitHub release assets. The signing key and package paths do not change.
@@ -20,7 +33,7 @@ New metadata is not copied back to that release.
 
 Install `.github/workflows/cache-pages.yml` on the default branch. Configure
 Pages with GitHub Actions as its build source. The workflow checks out the
-latest `cache-index` branch and uploads only cache metadata. Its concurrency
+latest `cache-index` branch and uploads cache metadata plus the moving catalog. Its concurrency
 queue never cancels an active deployment. The publisher explicitly dispatches
 this workflow after an index push, because a `GITHUB_TOKEN` push does not
 trigger another workflow. CI publication therefore needs `actions: write` as
@@ -29,16 +42,66 @@ Publication waits until Pages serves the exact committed metadata bytes.
 
 The one-off move and device rollback are described in [PAGES-MIGRATION.md](PAGES-MIGRATION.md).
 
-## Signing key
+## Catalogs and archives
 
-Generate a persistent key with the standard Nix command on a trusted machine:
+Each architecture job runs:
 
 ```sh
-umask 077
-nix-store --generate-binary-cache-key korri-plugins-1 cache.secret cache.public
+korri-publish repository --secret-key "$KEY_FILE" --release "$BATCH_TAG" \
+  --base-url "https://github.com/korri-os/plugins/releases/download/$BATCH_TAG/" \
+  --platform "$SYSTEM" "$OUTPUT_DIR" "${STORE_PATHS[@]}"
 ```
 
-Store the private key as the `NIX_CACHE_SIGNING_KEY` Actions secret. Keep it out
+The release label is the batch tag. Archives are assets of that immutable
+`build-*` release; each `archive_url` names its actual release asset. Eligible
+source-only outputs receive `platform: "any"` from Core. Native outputs retain
+`x86_64-linux` or `aarch64-linux`. The final job merges both architecture catalogs,
+deduplicates byte-identical `any` records and archives, and refuses conflicting
+records, latest marks, archive names, hashes, or native/`any` ambiguity.
+
+The merged catalog has two locations:
+
+- Immutable: `https://github.com/korri-os/plugins/releases/download/<batch-tag>/catalog.json`.
+  Product images pin this URL **and its SHA-256**, not the moving catalog.
+- Moving official catalog: `https://korri-os.github.io/plugins/catalog.json`.
+  It is the same catalog bytes as the most recently published batch, not a
+  historical union of all batches. `latest` applies to the plugins in that batch.
+
+Dry runs require the existing `NIX_CACHE_SIGNING_KEY` secret too. They prepare
+both signed forms, merge and verify the architecture artifacts, print the catalog
+SHA-256, and retain `merged-catalog` as a workflow artifact. They perform no release
+or Pages writes. Publication repeats these steps at exactly the same source and
+uploads all archives and the catalog while the release is still a draft. It then
+publishes the release, updates Pages, and waits for the exact catalog and cache
+metadata bytes to be served. Retries never replace release assets.
+
+Use only plugin outputs in catalog batches, not standalone native tools or host
+binaries. License restrictions still apply; `@korri:bitsybox` remains excluded
+pending its separate eligibility and redistribution decision.
+
+Before building or uploading in any checkout, check the recorded tested SHA:
+
+```sh
+test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+```
+
+Tag the tested source, dispatch `plugin-repository.yml` from `main` with
+`expected_source_sha`, `tag`, the selected `packages` and `publish=false`, and
+wait for success. Only then dispatch the same inputs with `publish=true`.
+A source change needs a new tag and a new dry run. The workflow accepts only
+`simonwjackson` as both actor and triggering actor and retains the
+`plugin-release` environment's approval gate.
+
+Cost: complete archives duplicate shared dependency bytes across plugins. Both
+architecture artifacts and the assembled release need space for those bytes.
+Each asset must remain below 2 GiB and each release below 1,000 assets; preparation
+fails before upload when a limit is exceeded. Archive availability still depends
+on GitHub, and a moving catalog is not an immutable image pin.
+
+## Signing key
+
+Reuse the existing `korri-plugins-1` key in the `NIX_CACHE_SIGNING_KEY` Actions
+secret for both forms. Create no new key for this cut. Keep it out
 of Git, the Nix store and workflow artifacts. Configure the public key as an
 additional trusted key on each device through its approved host configuration.
 Keep `require-sigs = true`. Never use a signature bypass to make an install work.
@@ -75,9 +138,10 @@ host declarations. The lists do not map IDs to paths. Select only affected
 outputs in the workflow's existing `packages` input. An unchanged output
 needs no publication. Batch 1's source-mutation assertions remain intact.
 
-Core images name exact published output paths in native Nix composition and
-pin the matching immutable offline metadata assets by hash. They no longer
-import this publisher's recipes or advance its Core pin during image builds.
+Current Core images retain their exact raw-cache output pins and offline proof
+assets until the explicit image cut-over. New images pin the immutable catalog
+URL and SHA-256, carry its signed archives, and seed repository receipts. They
+must not import publisher recipes or use the moving Pages catalog as an image pin.
 A plugin update requires an explicit image pin edit and acceptance before
 image delivery. Publication and deployment need separate approval; a
 successful Core test grants neither. Independent closures can retain old dependency versions and use
@@ -603,8 +667,8 @@ Refresh those snapshots from the committed producer, never from a working tree.
 
 The acquisition port is grounded in Core base
 `129e4381154622579e38819852ee935195ab8161` (ADR 0012). The tool-name check also
-needs Core's `korri-publish declaration` command. The committed Core input is
-`github:korri-os/korri/3047c2af14069381fa97e423fc147a1b639196bd`
+needs Core's `korri-publish declaration` command. The committed Core input is now
+`github:korri-os/korri/3c103bdae02ac65e751599e49d3f5fb870401b5e`,
 which provides that command, the current launch contract and netplay runner
 declarations. Run the checks against
 the checked-in lock, without an input override:

@@ -1,7 +1,11 @@
 # Korri plugins
 
-This repository publishes prebuilt Linux plugins through a signed Nix cache on
-GitHub Releases. Devices download exact store outputs. They never compile them.
+This repository publishes signed, content-addressed Linux plugin archives and
+an official catalog, alongside the existing signed Nix cache. Devices download
+prebuilt outputs. They never compile them.
+
+`@korri` publishes only content licensed for redistribution. A `@korri`
+acquisition provider serves only sources that publish their content legally.
 
 Core supplies the supported builder and generated launch contract. This
 repository owns its Nixpkgs and flake-utils inputs, initially locked to the
@@ -9,10 +13,9 @@ same revisions previously consumed through Core. Plugin builds do not use
 Core's Rust overlay or host binaries. Host admission and lifecycle checks use
 Core's own host composition, separately from plugin builds.
 
-This ownership move changes neither devices nor releases. Publication and
-physical-device acceptance need separate approval. Batch 3 validation uses a
-candidate Core input override. Before production use, update the GitHub lock to
-the reviewed, reachable Core revision that exports the new interface.
+The Core input is pinned to the reviewed plugin-direction contract. Publication
+does not update device images or grant permission approval. See
+[PUBLICATION.md](PUBLICATION.md) for immutable catalog pins and the moving catalog.
 
 ## Packages
 
@@ -200,10 +203,13 @@ TypeScript source root and manifest. The Nix closure contains its packages and
 native units. There is no `package.nix` compatibility route.
 
 Publisher composition supplies the namespace **before** Nix signs the output.
-The exporter does not rewrite manifests or remap store paths. This preserves
-cross-plugin pins. A manifest claim or a signature's key name does not grant
-trust: the device binds a namespace to one full public key and one cache URL,
-then verifies the actual NAR signature with that key.
+`korri-publish repository` uses Nix to convert complete closures to
+content-addressed paths, preserving exact dependency relationships. It signs
+the converted closure and includes its signatures in each archive. The raw Nix
+cache still exports the original paths unchanged for current devices and rollback.
+A manifest claim or a signature's key name does not grant trust: the device
+checks the full publisher key and still requires approval of the exact build.
+Runner and system IDs are derived by Core; do not author their `id` fields.
 
 ## Tailscale installation and login
 

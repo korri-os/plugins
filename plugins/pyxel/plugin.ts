@@ -14,7 +14,6 @@ export const description = "Runs local Pyxel application cartridges natively."
 // ZIP magic is format evidence, not evidence of trust or safe Python execution.
 export const systems = {
   pyxel: {
-    id: "pyxel",
     title: "Pyxel",
     content: {
       extensions: ["pyxapp"],
@@ -25,7 +24,6 @@ export const systems = {
 
 export const runners = {
   pyxel: {
-    id: "@korri:pyxel/pyxel",
     program: "pyxel",
     systems: ["pyxel"],
   },
@@ -36,7 +34,7 @@ type LaunchOutput = Omit<PluginLaunchOutput, "saveLocations"> & {
 }
 
 function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
-  if (input.runnerId !== runners.pyxel.id) throw new Error("Unknown Pyxel runner")
+  if (input.runnerId !== "@korri:pyxel/pyxel") throw new Error("Unknown Pyxel runner")
   if (input.corePath !== undefined) throw new Error("Pyxel loads no emulator core")
   if (
     input.overrides?.config !== undefined ||

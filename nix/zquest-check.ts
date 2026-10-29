@@ -28,14 +28,12 @@ accessSync(manifest.files.zplayer, constants.X_OK)
 assert.equal(name, "zquest-classic")
 assert.deepEqual(systems, {
   "zelda-classic": {
-    id: "zelda-classic",
     title: "Zelda Classic Quest",
     content: { extensions: ["qst"] },
   },
 })
 assert.deepEqual(runners, {
   zplayer: {
-    id: "@korri:zquest-classic/zplayer",
     program: "zplayer",
     systems: ["zelda-classic"],
   },
@@ -58,7 +56,7 @@ for (const contentPath of [
   "/library/Quest %s '; $(exit 19) #.QST",
 ]) {
   const input: PluginLaunchInput = {
-    runnerId: runners.zplayer.id,
+    runnerId: "@korri:zquest-classic/zplayer",
     program: recordArguments,
     contentPath,
     accountRoot: "/accounts/Player One '; $(exit 21)",

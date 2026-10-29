@@ -20,6 +20,7 @@ for (const [core, systemIds] of Object.entries(expected)) {
   assert.equal(plugin.controls.quit.owner.id, `@korri:${core}/${core}`)
   assert.deepEqual(Object.keys(plugin.systems).sort(), [...systemIds].sort(), core)
   assert.deepEqual(plugin.runners[core].systems, [...systemIds].sort(), core)
+  assert.ok(!Object.hasOwn(plugin.runners[core], "id"), `${core}: runner ID is derived`)
   if (core === "melonds") {
     assert.deepEqual(plugin.runners[core].layouts, {
       "Top/Bottom": { panes: {
@@ -38,7 +39,7 @@ for (const [core, systemIds] of Object.entries(expected)) {
   }
   // Exercise the real generated entrypoint, including its declaration binding.
   const request = {
-    runnerId: plugin.runners[core].id, program: "/program", corePath: "/core",
+    runnerId: `@korri:${core}/${core}`, program: "/program", corePath: "/core",
     contentPath: "/rom", accountRoot: "/account", saveRoot: "/saves", cacheRoot: "/cache",
     files: { autoconfig: "/autoconfig" }, artifacts: {},
   }
@@ -70,7 +71,7 @@ for (const [core, systemIds] of Object.entries(expected)) {
       assert.ok(!("panes" in system), `${core}/${id}: implicit single pane`)
       assert.ok(!("arrangement" in system), `${core}/${id}: no arrangement`)
     }
-    assert.equal(system.id, id, core)
+    assert.ok(!Object.hasOwn(system, "id"), `${core}/${id}: system ID is derived`)
     assert.ok(system.title.length > 0, `${core}/${id}: title`)
     assert.ok(system.content?.extensions.length > 0, `${core}/${id}: content extensions`)
     for (const extension of system.content.extensions) {

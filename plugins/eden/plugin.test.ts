@@ -3,7 +3,7 @@ import type { PluginLaunchInput } from "../../contracts/generated/korrid"
 import { handlers, runners, systems } from "./plugin"
 
 assert.deepEqual(systems.switch, {
-  id: "switch", title: "Nintendo Switch",
+  title: "Nintendo Switch",
   content: { extensions: ["nsp", "xci"] },
 })
 const input: PluginLaunchInput = {

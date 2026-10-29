@@ -172,6 +172,17 @@ fi
             publisher.push_metadata(str(self.remote), "cache-index", [info])
         self.assertEqual(self.stored(info.name), "StoreDir: /nix/store\n")
 
+    def test_catalog_moves_without_replacing_existing_signed_cache_records(self):
+        note = self.note("first")
+        catalog = self.root / "catalog.json"
+        catalog.write_text('{"records": [], "latest": {}}\n')
+        publisher.push_metadata(str(self.remote), "cache-index", [note, catalog])
+        catalog.write_text('{"records": [], "latest": {"@korri:source": "new"}}\n')
+        expected = publisher.push_metadata(str(self.remote), "cache-index", [catalog])
+        self.assertEqual(self.stored(note.name), note.read_text())
+        self.assertEqual(self.stored("catalog.json"), catalog.read_text())
+        self.assertEqual(expected, {"catalog.json": catalog.read_bytes()})
+
     def test_push_failure_without_a_concurrent_update_is_not_retried(self):
         hook = self.remote / "hooks/pre-receive"
         hook.write_text("#!/bin/sh\nexit 1\n")

@@ -6,7 +6,7 @@ import { handlers, systems, runners } from "./plugin"
 const [directory, program] = process.argv.slice(2)
 assert.deepEqual(systems.pyxel.content.extensions, ["pyxapp"])
 const input: PluginLaunchInput = {
-  runnerId: runners.pyxel.id,
+  runnerId: "@korri:pyxel/pyxel",
   program,
   contentPath: "/media/Selected '; $(touch injected).pyxapp",
   accountRoot: "/accounts/Player One",

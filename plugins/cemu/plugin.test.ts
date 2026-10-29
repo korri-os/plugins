@@ -3,7 +3,7 @@ import type { PluginLaunchInput } from "../../contracts/generated/korrid"
 import { handlers, runners, systems } from "./plugin"
 
 assert.deepEqual(systems.wiiu, {
-  id: "wiiu", title: "Wii U",
+  title: "Wii U",
   content: { extensions: ["wua", "wud", "wux", "rpx", "wuhb"] },
 })
 const input: PluginLaunchInput = {

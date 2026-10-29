@@ -15,16 +15,16 @@ export const title = "Eden"
 export const description = "Runs Nintendo Switch games with account-local Eden data and game saves."
 export const systems = {
   switch: {
-    id: "switch", title: "Nintendo Switch",
+    title: "Nintendo Switch",
     content: { extensions: ["nsp", "xci"] },
   },
 }
 export const runners = {
-  eden: { id: "@korri:eden/eden", program: "eden", systems: ["switch"] },
+  eden: { program: "eden", systems: ["switch"] },
 }
 
 function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
-  if (input.runnerId !== runners.eden.id) throw new Error("Unknown Eden runner")
+  if (input.runnerId !== "@korri:eden/eden") throw new Error("Unknown Eden runner")
   if (input.corePath !== undefined || input.ref !== undefined) {
     throw new Error("Eden requires a game file, not a core or provider reference")
   }
