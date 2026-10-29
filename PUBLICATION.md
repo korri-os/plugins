@@ -740,3 +740,18 @@ VM gap. Earlier batches were published with the same gap. This exception does
 not weaken signatures, publisher trust, permission approval, or the existing
 raw-cache checks. It does not establish ARM cold-host lifecycle acceptance or
 physical-device acceptance. Images and devices are a separate cut-over.
+
+### Serial RetroArch precheck
+
+The automatic main run [40837024962](https://github.com/korri-os/plugins/actions/runs/40837024962)
+failed its x86 netplay-host-during-play precheck. Its log shows the host,
+password, overlay and settings checks building concurrently. A fresh isolated
+run of the exact CI-variant netplay check passed with the same program and test.
+This does not prove that concurrency caused the CI failure.
+
+The RetroArch helper now passes `--max-jobs 1` and `--print-build-logs` to its
+native check build. This applies the existing serial-check policy to the
+precheck too, and retains full diagnostics if a check fails. All three native
+gates, assertions and deadlines stay unchanged. A subprocess-contract regression
+checks the job limit, diagnostics and gate selection, including checkout paths
+with spaces.

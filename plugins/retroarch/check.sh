@@ -7,7 +7,8 @@ bun install --frozen-lockfile --ignore-scripts
 bun run typecheck
 bun test
 system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-nix build --no-link \
+# Native netplay/window checks must not compete with other check builds.
+nix build --no-link --print-build-logs --max-jobs 1 \
   "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-settings" \
   "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-netplay-password" \
   "$root#${KORRI_CHECKS_ATTRIBUTE:-checks}.$system.korri-retroarch-netplay-host-during-play"

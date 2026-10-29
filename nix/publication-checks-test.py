@@ -2,7 +2,10 @@
 
 import importlib.util
 import json
+import os
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -114,6 +117,56 @@ class PublicationChecksTest(unittest.TestCase):
                 selection.select_checks(
                     mapping, ["korri-plugin-pyxel", "korri-plugin-pyxel"]
                 ),
+            )
+
+
+class RetroarchCheckInvocationTest(unittest.TestCase):
+    def test_native_prechecks_use_one_build_job_and_keep_the_existing_gates(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkout = root / "checkout with spaces"
+            (checkout / "plugins/retroarch").mkdir(parents=True)
+            commands = root / "commands"
+            commands.mkdir()
+            log = root / "commands.jsonl"
+            recorder = commands / "record-command"
+            recorder.write_text(
+                f"#!{sys.executable}\n"
+                "import json, os, sys\n"
+                "from pathlib import Path\n"
+                "command = [Path(sys.argv[0]).name, *sys.argv[1:]]\n"
+                "with open(os.environ['COMMAND_LOG'], 'a') as log:\n"
+                "    log.write(json.dumps(command) + '\\n')\n"
+                "if command[:2] == ['nix', 'eval']:\n"
+                "    print('x86_64-linux')\n"
+            )
+            recorder.chmod(0o755)
+            for command in ("bun", "nix"):
+                (commands / command).symlink_to(recorder)
+            subprocess.run(
+                ["bash", str(ROOT / "plugins/retroarch/check.sh")],
+                check=True,
+                env=os.environ | {
+                    "PATH": str(commands) + os.pathsep + os.environ["PATH"],
+                    "KORRI_ROOT": str(checkout),
+                    "KORRI_CHECKS_ATTRIBUTE": "ci.checks",
+                    "COMMAND_LOG": str(log),
+                },
+            )
+            calls = [json.loads(line) for line in log.read_text().splitlines()]
+            builds = [call for call in calls if call[:2] == ["nix", "build"]]
+            self.assertEqual(len(builds), 1)
+            build = builds[0]
+            self.assertIn("--max-jobs", build)
+            self.assertEqual(build[build.index("--max-jobs") + 1], "1")
+            self.assertIn("--print-build-logs", build)
+            self.assertEqual(
+                [argument for argument in build if "#ci.checks." in argument],
+                [f"{checkout}#ci.checks.x86_64-linux.{name}" for name in (
+                    "korri-retroarch-settings",
+                    "korri-retroarch-netplay-password",
+                    "korri-retroarch-netplay-host-during-play",
+                )],
             )
 
 
