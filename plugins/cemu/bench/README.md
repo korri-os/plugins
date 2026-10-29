@@ -1,7 +1,7 @@
 # Korri FPS bench
 
 An administrative Linux tool. It launches **only through korrid**, using the
-portal's authenticated localhost `/rpc` reserve/start/stop calls. The installed
+portal's authenticated localhost `/rpc` reserve/start/end calls. The installed
 runner, Gamescope modifier, bubblewrap policy, limits helper, saves and normal
 session lifecycle remain korrid's responsibility. It never runs an emulator
 command itself and never changes a system generation or sysfs value.
@@ -51,7 +51,8 @@ set -- --game "$GAME" --runner "$RUNNER" --process-name Cemu \
   --repeat-input-until-loading \
   --controller-profile "$ACCOUNT_ROOT/.config/Cemu/controllerProfiles/controller0.xml" \
   --controller-template "$STAGING/controller0-bench-p2.xml" \
-  --cemu-log "$ACCOUNT_ROOT/.local/share/Cemu/log.txt"
+  --cemu-log "$ACCOUNT_ROOT/.local/share/Cemu/log.txt" \
+  --mute-sink alsa_output.platform-sound.HiFi__Speaker__sink
 "$BENCH/bin/korri-cemu-bench" run "$@" --output "$STAGING/run-01"
 "$BENCH/bin/korri-cemu-bench" soak "$@" --minutes 15 --output "$STAGING/soak-01"
 "$BENCH/bin/korri-cemu-bench" ab "$@" --a baseline=- --b repeat=- --output "$STAGING/ab-01"
@@ -62,7 +63,12 @@ set -- --game "$GAME" --runner "$RUNNER" --process-name Cemu \
 `--warmup` (default 100 s), `--seconds` (180 s) and `--minutes` (15) control
 measurement, not game readiness. `--gate-timeout` (120 s, maximum 600) bounds each
 state gate. `--gate-poll` defaults to one second. Use a new private (0700) output
-directory each time. Keep the Speaker muted. Before **every** launch, the tool
+directory each time. Keep the Speaker muted: pass `--mute-sink` with the
+PipeWire sink node name (Odin: `alsa_output.platform-sound.HiFi__Speaker__sink`).
+The bench records the sink's mute state before launch, mutes it, mutes it again
+if anything unmutes it during the run, and restores the recorded state during
+cleanup, also after a failed run. `speaker.json` holds the result. Do not mute
+from a wrapper loop. Before **every** launch, the tool
 refuses other sessions/units and Eden, Gamescope or Cemu processes. If another
 person is playing, poll read-only at intervals of at least five minutes; never
 stop their game.
@@ -142,15 +148,18 @@ in a private `/tmp/korri-cemu-save-*` backup. Keep that backup until the run is
 reviewed; never commit it. There is no automatic unsupported re-insertion of
 missing objects.
 
-After exact-session stop, including gate/input failures, it uses the supported
+After the exact session ends, including gate/input failures, it uses the supported
 `app.saves.restore` to select that original payload again. It verifies every
 blob, exact location/file content and ancestry. Restore **appends a new
 continuation**; the original and final head IDs therefore differ. Both IDs and
 the number of additional records/session snapshots plus restore records are in
 `save-safety.json` and the report. New records can include peer arrivals; they
-are not silently counted as exclusively local bench work. If cleanup cannot
-prove idle, it refuses restoration and reports the deferred recovery. A
-concurrent writer can still race the RPC (it has no expected-head field).
+are not silently counted as exclusively local bench work. Cleanup always tries
+the restore, even when the session did not end or an earlier cleanup step
+failed. korrid refuses `app.saves.restore` while a session is active
+(`ActiveSessionConflict`); the report then names that refusal and the korrid
+session state. A concurrent writer can still race the RPC (it has no
+expected-head field).
 
 **Remaining risk / note for #212:** bench and restore snapshots still enter the
 person's real history, sync, and count toward retention. Restoring content is
@@ -226,7 +235,8 @@ and `--controller-template /actual/bench-p2.xml` together with `--cemu-log`.
 Both files must already exist; the template must come from Cemu with P2 selected.
 The tool treats their XML bytes as opaque native configuration. It snapshots the
 original, atomically installs the template for the run, and restores exact bytes,
-mode, ownership, mtime and xattrs after the exact session stops. Symlinks, invalid
+mode, ownership, mtime and xattrs during cleanup, also when the session did not
+end. Symlinks, invalid
 XML, files over 1 MiB, and implicit profile creation are refused. If another writer
 changes the active profile, the bench fails and keeps the original for manual
 review rather than overwriting that edit.
@@ -288,10 +298,14 @@ into the report and the complete log is retained.
 
 Failed runs have `report.md` and available diagnostics, but no `fps.json` or FPS table. An existing active/pending session is refused. A retained `HostLaunchFailed`
 from a previous terminal game is accepted only after systemd and the actual game
-cgroups conclusively show no game activity; unknown native state still fails. All stop/cancel operations name
-**only this bench's launch ID**. No global kill is used. Cleanup records an empty
+cgroups conclusively show no game activity; unknown native state still fails. All end/cancel operations name
+**only this bench's launch ID**. No global kill is used. The bench ends the
+session with `app.session.end` (korrid removed `app.session.stop`; there is no
+alias). It accepts the `ended` phase and polls a `pending` one. Then it waits up to
+60 seconds for the exact cgroup and every native game unit to empty. Cleanup records an empty
 exact cgroup, no newly surviving game/Cemu/Gamescope processes, and unchanged
-boot/system identity. After an exact stop returns `HostRecoveryBlocked`, the tool records the original
+boot/system identity. Every restore step then runs on its own, whatever failed
+before it; `cleanup.json` names each failed step. After an exact end returns `HostRecoveryBlocked`, the tool records the original
 warning and polls read-only status for up to 10 seconds plus bounded I/O. It
 accepts cleanup only after korrid leaves that state and systemd (including
 acquisition units) plus every games-slice cgroup prove idle. It never resets a

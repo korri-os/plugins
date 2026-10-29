@@ -1,7 +1,8 @@
 """Administrative bench, using the portal's existing localhost /rpc treaty.
 
 Wire authority: contracts/generated/korrid.ts (RpcRequest, SessionReserveRequest,
-SessionStartRequest, SessionStopRequest, LaunchSettingsSnapshotRequest).
+SessionStartRequest, SessionEndRequest/SessionEndResult, LaunchSettingsSnapshotRequest).
+korrid has no app.session.stop alias (clients/cli/README.md, product wire cut).
 Never log the capability, or launch anything other than through korrid.
 """
 
@@ -30,6 +31,7 @@ from metrics import fps_bins, summarize
 from reporting import fps_section, gate_section, not_measured_report
 from save_proof import SaveProof, SaveReadWatch
 from save_safety import SaveSafety
+from speaker import Speaker
 
 Record = dict[str, object]
 
@@ -213,17 +215,29 @@ def wrapping(tree: dict[int, Record]) -> str:
     )
 
 
-def stop_exact(
+# korrid's end reply for a launch that is already gone (host/mod.rs, lib.rs).
+SESSION_GONE = ("NoActiveSession", "SessionCompleted")
+
+
+def end_exact(
     rpc: Rpc,
     launch: str,
     native_guard: Callable[[], None] = confirm_native_idle,
     recovery_seconds: float = 10,
     poll_seconds: float = 0.5,
+    end_timeout_s: float = 90,
 ) -> list[str]:
+    """End only this launch through app.session.end; phase is ended or pending."""
+    pending = False
     for _ in range(20):
         try:
-            result = rpc.call("app.session.stop", {"expectedLaunchId": launch})
+            result = rpc.call(
+                "app.session.end", {"expectedLaunchId": launch}, end_timeout_s
+            )
         except RpcError as exc:
+            if pending and exc.code in SESSION_GONE:
+                # The pending end finished between two polls.
+                return []
             if exc.code != "HostRecoveryBlocked":
                 raise
             warning = str(exc)
@@ -262,10 +276,45 @@ def stop_exact(
             raise RuntimeError(
                 f"{warning}; exact stop recovery did not clear; no journal/reset/restart was attempted"
             ) from exc
-        if result.get("phase") == "stopped":
+        phase = result.get("phase")
+        if phase == "ended":
             return []
+        if phase != "pending":
+            raise ValueError(f"Unknown app.session.end phase: {phase!r}")
+        pending = True
         time.sleep(poll_seconds)
-    raise RuntimeError("Exact-session stop did not finish")
+    raise RuntimeError("Exact-session end did not finish")
+
+
+def wait_for_exit(
+    unit: str,
+    native_guard: Callable[[], None] = confirm_native_idle,
+    timeout_s: float = 60,
+    poll_seconds: float = 0.5,
+) -> str:
+    """Wait for the exact cgroup and all native game units to empty. Read-only."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        problem = ""
+        if members(unit):
+            problem = "exact launch cgroup still populated"
+        else:
+            try:
+                native_guard()
+            except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
+                problem = str(exc)
+        if not problem or time.monotonic() >= deadline:
+            return problem
+        time.sleep(poll_seconds)
+
+
+def session_status_problem(rpc: Rpc) -> str:
+    """Describe korrid's session state as a cleanup note. Never raises."""
+    try:
+        require_idle(rpc)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        return str(exc) or type(exc).__name__
+    return ""
 
 
 def run(rpc: Rpc, args: argparse.Namespace, folder: Path, name: str) -> None:
@@ -340,7 +389,7 @@ def _run(
     frames_file = (folder / "present.csv").open("w")
     observer_log = (folder / "observer.log").open("w")
     error = ""
-    cleanup_error = ""
+    cleanup_errors: list[str] = []
     stop_warnings: list[str] = []
     tree: dict[int, Record] = {}
     window = 0
@@ -354,6 +403,11 @@ def _run(
         reference, args.capture_user, args.runtime_dir, args.wayland_display
     )
     safety = SaveSafety(rpc, args.game, args.runner, args.save_objects, folder)
+    speaker = (
+        Speaker(args.mute_sink, args.capture_user, args.runtime_dir, folder)
+        if getattr(args, "mute_sink", None)
+        else None
+    )
     try:
         require_idle(rpc)
         confirm_native_idle()
@@ -374,6 +428,8 @@ def _run(
             input_observer = InputObserver(folder)
             input_observer.begin()
         safety.verify_before_launch()
+        if speaker:
+            speaker.mute()
         reservation = rpc.call("app.session.reserve", {"gameId": args.game})
         launch = str(reservation["launchId"])
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", launch):
@@ -462,6 +518,8 @@ def _run(
         )
 
         def observe() -> None:
+            if speaker:
+                speaker.hold()
             if observer is None or observer.poll() is not None or not members(unit):
                 raise RuntimeError("Game/observer exited during gameplay gate")
             statistics = capture.capture()
@@ -546,6 +604,8 @@ def _run(
                 rows.append(row)
                 if input_observer:
                     input_observer.collect()
+                if speaker:
+                    speaker.hold()
                 output.write(json.dumps(row) + "\n")
                 output.flush()
                 next_sample += 1
@@ -575,13 +635,18 @@ def _run(
         observer_log.close()
         if launch:
             try:
-                if started:
-                    stop_warnings.extend(stop_exact(rpc, launch))
-                else:
-                    # A timed-out start may have succeeded. Stop only our exact identity.
-                    try:
-                        stop_warnings.extend(stop_exact(rpc, launch))
-                    except RpcError:
+                try:
+                    stop_warnings.extend(end_exact(rpc, launch))
+                except RpcError as exc:
+                    if started and exc.code in SESSION_GONE:
+                        # The game exited on its own. wait_for_exit below
+                        # still proves the exact cgroup and native units empty.
+                        stop_warnings.append(f"{exc}; launch had already ended")
+                    elif started:
+                        raise
+                    else:
+                        # A timed-out start may have succeeded; otherwise
+                        # release only our exact reservation.
                         rpc.call("app.session.cancel", {"expectedLaunchId": launch})
             except (
                 OSError,
@@ -589,7 +654,7 @@ def _run(
                 RuntimeError,
                 subprocess.SubprocessError,
             ) as exc:
-                cleanup_error = str(exc)
+                cleanup_errors.append(f"end: {exc}")
         if input_observer:
             try:
                 # Capture ownership while our uinput source still exists, even
@@ -602,12 +667,12 @@ def _run(
                 RuntimeError,
                 subprocess.SubprocessError,
             ) as exc:
-                cleanup_error = cleanup_error or str(exc)
+                cleanup_errors.append(f"input observer: {exc}")
         if pad:
             try:
                 pad.close()
             except OSError as exc:
-                cleanup_error = cleanup_error or str(exc)
+                cleanup_errors.append(f"gamepad: {exc}")
         if input_observer:
             try:
                 input_observer.close()
@@ -628,10 +693,13 @@ def _run(
                 RuntimeError,
                 subprocess.SubprocessError,
             ) as exc:
-                cleanup_error = cleanup_error or str(exc)
-        time.sleep(0.5)
+                cleanup_errors.append(f"input observer: {exc}")
+        unit = f"korri-game-{launch}.service"
+        exit_problem = wait_for_exit(unit) if launch else ""
+        if exit_problem:
+            cleanup_errors.append(f"session exit: {exit_problem}")
         after = processes()
-        remaining = members(f"korri-game-{launch}.service") if launch else {}
+        remaining = members(unit) if launch else {}
         new_wrappers = {
             pid: item
             for pid, item in after.items()
@@ -641,25 +709,18 @@ def _run(
                 for token in ("cemu", "gamescope", args.process_name.lower())
             )
         }
+        # Every restore step runs, whatever failed before it. Each step
+        # protects itself: the profile is replaced only while it still holds
+        # the bench template, and korrid refuses a save restore while a
+        # session is active (ActiveSessionConflict), so nothing is forced.
         if controller_profile:
             try:
-                if remaining:
-                    raise RuntimeError(
-                        "Game still active; defer controller-profile restore until exact session stops"
-                    )
                 controller_profile.restore()
             except (OSError, ValueError, TypeError, RuntimeError) as exc:
-                cleanup_error = cleanup_error or str(exc)
-        if (
-            launch
-            and not remaining
-            and not new_wrappers
-            and not cleanup_error
-            and not getattr(args, "defer_save_restore", False)
-        ):
+                cleanup_errors.append(f"controller profile: {exc}")
+        if launch and not getattr(args, "defer_save_restore", False):
+            session_problem = session_status_problem(rpc)
             try:
-                require_idle(rpc)
-                confirm_native_idle()
                 safety.restore()
             except (
                 OSError,
@@ -668,12 +729,25 @@ def _run(
                 RuntimeError,
                 subprocess.SubprocessError,
             ) as exc:
-                cleanup_error = str(exc)
-        elif launch and (remaining or new_wrappers or cleanup_error):
-            cleanup_error = (
-                cleanup_error
-                or "Save restore deferred: exact session is not conclusively stopped"
-            )
+                cleanup_errors.append(
+                    f"save restore: {exc}"
+                    + (
+                        f" (korrid session: {session_problem})"
+                        if session_problem
+                        else ""
+                    )
+                )
+        if speaker:
+            try:
+                speaker.restore()
+            except (
+                OSError,
+                ValueError,
+                RuntimeError,
+                subprocess.SubprocessError,
+            ) as exc:
+                cleanup_errors.append(f"speaker: {exc}")
+        cleanup_error = "; ".join(cleanup_errors)
         write_json(folder / "gate.json", {"phase": gate.phase, "timings": gate.timings})
         cleanup: Record = {
             "exactCgroupRemaining": remaining,
@@ -792,6 +866,7 @@ def _run(
             f"Exact-stop warnings: {stop_warnings or 'none'}.",
             "No sysfs, system or generation writes by the bench.",
             f"Cemu-native controller profile: {controller_profile.state if controller_profile else 'not changed'}. See `controller-profile.json` when used.",
+            f"Speaker: {speaker.summary() if speaker else 'not changed'}. See `speaker.json` when used.",
             "A/B selects existing launch profiles through RPC and restores the original selection.",
             "Korri performs its normal play-log/save effects. uinput device is destroyed.",
             f"InputPlumber runtime management: { {key: input_observer.state.get(key) for key in ('before', 'after', 'managementUnchanged', 'compositesRestored', 'builtinUnchanged', 'seatP1Unchanged')} if input_observer else 'not changed (no input script)' }. See `input-observer.json` and `seat-events.json`.",
@@ -967,6 +1042,10 @@ def main() -> None:
         help="Cemu-created bench profile selecting P2; copied for this run and restored",
     )
     parser.add_argument(
+        "--mute-sink",
+        help="PipeWire sink node name to keep muted during the run; its previous mute state is restored",
+    )
+    parser.add_argument(
         "--repeat-input-until-loading",
         action="store_true",
         help="Repeat the native advance script until loading is observed, at most 60 seconds",
@@ -1050,9 +1129,10 @@ def main() -> None:
             finally:
                 if proof.watch:
                     proof.watch.close()
+                # Restore even when the session did not end; korrid refuses a
+                # save restore during an active session, and the reason is kept.
+                session_problem = session_status_problem(rpc)
                 try:
-                    require_idle(rpc)
-                    confirm_native_idle()
                     safety.restore()
                 except (
                     OSError,
@@ -1061,7 +1141,14 @@ def main() -> None:
                     RuntimeError,
                     subprocess.SubprocessError,
                 ) as exc:
-                    failure = failure or str(exc)
+                    failure = failure or (
+                        f"save restore: {exc}"
+                        + (
+                            f" (korrid session: {session_problem})"
+                            if session_problem
+                            else ""
+                        )
+                    )
                 (args.output / "report.md").write_text(
                     "\n".join(
                         [

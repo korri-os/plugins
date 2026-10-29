@@ -15,6 +15,32 @@ calibration can write the files. Tests run without decoding or displaying an
 image. References are tied to the existing library game ID and exact output
 size. They are not general scene-recognition models.
 
+## BotW Clarity and 960×540 runs, 2026-10-29 (no new reference)
+
+Four Odin runs used the Enhancements pack's Clarity preset "Serfrost's Preset
+(Recommended)" with FPS++ "No FPS Limit": `uncapped-20261029` (game
+1280×720) and `probe540`, `probe540b`, `probe540fsr3` (game 960×540, Shadows
+Low). The compositor output stayed 1920×1080. Their `frames.jsonl`
+descriptors were checked against `botw-1920x1080.json`:
+
+| State | Result with Clarity |
+|---|---|
+| Title | Matches: distance 0.0–3.3, foreground coverage 1.00, in all four runs. |
+| Loading | Matches: distance 0.6–2.8 in three runs. `probe540` never reached loading; after the title its frames kept coverage 0.99–1.00, which is another screen, and the gate correctly refused it. |
+| Gameplay | Does not match: distance 37–60 against the 35.5 threshold. |
+
+A Clarity gameplay reference cannot be calibrated from these frames. The
+frames after loading are not one stationary scene. Across the three runs that
+loaded, the largest distance between two of these frames is 82.3, and between
+two frames of `uncapped-20261029` alone it is 69.6. The smallest distance from
+any of them to a title or loading frame is 45.8 (54.0 in
+`uncapped-20261029`). `calibrate` refuses that overlap, and a threshold wide
+enough to accept these frames would also accept title-like frames. The gate
+was therefore not relaxed. A Clarity reference first needs runs whose
+post-loading frames are stable, as in the 2026-10-23 calibration (largest
+gameplay distance 3.8). Find out why the scene changes after loading with
+Clarity and the uncapped frame rate before capturing again.
+
 See the bench README for `korri-cemu-bench-reference capture` and `calibrate`.
 Capture multiple title backgrounds, loading and the intended stationary scene.
 Retain the private PNGs outside Git and never open them in an image viewer.

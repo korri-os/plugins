@@ -20,6 +20,8 @@ pkgs.stdenv.mkDerivation {
       ./reporting.py
       ./save_safety.py
       ./save_proof.py
+      ./speaker.py
+      ./test_speaker.py
       ./references
       ./test_gameplay_gate.py
       ./test_save_safety.py

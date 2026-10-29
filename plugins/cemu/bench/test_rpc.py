@@ -11,8 +11,9 @@ from bench import (
     RpcError,
     namespace_pid,
     require_idle,
-    stop_exact,
+    end_exact,
     verify_native_idle,
+    wait_for_exit,
 )
 
 
@@ -30,6 +31,90 @@ class RpcTests(unittest.TestCase):
         )
         self.assertEqual(namespace_pid("Name:\tfixture\n", 500), 500)
 
+    def serve(self, replies):
+        """Answer each request with the next outcome and record it."""
+        requests = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                requests.append(body)
+                response = {"_tag": body["_tag"], "outcome": replies.pop(0)}
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode())
+
+            def log_message(self, *_):
+                pass
+
+        tmp = tempfile.TemporaryDirectory()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        worker = threading.Thread(target=server.serve_forever)
+        worker.start()
+
+        def stop():
+            server.shutdown()
+            server.server_close()
+            worker.join()
+            tmp.cleanup()
+
+        self.addCleanup(stop)
+        key = Path(tmp.name) / "capability"
+        key.write_text("test-capability")
+        return Rpc(server.server_port, key), requests
+
+    def test_end_uses_current_korrid_tag_and_phases(self):
+        def ok(phase):
+            return {"_tag": "Ok", "payload": {"phase": phase}}
+
+        gone = {
+            "_tag": "Err",
+            "payload": {"code": "NoActiveSession", "message": "no host launch"},
+        }
+        rpc, requests = self.serve([ok("ended")])
+        self.assertEqual(end_exact(rpc, "owned-launch", poll_seconds=0), [])
+        self.assertEqual(
+            requests,
+            [
+                {
+                    "_tag": "app.session.end",
+                    "payload": {"expectedLaunchId": "owned-launch"},
+                }
+            ],
+        )
+        # A pending end that finishes between polls reports the launch gone.
+        rpc, requests = self.serve([ok("pending"), ok("pending"), gone])
+        self.assertEqual(end_exact(rpc, "owned-launch", poll_seconds=0), [])
+        self.assertEqual(len(requests), 3)
+        # Without a pending reply first, a gone launch is the caller's decision.
+        rpc, _ = self.serve([gone])
+        with self.assertRaises(RpcError) as raised:
+            end_exact(rpc, "owned-launch", poll_seconds=0)
+        self.assertEqual(raised.exception.code, "NoActiveSession")
+        # The removed reply phase is not accepted as success.
+        rpc, _ = self.serve([ok("stopped")])
+        with self.assertRaisesRegex(ValueError, "Unknown app.session.end phase"):
+            end_exact(rpc, "owned-launch", poll_seconds=0)
+
+    def test_wait_for_exit_polls_until_native_idle(self):
+        calls = []
+
+        def guard():
+            calls.append(1)
+            if len(calls) < 3:
+                raise RuntimeError("activity remains")
+
+        self.assertEqual(wait_for_exit("korri-game-absent.service", guard, 5, 0), "")
+        self.assertEqual(len(calls), 3)
+
+        def busy():
+            raise RuntimeError("activity remains")
+
+        self.assertEqual(
+            wait_for_exit("korri-game-absent.service", busy, 0.02, 0.005),
+            "activity remains",
+        )
+
     def test_stop_recovery_uses_status_only_and_requires_native_idle(self):
         requests = []
         status_codes = ["HostRecoveryBlocked", "HostLaunchFailed"]
@@ -40,7 +125,7 @@ class RpcTests(unittest.TestCase):
                 requests.append(body)
                 code = (
                     "HostRecoveryBlocked"
-                    if body["_tag"] == "app.session.stop"
+                    if body["_tag"] == "app.session.end"
                     else status_codes.pop(0)
                 )
                 response = {
@@ -67,7 +152,7 @@ class RpcTests(unittest.TestCase):
                 key = Path(tmp) / "capability"
                 key.write_text("test-capability")
                 rpc = Rpc(server.server_port, key)
-                warnings = stop_exact(
+                warnings = end_exact(
                     rpc,
                     "owned-launch",
                     partial(verify_native_idle, "", False),
@@ -78,7 +163,7 @@ class RpcTests(unittest.TestCase):
                 self.assertIn("resolved by korrid", warnings[0])
                 self.assertEqual(
                     [request["_tag"] for request in requests],
-                    ["app.session.stop", "app.session.status", "app.session.status"],
+                    ["app.session.end", "app.session.status", "app.session.status"],
                 )
                 self.assertEqual(
                     requests[0]["payload"], {"expectedLaunchId": "owned-launch"}
@@ -87,7 +172,7 @@ class RpcTests(unittest.TestCase):
                 requests.clear()
                 status_codes[:] = ["HostLaunchFailed"] * 100
                 with self.assertRaisesRegex(RuntimeError, "recovery did not clear"):
-                    stop_exact(
+                    end_exact(
                         rpc,
                         "owned-launch",
                         partial(verify_native_idle, "", True),
@@ -95,14 +180,14 @@ class RpcTests(unittest.TestCase):
                         poll_seconds=0.005,
                     )
                 self.assertEqual(
-                    sum(request["_tag"] == "app.session.stop" for request in requests),
+                    sum(request["_tag"] == "app.session.end" for request in requests),
                     1,
                 )
                 # An unresolved core recovery block must not trigger any native mutation.
                 requests.clear()
                 status_codes[:] = ["HostRecoveryBlocked"] * 100
                 with self.assertRaisesRegex(RuntimeError, "no journal/reset/restart"):
-                    stop_exact(
+                    end_exact(
                         rpc,
                         "owned-launch",
                         partial(verify_native_idle, "", False),
