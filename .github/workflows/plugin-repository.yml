@@ -155,6 +155,8 @@ jobs:
           mapfile -t paths < "$RUNNER_TEMP/paths.txt"
           ./cache-tool/bin/korri-cache export "$RUNNER_TEMP/file-cache" --key-file "$key" "${paths[@]}"
           ./cache-tool/bin/korri-cache prepare "$RUNNER_TEMP/file-cache" "$RUNNER_TEMP/prepared" --nar-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --upstream-cache https://cache.nixos.org
+          # Core defaults to slim signed native archives and self-contained
+          # content-addressed source-only archives. Do not force --self-contained.
           ./publisher-tool/bin/korri-publish repository --secret-key "$key" --release "$NAR_TAG" --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" --platform "$SYSTEM" "$RUNNER_TEMP/prepared/repository" "${paths[@]}"
           cp "$RUNNER_TEMP/paths.txt" "$RUNNER_TEMP/prepared/paths-$SYSTEM.txt"
           printf '%s\n' "$EXPECTED_SOURCE_SHA" > "$RUNNER_TEMP/prepared/revision.txt"
@@ -184,7 +186,9 @@ jobs:
   lifecycle:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Run 40844588188 exhausted 90 min: an uncached Core pin builds korrid
+    # from source before the cold-host VM can complete.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

@@ -2,17 +2,20 @@
 
 Each batch publishes two independent forms from the same tested source:
 
-- `korri-publish repository` converts complete plugin closures to
-  content-addressed store paths, signs them with the existing `korri-plugins-1`
-  key, and produces complete archives plus Core's catalog. Nix rewrites exact
-  `requires` paths with the rest of each closure. Plugins keep their exact
-  requirements; publication adds no floating requirements.
+- `korri-publish repository` uses slim archives for signed native plugins:
+  it keeps input-addressed paths, omits shared paths verified at
+  `https://cache.nixos.org`, and signs retained paths with the existing
+  `korri-plugins-1` key. Source-only plugins remain self-contained and
+  content-addressed. Core selects these defaults; the workflow must not force
+  `--self-contained`. Exact requirements stay exact; publication adds no
+  floating requirements.
 - The existing signed Nix cache keeps the original input-addressed outputs,
   metadata, path lists and offline proofs unchanged for current devices and
   rollback. No cache record or old release is removed.
 
-Core at `3c103bdae02ac65e751599e49d3f5fb870401b5e` supplies the catalog schema,
-content-address conversion and in-archive signatures (ADRs 0042–0049). Nix owns
+Core at `79977b4383e9be5e74ceefae544a0dbbb925f447` supplies slim publication,
+the catalog schema, content-address conversion and in-archive signatures
+(ADRs 0042–0049). Nix owns
 signatures and verifies downloaded contents. Catalogs contain per-record
 `publicKey`, `archive_url` and `archive_sha256`, plus explicit `latest` marks.
 Publication grants neither device-owner approval nor automatic installation.
@@ -92,8 +95,10 @@ A source change needs a new tag and a new dry run. The workflow accepts only
 `simonwjackson` as both actor and triggering actor and retains the
 `plugin-release` environment's approval gate.
 
-Cost: complete archives duplicate shared dependency bytes across plugins. Both
-architecture artifacts and the assembled release need space for those bytes.
+Cost: slim native installation needs `https://cache.nixos.org` for shared
+paths not already present on the device. Self-contained source-only archives
+need no shared paths. Both architecture artifacts and the assembled release
+still need space for every retained native path.
 Each asset must remain below 2 GiB and each release below 1,000 assets; preparation
 fails before upload when a limit is exceeded. Archive availability still depends
 on GitHub, and a moving catalog is not an immutable image pin.
@@ -388,8 +393,7 @@ still invalidate the check. Generated contract source remains read-only.
 
 Builds run before the signing key is exposed. Signed exports use `nix copy` with
 zero build jobs and no remote builders. The secret is removed before artifacts
-upload. When publication is false and no signing secret exists, the build uses a
-temporary test key. Such outputs are not production artifacts.
+upload. Both dry runs and publication require the existing signing secret.
 
 The workflow prepares against `https://cache.nixos.org` by default. It uploads
 only paths not already verified there, normally custom plugin wrappers and their
@@ -668,7 +672,7 @@ Refresh those snapshots from the committed producer, never from a working tree.
 The acquisition port is grounded in Core base
 `129e4381154622579e38819852ee935195ab8161` (ADR 0012). The tool-name check also
 needs Core's `korri-publish declaration` command. The committed Core input is now
-`github:korri-os/korri/3c103bdae02ac65e751599e49d3f5fb870401b5e`,
+`github:korri-os/korri/79977b4383e9be5e74ceefae544a0dbbb925f447`,
 which provides that command, the current launch contract and netplay runner
 declarations. Run the checks against
 the checked-in lock, without an input override:

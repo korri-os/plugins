@@ -895,7 +895,7 @@ def publish(prepared, repo, tag, index_branch, cache_url, revision):
                 "--title",
                 tag,
                 "--notes",
-                f"Signed plugin catalog, content-addressed archives and prebuilt Nix cache payloads from {revision}. Exact package paths are in this release's paths-SYSTEM.txt assets; revision.txt records the source commit.",
+                f"Signed plugin catalog, slim native archives, self-contained source archives and prebuilt Nix cache payloads from {revision}. Exact package paths are in this release's paths-SYSTEM.txt assets; revision.txt records the source commit.",
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             # A manual creator can win the race, or GitHub can accept a request
