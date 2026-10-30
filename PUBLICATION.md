@@ -701,7 +701,64 @@ Native package checks are not device or deployment proof. This batch performs
 no publication, VM tests, device tests, deployment, or operational cache reset.
 ADR 0012's cache reset remains an operator action in a later coordinated window.
 
-## Plugin-direction republish verification (2026-10-29)
+## Slim archive republish verification (2026-10-29)
+
+The slim batch consumes Core `79977b4383e9be5e74ceefae544a0dbbb925f447`
+and retains the same 33 plugin outputs as the earlier full-archive batch.
+`bitsybox`, standalone native tools and the temporary
+`publish-core-main-cache.yml` workflow are outside this cut.
+
+On aka, the real x86 mGBA `korri-publish repository` command produced a
+**5,844,480-byte archive (5.57 MiB)** in **46.45 seconds**. The timer covered
+publication preparation only, with inputs already built. The command used
+`--platform x86_64-linux`, the default slim mode, and a throwaway key below
+`/tmp`; it uploaded nothing. Its catalog retained the input-addressed output
+`/nix/store/v091793jn2zrk1m8nh7pqnjds8lp4ybf-korri-plugin`.
+The archive SHA-256 was independently checked against the generated catalog:
+`453873590bee69714ece1fa76666a5344d557e23528b2f2132687f028769ebf5`.
+This is not a production-key archive or a publication claim.
+
+Run `40844588188` exhausted the old lifecycle job's 90-minute budget while
+building the uncached Core pin, including korrid, before the VM could finish.
+The lifecycle budget is now 150 minutes. Archive preparation uses Core's slim
+default instead of repeating full content-addressed native closures.
+
+The full `ci.checks` list ran once on aka for x86 and through aka on fuji/yari
+for ARM, at source `33e7e3f6d571076b1237bd1d75fce4a415b24493`. All 66 x86
+checks have passing results, including the cold-host VM. The first native
+fantasy-runner attempt failed TIC-80 frontend startup with
+`failed_to_start_audio_driver`; its unchanged isolated retry passed. This does
+not prove a timing cause. Source authentication (4 tests), publication scope
+(8 tests), cache configuration (2 tests), actionlint, RetroArch's source
+precheck, and both architecture churn checks also passed.
+
+The first ARM pass completed 63 of 66 checks. Three could not schedule:
+`korri-runtime-plugin-host` requires `kvm` and `nixos-test`;
+`sunshine-korri-input-presence` requires `nixos-test`; and
+`sunshine-korri-input-seat-patch` depends on that Sunshine VM. The aka helper's
+builder list omitted both test features. These are scheduler failures before
+VM assertions, not three failing plugin behaviors and not three uses of the
+[korri-os/korri#346](https://github.com/korri-os/korri/issues/346) exception.
+
+Direct SSH probes found that both fuji/yari daemons report `nixos-test` and
+`kvm`, while neither SSH session could find `/dev/kvm`. Retrying only the two
+Sunshine checks with the verified `nixos-test` feature advertised passed. Its
+committed ARM VM already selects software emulation and does not require KVM.
+The runtime VM was then retried alone with both daemon-reported features
+advertised. It ran on fuji. Both QEMU guests reported
+`Could not access KVM kernel module` and `failed to initialize kvm: No such
+file or directory`; guest boot fell back to software emulation. The test
+failed with `Shell did not start in time` before plugin assertions. The
+existing #346 exception applies only to this ARM lifecycle boot timeout,
+not to Sunshine or to the earlier scheduler failures.
+
+Final evidence is **66 x86 checks passed** (one isolated startup retry) and
+**65 ARM checks passed** (two scheduler retries), with **one ARM lifecycle
+exception**. The full suite is not green. No host virtualization, fleet
+configuration, feature requirement, signature, approval or lifecycle assertion
+was changed.
+
+## Earlier full-archive republish verification (2026-10-29)
 
 This batch republishes only the 33 plugin outputs pinned in Core's
 `nix/product/published-plugins.nix`. Standalone tools and every other plugin
