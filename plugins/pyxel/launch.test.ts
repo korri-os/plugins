@@ -16,6 +16,14 @@ const input: PluginLaunchInput = {
   artifacts: {},
 }
 const launch = handlers["launch.prepare"](input)
+for (const namespace of ["@test-publisher", "@another-publisher"]) {
+  assert.deepEqual(handlers["launch.prepare"]({
+    ...input, runnerId: `${namespace}:pyxel/pyxel`,
+  }), launch)
+  assert.throws(() => handlers["launch.prepare"]({
+    ...input, runnerId: `${namespace}:pyxel/other`,
+  }), /Unknown Pyxel runner/)
+}
 assert.deepEqual(launch.args, [input.contentPath])
 assert.equal(launch.cwd, input.saveRoot)
 assert.deepEqual(launch.saveLocations, [{ key: "saves", kind: "save", path: `${input.saveRoot}/.pyxel` }])

@@ -34,7 +34,7 @@ type LaunchOutput = Omit<PluginLaunchOutput, "saveLocations"> & {
 }
 
 function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
-  if (input.runnerId !== "@korri:pyxel/pyxel") throw new Error("Unknown Pyxel runner")
+  if (input.runnerId.slice(input.runnerId.lastIndexOf("/") + 1) !== "pyxel") throw new Error("Unknown Pyxel runner")
   if (input.corePath !== undefined) throw new Error("Pyxel loads no emulator core")
   if (
     input.overrides?.config !== undefined ||
