@@ -1,0 +1,10 @@
+StorePath: /nix/store/hnx12gamnqvzsk5a1shqa2agcaig63rq-korri-steam-arm64-fhs
+URL: https://github.com/korri-os/plugins/releases/download/build-72627749471e-plugin-direction/18s95jbnb979cznplagmcl9kxz5ywx9glc272jbcihcpfxycxs6c.nar.xz
+Compression: xz
+FileHash: sha256:18s95jbnb979cznplagmcl9kxz5ywx9glc272jbcihcpfxycxs6c
+FileSize: 236
+NarHash: sha256:09f9313kgdcjva8liah6kwh4560by6zyzm8k6ivc3v6rrv1dv54h
+NarSize: 528
+References: 1nvrszwly4b5psyj62d1yyn0nfj19m16-korri-steam-arm64-fhs-bwrap
+Deriver: 2wndwypf6gb1ygjczgpgf8zpv51zwxin-korri-steam-arm64-fhs.drv
+Sig: korri-plugins-1:zqU7ZUZ5FMKnLN4/mYgXzWuLL6rvHty5KPN7UxD3fZw2V6mU9CThcgC8ObU0ROtIDCptY+qN4Xm2Mz/ysj+sBw==

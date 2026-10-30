@@ -1,0 +1,10 @@
+StorePath: /nix/store/8kw973szv397yfriybkr3f7v3q68v64w-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-72627749471e-plugin-direction/0qqcrg98g8qz9n4249kqbg2xrv6dnm29qhcw13jprhsqk2ad1dw9.nar.xz
+Compression: xz
+FileHash: sha256:0qqcrg98g8qz9n4249kqbg2xrv6dnm29qhcw13jprhsqk2ad1dw9
+FileSize: 13680
+NarHash: sha256:03d4zkzx3gcswpqr34kzdiv04jpq43d1nz1nxvn6pfbql3sq179r
+NarSize: 56720
+References: 68cicxja0slvcyad88mv8n20f3ys6wbw-retroarch-bare-1.22.2 7fmg8lgg5wv5msb0hlqbh5v54jqd6c4j-libretro-core-info-1.22.2 k6p8ynx551w05rjq606ngg5lgxpgcg6l-libretro-nestopia-0-unstable-2026-10-11 r2jfkg289bjbpylmdw1w3ajrm1l7qi6l-korri-inputplumber-retroarch-autoconfig-1.22.0 v3gf49wvjs92wvkihzb29xvz5wps39lc-retroarch-source-checked-settings-1.22.2
+Deriver: j95c68p0ngy8y5pqrb6ip2bwws2k68vy-korri-plugin.drv
+Sig: korri-plugins-1:yOdV+l0Hk494O1JFfTDS24O63oG+LKAQX91aRJXLmZru2Y4ZlcvPVSAOhiO3KanFMbAfuq8YDlMp4KP4S6xfAA==

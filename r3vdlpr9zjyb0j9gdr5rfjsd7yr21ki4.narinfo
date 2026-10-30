@@ -1,0 +1,10 @@
+StorePath: /nix/store/r3vdlpr9zjyb0j9gdr5rfjsd7yr21ki4-vdf-settings.py
+URL: https://github.com/korri-os/plugins/releases/download/build-72627749471e-plugin-direction/1s7phhcbjxdhlzg29d46afs8qs9na26bqk6w6cxpkj701wm7s1kp.nar.xz
+Compression: xz
+FileHash: sha256:1s7phhcbjxdhlzg29d46afs8qs9na26bqk6w6cxpkj701wm7s1kp
+FileSize: 3256
+NarHash: sha256:1rihs70ak0mr3l7d3mrx8fs4jkddwbb49ww49473a9f86g5y0xk4
+NarSize: 8360
+References: 
+Deriver: kqpaf9gl05z506w8cfsc6c3axdd8gd7v-vdf-settings.py.drv
+Sig: korri-plugins-1:bE0/E9l2f5Y5Yco2jX+L4K2ok0gHibCiHKIkrr9odllWWR3hYYGogw54FWGw0l6v8YBCWH7vnBNZNP/MxfStBA==
