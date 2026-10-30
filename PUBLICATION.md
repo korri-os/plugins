@@ -722,6 +722,33 @@ This changed source requires its own tested tag, dry run and publication.
 Earlier ARM artifacts are evidence, not reusable payloads for the new source.
 The signed Nix cache and temporary raw-cache workflow remain unchanged.
 
+At consuming source `2d2ad9ce0e7d7ce150f5c9cd2bd0fbbb5e117841`, the complete
+132-check path comparison found 23 changed outputs per architecture relative
+to the tested password-fixture repair. The other 86 check outputs, including
+both password checks, retained their tested derivation and output paths. All
+33 selected plugin package paths on each architecture were unchanged.
+
+The combined affected set ran once, serially: all 23 x86 checks and 22 ARM
+checks passed. The distinct plugins x86 integration VM passed; its output is
+not the same as Core's final VM, so Core's gate alone did not replace it.
+The remaining ARM runtime VM ran on fuji, reported KVM initialization failures
+for both guests, then failed `Shell did not start in time` in the initial
+`wait_for_unit`, before plugin assertions. Only this observed boot timeout uses
+#346. No other failure was skipped and no fleet configuration changed.
+Together with the unchanged results, this accounts for 131 passing checks and
+one narrow ARM lifecycle exception, not a green full suite.
+
+A fresh mGBA slim measurement with the integrated Core publisher produced
+5,844,480 bytes (5.57 MiB) in 40.24 seconds on aka. The timer covered only the
+publisher, with inputs prebuilt. A throwaway `/tmp` key was deleted afterward;
+nothing was uploaded. Its independently checked archive SHA-256 was
+`7ee078fd53b4157360ca0eb643149156b721d3f55ded43c40ec8ea6c36b42462`.
+
+Publication scope, effective signed-cache configuration, daemon-sandboxed
+source authentication, actionlint, Python syntax, Ruff and Nix formatting also
+passed. The final documentation-only source is re-evaluated before tagging to
+prove all tested check and selected package paths remain identical.
+
 ## Earlier slim archive republish verification (2026-10-29)
 
 The slim batch consumes Core `79977b4383e9be5e74ceefae544a0dbbb925f447`
