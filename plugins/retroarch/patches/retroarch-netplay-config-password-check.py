@@ -41,7 +41,7 @@ def check(password, accepted):
             config = directory / f"{role}.cfg"
             config.write_text(f'''
 video_driver = "sdl2"
-audio_driver = "null"
+audio_driver = "sdl2"
 input_driver = "sdl2"
 input_joypad_driver = "sdl2"
 menu_driver = "null"

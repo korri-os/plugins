@@ -12,7 +12,7 @@ pkgs.runCommand "retroarch-netplay-config-password-check"
     $CC -std=c99 -shared -fPIC -Wall -Wextra -Werror \
       -I${program.src}/libretro-common/include \
       ${./retroarch-netplay-test-core.c} -o "$PWD/core.so"
-    export SDL_VIDEODRIVER=x11 SDL_RENDER_DRIVER=software
+    export SDL_VIDEODRIVER=x11 SDL_RENDER_DRIVER=software SDL_AUDIODRIVER=dummy
     export XDG_RUNTIME_DIR="$TMPDIR/runtime"
     mkdir -m 700 "$XDG_RUNTIME_DIR"
     xvfb-run -a python3 ${./retroarch-netplay-config-password-check.py} \
