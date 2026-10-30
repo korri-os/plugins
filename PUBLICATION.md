@@ -13,7 +13,7 @@ Each batch publishes two independent forms from the same tested source:
   metadata, path lists and offline proofs unchanged for current devices and
   rollback. No cache record or old release is removed.
 
-Core at `79977b4383e9be5e74ceefae544a0dbbb925f447` supplies slim publication,
+Core at `14de9e3e5aa17e967b0747cba3e407c886438d83` supplies slim publication,
 the catalog schema, content-address conversion and in-archive signatures
 (ADRs 0042–0049). Nix owns
 signatures and verifies downloaded contents. Catalogs contain per-record
@@ -672,7 +672,7 @@ Refresh those snapshots from the committed producer, never from a working tree.
 The acquisition port is grounded in Core base
 `129e4381154622579e38819852ee935195ab8161` (ADR 0012). The tool-name check also
 needs Core's `korri-publish declaration` command. The committed Core input is now
-`github:korri-os/korri/79977b4383e9be5e74ceefae544a0dbbb925f447`,
+`github:korri-os/korri/14de9e3e5aa17e967b0747cba3e407c886438d83`,
 which provides that command, the current launch contract and netplay runner
 declarations. Run the checks against
 the checked-in lock, without an input override:
@@ -701,7 +701,28 @@ Native package checks are not device or deployment proof. This batch performs
 no publication, VM tests, device tests, deployment, or operational cache reset.
 ADR 0012's cache reset remains an operator action in a later coordinated window.
 
-## Slim archive republish verification (2026-10-29)
+## Lock and password-fixture republish cut (2026-10-30)
+
+Core `14de9e3e5aa17e967b0747cba3e407c886438d83` ends the state lock at
+`State::drop`, before a concurrent pre-exec child can prolong its inherited
+file description. Its deterministic regression and final `korri-plugin-check`,
+including the x86 cold-host VM, passed on aka at that exact source.
+
+The password fixture uses `audio_driver = "sdl2"` with
+`SDL_AUDIODRIVER=dummy`. Its native correct-secret connection, frame-advancement
+and wrong-secret rejection assertions are unchanged. Both architecture checks
+passed for the isolated fixture repair. This is a test-fixture repair, not
+proof of the underlying startup stall's cause; product audio is unchanged.
+
+Earlier dry run `40980117267` failed the x86 password fixture and the Core
+power-loss test's busy-lock reopen before VM startup. Its ARM build passed,
+including slim archive preparation. Neither failure is the ARM lifecycle
+exception #346. The old `build-40bbbaa7cb7a-plugin-direction` tag stays fixed.
+This changed source requires its own tested tag, dry run and publication.
+Earlier ARM artifacts are evidence, not reusable payloads for the new source.
+The signed Nix cache and temporary raw-cache workflow remain unchanged.
+
+## Earlier slim archive republish verification (2026-10-29)
 
 The slim batch consumes Core `79977b4383e9be5e74ceefae544a0dbbb925f447`
 and retains the same 33 plugin outputs as the earlier full-archive batch.
