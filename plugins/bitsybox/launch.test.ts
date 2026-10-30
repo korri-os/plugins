@@ -76,6 +76,18 @@ try {
       { encoding: "utf8", timeout: 30_000 },
     )
   }
+  for (const namespace of ["@test-publisher", "@another-publisher"]) {
+    const request = { ...input, runnerId: `${namespace}:bitsybox/bitsybox` }
+    assert.deepEqual(handlers["launch.prepare"](request), expected)
+    const result = execute(request)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.stdout, `${input.contentPath}\0${accountRoot}\0`)
+    const invalid = { ...input, runnerId: `${namespace}:bitsybox/other` }
+    assert.throws(() => handlers["launch.prepare"](invalid), /Unknown Bitsybox runner/)
+    const rejected = execute(invalid)
+    assert.notEqual(rejected.status, 0, rejected.stderr)
+    assert.equal(rejected.stdout, "")
+  }
   const launch = execute(input)
   assert.equal(launch.status, 0, launch.stderr)
   assert.equal(launch.stdout, `${input.contentPath}\0${accountRoot}\0`)

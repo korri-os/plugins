@@ -24,7 +24,7 @@ export const runners = {
 }
 
 function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
-  if (input.runnerId !== "@korri:bitsybox/bitsybox") {
+  if (input.runnerId.slice(input.runnerId.lastIndexOf("/") + 1) !== "bitsybox") {
     throw new Error("Unknown Bitsybox runner")
   }
   if (input.corePath !== undefined) {
