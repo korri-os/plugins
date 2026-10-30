@@ -24,7 +24,7 @@ export const runners = {
 }
 
 function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
-  if (input.runnerId !== "@korri:eden/eden") throw new Error("Unknown Eden runner")
+  if (input.runnerId.slice(input.runnerId.lastIndexOf("/") + 1) !== "eden") throw new Error("Unknown Eden runner")
   if (input.corePath !== undefined || input.ref !== undefined) {
     throw new Error("Eden requires a game file, not a core or provider reference")
   }

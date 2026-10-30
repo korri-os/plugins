@@ -29,6 +29,14 @@ assert.deepEqual(plan, {
   saveLocations: [{ key: "saves", kind: "save", path: "/saves/game/nand/user/save" }],
 })
 assert.deepEqual(handlers["launch.prepare"]({ ...input, overrides: { settings: {} } }), plan)
+for (const namespace of ["@test-publisher", "@another-publisher"]) {
+  assert.deepEqual(handlers["launch.prepare"]({
+    ...input, runnerId: `${namespace}:eden/eden`,
+  }), plan)
+  assert.throws(() => handlers["launch.prepare"]({
+    ...input, runnerId: `${namespace}:eden/other`,
+  }), /Unknown Eden runner/)
+}
 for (const patch of [
   { runnerId: "@korri:other/other" }, { corePath: "/core.so" },
   { contentPath: undefined }, { ref: "123" },
