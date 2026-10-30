@@ -142,11 +142,17 @@ stdenv.mkDerivation rec {
       '030000005e040000120b000001000000,Microsoft Xbox Series S|X Controller,a:b0,b:b1,x:b2,y:b3,back:b6,start:b7,guide:b8,leftstick:b9,rightstick:b10,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,leftx:a0,lefty:a1,rightx:a3,righty:a4,lefttrigger:a2,righttrigger:a5,platform:Linux,' \
       >> "$korriInputplumberMapping"
     printf 'present\n' > "$out/nix-support/moonlight-embedded-korri/korri-inputplumber-gamecontrollerdb-present"
-
-    if [ -f CMakeCache.txt ]; then
-      cp CMakeCache.txt "$out/nix-support/moonlight-embedded-korri/CMakeCache.txt"
-    fi
   '';
+
+  # The runtime closure ships to every device. Build tools and -dev outputs
+  # must not reach it (korri-os/korri#347); a CMakeCache.txt copy once did.
+  disallowedReferences = [
+    cmake
+    stdenv.cc
+    stdenv.cc.cc
+    ffmpegV4l2Request.dev
+    opusStandardModes.dev
+  ];
 
   meta = {
     description = "Moonlight Embedded with DRM PRIME, V4L2 M2M, V4L2 Request and Korri viewer patches";
