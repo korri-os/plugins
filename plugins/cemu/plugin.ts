@@ -24,7 +24,7 @@ export const runners = {
 }
 
 function prepareLaunch(input: PluginLaunchInput): LaunchOutput {
-  if (input.runnerId !== "@korri:cemu/cemu") throw new Error("Unknown Cemu runner")
+  if (input.runnerId.slice(input.runnerId.lastIndexOf("/") + 1) !== "cemu") throw new Error("Unknown Cemu runner")
   if (input.corePath !== undefined || input.ref !== undefined) {
     throw new Error("Cemu requires a game file, not a core or provider reference")
   }

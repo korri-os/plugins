@@ -28,6 +28,14 @@ assert.deepEqual(plan, {
   saveLocations: [{ key: "saves", kind: "save", path: "/saves/game/mlc01/usr/save" }],
 })
 assert.deepEqual(handlers["launch.prepare"]({ ...input, overrides: { settings: {} } }), plan)
+for (const namespace of ["@test-publisher", "@another-publisher"]) {
+  assert.deepEqual(handlers["launch.prepare"]({
+    ...input, runnerId: `${namespace}:cemu/cemu`,
+  }), plan)
+  assert.throws(() => handlers["launch.prepare"]({
+    ...input, runnerId: `${namespace}:cemu/other`,
+  }), /Unknown Cemu runner/)
+}
 for (const patch of [
   { runnerId: "@korri:other/other" }, { corePath: "/core.so" },
   { contentPath: undefined, ref: "123" }, { ref: "123" },
