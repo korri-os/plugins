@@ -1,0 +1,10 @@
+StorePath: /nix/store/zr6zwg0rjc1xzd5b804lk22pamrym3i9-steam-unwrapped-1.0.0.87
+URL: https://github.com/korri-os/plugins/releases/download/build-207796f63f94-steam-x86/1x0b7q3pd08n4y6s9myx55vmhpj369fiy2qakgvx9rvcyqy2lsmh.nar.xz
+Compression: xz
+FileHash: sha256:1x0b7q3pd08n4y6s9myx55vmhpj369fiy2qakgvx9rvcyqy2lsmh
+FileSize: 20355076
+NarHash: sha256:1nzn8ixgvh7bjrc6nnv1wg739nd0r7sbd9g1lp5k7qwbm1gc8dyq
+NarSize: 20448056
+References: kwyi4bq5s2qgwbhz6cs4gjy57c2zdxws-bash-interactive-5.3p20 nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20
+Deriver: zrwph7n7x3jysbjs7jryjpyym0fg8iqc-steam-unwrapped-1.0.0.87.drv
+Sig: korri-plugins-1:6WSFcy31Iwf36BbWZm6+F283GDU7JOcQq8ruq10JQuREHwS1HxNWrv/gwBOM2X5NRbki4O7WfMTbTi1jp7wnDQ==

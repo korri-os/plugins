@@ -1,0 +1,10 @@
+StorePath: /nix/store/52m1rqj6vkx0qy0b29r3fkg86pqnbrpv-steam-1.0.0.87
+URL: https://github.com/korri-os/plugins/releases/download/build-207796f63f94-steam-x86/1jv4jizfk9dg6hr6l03lhc3208il1s3xp8agd5z93z34b9m51ic2.nar.xz
+Compression: xz
+FileHash: sha256:1jv4jizfk9dg6hr6l03lhc3208il1s3xp8agd5z93z34b9m51ic2
+FileSize: 280
+NarHash: sha256:11apr95qpalwca9hlg87f3bj8lyhvxdcfam78nb96vd8hnmj5ip5
+NarSize: 776
+References: c9fhz6pkr52gizcfiala2w91vh5arky8-steam-1.0.0.87-bwrap zr6zwg0rjc1xzd5b804lk22pamrym3i9-steam-unwrapped-1.0.0.87
+Deriver: bp07lr2mkrq9i8wm3yr4iwy0wg9689vw-steam-1.0.0.87.drv
+Sig: korri-plugins-1:qj4chO4fFCGyknq8+5+WGjpHC9dhBrKZKNaNAPC8Q5pHSQsGf1QPLZ9fJ7/ddC725xQzCzkdjLNFGf2R/oX0AQ==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/xj192clw012kpnyr369sbi50sx0v8s4s-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-207796f63f94-steam-x86/1afnbxd2ckma90g1jpmrllwcw1xjhls1afz0f7vrsi24xpflr68q.nar.xz
+Compression: xz
+FileHash: sha256:1afnbxd2ckma90g1jpmrllwcw1xjhls1afz0f7vrsi24xpflr68q
+FileSize: 1724
+NarHash: sha256:1kg45lc8klq8483srfj9597s9kr9xia3vrd0qj945zk9c0wza896
+NarSize: 5080
+References: lpgygdfg23417b0wzyp5c25i3scbi6bp-korri-fex-config wvbf4mg0jh47j1cqcms5551vkx56ccq7-fex-unpack
+Deriver: 7amhgzgz18bsx2g2x9yx7n7m17md1xz0-korri-plugin.drv
+Sig: korri-plugins-1:wWQfN27zfa4SSOPqZ/v6/Qgb1UrvxuwaKs7MTal0CfoKGGGniska4damompOVEhw3i53Wnimin5jEYUk3+lXAA==
