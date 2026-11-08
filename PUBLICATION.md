@@ -163,6 +163,21 @@ selector rejects unknown outputs. Its regression test checks coverage and valid
 check names against both real architecture output sets. Add reviewed gates when
 adding a package; do not silently fall back to no tests.
 
+Libretro package selection also reads each core's existing Nix platform
+metadata, through the derived `publicationPlatforms` output. It does not force
+an unsupported plugin manifest merely to inspect availability. A requested core
+is built only on architectures where `lib.meta.availableOn` accepts its actual
+core package. The selector refuses a package unavailable on both publication
+architectures, and logs each architecture-specific omission. Other outputs are
+not skipped by this core-specific filter. Each architecture job still requires
+at least one supported selected output. No platform restriction, plugin ID,
+recipe, signature check or runtime gate is changed by filtering.
+
+In particular, BlastEm, LRPS2 (`pcsx2`) and ParaLLEl N64 retain their existing
+IDs and x86_64 outputs without inventing ARM builds. Nixpkgs restricts the first
+two to x86; this catalogue already documents ParaLLEl N64's ARM link failure.
+Supported ARM outputs still run all their existing publication gates.
+
 The publisher tests, signed-cache configuration, scoped source authentication,
 churn regression and cold-host lifecycle acceptance still gate every batch.
 Matching native/admission/package checks also gate the batch. In particular,

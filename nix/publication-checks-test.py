@@ -120,6 +120,75 @@ class PublicationChecksTest(unittest.TestCase):
             )
 
 
+class PublicationPlatformsTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.mappings = {
+            system: evaluate(f"ci.publicationChecks.{system}")
+            for system in selection.SYSTEMS
+        }
+        cls.platforms = {
+            system: evaluate(f"ci.publicationPlatforms.{system}")
+            for system in selection.SYSTEMS
+        }
+
+    def test_existing_x86_only_cores_keep_their_ids_and_x86_outputs(self):
+        packages = [
+            "korri-plugin-blastem",
+            "korri-plugin-pcsx2",
+            "korri-plugin-parallel-n64",
+            "korri-plugin-mgba",
+        ]
+        self.assertEqual(
+            selection.select_packages(self.mappings, self.platforms, packages, "x86_64-linux"),
+            packages,
+        )
+        self.assertEqual(
+            selection.select_packages(self.mappings, self.platforms, packages, "aarch64-linux"),
+            ["korri-plugin-mgba"],
+        )
+
+    def test_cli_records_the_exact_supported_package_selection(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "packages.txt"
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "nix/publication-checks.py"),
+                 "--system", "aarch64-linux", "--packages-file", str(path),
+                 "korri-plugin-blastem", "korri-plugin-mgba"],
+                cwd=ROOT, text=True, capture_output=True, check=True,
+            )
+            self.assertEqual(path.read_text(), "korri-plugin-mgba\n")
+            self.assertIn("Skipping korri-plugin-blastem on aarch64-linux", result.stderr)
+            self.assertIn(".#ci.checks.aarch64-linux.korri-libretro-netplay", result.stdout)
+
+    def test_no_package_can_be_skipped_on_both_architectures(self):
+        platforms = {
+            system: values | {"korri-plugin-mgba": False}
+            for system, values in self.platforms.items()
+        }
+        for system in selection.SYSTEMS:
+            with self.subTest(system=system), self.assertRaisesRegex(ValueError, "every publication architecture"):
+                selection.select_packages(
+                    self.mappings, platforms, ["korri-plugin-mgba"], system
+                )
+
+    def test_platform_filter_does_not_hide_unknown_packages(self):
+        for system in selection.SYSTEMS:
+            with self.subTest(system=system), self.assertRaisesRegex(ValueError, "No reviewed publication gates"):
+                selection.select_packages(
+                    self.mappings, self.platforms, ["missing"], system
+                )
+
+    def test_outputs_without_a_core_platform_restriction_are_not_skipped(self):
+        packages = ["korri-plugin-pico8", "korri-plugin-pyxel", "korri-plugin-starter-pack"]
+        for system in selection.SYSTEMS:
+            with self.subTest(system=system):
+                self.assertEqual(
+                    selection.select_packages(self.mappings, self.platforms, packages, system),
+                    packages,
+                )
+
+
 class RetroarchCheckInvocationTest(unittest.TestCase):
     def test_native_prechecks_use_one_build_job_and_keep_the_existing_gates(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -109,7 +109,7 @@ jobs:
           # in plugin-checks.yml and cannot cancel a publication architecture.
           python3 nix/publication-checks-test.py
           read -ra selected_outputs <<< "$PACKAGES"
-          python3 nix/publication-checks.py --system "$SYSTEM" "${selected_outputs[@]}" > "$RUNNER_TEMP/publication-checks.txt"
+          python3 nix/publication-checks.py --system "$SYSTEM" --packages-file "$RUNNER_TEMP/publication-packages.txt" "${selected_outputs[@]}" > "$RUNNER_TEMP/publication-checks.txt"
           cat "$RUNNER_TEMP/publication-checks.txt"
           if grep -q '\.korri-retroarch-package$' "$RUNNER_TEMP/publication-checks.txt"; then
             nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
@@ -132,7 +132,7 @@ jobs:
           nix eval --json ".#packages.$SYSTEM" \
             --apply 'packages: builtins.attrNames packages' \
             >/dev/null
-          read -ra selected_outputs <<< "$PACKAGES"
+          mapfile -t selected_outputs < "$RUNNER_TEMP/publication-packages.txt"
           ./cache-tool/bin/korri-cache build --ci-source-auth --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
       - name: Prepare signed plugin repository and the unchanged Nix cache
         env:

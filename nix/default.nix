@@ -363,6 +363,15 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         program = "${retroarchCheck}/bin/korri-retroarch-check";
       };
     };
+    # Read restrictions from the actual core packages without forcing an
+    # unsupported plugin's manifest or output path. Other outputs are never
+    # skipped by this core-specific platform filter.
+    publicationPlatforms = pkgs.lib.mapAttrs' (
+      name: spec:
+      pkgs.lib.nameValuePair "korri-plugin-${name}" (
+        pkgs.lib.meta.availableOn pkgs.stdenv.hostPlatform spec.core
+      )
+    ) libretro.catalogue;
     publicationChecks = import ./publication-checks.nix {
       inherit (pkgs) lib;
       libretroPackages = libretro.packages;
