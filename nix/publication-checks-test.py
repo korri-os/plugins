@@ -179,6 +179,17 @@ class PublicationPlatformsTest(unittest.TestCase):
                     self.mappings, self.platforms, ["missing"], system
                 )
 
+    def test_existing_arm_only_output_keeps_its_local_reviewed_gates(self):
+        package = "sunshine-korri-v4l2m2m"
+        self.assertNotIn(package, self.mappings["x86_64-linux"])
+        self.assertIn(package, self.mappings["aarch64-linux"])
+        self.assertEqual(
+            selection.select_packages(
+                self.mappings, self.platforms, [package], "aarch64-linux"
+            ),
+            [package],
+        )
+
     def test_outputs_without_a_core_platform_restriction_are_not_skipped(self):
         packages = ["korri-plugin-pico8", "korri-plugin-pyxel", "korri-plugin-starter-pack"]
         for system in selection.SYSTEMS:

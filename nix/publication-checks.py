@@ -22,8 +22,7 @@ def select_checks(mapping, packages):
 def select_packages(mappings, platforms, packages, system):
     # Unknown outputs fail before filtering. A platform restriction must not
     # turn a typo or an entirely unsupported plugin into a successful batch.
-    for mapping in mappings.values():
-        select_checks(mapping, packages)
+    select_checks(mappings[system], packages)
     unavailable = [
         name for name in packages
         if not any(platforms[target].get(name, True) for target in SYSTEMS)
