@@ -1,0 +1,10 @@
+StorePath: /nix/store/ddrvlcyksdlrcv6hk691cikpb6dhlg7h-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-3f622e1037f2-steam-eula/0hw9ppyncvafjqjf902c1ndihw1lvww3qyqy2ygjp0vm7172b203.nar.xz
+Compression: xz
+FileHash: sha256:0hw9ppyncvafjqjf902c1ndihw1lvww3qyqy2ygjp0vm7172b203
+FileSize: 2524
+NarHash: sha256:12yxx2w1dlv89xjainlkac6262cimq54ms2qcdcmn9712gyzz6yy
+NarSize: 6720
+References: 6ijvfj8pldi4ar790xxhbcvj4l6abddy-korri-plugin pm36g2qq94zwb8vfsz0k6sdss4x1rz1b-korri-plugin zqrc75qb0lslwzmlpww1l15aalx4c0w6-steam-session
+Deriver: zvqj8yz1gixl2119qh3i4qyli28s773i-korri-plugin.drv
+Sig: korri-plugins-1:NeTG8byiEpGYlwyu5IYESY/2ZAe2E3RF9lMgpShAmdO73l+hRLjgCZeDOWfgZ4vgp/gFqjomZvY46O9w54GACw==

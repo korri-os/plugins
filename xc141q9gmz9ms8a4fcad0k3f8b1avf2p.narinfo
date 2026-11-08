@@ -1,0 +1,10 @@
+StorePath: /nix/store/xc141q9gmz9ms8a4fcad0k3f8b1avf2p-steam-vdf-settings
+URL: https://github.com/korri-os/plugins/releases/download/build-3f622e1037f2-steam-eula/1rgiajpc4d341q1ffb3k7hs2ssppna0wi7hznhk2y3q25v7kgbfq.nar.xz
+Compression: xz
+FileHash: sha256:1rgiajpc4d341q1ffb3k7hs2ssppna0wi7hznhk2y3q25v7kgbfq
+FileSize: 392
+NarHash: sha256:07w24vqja18qipfvp2vca2bw585rijgdakzkibl5m2d0syg33akf
+NarSize: 776
+References: czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 lq2fsnmg0q3y0vlxn91w8s8wvj1m6fld-python3-3.14.8 wr5si33g0k8a0yfips246j4j2sigp5np-vdf-settings.py
+Deriver: jjhkmr57cipgknphdgs319sw432g3k8d-steam-vdf-settings.drv
+Sig: korri-plugins-1:OGRzVX2q+1AUBjrji/eYehDsqFEZX76ZgPVy56T6NydUdFVLd5pEvtgGV3tQ09p5RJ+rutB+9pjScn1dv1WuAA==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/x37a86a43zzcdiizcd2r2yfpfn3vq6qc-steam-arm64-helpers-1
+URL: https://github.com/korri-os/plugins/releases/download/build-3f622e1037f2-steam-eula/1kvmmirzbb1lzwpv2ls00d5slgl0b5p25b7zyrbbmhd6lwcdy6dz.nar.xz
+Compression: xz
+FileHash: sha256:1kvmmirzbb1lzwpv2ls00d5slgl0b5p25b7zyrbbmhd6lwcdy6dz
+FileSize: 5440
+NarHash: sha256:0bl2g5cadb556wr8hpnk33x0x01882g5a77n27dd3gbks3sys40f
+NarSize: 22120
+References: 5lpg7j8y8lf8c4zv318yi4rmgyn5yhip-curl-8.22.0-bin 99v13ig4382mngi6ggf0csqi7rfa04j5-findutils-4.11.0 9ika5s969fh9ayh4js9kd3j1n4lq8knq-unzip-6.0 c3f45pxlb81gzz4w1nym7lpznfypva7s-gnugrep-3.12 cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12 cp7d3y7na0qx3i6d4kskymv3r9ssz47k-korri-steam-input-guard-1 f9shc46n2300jbm0h60f6s4m69j0smyp-gnutar-1.35 fi98g122a3kzbschgvbvsqvpyxrmqvvl-binutils-wrapper-2.46 kwyi4bq5s2qgwbhz6cs4gjy57c2zdxws-bash-interactive-5.3p20 lvmz7ixxf58fm6c18bqbnk7v43d6ny1i-steam-vdf-settings nflpm51il93hxh2rba6dvz59kaff0i7v-xz-5.8.4-bin nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20 rpswfv0ff4wap9anx7k1224x2m94pfcc-gzip-1.15 x37a86a43zzcdiizcd2r2yfpfn3vq6qc-steam-arm64-helpers-1
+Deriver: 9sp14w15ydhn2j746ws17p21nh2lisad-steam-arm64-helpers-1.drv
+Sig: korri-plugins-1:vm/RjzQJZ7yOLV/9wmZwAkNLCTntgA5xMk0JA+ymsNqCpoNVP0WIkjItCwBCXp7axXyoZABHyScdZ8qlPlTtDg==
