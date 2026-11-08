@@ -15,8 +15,10 @@ reads these files from its launch input under `@korri:fex/<key>`:
 
 ## Artifact `@korri:fex/rootfs`
 
-`plugin.ts` declares the pinned x86 rootfs as the artifact `rootfs`, version
-`archlinux-2026-01-08-mesa-26.1.2`: the ArchLinux 2026-01-08 squashfs
+`plugin.ts` declares the pinned x86 rootfs as the artifact `rootfs`, for
+`aarch64-linux` only (Core ADR 0052): an x86_64 device runs x86 code natively,
+skips the artifact, and a runner that lists it starts without it. Its version
+is `archlinux-2026-01-08-mesa-26.1.2`: the ArchLinux 2026-01-08 squashfs
 (1.16 GB) followed by ten Arch Mesa `1:26.1.2-1` overlay packages (0.03 GB),
 each with its URL, `sha256:<hex>` and `bytes` from the server's
 Content-Length. `plugin.ts` is the single source of these pins. The rootfs is

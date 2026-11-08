@@ -22,7 +22,8 @@ export const runners = {
     program: "steam-session",
     systems: ["steam"],
     // korrid downloads these before it starts the runner and passes the
-    // ready directories in `artifacts`.
+    // ready directories in `artifacts`. An x86_64 device skips the FEX rootfs,
+    // which has no x86_64 build (Core ADR 0052).
     artifacts: ["@korri:fex/rootfs", "@korri:proton/cachyos"],
   },
 }
@@ -54,9 +55,14 @@ function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   // ready artifacts, as korrid passes them under `<pluginId>/<key>`.
   const env: Record<string, string> = {
     STEAM_HOME: steamHome,
-    KORRI_FEX_CONFIG: requiredPath(input.files, "@korri:fex/config"),
-    KORRI_FEX_ROOTFS: requiredPath(input.artifacts, "@korri:fex/rootfs"),
     KORRI_PROTON_CACHYOS: requiredPath(input.artifacts, "@korri:proton/cachyos"),
+  }
+  // korrid passes the FEX rootfs only on a device whose platform has it. The
+  // ARM64 session program refuses to start without it; the x86_64 one needs
+  // no FEX.
+  if (input.artifacts["@korri:fex/rootfs"]) {
+    env.KORRI_FEX_CONFIG = requiredPath(input.files, "@korri:fex/config")
+    env.KORRI_FEX_ROOTFS = input.artifacts["@korri:fex/rootfs"]
   }
   return {
     command: input.program,

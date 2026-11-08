@@ -9,9 +9,10 @@ effects.
 the runner lists their artifacts, `@korri:fex/rootfs` and
 `@korri:proton/cachyos`. korrid downloads, verifies and unpacks those before
 it starts the runner (ADR 0012); see `plugins/fex/README.md` and
-`plugins/proton/README.md`. `launch.prepare` refuses the launch unless korrid
-supplies the required-plugin file and both ready artifact directories. It
-passes them to the session program:
+`plugins/proton/README.md`. The FEX rootfs exists for `aarch64-linux` only, so
+an x86_64 device skips it (Core ADR 0052). `launch.prepare` refuses the launch
+unless korrid supplies the Proton directory, and the FEX config file whenever
+it supplies the FEX rootfs. It passes them to the session program:
 
 | Variable | Launch input |
 |---|---|
@@ -19,7 +20,26 @@ passes them to the session program:
 | `KORRI_FEX_ROOTFS` | `artifacts["@korri:fex/rootfs"]` |
 | `KORRI_PROTON_CACHYOS` | `artifacts["@korri:proton/cachyos"]` |
 
-`steam-session` refuses with status 2 if one is missing or is not a directory.
+The FEX variables are set only when korrid supplied the FEX rootfs.
+
+One plugin serves both architectures; `packages/default.nix` builds the
+session for its platform:
+
+| | ARM64 (RP Mini V2) | x86_64 (aka) |
+|---|---|---|
+| Client | Valve's ARM64 client, seeded into the Steam home and run from the package's own FHS | nixpkgs' Steam FHS, with the same input guard preloaded |
+| FEX | Required: config and rootfs | None |
+| Proton | Proton-CachyOS arm64 | Proton-CachyOS x86_64 |
+| Channel | `steamdeck_stable`, with the manifest repair below | Steam's public channel |
+| Scaling | `-forcedesktopscaling 1.5` | none |
+
+On x86_64 the session points `~/.steam/steam`, `~/.steam/root` and
+`~/.local/share/Steam` at `STEAM_HOME`, so Valve's bootstrap starts, or
+installs, the client there. It refuses to start if one of them is a separate
+directory.
+
+`steam-session` refuses with status 2 if a required path is missing or is not a
+directory.
 The session sets `FEX_ROOTFS` to the rootfs directory and
 `FEX_APP_CONFIG_LOCATION` to the FEX plugin's `config` directory. On every
 launch it links `compatibilitytools.d/proton-cachyos-11.0-20260601-slr-arm64`

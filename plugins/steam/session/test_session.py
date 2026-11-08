@@ -21,7 +21,8 @@ def program(path, source):
 
 class SteamSessionTests(unittest.TestCase):
     def run_session(self, behavior, seeded=True, setup=None, installed=True, shm=None,
-                    copy_behavior=None):
+                    copy_behavior=None, platform="aarch64-linux"):
+        arm = platform == "aarch64-linux"
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -34,7 +35,7 @@ class SteamSessionTests(unittest.TestCase):
                 '"AppState"\n{\n\t"appid"\t\t"401710"\n\t"StateFlags"\t\t"4"\n}\n')
         if setup:
             setup(home)
-        if seeded:
+        if seeded and arm:
             (home / "steamrtarm64").mkdir()
             client = home / "steamrtarm64/steam"
             client.touch()
@@ -61,13 +62,22 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         self.proton = root / "cache/proton/cachyos/fixture-arm64"
         self.rootfs.mkdir(parents=True)
         self.proton.mkdir(parents=True)
-        program(root / "bin/steam-arm64-fhs", (HERE / "fixtures/session-client.py").read_text())
+        client = root / "bin" / ("steam-arm64-fhs" if arm else "steam")
+        program(client, (HERE / "fixtures/session-client.py").read_text())
         program(root / "bin/steam-arm64-seed", (HERE / "fixtures/seed.py").read_text())
         program(root / "bin/steam-vdf-settings",
                 (HERE / "vdf-settings.py").read_text().replace("@protonToolName@", TOOL))
         script = (HERE / "steam-session.sh").read_text()
-        for placeholder in ("fhs", "helpers", "settings"):
+        for placeholder in ("helpers", "settings"):
             script = script.replace(f"@{placeholder}@", str(root))
+        # The values packages/default.nix substitutes for each platform.
+        for placeholder, value in {
+            "steamClient": str(client),
+            "usesFex": "1" if arm else "0",
+            "steamBeta": "steamdeck_stable" if arm else "",
+            "desktopScaling": "1.5" if arm else "",
+        }.items():
+            script = script.replace(f"@{placeholder}@", value)
         script = script.replace("@protonToolName@", TOOL)
         # Never touch the host's real shared memory.
         (root / "shm").mkdir()
@@ -81,11 +91,10 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
             ["bash", str(path), "401710"], timeout=60, capture_output=True, text=True,
             env={
                 **os.environ, "STEAM_HOME": str(home), "HOME": str(root), "CLIENT_BEHAVIOR": behavior,
-                "STEAM_BETA": "steamdeck_stable",
                 "PATH": str(root / "bin") + os.pathsep + os.environ["PATH"],
-                "KORRI_FEX_CONFIG": str(root / "fex-config"),
-                "KORRI_FEX_ROOTFS": str(self.rootfs),
                 "KORRI_PROTON_CACHYOS": str(self.proton),
+                **({"KORRI_FEX_CONFIG": str(root / "fex-config"),
+                    "KORRI_FEX_ROOTFS": str(self.rootfs)} if arm else {}),
             },
         )
         return result, home, time.monotonic() - started
@@ -101,6 +110,31 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         self.assertEqual(client["FEX_APP_CONFIG_LOCATION"], str(self.root / "fex-config") + "/")
         self.assertEqual(os.readlink(home / "compatibilitytools.d" / TOOL), str(self.proton))
         self.assertIn(f'"{TOOL}"', (home / "config/config.vdf").read_text())
+
+    def test_x86_64_points_the_bootstrap_at_steam_home_without_fex(self):
+        result, home, _ = self.run_session("game", platform="x86_64-linux")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((home / "seed.json").exists())
+        self.assertFalse((home / "fex-data").exists())
+        client = json.loads((home / "client-env.json").read_text())
+        self.assertEqual(client, {"FEX_ROOTFS": None, "FEX_APP_CONFIG_LOCATION": None})
+        for link in (self.root / ".steam/steam", self.root / ".steam/root",
+                     self.root / ".local/share/Steam"):
+            self.assertEqual(os.readlink(link), str(home))
+        self.assertEqual(os.readlink(home / "compatibilitytools.d" / TOOL), str(self.proton))
+        # The public channel: no channel file, no ARM64 manifest copy.
+        self.assertFalse((home / "package/beta").exists())
+        self.assertFalse((home / ".korri").exists())
+        self.assertIn("AppID 401710 exited", result.stderr)
+        self.assertTrue((home / "shutdown").exists())
+
+    def test_x86_64_refuses_a_separate_steam_directory(self):
+        def separate(home):
+            (home.parent / ".local/share/Steam").mkdir(parents=True)
+        result, home, _ = self.run_session("game", platform="x86_64-linux", setup=separate)
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertIn("is a separate Steam directory", result.stderr)
+        self.assertFalse((home / "forwards").exists())
 
     def test_game_exit_waits_for_process_and_stops_steam(self):
         result, home, duration = self.run_session("game")
@@ -241,7 +275,6 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         env = {
             **os.environ, "STEAM_HOME": str(home), "HOME": str(self.root),
             "CLIENT_BEHAVIOR": "leftover-hold",
-            "STEAM_BETA": "steamdeck_stable",
             "KORRI_FEX_CONFIG": str(self.root / "fex-config"),
             "KORRI_FEX_ROOTFS": str(self.rootfs),
             "KORRI_PROTON_CACHYOS": str(self.proton),

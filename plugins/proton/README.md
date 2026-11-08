@@ -19,14 +19,17 @@ it from its own closure.
 
 ## Artifact `@korri:proton/cachyos`
 
-`plugin.ts` declares the pinned Proton-CachyOS arm64 release as the artifact
-`cachyos`, version `11.0-20260601-slr-arm64`, with its URL, `sha256:<hex>`
-and `bytes` (0.34 GB, the server's Content-Length). `plugin.ts` is the single
-source of the pin. The tool is not in the plugin closure.
+`plugin.ts` declares the pinned Proton-CachyOS release as the artifact
+`cachyos`, with one build per architecture under `platforms` (Core ADR 0052):
+`aarch64-linux` is version `11.0-20260601-slr-arm64` and `x86_64-linux` is
+version `11.0-20260601-slr-x86_64`. Each has its URL, `sha256:<hex>` and
+`bytes` (0.34 GB each, the server's Content-Length). `plugin.ts` is the single
+source of the pins. The tool is not in the plugin closure.
 
 A runner that lists `@korri:proton/cachyos` in its `artifacts` receives the
-ready directory, `<storage-root>/cache/proton/cachyos/11.0-20260601-slr-arm64/`,
-in its launch input as `artifacts["@korri:proton/cachyos"]`. korrid downloads,
+ready directory for its device's build, for example
+`<storage-root>/cache/proton/cachyos/11.0-20260601-slr-arm64/`, in its launch
+input as `artifacts["@korri:proton/cachyos"]`. korrid downloads,
 resumes and verifies the release, runs `cachyos-unpack` in a work directory,
 makes the tree read-only, flushes it and renames it to the ready directory.
 See ADR 0012.
@@ -34,9 +37,11 @@ See ADR 0012.
 ## Tool name
 
 `plugin.ts` is the only version source. During Nix evaluation,
-`cachyos/tool-name.nix` reads `artifacts.cachyos.version` and derives
-`proton-cachyos-11.0-20260601-slr-arm64`. It accepts only one `version:` in the
-file, inside the cachyos artifact; any other form stops evaluation. Builders
+`cachyos/tool-name.nix` reads the build system's `platforms` entry of the
+cachyos artifact and derives `proton-cachyos-11.0-20260601-slr-arm64` or
+`proton-cachyos-11.0-20260601-slr-x86_64`. It accepts only the current form:
+one `"<system>": {` entry per supported system, each followed directly by its
+one `version:` line; any other form stops evaluation. Builders
 substitute the string into `compatibilitytool.vdf`, the Steam session and the
 VDF settings helper. Nix evaluation does not read build outputs. No compiled
 declaration is shipped. The current tool name and existing per-game selections

@@ -46,15 +46,24 @@ describe("Steam launch declaration", () => {
     })
   })
 
-  test("refuses the launch when a required file or artifact path is missing", () => {
-    for (const key of ["@korri:fex/rootfs", "@korri:proton/cachyos"]) {
-      const input = launchInput()
-      delete input.artifacts[key]
-      expect(() => handlers["launch.prepare"](input)).toThrow(`Steam requires ${key}`)
-    }
+  test("refuses the launch when Proton, or the FEX config beside the FEX rootfs, is missing", () => {
+    const noProton = launchInput()
+    delete noProton.artifacts["@korri:proton/cachyos"]
+    expect(() => handlers["launch.prepare"](noProton)).toThrow("Steam requires @korri:proton/cachyos")
     const noFile = launchInput()
     delete noFile.files["@korri:fex/config"]
     expect(() => handlers["launch.prepare"](noFile)).toThrow("Steam requires @korri:fex/config")
+  })
+
+  test("passes no FEX paths on a device that skips the FEX rootfs (x86_64)", () => {
+    const input = launchInput()
+    delete input.artifacts["@korri:fex/rootfs"]
+    input.artifacts["@korri:proton/cachyos"] =
+      "/var/lib/korri/cache/proton/cachyos/11.0-20260601-slr-x86_64"
+    expect(handlers["launch.prepare"](input).env).toEqual({
+      STEAM_HOME: "/var/lib/korri/accounts/a/steam",
+      KORRI_PROTON_CACHYOS: "/var/lib/korri/cache/proton/cachyos/11.0-20260601-slr-x86_64",
+    })
   })
 })
 

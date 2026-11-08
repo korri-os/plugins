@@ -1,9 +1,11 @@
 # Invoked once under dbus-run-session by the public steam-session command.
-# Steam's own artifact paths and the Proton tool name are substituted by
-# packages/default.nix. The FEX config file and the ready FEX rootfs and
-# Proton-CachyOS directories come from the required plugins through the
-# KORRI_* environment checked by that command; korrid downloaded them before
-# this session started.
+# Steam's own artifact paths, the Proton tool name and this build's platform
+# choices are substituted by packages/default.nix. ARM64 runs Valve's ARM64
+# client from its own FHS with FEX; x86_64 runs nixpkgs' Steam FHS and needs
+# no FEX. The ready Proton-CachyOS directory, and on ARM64 the FEX config file
+# and ready FEX rootfs, come from the required plugins through the KORRI_*
+# environment checked by that command; korrid downloaded them before this
+# session started.
 set -Eeuo pipefail
 umask 077
 
@@ -14,14 +16,24 @@ trap 'fail 126 "Steam failed: session error at line $LINENO (status $?)"' ERR
 appid="$1"
 export STEAM_GAMES_ROOT="$STEAM_HOME"
 export STEAM_DOT="$HOME/.steam"
-export STEAM_BETA=steamdeck_stable
-export FEX_APP_CONFIG_LOCATION="$KORRI_FEX_CONFIG/"
-export FEX_APP_DATA_LOCATION="$STEAM_HOME/fex-data/"
+steam_client=@steamClient@
+uses_fex=@usesFex@
+# Empty means Steam's public channel: the client keeps its own channel and
+# manifest, and the ARM64 manifest repair below does not apply.
+export STEAM_BETA=@steamBeta@
+if [[ "$uses_fex" == 1 ]]; then
+  export FEX_APP_CONFIG_LOCATION="$KORRI_FEX_CONFIG/"
+  export FEX_APP_DATA_LOCATION="$STEAM_HOME/fex-data/"
+fi
 export XDG_CURRENT_DESKTOP=sway
 export LANG=C.UTF-8
 # Do not reintroduce WAYLAND_DISPLAY, SWAYSOCK or the host's XDG_RUNTIME_DIR.
 # Steam uses the game unit's Xwayland DISPLAY and its private D-Bus session.
-flags=(-clientbeta steamdeck_stable -silent -nobigpicture -nochatui -nofriendsui -forcedesktopscaling 1.5)
+flags=(-silent -nobigpicture -nochatui -nofriendsui)
+if [[ -n "$STEAM_BETA" ]]; then flags=(-clientbeta "$STEAM_BETA" "${flags[@]}"); fi
+# Only a small built-in screen needs the client scaled up.
+desktop_scaling=@desktopScaling@
+if [[ -n "$desktop_scaling" ]]; then flags+=(-forcedesktopscaling "$desktop_scaling"); fi
 steam_pid=""
 console_log="$STEAM_HOME/logs/console_log.txt"
 bootstrap_log="$STEAM_HOME/logs/bootstrap_log.txt"
@@ -110,7 +122,7 @@ shutdown() {
   trap '' TERM INT HUP
   [[ -n "$steam_pid" ]] || return 0
   say 'end: stopping Steam'
-  timeout 15 @fhs@/bin/steam-arm64-fhs -shutdown >/dev/null 2>&1 || true
+  timeout 15 "$steam_client" -shutdown >/dev/null 2>&1 || true
   while kill -0 "$steam_pid" 2>/dev/null && (( SECONDS < deadline )); do sleep 1; done
   # The owning game unit has KillMode=control-group. Do not leave it waiting
   # indefinitely on a client that ignored -shutdown.
@@ -132,7 +144,7 @@ trap 'exit 143' TERM
 # installed and put it back before every start.
 save_client_manifest() {
   local manifest_fd
-  [[ -f "$client_manifest" ]] || return 0
+  [[ -n "$STEAM_BETA" && -f "$client_manifest" ]] || return 0
   # Steam may unlink the pathname at any point. Retain the opened inode for
   # both comparison and copying; do not turn a copy failure into success.
   if ! { exec {manifest_fd}< "$client_manifest"; } 2>/dev/null; then
@@ -147,6 +159,7 @@ save_client_manifest() {
   exec {manifest_fd}<&-
 }
 restore_client_channel() {
+  [[ -n "$STEAM_BETA" ]] || return 0
   mkdir -p "$package_dir"
   if [[ "$(cat "$package_dir/beta" 2>/dev/null)" != "$STEAM_BETA" ]]; then
     printf '%s\n' "$STEAM_BETA" >"$package_dir/beta.tmp.$$"
@@ -164,7 +177,7 @@ start_steam() {
   say 'start: Steam desktop client'
   restore_client_channel
   mark_logs
-  @fhs@/bin/steam-arm64-fhs "${flags[@]}" >>"$STEAM_HOME/logs/session_log.txt" 2>&1 &
+  "$steam_client" "${flags[@]}" >>"$STEAM_HOME/logs/session_log.txt" 2>&1 &
   steam_pid=$!
   generation=$((generation + 1))
 }
@@ -240,7 +253,7 @@ forward_appid() {
     forward_generation="$generation"
     status=0
     say "launch: forwarding AppID $appid"
-    timeout 15 @fhs@/bin/steam-arm64-fhs "${flags[@]}" -applaunch "$appid" \
+    timeout 15 "$steam_client" "${flags[@]}" -applaunch "$appid" \
       >>"$STEAM_HOME/logs/session_log.txt" 2>&1 || status=$?
     # A forwarding stub can itself return 42, or report another IPC failure
     # after the managed client exited 42. Both need the same bounded recovery
@@ -277,7 +290,8 @@ app_process_present() {
 # refuses an extractor's chmod of such a directory, and Steam's own unpacking
 # fails. Clear the bit on every directory this user owns in the Steam home.
 find "$STEAM_HOME" -xdev -type d -perm -2000 -user "$(id -u)" -exec chmod g-s {} +
-mkdir -p "$STEAM_HOME/logs" "$STEAM_HOME/fex-data" "$STEAM_HOME/steamapps"
+mkdir -p "$STEAM_HOME/logs" "$STEAM_HOME/steamapps"
+if [[ "$uses_fex" == 1 ]]; then mkdir -p "$STEAM_HOME/fex-data"; fi
 # korrid discovers installed games from steamapps/appmanifest_*.acf (Korri
 # ADR 0011). It is the owner of the account root above this home, and gets
 # no access to a directory this user creates. Grant it listing of the home
@@ -299,11 +313,26 @@ if pgrep -x steam >/dev/null; then fail 126 'Steam failed: client is already run
 clean_shared_memory
 # bwrap enters its caller's cwd before the guest helper can change directory.
 cd "$STEAM_HOME"
-export FEX_ROOTFS="$KORRI_FEX_ROOTFS"
-say 'seed: preparing ARM64 runtime and client'
-if [[ ! -x "$STEAM_HOME/steamrtarm64/steam" ]]; then
-  @helpers@/bin/steam-arm64-seed --apply >>"$STEAM_HOME/logs/session_log.txt" 2>&1 \
-    || fail 126 'Steam failed: ARM64 seed failed (see logs/session_log.txt)'
+if [[ "$uses_fex" == 1 ]]; then
+  export FEX_ROOTFS="$KORRI_FEX_ROOTFS"
+  say 'seed: preparing ARM64 runtime and client'
+  if [[ ! -x "$STEAM_HOME/steamrtarm64/steam" ]]; then
+    @helpers@/bin/steam-arm64-seed --apply >>"$STEAM_HOME/logs/session_log.txt" 2>&1 \
+      || fail 126 'Steam failed: ARM64 seed failed (see logs/session_log.txt)'
+  fi
+else
+  # Valve's bootstrap starts the client that ~/.steam/steam points to, and
+  # installs a missing client into ~/.local/share/Steam. Point both at
+  # STEAM_HOME, so this home is the only Steam this user runs. Never replace
+  # a real directory: it would be another Steam install.
+  say 'seed: pointing the Steam bootstrap at STEAM_HOME'
+  mkdir -p "$STEAM_DOT" "$HOME/.local/share"
+  for link in "$STEAM_DOT/steam" "$STEAM_DOT/root" "$HOME/.local/share/Steam"; do
+    if [[ -d "$link" && ! -L "$link" ]]; then
+      fail 126 "Steam failed: $link is a separate Steam directory, not a link to STEAM_HOME"
+    fi
+    ln -sfn "$STEAM_HOME" "$link"
+  done
 fi
 # Link on every launch: the seed runs only once per Steam home, and a new
 # Proton pin brings a new tool name and ready directory.

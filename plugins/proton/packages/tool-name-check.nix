@@ -9,7 +9,13 @@
   protonToolName,
 }:
 let
-  current = "11.0-20260601-slr-arm64";
+  inherit (pkgs.stdenv.hostPlatform) system;
+  current =
+    {
+      aarch64-linux = "11.0-20260601-slr-arm64";
+      x86_64-linux = "11.0-20260601-slr-x86_64";
+    }
+    .${system};
   changed = "${current}-regression";
   source = builtins.readFile ../plugin.ts;
   # builtins.toFile, not a derivation: tool-name.nix reads the file during
@@ -18,7 +24,7 @@ let
     pkgs.lib.replaceStrings [ ''version: "${current}"'' ] [ ''version: "${changed}"'' ] source
   );
   changedToolName = import ../cachyos/tool-name.nix {
-    inherit (pkgs) lib;
+    inherit (pkgs) lib system;
     source = changedSource;
   };
   declared =
@@ -27,9 +33,10 @@ let
       mkdir source
       cp ${declarationSource} source/plugin.ts
       ${evaluator}/bin/korri-publish declaration @korri "$PWD/source" plugin.ts > declaration.json
-      jq -er '
+      jq -er --arg system ${system} '
         select(.name == "proton" and .artifacts.cachyos.id == "@korri:proton/cachyos") |
-        .artifacts.cachyos.version | select(type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._+-]*$")) |
+        .artifacts.cachyos.platforms[$system].version |
+        select(type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._+-]*$")) |
         "proton-cachyos-" + .
       ' declaration.json > "$out"
     '';
