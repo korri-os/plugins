@@ -1,0 +1,10 @@
+StorePath: /nix/store/hvj21wh9byjb3xgvris7csnyfp52ilrn-korri-korri-sunshine.service
+URL: https://github.com/korri-os/plugins/releases/download/build-2d8d21283fd1-sunshine-runtime-uid/0f3byra1x84jd6lacqa2b8z3ia4m7wir3yx9xrp89qd5pxkrckyh.nar.xz
+Compression: xz
+FileHash: sha256:0f3byra1x84jd6lacqa2b8z3ia4m7wir3yx9xrp89qd5pxkrckyh
+FileSize: 1040
+NarHash: sha256:0xjr5ckmd3flwjv62fx9ycaib3p0zc57mn9n5p3sa2jpk3zlzb7v
+NarSize: 2736
+References: f7i2a332wa90gvpdrwc4b5ljnpv4vrk2-korri-sunshine-run
+Deriver: 8i3bbcwhqgb0df8fb0i2f77bfpjn3fhm-korri-korri-sunshine.service.drv
+Sig: korri-plugins-1:dv9deFsN5wHHXZbfDvZr6Hg8oQNn4cOVatBsELHMGQUBkG9RAl6mFLKV5LK7qwvV286uoqVMdixkwaZkVK9vAQ==
