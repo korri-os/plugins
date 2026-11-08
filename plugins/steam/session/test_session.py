@@ -192,6 +192,13 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AppID 401710 is not installed; waiting up to 3600 s", result.stderr)
 
+    def test_a_question_from_steam_extends_the_launch_window(self):
+        result, home, _ = self.run_session("eula")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Steam is waiting for an answer about AppID 401710; waiting up to 3600 s",
+                      result.stderr)
+        self.assertIn("AppID 401710 exited", result.stderr)
+
     def test_channel_and_installed_manifest_survive_the_client_deleting_them(self):
         manifest = '"linuxarm64"\n{\n\t"version"\t\t"1791918634"\n}\n'
 

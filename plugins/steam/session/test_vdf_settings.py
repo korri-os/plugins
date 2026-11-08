@@ -74,6 +74,20 @@ class SteamSettingsTests(unittest.TestCase):
         self.assertEqual(first, local.read_bytes())
         self.assertFalse((self.home / "userdata/0").exists())
 
+    def test_keeps_an_accepted_eula_version_steam_wrote(self):
+        local = self.home / "userdata/123/config/localconfig.vdf"
+        local.parent.mkdir(parents=True)
+        local.write_text(
+            '"UserLocalConfigStore"\n{\n\t"Software"\n\t{\n\t\t"Valve"\n\t\t{\n\t\t\t"Steam"\n\t\t\t{\n'
+            '\t\t\t\t"apps"\n\t\t\t\t{\n\t\t\t\t\t"401710"\n\t\t\t\t\t{\n'
+            '\t\t\t\t\t\t"401710_eula_1"\t\t"4"\n'
+            '\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n')
+        self.assertEqual(self.run_helper().returncode, 0)
+        content = local.read_text()
+        self.assertIn('"401710_eula_1"\t\t"4"', content)
+        self.assertIn('"401710_eula_0"\t\t"1"', content)
+        self.assertIn('"401710_eula_2"\t\t"1"', content)
+
     def test_rejects_malformed_vdf_without_overwriting_it(self):
         content = '"InstallConfigStore" { "incomplete"'
         self.config.write_text(content)

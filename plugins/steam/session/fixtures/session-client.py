@@ -69,6 +69,9 @@ while not (home / "shutdown").exists():
         sys.exit(42)
     if (home / "launch").exists():
         (home / "launch").unlink()
+        if behavior == "eula":
+            event("GameAction [AppID 401710, ActionID 1] : LaunchApp waiting for user response to ShowEula \"\"")
+            time.sleep(2)
         event("GameAction [AppID 401710, ActionID 1] : LaunchApp changed task to Completed")
         if manifest.exists():
             # The client clears its channel and this file during a session.

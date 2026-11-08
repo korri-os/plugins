@@ -27,6 +27,10 @@ PER_GAME = (
 TOKEN = re.compile(r'\s+|//[^\r\n]*|"(?:\\.|[^"\\])*"|[{}]|[^\s{}"]+')
 
 
+class Default(str):
+    """A value written only when the key is missing; an existing value stays."""
+
+
 @dataclass
 class Token:
     value: str
@@ -124,6 +128,8 @@ def merge(text: str, values: dict) -> str:
                 visit(current, value, depth + 1)
             elif isinstance(current, Object):
                 raise ValueError(f"expected VDF string: {key}")
+            elif isinstance(value, Default):
+                continue
             elif current.value != value:
                 edits.append((current.start, current.end, quote(value)))
         if missing:
@@ -201,7 +207,9 @@ def main():
         for user in users:
             seeds = {f"Deck_ConfiguratorInterstitialsVersionSeen_{key}": "99" for key in ONCE + PER_GAME}
             seeds.update({f"Deck_ConfiguratorInterstitialsCheckbox_{key}": "1" for key in PER_GAME})
-            seeds["apps"] = {appid: {f"{appid}_eula_{index}": "1" for index in range(3)}}
+            # Steam stores the accepted EULA version here. Never replace one
+            # Steam wrote: a lower value makes Steam ask for the EULA again.
+            seeds["apps"] = {appid: {f"{appid}_eula_{index}": Default("1") for index in range(3)}}
             changes.append(prepare(user / "config/localconfig.vdf", {
                 "UserLocalConfigStore": {"Software": {"Valve": {"Steam": seeds}}},
             }))

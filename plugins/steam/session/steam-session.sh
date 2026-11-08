@@ -354,6 +354,7 @@ forward_appid
 saw_added=0
 saw_removed=0
 acted=0
+asked=0
 say "watch: waiting for AppID $appid"
 while true; do
   check_login
@@ -368,6 +369,13 @@ while true; do
       launch_deadline=$((SECONDS + 3600))
     fi
     acted=1
+  fi
+  # Steam can stop a launch to ask the person something, such as a game's
+  # EULA. Answering takes longer than a launch; give it the install window.
+  if (( asked == 0 )) && grep -aqE "GameAction \[AppID $appid, [^]]*\] : LaunchApp waiting for user response" <<<"$new_console"; then
+    say "watch: Steam is waiting for an answer about AppID $appid; waiting up to 3600 s"
+    launch_deadline=$((SECONDS + 3600))
+    asked=1
   fi
   if grep -aqE "Game process added[[:space:]]*: AppID $appid([^0-9]|$)" <<<"$new_console"; then
     if (( saw_added == 0 )); then say "watch: AppID $appid started"; fi
