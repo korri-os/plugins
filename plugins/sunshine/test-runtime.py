@@ -42,7 +42,7 @@ class RuntimeArguments(unittest.TestCase):
                 replacements = {
                     "@coreutils@/bin/": "", "@gnugrep@/bin/": "", "@jq@/bin/": "",
                     "@pipewire@": str(tools.parent), "@sway@": str(tools.parent), "@sunshine@": str(tools.parent),
-                    "@apps@": str(root / "apps.json"), "/run/user/1000": str(runtime),
+                    "@apps@": str(root / "apps.json"), "/run/user/$(id -u)": str(runtime),
                     "/run/korri-compositor/sway-ipc.sock": str(root / "sway.sock"),
                     "/run/korri-launch-services/korri-sunshine.args": str(args_file),
                     "/home/korri": str(root / "home"),
@@ -65,6 +65,11 @@ class RuntimeArguments(unittest.TestCase):
         args, _ = self.run_runtime("encoder=v4l2m2m\nmin_log_level=debug\n\nBad_key=ignored\nbad-key=ignored\n=empty-key\nmissing-equals\n key=space\nkey name=space\nexternal_ip=has spaces = and \\\\backslash\ncontroller=disabled\nkey=\n0_ok=value\nsw_tune=$(touch /should-not-run)\nqp=31")
         self.assertEqual(args[6:], ["encoder=v4l2m2m", "min_log_level=debug", "external_ip=has spaces = and \\\\backslash", "controller=disabled", "key=", "0_ok=value", "sw_tune=$(touch /should-not-run)", "qp=31"])
         self.assertNotIn("encoder=auto", args)
+
+    def test_runtime_directory_follows_the_running_account(self):
+        text = SOURCE.read_text()
+        self.assertNotIn("/run/user/1000", text)
+        self.assertIn("runtime_dir=/run/user/$(@coreutils@/bin/id -u)", text)
 
     def test_newline_cannot_be_part_of_an_argument(self):
         args, _ = self.run_runtime("encoder=rkmpp\ncontinuation without equals\nqp=28\n")

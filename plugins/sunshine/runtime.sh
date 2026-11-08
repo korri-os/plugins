@@ -1,6 +1,7 @@
 set -eu
 
-runtime_dir=/run/user/1000
+# The unit runs as the device's korri runtime account, whose UID varies by host.
+runtime_dir=/run/user/$(@coreutils@/bin/id -u)
 sway_socket=/run/korri-compositor/sway-ipc.sock
 wayland_display=korri-wayland
 
