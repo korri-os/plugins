@@ -150,6 +150,8 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     puzzlescriptPlugin = acquisitionPlugin "puzzlescript";
     pyxelGalleryPlugin = acquisitionPlugin "pyxelgallery";
     homebrewhubPlugin = acquisitionPlugin "homebrewhub";
+    # Korri ADR 0054: declarations only, for Android devices.
+    androidAppPlugin = acquisitionPlugin "android-app";
     retrobrewsPlugin = acquisitionPlugin "retrobrews";
     acquisitionCheck =
       name: package: hosts:
@@ -318,6 +320,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-puzzlescript = puzzlescriptPlugin;
       korri-plugin-pyxelgallery = pyxelGalleryPlugin;
       korri-plugin-homebrewhub = homebrewhubPlugin;
+      korri-plugin-android-app = androidAppPlugin;
       korri-plugin-retrobrews = retrobrewsPlugin;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
