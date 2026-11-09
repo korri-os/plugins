@@ -70,6 +70,7 @@ in
   services = {
     korri-sunshine = unit "korri-sunshine.service" ./korri-sunshine.service {
       "@runtime@" = "${runtimePackage}/bin/korri-sunshine-run";
+      "@setup@" = "${setupPackage}/bin/korri-sunshine-input-seat-setup";
     };
     "korri-sunshine-certificate-control.socket" =
       unit "korri-sunshine-certificate-control.socket" ./korri-sunshine-certificate-control.socket

@@ -4,13 +4,22 @@ set -eu
 # plugin grant for uhid after it. Persistent seats and /dev/uinput belong to
 # the host; stopping this helper does not change their permissions.
 rules=/run/udev/rules.d/99-z-korri-sunshine-input.rules
+# A host with immutable users (NixOS users.mutableUsers = false) deletes this
+# group at its next system switch, so the Sunshine unit ensures it before
+# every start, not only when this helper starts.
+ensure_group() {
+  if @getent@/bin/getent group korri-sunshine-input-seat >/dev/null; then
+    test "$(@getent@/bin/getent group korri-sunshine-input-seat | @coreutils@/bin/cut -d: -f3)" = 980
+  else
+    @groupadd@/bin/groupadd --system --gid 980 korri-sunshine-input-seat
+  fi
+}
 case "${1:-}" in
+  ensure-group)
+    ensure_group
+    ;;
   start)
-    if @getent@/bin/getent group korri-sunshine-input-seat >/dev/null; then
-      test "$(@getent@/bin/getent group korri-sunshine-input-seat | @coreutils@/bin/cut -d: -f3)" = 980
-    else
-      @groupadd@/bin/groupadd --system --gid 980 korri-sunshine-input-seat
-    fi
+    ensure_group
     @coreutils@/bin/install -d -m 0700 -o korri -g korri /home/korri/.config/sunshine
     @coreutils@/bin/mkdir -p /run/udev/rules.d
     @coreutils@/bin/install -m 0644 @rules@ "$rules"
@@ -30,7 +39,7 @@ case "${1:-}" in
     @groupdel@/bin/groupdel korri-sunshine-input-seat
     ;;
   *)
-    echo "usage: korri-sunshine-input-seat-setup <start|stop>" >&2
+    echo "usage: korri-sunshine-input-seat-setup <start|stop|ensure-group>" >&2
     exit 2
     ;;
 esac

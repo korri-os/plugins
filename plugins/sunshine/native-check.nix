@@ -58,6 +58,10 @@ pkgs.runCommand "korri-sunshine-plugin-native-check"
     ! grep -E '^ExecStart=\+|^RemainAfterExit=' "$setup_unit"
     grep -E '^Requires=.*korri-sunshine-input-setup.service.*korri-input-seat-receiver.service' "$sunshine_unit"
     ! grep -F 'korri-sunshine-input-seat-receiver.service' "$sunshine_unit"
+    # Immutable-user hosts delete the input-seat group at a switch; Sunshine
+    # recreates it before each start, and the helper accepts that command.
+    grep -E '^ExecStartPre=\+/nix/store/[^ ]+/bin/korri-sunshine-input-seat-setup ensure-group$' "$sunshine_unit"
+    grep -F 'ensure-group)' "$setup"
     grep -Fx 'Environment=KORRI_INPUT_SEAT_MIRROR_SOCKET=/run/korri-input-seat/sunshine-input-seat.sock' "$sunshine_unit"
 
     # The host owns /dev/uinput (korri-inputd:uinput 0660). A plugin rule that

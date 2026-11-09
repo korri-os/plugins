@@ -19,6 +19,8 @@ Environment=KORRI_CERTIFICATE_CONTROL_PATH=/run/korri-certificate-control/contro
 Environment=KORRI_INPUT_SEAT_MIRROR_SOCKET=/run/korri-input-seat/sunshine-input-seat.sock
 Environment=KORRI_INPUT_SEAT_RUNTIME_DIR=/run/korri-input-seat
 Sockets=korri-sunshine-certificate-control.socket
+# The group in Group= above can vanish at a host switch; recreate it first.
+ExecStartPre=+@setup@ ensure-group
 ExecStart=@runtime@
 Restart=on-failure
 RestartSec=5
