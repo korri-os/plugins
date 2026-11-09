@@ -1,28 +1,28 @@
 {
   "latest": {
-    "@korri:steam": "build-3f622e1037f2-steam-eula"
+    "@korri:steam": "build-97c28031b06c-steam-launch-steps"
   },
   "records": [
     {
-      "archive_sha256": "4872d1fbec806cb934bbdc496050ebea8b1f72f197fc7bba2b5d985273538317",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-3f622e1037f2-steam-eula/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-3f622e1037f2-steam-eula-aarch64-linux.tar",
+      "archive_sha256": "f48a5a2effa820c74b5b3db8ab516d5c22fa39b94a624f2ce366452a5ada7f12",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-97c28031b06c-steam-launch-steps/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-97c28031b06c-steam-launch-steps-aarch64-linux.tar",
       "description": "Runs Steam content through the native session program.",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-3f622e1037f2-steam-eula",
-      "store_path": "/nix/store/ddrvlcyksdlrcv6hk691cikpb6dhlg7h-korri-plugin",
+      "release_version": "build-97c28031b06c-steam-launch-steps",
+      "store_path": "/nix/store/qbzvhbs8nplsd2n9xq23hrv1qxw8c8b3-korri-plugin",
       "title": "Steam"
     },
     {
-      "archive_sha256": "88d234299951a929aa4d40adba82fe0aa7bc8b8ba8effe29c3709963a5a866c0",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-3f622e1037f2-steam-eula/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-3f622e1037f2-steam-eula-x86_64-linux.tar",
+      "archive_sha256": "b718c02f50c2f8ef2686146d4b1f14ff04b6ec225fb1eaf45708a8c22f67828d",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-97c28031b06c-steam-launch-steps/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-97c28031b06c-steam-launch-steps-x86_64-linux.tar",
       "description": "Runs Steam content through the native session program.",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-3f622e1037f2-steam-eula",
-      "store_path": "/nix/store/69493jm748442jyn5ivqhr2air4786db-korri-plugin",
+      "release_version": "build-97c28031b06c-steam-launch-steps",
+      "store_path": "/nix/store/vba6bi5zxp306jh8vhiz9658m76acvr1-korri-plugin",
       "title": "Steam"
     }
   ]
