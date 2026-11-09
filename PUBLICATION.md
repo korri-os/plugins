@@ -339,8 +339,9 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 
 Inputs to `.github/workflows/plugin-publish.yml`: `dry_run_id`, plus the dry
 run's `expected_source_sha`, `tag` and `packages`. It is the only workflow that
-creates a release, uploads assets or writes the `cache-index` metadata branch;
-`CACHE_URL` identifies that branch's Pages site.
+publishes a signed plugin-catalog batch: its release, assets and `cache-index`
+metadata. `CACHE_URL` identifies that branch's Pages site.
+`publish-core-main-cache.yml` keeps its own raw-cache publication path.
 
 Build jobs read the signed publisher cache before their test and build commands.
 Lifecycle verification also reads Core's signed cache through `--include-core`.
