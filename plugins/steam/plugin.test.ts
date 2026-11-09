@@ -26,6 +26,17 @@ const launchInput = () => ({
 })
 
 describe("Steam launch declaration", () => {
+  test("declares the ordered Steam launch steps", () => {
+    expect(runners.steam.steps).toEqual([
+      { key: "start-steam", label: "Starting Steam" },
+      { key: "update", label: "Updating Steam" },
+      { key: "sign-in", label: "Signing in" },
+      { key: "install", label: "Installing the game" },
+      { key: "answer", label: "Waiting for your answer in Steam" },
+      { key: "game", label: "Starting the game" },
+    ])
+  })
+
   test("lists the FEX rootfs and Proton-CachyOS artifacts korrid must ready first", () => {
     expect(runners.steam.artifacts).toEqual(["@korri:fex/rootfs", "@korri:proton/cachyos"])
   })

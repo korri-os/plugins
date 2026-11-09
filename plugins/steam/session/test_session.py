@@ -21,7 +21,7 @@ def program(path, source):
 
 class SteamSessionTests(unittest.TestCase):
     def run_session(self, behavior, seeded=True, setup=None, installed=True, shm=None,
-                    copy_behavior=None, platform="aarch64-linux"):
+                    copy_behavior=None, platform="aarch64-linux", notify_socket=True):
         arm = platform == "aarch64-linux"
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -41,6 +41,12 @@ class SteamSessionTests(unittest.TestCase):
             client.touch()
             client.chmod(0o755)
         (root / "bin").mkdir()
+        program(root / "bin/systemd-notify", """import os
+from pathlib import Path
+import sys
+with (Path(os.environ["STEAM_HOME"]) / "statuses").open("a") as stream:
+    stream.write(sys.argv[1] + "\\n")
+""")
         if copy_behavior:
             # Exercise the real cp after a controlled filesystem mutation at
             # the copy boundary. Production has no test hook or timing knob.
@@ -93,11 +99,32 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
                 **os.environ, "STEAM_HOME": str(home), "HOME": str(root), "CLIENT_BEHAVIOR": behavior,
                 "PATH": str(root / "bin") + os.pathsep + os.environ["PATH"],
                 "KORRI_PROTON_CACHYOS": str(self.proton),
+                "NOTIFY_SOCKET": str(root / "notify") if notify_socket else "",
                 **({"KORRI_FEX_CONFIG": str(root / "fex-config"),
                     "KORRI_FEX_ROOTFS": str(self.rootfs)} if arm else {}),
             },
         )
         return result, home, time.monotonic() - started
+
+    def assert_steps(self, home, keys):
+        self.assertEqual((home / "statuses").read_text().splitlines(),
+                         [f"--status=korri-step: {key}" for key in keys])
+
+    def test_no_notify_socket_sends_no_status(self):
+        result, home, _ = self.run_session("game", notify_socket=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((home / "statuses").exists())
+
+    def test_creating_process_reports_game_before_game_process_added(self):
+        result, home, _ = self.run_session("creating-process")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_steps(home, ["start-steam", "sign-in", "game"])
+        self.assertIn("--status=korri-step: game", (home / "creating-status").read_text())
+
+    def test_creating_process_falls_back_to_game_process_added(self):
+        result, home, _ = self.run_session("no-creating-process")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_steps(home, ["start-steam", "sign-in", "game"])
 
     def test_ready_artifacts_configure_fex_and_proton_before_seeding(self):
         result, home, _ = self.run_session("game", seeded=False)
@@ -142,6 +169,7 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         # An already seeded home still gets the link to the ready tool.
         self.assertFalse((home / "seed.json").exists())
         self.assertEqual(os.readlink(home / "compatibilitytools.d" / TOOL), str(self.proton))
+        self.assert_steps(home, ["start-steam", "sign-in", "game"])
         self.assertGreaterEqual(duration, 2)
         self.assertIn("AppID 401710 exited", result.stderr)
         self.assertTrue((home / "shutdown").exists())
@@ -151,6 +179,7 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         result, home, _ = self.run_session("restart")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("update restart (42)", result.stderr)
+        self.assert_steps(home, ["start-steam", "sign-in", "game"])
         self.assertEqual((home / "forwards").read_text(), "2")
         self.assertTrue((home / "shutdown").exists())
 
@@ -178,6 +207,7 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         result, home, _ = self.run_session("update")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("startup update observed", result.stderr)
+        self.assert_steps(home, ["start-steam", "update", "sign-in", "game"])
         self.assertTrue((home / "update-complete").exists())
 
     def test_dropped_forward_is_sent_again(self):
@@ -188,13 +218,15 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         self.assertGreaterEqual(duration, 20)
 
     def test_uninstalled_app_waits_for_the_install(self):
-        result, _, _ = self.run_session("game", installed=False)
+        result, home, _ = self.run_session("game", installed=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AppID 401710 is not installed; waiting up to 3600 s", result.stderr)
+        self.assert_steps(home, ["start-steam", "sign-in", "install", "game"])
 
     def test_a_question_from_steam_extends_the_launch_window(self):
         result, home, _ = self.run_session("eula")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_steps(home, ["start-steam", "sign-in", "answer", "game"])
         self.assertIn("Steam is waiting for an answer about AppID 401710; waiting up to 3600 s",
                       result.stderr)
         self.assertIn("AppID 401710 exited", result.stderr)
@@ -282,6 +314,8 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         env = {
             **os.environ, "STEAM_HOME": str(home), "HOME": str(self.root),
             "CLIENT_BEHAVIOR": "leftover-hold",
+            "PATH": str(self.root / "bin") + os.pathsep + os.environ["PATH"],
+            "NOTIFY_SOCKET": str(self.root / "notify"),
             "KORRI_FEX_CONFIG": str(self.root / "fex-config"),
             "KORRI_FEX_ROOTFS": str(self.rootfs),
             "KORRI_PROTON_CACHYOS": str(self.proton),

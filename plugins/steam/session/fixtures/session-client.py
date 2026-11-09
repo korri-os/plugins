@@ -72,6 +72,18 @@ while not (home / "shutdown").exists():
         if behavior == "eula":
             event("GameAction [AppID 401710, ActionID 1] : LaunchApp waiting for user response to ShowEula \"\"")
             time.sleep(2)
+        if behavior != "no-creating-process":
+            event("GameAction [AppID 401710, ActionID 1] : LaunchApp changed task to CreatingProcess")
+        if behavior == "creating-process":
+            # Hold process-added until the session has had time to report the
+            # earlier CreatingProcess event. Record what the observer saw.
+            statuses = home / "statuses"
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if statuses.exists() and "korri-step: game" in statuses.read_text():
+                    break
+                time.sleep(0.05)
+            (home / "creating-status").write_text(statuses.read_text() if statuses.exists() else "")
         event("GameAction [AppID 401710, ActionID 1] : LaunchApp changed task to Completed")
         if manifest.exists():
             # The client clears its channel and this file during a session.

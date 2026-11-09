@@ -5,6 +5,29 @@ provider `ref` to the packaged `steam-session <appid>` program. It declares
 `STEAM_HOME=${accountRoot}/steam` and that directory. `plugin.ts` performs no
 effects.
 
+## Launch steps
+
+This declaration requires a korrid with runner steps support (korri #387).
+Older runner declaration decoders do not accept `steps`.
+
+| Key | Label | Reached when |
+|---|---|---|
+| `start-steam` | Starting Steam | Preparing the seed and starting the client |
+| `update` | Updating Steam | A startup update or update restart is observed |
+| `sign-in` | Signing in | The client reaches the login gate after startup updates |
+| `install` | Installing the game | Steam acts on an AppID that is not installed |
+| `answer` | Waiting for your answer in Steam | Steam reports `LaunchApp waiting for user response`, such as a EULA |
+| `game` | Starting the game | Steam reports `CreatingProcess` for the AppID, or a game process is added |
+
+The session sends `STATUS=korri-step: <key>` through `systemd-notify` only
+when `NOTIFY_SOCKET` is set. Steps only move forward; unused steps are skipped.
+An AppID forward is only a request, not proof that the game is starting:
+Steam can still ask for installation or a EULA. Retries and client restarts
+do not repeat earlier steps. The game unit must allow `NotifyAccess=all`.
+korrid ends these steps at the initial game handoff.
+
+## Runtime
+
 `plugin.nix` requires the exact `@korri:fex` and `@korri:proton` outputs, and
 the runner lists their artifacts, `@korri:fex/rootfs` and
 `@korri:proton/cachyos`. korrid downloads, verifies and unpacks those before

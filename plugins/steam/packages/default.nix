@@ -31,7 +31,8 @@ let
         steamBeta = "";
         desktopScaling = "";
       };
-  requiredPaths = if arm then "KORRI_FEX_CONFIG KORRI_FEX_ROOTFS KORRI_PROTON_CACHYOS" else "KORRI_PROTON_CACHYOS";
+  requiredPaths =
+    if arm then "KORRI_FEX_CONFIG KORRI_FEX_ROOTFS KORRI_PROTON_CACHYOS" else "KORRI_PROTON_CACHYOS";
   settingsSource = pkgs.runCommand "vdf-settings.py" { } ''
     substitute ${../session/vdf-settings.py} "$out" \
       --replace-fail @protonToolName@ ${pkgs.lib.escapeShellArg protonToolName}
@@ -50,6 +51,7 @@ let
       findutils
       gnugrep
       procps
+      systemd
       util-linux
     ];
     text =

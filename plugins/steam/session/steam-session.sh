@@ -48,6 +48,25 @@ resends=0
 package_dir="$STEAM_HOME/package"
 client_manifest="$package_dir/steam_client_${STEAM_BETA}_linuxarm64.manifest"
 saved_manifest="$STEAM_HOME/.korri/steam_client_${STEAM_BETA}_linuxarm64.manifest"
+launch_steps=(start-steam update sign-in install answer game)
+step_index=-1
+
+reach_step() {
+  local index
+  for index in "${!launch_steps[@]}"; do
+    if [[ "${launch_steps[$index]}" == "$1" ]] && (( index > step_index )); then
+      step_index=$index
+      if [[ -n "${NOTIFY_SOCKET:-}" ]]; then
+        # systemd 262's systemd-notify waits for the notify barrier by default.
+        # Keep that wait: the manager must attribute this short-lived sender
+        # before it exits (the game unit uses NotifyAccess=all).
+        # Progress reporting must not abort an otherwise working launch.
+        systemd-notify --status="korri-step: $1" || say "could not report launch step $1"
+      fi
+      return 0
+    fi
+  done
+}
 
 login_present() {
   local user
@@ -174,6 +193,7 @@ restore_client_channel() {
   fi
 }
 start_steam() {
+  reach_step start-steam
   say 'start: Steam desktop client'
   restore_client_channel
   mark_logs
@@ -191,6 +211,7 @@ check_client() {
   if ! kill -0 "$steam_pid" 2>/dev/null; then
     wait "$steam_pid" || status=$?
     if (( status == 42 )); then
+      reach_step update
       say 'restart: Steam requested update restart (42)'
       start_steam
     else
@@ -212,6 +233,7 @@ wait_for_steam_ready() {
     fi
     read_logs
     if grep -aqE 'Found pending update|Installing update\.\.\.|Extracting package' <<<"$new_console$new_bootstrap"; then
+      reach_step update
       updating=1
       desktop_since=-1; ready_log=0
       if (( update_seen == 0 )); then
@@ -232,6 +254,11 @@ wait_for_steam_ready() {
       desktop_since=-1
     fi
     desktop_pid="$pid"
+    # Do not enter the login gate before startup/update readiness is known:
+    # a later update status must not move the visible steps backwards.
+    if (( updating == 0 )) && { (( ready_log == 1 )) || [[ -n "$pid" ]]; }; then
+      reach_step sign-in
+    fi
     if (( updating == 0 )) && login_present &&
       { (( ready_log == 1 )) || (( desktop_since >= 0 && SECONDS - desktop_since >= 5 )); }; then
       return 0
@@ -252,6 +279,8 @@ forward_appid() {
   while true; do
     forward_generation="$generation"
     status=0
+    # Forwarding is only a request: Steam can still ask for an install or
+    # EULA. Reach game only when Steam starts creating the game process.
     say "launch: forwarding AppID $appid"
     timeout 15 "$steam_client" "${flags[@]}" -applaunch "$appid" \
       >>"$STEAM_HOME/logs/session_log.txt" 2>&1 || status=$?
@@ -313,6 +342,7 @@ if pgrep -x steam >/dev/null; then fail 126 'Steam failed: client is already run
 clean_shared_memory
 # bwrap enters its caller's cwd before the guest helper can change directory.
 cd "$STEAM_HOME"
+reach_step start-steam
 if [[ "$uses_fex" == 1 ]]; then
   export FEX_ROOTFS="$KORRI_FEX_ROOTFS"
   say 'seed: preparing ARM64 runtime and client'
@@ -365,6 +395,7 @@ while true; do
     if (( acted == 0 )) && ! app_installed; then
       # Steam asks the person to confirm an install, then downloads. Both
       # can take much longer than a launch.
+      reach_step install
       say "watch: AppID $appid is not installed; waiting up to 3600 s for the install"
       launch_deadline=$((SECONDS + 3600))
     fi
@@ -373,11 +404,16 @@ while true; do
   # Steam can stop a launch to ask the person something, such as a game's
   # EULA. Answering takes longer than a launch; give it the install window.
   if (( asked == 0 )) && grep -aqE "GameAction \[AppID $appid, [^]]*\] : LaunchApp waiting for user response" <<<"$new_console"; then
+    reach_step answer
     say "watch: Steam is waiting for an answer about AppID $appid; waiting up to 3600 s"
     launch_deadline=$((SECONDS + 3600))
     asked=1
   fi
+  if grep -aqE "GameAction \[AppID $appid, [^]]*\] : LaunchApp changed task to CreatingProcess" <<<"$new_console"; then
+    reach_step game
+  fi
   if grep -aqE "Game process added[[:space:]]*: AppID $appid([^0-9]|$)" <<<"$new_console"; then
+    reach_step game
     if (( saw_added == 0 )); then say "watch: AppID $appid started"; fi
     saw_added=1
   fi

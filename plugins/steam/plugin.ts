@@ -21,6 +21,14 @@ export const runners = {
   steam: {
     program: "steam-session",
     systems: ["steam"],
+    steps: [
+      { key: "start-steam", label: "Starting Steam" },
+      { key: "update", label: "Updating Steam" },
+      { key: "sign-in", label: "Signing in" },
+      { key: "install", label: "Installing the game" },
+      { key: "answer", label: "Waiting for your answer in Steam" },
+      { key: "game", label: "Starting the game" },
+    ],
     // korrid downloads these before it starts the runner and passes the
     // ready directories in `artifacts`. An x86_64 device skips the FEX rootfs,
     // which has no x86_64 build (Core ADR 0052).
