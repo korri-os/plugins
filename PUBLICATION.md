@@ -212,6 +212,24 @@ publishing Pyxel still runs its native window check; publishing the four fantasy
 runners still runs their native frontend check. Publishing SNES cores and
 RetroArch does not run Pyxel or Cemu. Neither signing nor source pinning changes.
 
+The cold-host lifecycle gate is two Nix checks, `korri-runtime-plugin-host` and
+`sunshine-korri-input-presence`. Their run takes about 80 minutes on hosted
+runners. The dry run evaluates both derivation paths. When a passed record exists
+for exactly those paths and the installed Nix version, it skips the VM run
+(#392). Otherwise it runs the gate and, on success, saves the record as an
+Actions cache entry. A derivation path names every input of its check, so
+the record covers only bytes that already passed. On 2026-11-09 a local
+evaluation gave identical paths for both checks at plugins `2d4e681`, `97c2803` (Steam), `bdf6509` (Sunshine
+input-seat group) and `7f230e2` (workflows); a release of any of them would
+have skipped the run. A change to Core, the plugin host, Sunshine's input-seat
+check or the tests gives new paths and runs the gate.
+
+Only the dispatched dry run on `main` saves a record. GitHub scopes caches by
+branch, so a pull-request run cannot write one that `main` reads. Cost: a
+check that fails only sometimes, for example on a slow hosted runner, stays
+recorded as passed until its inputs change. An evicted record (seven days
+unused) only means the gate runs again.
+
 `plugin-checks.yml` runs **all** `ci.checks` on both architectures for pushes to
 main, pull requests and manual checks. It has no publication environment or
 signing key and is not a dependency of publication. Both workflows run one check

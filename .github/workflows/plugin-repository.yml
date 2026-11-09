@@ -209,12 +209,59 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           sudo --preserve-env=GITHUB_TOKEN,GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py setup --nix "$(command -v nix)"
+      # The gate is two Nix checks. A derivation names every input of its
+      # check, so a pass recorded for the same derivations still holds: a
+      # batch that changes none of them (a runner-only plugin, a workflow or
+      # document edit) skips the 80-minute VM run. Any change to Core, the
+      # plugin host, Sunshine or the tests themselves gives new derivations
+      # and runs the gate again. Only this job, dispatched on main by the
+      # owner, saves a record. Actions cache scopes keep pull-request runs
+      # from writing one that main can read.
+      - name: Name the lifecycle gate by its derivations
+        id: gate
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          record="$RUNNER_TEMP/lifecycle-gate/passed.txt"
+          mkdir -p "$(dirname "$record")"
+          for check in korri-runtime-plugin-host sunshine-korri-input-presence; do
+            nix eval --raw ".#ci.checks.x86_64-linux.$check.drvPath"
+            echo
+          done > "$record"
+          cat "$record"
+          # The installed Nix is part of the gate's environment, not of its
+          # derivations; a different Nix must run the gate again.
+          nix_version=$(nix --version | tr -c 'A-Za-z0-9.\n' '-')
+          echo "key=lifecycle-passed-v1-$nix_version-$(sha256sum < "$record" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "record=$record" >> "$GITHUB_OUTPUT"
+      - name: Look for a recorded pass of these derivations
+        id: passed
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ steps.gate.outputs.record }}
+          key: ${{ steps.gate.outputs.key }}
+          lookup-only: true
       - name: Existing cold-host lifecycle acceptance
+        if: steps.passed.outputs.cache-hit != 'true'
         run: |
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           nix build --no-link .#ci.checks.x86_64-linux.korri-runtime-plugin-host .#ci.checks.x86_64-linux.sunshine-korri-input-presence
+      - name: Record that these derivations passed
+        if: steps.passed.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ steps.gate.outputs.record }}
+          key: ${{ steps.gate.outputs.key }}
+      - name: Report a recorded pass
+        if: steps.passed.outputs.cache-hit == 'true'
+        env:
+          RECORD: ${{ steps.gate.outputs.record }}
+        run: |
+          echo "Lifecycle gate already passed for these exact derivations:"
+          cat "$RECORD"
 
       - name: Remove source credentials
         if: always()
