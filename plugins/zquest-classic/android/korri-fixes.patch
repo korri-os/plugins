@@ -1,0 +1,305 @@
+diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+index d81bbc2..071874e 100644
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -2,6 +2,7 @@
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+     <application
+         android:allowBackup="false"
++        android:appCategory="game"
+         android:label="ZQuest Classic"
+         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+         <activity
+diff --git a/android/app/src/main/java/org/liballeg/android/PlayerActivity.java b/android/app/src/main/java/org/liballeg/android/PlayerActivity.java
+index 1bb3616..d703b8f 100644
+--- a/android/app/src/main/java/org/liballeg/android/PlayerActivity.java
++++ b/android/app/src/main/java/org/liballeg/android/PlayerActivity.java
+@@ -1,8 +1,16 @@
+ package org.liballeg.android;
+ 
++import android.content.Context;
+ import android.graphics.Color;
+ import android.graphics.drawable.GradientDrawable;
++import android.hardware.input.InputManager;
++import android.os.Build;
+ import android.os.Bundle;
++import android.view.InputDevice;
++import android.view.Window;
++import android.view.WindowInsets;
++import android.view.WindowInsetsController;
++import android.view.WindowManager;
+ import android.os.Handler;
+ import android.os.Looper;
+ import android.view.Gravity;
+@@ -17,14 +25,33 @@ import android.widget.TextView;
+ import android.util.Log;
+ 
+ import java.util.HashMap;
++import java.util.HashSet;
+ import java.util.Map;
++import java.util.Set;
+ 
+ /** Allegro's Android surface with lightweight touch controls layered over it. */
+ public final class PlayerActivity extends AllegroActivity {
+     private final Map<View, Integer> heldControls = new HashMap<>();
+     private View controlsOverlay;
+     private View gamePad;
++    private View topBarView;
+     private boolean menuHeld = false;
++
++    // Korri: physical controllers. Their buttons and sticks are translated to
++    // the same keyboard keys the touch pad sends (the engine's default keyboard
++    // scheme), so the engine never depends on Allegro's Android joystick list,
++    // where index 0 is always the accelerometer.
++    private boolean controllerConnected = false;
++    private InputManager inputManager;
++    private final Map<Integer, Set<String>> padKeySources = new HashMap<>();
++    private final Runnable hideTopBar = () -> {
++        if (controllerConnected && topBarView != null) topBarView.setVisibility(View.GONE);
++    };
++    private final InputManager.InputDeviceListener deviceListener = new InputManager.InputDeviceListener() {
++        @Override public void onInputDeviceAdded(int deviceId) { refreshControllerState(); }
++        @Override public void onInputDeviceRemoved(int deviceId) { refreshControllerState(); }
++        @Override public void onInputDeviceChanged(int deviceId) { refreshControllerState(); }
++    };
+     private boolean returningToLibrary = false;
+     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+ 
+@@ -68,6 +95,199 @@ public final class PlayerActivity extends AllegroActivity {
+     public void onCreate(Bundle state) {
+         super.onCreate(state);
+         getWindow().getDecorView().setKeepScreenOn(true);
++        enterImmersive();
++        inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
++        if (inputManager != null) inputManager.registerInputDeviceListener(deviceListener, mainHandler);
++    }
++
++    @Override
++    public void onResume() {
++        super.onResume();
++        enterImmersive();
++        refreshControllerState();
++    }
++
++    @Override
++    public void onWindowFocusChanged(boolean hasFocus) {
++        super.onWindowFocusChanged(hasFocus);
++        if (hasFocus) enterImmersive();
++    }
++
++    @Override
++    public void onDestroy() {
++        if (inputManager != null) inputManager.unregisterInputDeviceListener(deviceListener);
++        mainHandler.removeCallbacks(hideTopBar);
++        super.onDestroy();
++    }
++
++    /** Full-screen game mode: no status bar, navigation bar or taskbar. */
++    @SuppressWarnings("deprecation")
++    private void enterImmersive() {
++        Window window = getWindow();
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
++            WindowManager.LayoutParams attrs = window.getAttributes();
++            attrs.layoutInDisplayCutoutMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
++                    ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
++                    : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
++            window.setAttributes(attrs);
++        }
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
++            window.setDecorFitsSystemWindows(false);
++            WindowInsetsController controller = window.getInsetsController();
++            if (controller != null) {
++                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
++                controller.hide(WindowInsets.Type.systemBars());
++            }
++        } else {
++            window.getDecorView().setSystemUiVisibility(
++                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
++                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
++                    | View.SYSTEM_UI_FLAG_FULLSCREEN
++                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
++                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
++                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
++        }
++    }
++
++    private static boolean isControllerDevice(InputDevice device) {
++        if (device == null || device.isVirtual()) return false;
++        int sources = device.getSources();
++        boolean pad = (sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
++                || (sources & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK;
++        if (!pad) return false;
++        return Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || device.isExternal();
++    }
++
++    private void refreshControllerState() {
++        boolean connected = false;
++        for (int id : InputDevice.getDeviceIds()) {
++            if (isControllerDevice(InputDevice.getDevice(id))) {
++                connected = true;
++                break;
++            }
++        }
++        if (!connected && controllerConnected) releaseAllPadKeys();
++        controllerConnected = connected;
++        applyOverlayVisibility();
++    }
++
++    /** With a controller the touch overlay goes away; a tap shows the top bar briefly. */
++    private void applyOverlayVisibility() {
++        mainHandler.removeCallbacks(hideTopBar);
++        if (gamePad != null) {
++            boolean padPreferred = getSharedPreferences("zquestclassic", MODE_PRIVATE).getBoolean("controls-visible", true);
++            gamePad.setVisibility(!controllerConnected && padPreferred ? View.VISIBLE : View.GONE);
++        }
++        if (topBarView != null) topBarView.setVisibility(controllerConnected ? View.GONE : View.VISIBLE);
++    }
++
++    @Override
++    public boolean dispatchTouchEvent(MotionEvent event) {
++        if (controllerConnected && topBarView != null && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
++            topBarView.setVisibility(View.VISIBLE);
++            mainHandler.removeCallbacks(hideTopBar);
++            mainHandler.postDelayed(hideTopBar, 4000);
++        }
++        return super.dispatchTouchEvent(event);
++    }
++
++    private static boolean isControllerEvent(InputDevice device, int source) {
++        if (device == null || device.isVirtual()) return false;
++        return (source & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD
++                || (source & InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
++                || ((source & InputDevice.SOURCE_DPAD) == InputDevice.SOURCE_DPAD && isControllerDevice(device));
++    }
++
++    /** Controller button to the engine's default keyboard binding, or 0 to swallow. */
++    private static int keyForControllerButton(int keyCode) {
++        switch (keyCode) {
++            case KeyEvent.KEYCODE_BUTTON_A: return KeyEvent.KEYCODE_Z;        // A
++            case KeyEvent.KEYCODE_BUTTON_B: return KeyEvent.KEYCODE_X;        // B
++            case KeyEvent.KEYCODE_BUTTON_X: return KeyEvent.KEYCODE_A;        // Ex1
++            case KeyEvent.KEYCODE_BUTTON_Y: return KeyEvent.KEYCODE_S;        // Ex2
++            case KeyEvent.KEYCODE_BUTTON_L1: return KeyEvent.KEYCODE_Q;       // L
++            case KeyEvent.KEYCODE_BUTTON_R1: return KeyEvent.KEYCODE_W;       // R
++            case KeyEvent.KEYCODE_BUTTON_L2: return KeyEvent.KEYCODE_D;       // Ex3
++            case KeyEvent.KEYCODE_BUTTON_R2: return KeyEvent.KEYCODE_C;       // Ex4
++            case KeyEvent.KEYCODE_BUTTON_START: return KeyEvent.KEYCODE_ENTER; // Start
++            case KeyEvent.KEYCODE_BUTTON_SELECT:
++            case KeyEvent.KEYCODE_BACK: return KeyEvent.KEYCODE_SPACE;       // Map
++            case KeyEvent.KEYCODE_BUTTON_MODE: return KeyEvent.KEYCODE_ESCAPE; // engine menu
++            case KeyEvent.KEYCODE_DPAD_UP: return KeyEvent.KEYCODE_DPAD_UP;
++            case KeyEvent.KEYCODE_DPAD_DOWN: return KeyEvent.KEYCODE_DPAD_DOWN;
++            case KeyEvent.KEYCODE_DPAD_LEFT: return KeyEvent.KEYCODE_DPAD_LEFT;
++            case KeyEvent.KEYCODE_DPAD_RIGHT: return KeyEvent.KEYCODE_DPAD_RIGHT;
++            default: return 0;
++        }
++    }
++
++    @Override
++    public boolean dispatchKeyEvent(KeyEvent event) {
++        int keyCode = event.getKeyCode();
++        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
++                || !isControllerEvent(event.getDevice(), event.getSource())) {
++            return super.dispatchKeyEvent(event);
++        }
++        if (!controllerConnected) refreshControllerState();
++        int mapped = keyForControllerButton(keyCode);
++        if (mapped != 0 && event.getRepeatCount() == 0) {
++            int action = event.getAction();
++            if (action == KeyEvent.ACTION_DOWN || action == KeyEvent.ACTION_UP) {
++                setPadKey("button:" + keyCode, mapped, action == KeyEvent.ACTION_DOWN);
++            }
++        }
++        return true;
++    }
++
++    @Override
++    public boolean dispatchGenericMotionEvent(MotionEvent event) {
++        int source = event.getSource();
++        if (event.getActionMasked() != MotionEvent.ACTION_MOVE
++                || (source & InputDevice.SOURCE_JOYSTICK) != InputDevice.SOURCE_JOYSTICK
++                || !isControllerEvent(event.getDevice(), source)) {
++            return super.dispatchGenericMotionEvent(event);
++        }
++        if (!controllerConnected) refreshControllerState();
++        final float dead = 0.5f;
++        float sx = event.getAxisValue(MotionEvent.AXIS_X);
++        float sy = event.getAxisValue(MotionEvent.AXIS_Y);
++        float hx = event.getAxisValue(MotionEvent.AXIS_HAT_X);
++        float hy = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
++        setPadKey("stick", KeyEvent.KEYCODE_DPAD_LEFT, sx < -dead);
++        setPadKey("stick", KeyEvent.KEYCODE_DPAD_RIGHT, sx > dead);
++        setPadKey("stick", KeyEvent.KEYCODE_DPAD_UP, sy < -dead);
++        setPadKey("stick", KeyEvent.KEYCODE_DPAD_DOWN, sy > dead);
++        setPadKey("hat", KeyEvent.KEYCODE_DPAD_LEFT, hx < -dead);
++        setPadKey("hat", KeyEvent.KEYCODE_DPAD_RIGHT, hx > dead);
++        setPadKey("hat", KeyEvent.KEYCODE_DPAD_UP, hy < -dead);
++        setPadKey("hat", KeyEvent.KEYCODE_DPAD_DOWN, hy > dead);
++        float lt = Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE));
++        float rt = Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS));
++        setPadKey("ltrigger", KeyEvent.KEYCODE_D, lt > dead);
++        setPadKey("rtrigger", KeyEvent.KEYCODE_C, rt > dead);
++        return true;
++    }
++
++    /** Holds a keyboard key while any controller input mapped to it is held. */
++    private void setPadKey(String origin, int keyCode, boolean down) {
++        Set<String> origins = padKeySources.get(keyCode);
++        if (origins == null) {
++            origins = new HashSet<>();
++            padKeySources.put(keyCode, origins);
++        }
++        boolean wasDown = !origins.isEmpty();
++        if (down) origins.add(origin); else origins.remove(origin);
++        boolean isDown = !origins.isEmpty();
++        if (isDown != wasDown) sendKey(keyCode, isDown ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP);
++    }
++
++    private void releaseAllPadKeys() {
++        for (Map.Entry<Integer, Set<String>> entry : padKeySources.entrySet()) {
++            if (!entry.getValue().isEmpty()) {
++                entry.getValue().clear();
++                sendKey(entry.getKey(), KeyEvent.ACTION_UP);
++            }
++        }
+     }
+ 
+     // Allegro creates/replaces its SurfaceView asynchronously after onCreate.
+@@ -133,6 +353,7 @@ public final class PlayerActivity extends AllegroActivity {
+         FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
+         topBarParams.setMargins(0, dp(8), dp(8), 0);
+         controls.addView(topBar, topBarParams);
++        topBarView = topBar;
+ 
+         // Gamepad Container
+         FrameLayout gamePadContainer = new FrameLayout(this);
+@@ -183,6 +404,7 @@ public final class PlayerActivity extends AllegroActivity {
+ 
+         controlsOverlay = controls;
+         decor.addView(controlsOverlay, new ViewGroup.LayoutParams(-1, -1));
++        refreshControllerState();
+     }
+ 
+     private GradientDrawable createTopBarBackground() {
+@@ -331,6 +553,7 @@ public final class PlayerActivity extends AllegroActivity {
+     @Override
+     public void onPause() {
+         for (View view : new java.util.ArrayList<>(heldControls.keySet())) releaseControl(view);
++        releaseAllPadKeys();
+         
+         // Release menu key if held
+         if (menuHeld) {
+diff --git a/android/app/src/main/java/org/zquestclassic/android/MainActivity.java b/android/app/src/main/java/org/zquestclassic/android/MainActivity.java
+index e9cea44..0243633 100644
+--- a/android/app/src/main/java/org/zquestclassic/android/MainActivity.java
++++ b/android/app/src/main/java/org/zquestclassic/android/MainActivity.java
+@@ -236,6 +236,9 @@ public final class MainActivity extends Activity {
+         row.setOnClickListener(view -> {
+             importer.execute(() -> {
+                 try {
++                    // Quests can reach app storage without an import (an update,
++                    // a restore, or another installer), so check resources here too.
++                    copyResourcesIfNeeded();
+                     File marker = new File(getFilesDir(), "selected-quest.txt");
+                     try (FileOutputStream output = new FileOutputStream(marker)) {
+                         output.write(questFile.getAbsolutePath().getBytes(StandardCharsets.UTF_8));
