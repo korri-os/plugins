@@ -1,0 +1,92 @@
+name: Publish a dry-run plugin batch
+run-name: "Publish ${{ inputs.tag }} from dry run ${{ inputs.dry_run_id }}"
+
+# Publication ships the signed artifacts that a passed plugin-repository.yml
+# dry run built and tested. It builds nothing and runs no gate again: those
+# bytes already passed every gate, and they are signed with the release key.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run_id:
+        description: "Run ID of the passed plugin-repository.yml dry run to publish"
+        required: true
+        type: string
+      expected_source_sha:
+        description: "Full 40-character SHA that the dry run tested"
+        required: true
+        type: string
+      tag:
+        description: "The dry run's batch tag; must point at expected_source_sha"
+        required: true
+        type: string
+      packages:
+        description: "The dry run's packages input, exactly as dispatched"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Every publication writes shared cache metadata. Never cancel one in flight.
+concurrency:
+  group: plugin-binary-cache
+  cancel-in-progress: false
+
+env:
+  DRY_RUN_ID: ${{ inputs.dry_run_id }}
+  EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+  NAR_TAG: ${{ inputs.tag }}
+  PACKAGES: ${{ inputs.packages }}
+  INDEX_BRANCH: cache-index
+  CACHE_URL: https://korri-os.github.io/plugins/
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: plugin-release
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.expected_source_sha }}
+          fetch-depth: 0
+      # The script refuses any run but the passed dry run of these exact
+      # inputs, and any artifact whose bytes differ from GitHub's recorded
+      # digest. (download-artifact only warns on a digest mismatch.)
+      - name: Check the source and fetch the dry run's artifacts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          python3 .github/workflows/dry-run.py --repo "$GITHUB_REPOSITORY" --run-id "$DRY_RUN_ID" --tag "$NAR_TAG" --source-sha "$EXPECTED_SOURCE_SHA" --packages "$PACKAGES" --output "$RUNNER_TEMP/artifacts"
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.34.1/install
+      - name: Merge again and require the dry run's exact catalog
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          artifacts="$RUNNER_TEMP/artifacts"
+          for system in x86_64-linux aarch64-linux; do
+            test "$(cat "$artifacts/cache-$system/revision.txt")" = "$EXPECTED_SOURCE_SHA"
+          done
+          nix build --out-link cache-tool .#korri-cache
+          ./cache-tool/bin/korri-cache combine --archive-base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$NAR_TAG/" prepared "$artifacts/cache-x86_64-linux" "$artifacts/cache-aarch64-linux"
+          sha256sum "$artifacts/merged-catalog/catalog.json" prepared/repository/catalog.json
+          cmp "$artifacts/merged-catalog/catalog.json" prepared/repository/catalog.json
+      - name: Publish the batch then append cache metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
+          ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --index-branch "$INDEX_BRANCH" --cache-url "$CACHE_URL" --revision "$EXPECTED_SOURCE_SHA"

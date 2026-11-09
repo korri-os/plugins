@@ -1,4 +1,7 @@
-name: Publish plugin repository and Nix cache
+name: Dry run a plugin batch
+# plugin-publish.yml checks this title, which GitHub renders from the inputs,
+# before it publishes this run's artifacts. Change both sides together.
+run-name: "Dry run ${{ inputs.tag }} at ${{ inputs.expected_source_sha }}: ${{ inputs.packages }}"
 
 on:
   workflow_dispatch:
@@ -16,24 +19,17 @@ on:
         description: "Batch tag, not a plugin version; must already point at expected_source_sha"
         required: true
         type: string
-      publish:
-        description: "Publish signed plugin catalog, archives and existing Nix cache"
-        default: false
-        type: boolean
 
+# A dry run writes no release, cache metadata or Pages. plugin-publish.yml
+# publishes its signed artifacts later, so dry runs share no concurrency group
+# with publication and may run beside each other.
 permissions:
   contents: read
-
-# All batches share cache metadata. Never cancel an in-flight publication.
-concurrency:
-  group: plugin-binary-cache
-  cancel-in-progress: false
 
 env:
   EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
   NAR_TAG: ${{ inputs.tag }}
   INDEX_BRANCH: cache-index
-  CACHE_URL: https://korri-os.github.io/plugins/
   PACKAGES: ${{ inputs.packages }}
 
 jobs:
@@ -224,17 +220,15 @@ jobs:
         if: always()
         run: sudo --preserve-env=GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py cleanup
 
-  # Only this non-matrix job may create the batch release. Build jobs prepare
-  # local artifacts without release-write permission; manual drafts are reused.
-  publish:
+  # Merge both architectures into the catalog that plugin-publish.yml ships.
+  # No job in a dry run can write a release.
+  assemble:
     needs: [build, lifecycle]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    environment: plugin-release
     permissions:
-      contents: write
-      actions: write
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -248,7 +242,7 @@ jobs:
         with:
           pattern: cache-*
           path: artifacts
-      - name: Prepare the tool before exposing a write token
+      - name: Merge and check both architectures
         run: |
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
@@ -262,12 +256,3 @@ jobs:
           path: prepared/repository/catalog.json
           if-no-files-found: error
           retention-days: 7
-      - name: Publish the batch then append cache metadata
-        if: inputs.publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
-          test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
-          ./cache-tool/bin/korri-cache publish prepared --repo "$GITHUB_REPOSITORY" --tag "$NAR_TAG" --index-branch "$INDEX_BRANCH" --cache-url "$CACHE_URL" --revision "$EXPECTED_SOURCE_SHA"

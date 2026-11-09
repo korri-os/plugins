@@ -73,7 +73,8 @@ The merged catalog has two locations:
 Dry runs require the existing `NIX_CACHE_SIGNING_KEY` secret too. They prepare
 both signed forms, merge and verify the architecture artifacts, print the catalog
 SHA-256, and retain `merged-catalog` as a workflow artifact. They perform no release
-or Pages writes. Publication repeats these steps at exactly the same source and
+or Pages writes. Publication (`plugin-publish.yml`) builds nothing and runs no
+gate again. It ships the passed dry run's own signed artifacts (#392). It
 uploads all archives and the catalog while the release is still a draft. It then
 publishes the release, updates Pages, and waits for the exact catalog and cache
 metadata bytes to be served. Retries never replace release assets.
@@ -88,12 +89,38 @@ Before building or uploading in any checkout, check the recorded tested SHA:
 test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
 ```
 
-Tag the tested source, dispatch `plugin-repository.yml` from `main` with
-`expected_source_sha`, `tag`, the selected `packages` and `publish=false`, and
-wait for success. Only then dispatch the same inputs with `publish=true`.
-A source change needs a new tag and a new dry run. The workflow accepts only
-`simonwjackson` as both actor and triggering actor and retains the
-`plugin-release` environment's approval gate.
+Tag the tested source, dispatch `plugin-repository.yml` (the dry run) from
+`main` with `expected_source_sha`, `tag` and the selected `packages`, and wait
+for success. Then dispatch `plugin-publish.yml` from `main` with the dry run's
+run ID as `dry_run_id` and the same three inputs, `packages` exactly as
+dispatched. A source change needs a new tag and a new dry run. Both workflows
+accept only `simonwjackson` as both actor and triggering actor. Publication
+retains the `plugin-release` environment's approval gate.
+
+Publication reuses the tested bytes only after `.github/workflows/dry-run.py`
+proves what they are, from GitHub's own run records:
+
+- The run is `plugin-repository.yml`, dispatched on `main` by `simonwjackson`
+  (actor and triggering actor), completed with success in its latest attempt.
+- Every job of that attempt (both builds, `lifecycle`, `assemble`) succeeded.
+  A skipped job would also leave the run successful, so this is checked per job.
+- The run title equals the dry run's `run-name`, which GitHub renders from the
+  dispatch inputs. It names the tag, the full source SHA and the packages.
+- Each artifact (`cache-x86_64-linux`, `cache-aarch64-linux`, `merged-catalog`)
+  exists, has not expired, and its downloaded bytes match the SHA-256 digest
+  GitHub recorded at upload. A mismatch stops publication;
+  `actions/download-artifact` only warns, so the script downloads them itself.
+
+Publication then checks that both `revision.txt` files name the source SHA,
+merges the two architectures again, and requires the merged catalog to equal
+the dry run's `merged-catalog` byte for byte. `korri-cache publish` keeps its
+own revision and tag checks.
+
+Cost: dry-run artifacts expire after seven days. An older dry run cannot be
+published; dispatch a new one. A dry run from before this cut has neither the
+title nor the `assemble` job, so it is refused. The published bytes are the
+bytes the dry run built, signed and checked. Before this cut, publication
+rebuilt them and ran every gate again, about 85 more minutes per batch.
 
 Cost: slim native installation needs `https://cache.nixos.org` for shared
 paths not already present on the device. Self-contained source-only archives
@@ -187,7 +214,7 @@ RetroArch does not run Pyxel or Cemu. Neither signing nor source pinning changes
 
 `plugin-checks.yml` runs **all** `ci.checks` on both architectures for pushes to
 main, pull requests and manual checks. It has no publication environment or
-signing key and is not a dependency of `publish`. Both workflows run one check
+signing key and is not a dependency of publication. Both workflows run one check
 build at a time with `--max-jobs 1`, so unrelated compilations cannot compete
 with window startup or emulated VM boot in that job. Dependency tests inside a
 single derivation can still run in parallel. Architecture failures no longer
@@ -308,9 +335,12 @@ Inputs to `.github/workflows/plugin-repository.yml`:
 - `tag` identifies the build batch. Before publication, this tag must already
   resolve to the workflow's exact source commit. The publisher never creates or
   moves a tag.
-- `cache-index` is the metadata branch. `CACHE_URL` identifies its Pages site.
-- `publish` defaults to false. True explicitly permits NAR release creation,
-  publication and metadata uploads after both builds and the lifecycle gate pass.
+- `expected_source_sha` is the full tested commit; every job checks out exactly it.
+
+Inputs to `.github/workflows/plugin-publish.yml`: `dry_run_id`, plus the dry
+run's `expected_source_sha`, `tag` and `packages`. It is the only workflow that
+creates a release, uploads assets or writes the `cache-index` metadata branch;
+`CACHE_URL` identifies that branch's Pages site.
 
 Build jobs read the signed publisher cache before their test and build commands.
 Lifecycle verification also reads Core's signed cache through `--include-core`.
@@ -557,7 +587,8 @@ remains available independently.
 
 ## Retries and failures
 
-All workflow batches share one concurrency group. Uploads never use `--clobber`
+All publications share one concurrency group. Dry runs write nothing and share
+no group, so a publication never queues behind a dry run. Uploads never use `--clobber`
 or delete assets. A retry skips assets whose reported SHA256 and size match.
 A different file under an existing name stops publication before that upload set
 writes anything. Partial uploads remain available for an identical retry.

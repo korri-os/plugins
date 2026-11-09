@@ -22,6 +22,11 @@ pkgs.runCommand "korri-github-cache-check"
     python3 plugin-repository.test.py
     cp ${./metadata-migration.test.py} metadata-migration.test.py
     python3 metadata-migration.test.py
-    actionlint ${../.github/workflows/plugin-repository.yml} ${../.github/workflows/cache-pages.yml}
+    mkdir -p dry-run/nix dry-run/.github/workflows
+    cp ${./dry-run.test.py} dry-run/nix/dry-run.test.py
+    cp ${../.github/workflows/dry-run.py} dry-run/.github/workflows/dry-run.py
+    cp ${../.github/workflows/plugin-repository.yml} dry-run/.github/workflows/plugin-repository.yml
+    python3 dry-run/nix/dry-run.test.py
+    actionlint ${../.github/workflows/plugin-repository.yml} ${../.github/workflows/plugin-publish.yml} ${../.github/workflows/cache-pages.yml}
     touch "$out"
   ''
