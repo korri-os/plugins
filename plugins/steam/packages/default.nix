@@ -1,6 +1,7 @@
 { pkgs, protonToolName }:
 let
   native = import ./steam-korri { inherit pkgs settings; };
+  steps = import ./session-steps.nix { inherit pkgs; };
   # ARM64 runs Valve's ARM64 client from the package's own FHS, with FEX for
   # the x86 Steam Runtime helpers. nixpkgs has no ARM64 Steam. x86_64 runs
   # nixpkgs' Steam FHS with the same input guard, and needs no FEX.
@@ -57,6 +58,7 @@ let
     text =
       pkgs.lib.replaceStrings
         [
+          "@steps@"
           "@failure@"
           "@steamClient@"
           "@usesFex@"
@@ -67,6 +69,7 @@ let
           "@protonToolName@"
         ]
         [
+          "${steps}"
           "${../session/steam-failure.sh}"
           platform.steamClient
           platform.usesFex

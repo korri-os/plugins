@@ -57,7 +57,7 @@ if "-applaunch" in sys.argv:
             time.sleep(0.1)
             sys.exit(1)
         sys.exit(42)
-    if behavior == "update" and not (home / "update-complete").exists():
+    if behavior in ("update", "all-steps") and not (home / "update-complete").exists():
         sys.exit(70)
     if behavior == "drop-first" and forwards == 1:
         # Steam accepted the IPC but acted on nothing, as before sign-in.
@@ -75,7 +75,7 @@ beta = home / "package/beta"
 (home / "beta-seen").write_text(beta.read_text() if beta.exists() else "missing\n")
 (home / "client-env.json").write_text(json.dumps(
     {name: os.environ.get(name) for name in ("FEX_ROOTFS", "FEX_APP_CONFIG_LOCATION")}))
-if behavior == "update":
+if behavior in ("update", "all-steps"):
     event("Found pending update")
     event("Waiting for compat in post-logon")
     time.sleep(2)
@@ -90,7 +90,7 @@ while not (home / "shutdown").exists():
         sys.exit(42)
     if (home / "launch").exists():
         (home / "launch").unlink()
-        if behavior == "eula":
+        if behavior in ("eula", "all-steps"):
             event("GameAction [AppID 401710, ActionID 1] : LaunchApp waiting for user response to ShowEula \"\"")
             time.sleep(2)
         if behavior != "no-creating-process":

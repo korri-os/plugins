@@ -757,8 +757,11 @@ The #387 follow-up advances the checked-in Core pin to
 isolated `pluginContract` and its generated `surface.ts` import together. Only
 those consumed files enter the shared contract directory; unrelated Core files
 do not invalidate the typechecks. This is a pin and check repair, not publication
-or device acceptance. Steam's ordered native steps and failure-status reporting
-are covered by `korri-steam-declaration` and `korri-steam-source`, respectively.
+or device acceptance. Steam's session step keys and labels
+are now generated from the declaration at build time. `korri-steam-source` runs
+the session against fixture logs and compares its emitted steps with that
+declaration; it also covers failure-status reporting. `korri-steam-declaration`
+typechecks the declaration and its step-data generator.
 
 Proton's declaration alone defines the artifact version. Nix evaluation reads
 its tool name from `plugin.ts` and feeds the string to both Proton and Steam

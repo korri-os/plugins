@@ -20,6 +20,28 @@ def program(path, source):
 
 
 class SteamSessionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.declared_steps = json.loads(subprocess.check_output(
+            ["bun", "-e", ('import { runners } from "./plugin.ts"; '
+             'process.stdout.write(JSON.stringify(runners.steam.steps))')],
+            cwd=HERE.parent, text=True,
+        ))
+        if "STEAM_SESSION_STEPS" in os.environ:
+            cls.steps_file = Path(os.environ["STEAM_SESSION_STEPS"])
+        else:
+            directory = tempfile.TemporaryDirectory()
+            cls.addClassCleanup(directory.cleanup)
+            cls.steps_file = Path(directory.name) / "steps.sh"
+            cls.steps_file.write_text(subprocess.check_output(
+                ["bun", str(HERE.resolve().parent / "packages/session-steps.ts")], text=True,
+            ))
+
+    def test_emits_the_declarations_steps_in_order(self):
+        result, home, _ = self.run_session("all-steps", installed=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_steps(home, [step["key"] for step in self.declared_steps])
+
     def run_session(self, behavior, seeded=True, setup=None, installed=True, shm=None,
                     copy_behavior=None, platform="aarch64-linux", notify_socket=True, short_deadlines=False, notify_exit=0):
         arm = platform == "aarch64-linux"
@@ -86,11 +108,14 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         }.items():
             script = script.replace(f"@{placeholder}@", value)
         script = script.replace("@protonToolName@", TOOL)
+        script = script.replace("@steps@", str(self.steps_file))
         script = script.replace("@failure@", str(HERE.resolve() / "steam-failure.sh"))
         # Exercise timeout branches without adding timing knobs to production.
+        # Keep client readiness independent of process startup time on the host.
         if short_deadlines:
-            for seconds in (600, 180, 3600):
-                script = script.replace(f"SECONDS + {seconds}", "SECONDS + 2")
+            for name, seconds in (("login", 600), ("launch", 180), ("launch", 3600)):
+                script = script.replace(f"{name}_deadline=$((SECONDS + {seconds}))",
+                                        f"{name}_deadline=$((SECONDS + 2))")
         # Never touch the host's real shared memory.
         (root / "shm").mkdir()
         script = script.replace("/dev/shm", str(root / "shm"))
@@ -412,7 +437,8 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         self.assert_refusal(home, "Steam: still waiting for sign-in after 10 minutes")
 
     def test_launch_timeout_reports_update_state_or_last_step(self):
-        for behavior, expected in (("no-launch", "Signing in failed"),
+        label = next(step["label"] for step in self.declared_steps if step["key"] == "sign-in")
+        for behavior, expected in (("no-launch", f"{label} failed"),
                                    ("update-required", "Steam: this game needs an update")):
             with self.subTest(behavior=behavior):
                 result, home, _ = self.run_session(behavior, short_deadlines=True)

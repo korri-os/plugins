@@ -24,9 +24,10 @@ when `NOTIFY_SOCKET` is set. Steps only move forward; unused steps are skipped.
 An AppID forward is only a request, not proof that the game is starting:
 Steam can still ask for installation or a EULA. Retries and client restarts
 do not repeat earlier steps. The game unit must allow `NotifyAccess=all`.
-korrid ends these steps at the initial game handoff. The declaration build check
-compares the native session's ordered keys and labels with the runner declaration.
-A change to only one side fails the package's publication gate.
+korrid ends these steps at the initial game handoff. The package generates the session's
+ordered keys and labels from `runners.steam.steps`. The subprocess tests drive a
+full launch through fixture logs and compare its emitted statuses with that
+declaration. No hand-kept native step list or label list remains.
 
 ## Launch refusals
 

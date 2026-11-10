@@ -56,10 +56,9 @@ resends=0
 package_dir="$STEAM_HOME/package"
 client_manifest="$package_dir/steam_client_${STEAM_BETA}_linuxarm64.manifest"
 saved_manifest="$STEAM_HOME/.korri/steam_client_${STEAM_BETA}_linuxarm64.manifest"
-# The declaration check compares these native steps (including labels) with
-# runners.steam.steps. Neither side can change independently.
-launch_steps=(start-steam update sign-in install answer game)
-launch_step_labels=("Starting Steam" "Updating Steam" "Signing in" "Installing the game" "Waiting for your answer in Steam" "Starting the game")
+# The package generates both arrays from the runner declaration.
+# shellcheck source=/dev/null
+source @steps@
 step_index=-1
 # The source module is checked separately, before substitution.
 # shellcheck source=/dev/null
@@ -105,6 +104,8 @@ report_failure() {
 
 reach_step() {
   local index
+  # The generated steps module assigns this array.
+  # shellcheck disable=SC2154
   for index in "${!launch_steps[@]}"; do
     if [[ "${launch_steps[$index]}" == "$1" ]] && (( index > step_index )); then
       step_index=$index
