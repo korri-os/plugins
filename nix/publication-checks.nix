@@ -133,6 +133,11 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
   korri-cache = [ "korri-github-cache" ];
   korri-plugin-churn-check = [ ];
   korri-plugin-host = [ "korri-runtime-plugin-host" ];
+  # No reviewed gate exists yet for this declaration-only Android package
+  # (5871af7). It has no plugin.test.ts or fixtures for the acquisition
+  # check. Publishing it runs no package gate until one is added;
+  # korri-os/korri#407 tracks that. Listed so every other batch can run.
+  korri-plugin-android-app = [ ];
 }
 // lib.genAttrs (map (name: "korri-plugin-${name}") [
   "pico8"
