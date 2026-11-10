@@ -1,0 +1,10 @@
+StorePath: /nix/store/zwck8p6gis60l3pach2sj4g84xpfxxrz-steam-failure.sh
+URL: https://github.com/korri-os/plugins/releases/download/build-9d86839635c3-steam-reason/0a6a08kfsc7p8wz4r4s356pr86x4ws6lakqqjs9wkz9m7xm3bxzr.nar.xz
+Compression: xz
+FileHash: sha256:0a6a08kfsc7p8wz4r4s356pr86x4ws6lakqqjs9wkz9m7xm3bxzr
+FileSize: 1012
+NarHash: sha256:1q8f1nb307597fgf7fwl8xsi18wfmqsaiqqhjaf7sf38j1jikwws
+NarSize: 2432
+References: 
+Sig: korri-plugins-1:gXu7dIiq86E1hEjGGk1lt/GbJ23PL0TbbRPatViw0HvIol094r6KqzHHbW/iyQcYxvztpZYd/YLFpnOz3hAHDg==
+CA: fixed:r:sha256:1q8f1nb307597fgf7fwl8xsi18wfmqsaiqqhjaf7sf38j1jikwws
