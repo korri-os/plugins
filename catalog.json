@@ -1,27 +1,27 @@
 {
   "latest": {
-    "@korri:steam": "build-97c28031b06c-steam-launch-steps"
+    "@korri:steam": "build-43f53ab4b7ea-release-speed"
   },
   "records": [
     {
       "archive_sha256": "f48a5a2effa820c74b5b3db8ab516d5c22fa39b94a624f2ce366452a5ada7f12",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-97c28031b06c-steam-launch-steps/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-97c28031b06c-steam-launch-steps-aarch64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-43f53ab4b7ea-release-speed/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-43f53ab4b7ea-release-speed-aarch64-linux.tar",
       "description": "Runs Steam content through the native session program.",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-97c28031b06c-steam-launch-steps",
+      "release_version": "build-43f53ab4b7ea-release-speed",
       "store_path": "/nix/store/qbzvhbs8nplsd2n9xq23hrv1qxw8c8b3-korri-plugin",
       "title": "Steam"
     },
     {
       "archive_sha256": "b718c02f50c2f8ef2686146d4b1f14ff04b6ec225fb1eaf45708a8c22f67828d",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-97c28031b06c-steam-launch-steps/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-97c28031b06c-steam-launch-steps-x86_64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-43f53ab4b7ea-release-speed/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-43f53ab4b7ea-release-speed-x86_64-linux.tar",
       "description": "Runs Steam content through the native session program.",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-97c28031b06c-steam-launch-steps",
+      "release_version": "build-43f53ab4b7ea-release-speed",
       "store_path": "/nix/store/vba6bi5zxp306jh8vhiz9658m76acvr1-korri-plugin",
       "title": "Steam"
     }
