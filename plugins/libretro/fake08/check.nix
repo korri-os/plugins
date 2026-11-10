@@ -6,10 +6,6 @@
 }:
 let
   saveStateCheck = import ./save-state-check.nix { inherit pkgs core; };
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
 in
 pkgs.runCommand "korri-fake08-package-check"
   {
@@ -26,7 +22,7 @@ pkgs.runCommand "korri-fake08-package-check"
     mkdir -p work/plugins/libretro work/contracts/generated
     cp ${package}/*.ts work/plugins/libretro/
     cmp ${package.source}/retroarch.ts ${package}/retroarch.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     tsc --strict --noEmit --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler work/plugins/libretro/*.ts
     bun ${./plugin-check.ts} ${package}

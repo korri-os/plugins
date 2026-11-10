@@ -57,6 +57,7 @@ let
     text =
       pkgs.lib.replaceStrings
         [
+          "@failure@"
           "@steamClient@"
           "@usesFex@"
           "@steamBeta@"
@@ -66,6 +67,7 @@ let
           "@protonToolName@"
         ]
         [
+          "${../session/steam-failure.sh}"
           platform.steamClient
           platform.usesFex
           platform.steamBeta

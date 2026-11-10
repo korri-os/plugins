@@ -7,10 +7,6 @@
 let
   selected = pkgs.lib.getAttrs [ "tic80" "wasm4" "lowresnx" "pzretro" ] packages;
   packageList = pkgs.writeText "native-runner-packages.json" (builtins.toJSON selected);
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
 in
 pkgs.runCommand "korri-native-fantasy-runners-check"
   {
@@ -25,7 +21,7 @@ pkgs.runCommand "korri-native-fantasy-runners-check"
   ''
     export HOME="$TMPDIR/home"
     mkdir -p "$HOME" fixtures work/plugins/libretro work/contracts/generated
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     ${pkgs.lib.concatStringsSep "\n" (
       pkgs.lib.mapAttrsToList (name: package: ''
         mkdir -p work/plugins/${name}

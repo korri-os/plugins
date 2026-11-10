@@ -24,7 +24,31 @@ when `NOTIFY_SOCKET` is set. Steps only move forward; unused steps are skipped.
 An AppID forward is only a request, not proof that the game is starting:
 Steam can still ask for installation or a EULA. Retries and client restarts
 do not repeat earlier steps. The game unit must allow `NotifyAccess=all`.
-korrid ends these steps at the initial game handoff.
+korrid ends these steps at the initial game handoff. The declaration build check
+compares the native session's ordered keys and labels with the runner declaration.
+A change to only one side fails the package's publication gate.
+
+## Launch refusals
+
+Before a failed launch exits, the session sends `STATUS=plugin-launch: <reason>`
+through the same notification socket. korrid uses this existing status as the
+refusal on each client; there is no new treaty field.
+
+The session reads only bytes written during this session in `console_log.txt`,
+`content_log.txt` and `gameprocess_log.txt` below `STEAM_HOME/logs`. It accepts
+only lines for the selected AppID. Known Steam launch and download errors become
+short fixed messages: ownership, platform availability, missing executable,
+disk space/read/write errors, corrupt downloads and connection failures. An
+`Update Required` app state explains a timed-out launch but does not stop a
+working download. Suspended updates and helper process exit codes are not
+launch errors. A `LaunchApp failed` event ends the wait immediately.
+
+The status never copies raw log text, paths or account IDs. Unknown launch errors
+use a generic Steam launch-error message. With no recognized Steam diagnostic,
+it reports the last launch step's label plus “failed”. Client exit and the
+10-minute sign-in timeout have their own plain messages. Notification failure
+does not change the exit code or skip Steam cleanup. Unknown Steam wording can
+therefore lose detail; it cannot expose arbitrary log content.
 
 ## Runtime
 

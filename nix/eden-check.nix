@@ -18,10 +18,6 @@ let
       patches = upstream.patches or [ ];
     }
   );
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
 in
 assert unpatched;
 pkgs.runCommand "korri-eden-package-check"
@@ -48,7 +44,7 @@ pkgs.runCommand "korri-eden-package-check"
     cp ${../plugins/eden/p1_controls.py} work/plugins/eden/p1_controls.py
     cp ${../plugins/eden/p1_controls_test.py} work/plugins/eden/p1_controls_test.py
     cp ${../plugins/eden/p1-controls.ini} work/plugins/eden/p1-controls.ini
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     mkdir -p "$out"
     cp ${buildFlags} "$out/build-flags.json"
     # The innermost Qt frontend is the real ELF, not either Nix wrapper.

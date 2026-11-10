@@ -3,12 +3,12 @@ import json
 import os
 import shutil
 import signal
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 HERE = Path(__file__).parent
 TOOL = "proton-cachyos-11.0-20260601-slr-arm64"
@@ -21,7 +21,7 @@ def program(path, source):
 
 class SteamSessionTests(unittest.TestCase):
     def run_session(self, behavior, seeded=True, setup=None, installed=True, shm=None,
-                    copy_behavior=None, platform="aarch64-linux", notify_socket=True):
+                    copy_behavior=None, platform="aarch64-linux", notify_socket=True, short_deadlines=False, notify_exit=0):
         arm = platform == "aarch64-linux"
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -46,6 +46,7 @@ from pathlib import Path
 import sys
 with (Path(os.environ["STEAM_HOME"]) / "statuses").open("a") as stream:
     stream.write(sys.argv[1] + "\\n")
+sys.exit(int(os.environ["NOTIFY_EXIT"]))
 """)
         if copy_behavior:
             # Exercise the real cp after a controlled filesystem mutation at
@@ -85,6 +86,11 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         }.items():
             script = script.replace(f"@{placeholder}@", value)
         script = script.replace("@protonToolName@", TOOL)
+        script = script.replace("@failure@", str(HERE.resolve() / "steam-failure.sh"))
+        # Exercise timeout branches without adding timing knobs to production.
+        if short_deadlines:
+            for seconds in (600, 180, 3600):
+                script = script.replace(f"SECONDS + {seconds}", "SECONDS + 2")
         # Never touch the host's real shared memory.
         (root / "shm").mkdir()
         script = script.replace("/dev/shm", str(root / "shm"))
@@ -94,12 +100,13 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         path.write_text(script)
         started = time.monotonic()
         result = subprocess.run(
-            ["bash", str(path), "401710"], timeout=60, capture_output=True, text=True,
+            ["bash", str(path), "401710"], check=False, timeout=60, capture_output=True, text=True,
             env={
                 **os.environ, "STEAM_HOME": str(home), "HOME": str(root), "CLIENT_BEHAVIOR": behavior,
                 "PATH": str(root / "bin") + os.pathsep + os.environ["PATH"],
                 "KORRI_PROTON_CACHYOS": str(self.proton),
                 "NOTIFY_SOCKET": str(root / "notify") if notify_socket else "",
+                "NOTIFY_EXIT": str(notify_exit),
                 **({"KORRI_FEX_CONFIG": str(root / "fex-config"),
                     "KORRI_FEX_ROOTFS": str(self.rootfs)} if arm else {}),
             },
@@ -316,6 +323,7 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
             "CLIENT_BEHAVIOR": "leftover-hold",
             "PATH": str(self.root / "bin") + os.pathsep + os.environ["PATH"],
             "NOTIFY_SOCKET": str(self.root / "notify"),
+            "NOTIFY_EXIT": "0",
             "KORRI_FEX_CONFIG": str(self.root / "fex-config"),
             "KORRI_FEX_ROOTFS": str(self.rootfs),
             "KORRI_PROTON_CACHYOS": str(self.proton),
@@ -352,6 +360,74 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         self.assertEqual(result.returncode, 0, result.stderr)
         for directory in (home, home / "steamapps", home / "steamapps/common"):
             self.assertFalse(directory.stat().st_mode & 0o2000, directory)
+
+    def assert_refusal(self, home, reason):
+        statuses = (home / "statuses").read_text().splitlines()
+        self.assertEqual(statuses[-1], f"--status=plugin-launch: {reason}")
+        self.assertLessEqual(len(reason), 160)
+
+    def test_launch_error_reports_steam_reason_before_cleanup(self):
+        result, home, _ = self.run_session("launch-error")
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assert_refusal(home, "Steam: this game is not owned by the signed-in account")
+        self.assertTrue((home / "shutdown").exists())
+
+    def test_content_and_process_logs_report_current_app_only(self):
+        for behavior, expected in (
+            ("content-error", "Steam: the game update failed because Steam could not write to disk"),
+            ("process-error", "Steam: the game executable is missing"),
+            ("other-app-error", "Signing in failed"),
+        ):
+            with self.subTest(behavior=behavior):
+                result, home, _ = self.run_session(behavior)
+                self.assertEqual(result.returncode, 126, result.stderr)
+                self.assert_refusal(home, expected)
+
+    def test_old_errors_are_ignored_and_truncated_logs_are_read(self):
+        def old_errors(home):
+            (home / "logs").mkdir()
+            for log in ("console_log.txt", "content_log.txt", "gameprocess_log.txt"):
+                (home / "logs" / log).write_text(
+                    'GameAction [AppID 401710, ActionID 1] : LaunchApp failed with error "No subscription"\n' * 10)
+
+        result, home, _ = self.run_session("forward-error", setup=old_errors)
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assert_refusal(home, "Signing in failed")
+        for behavior in ("truncated-error", "replaced-error"):
+            with self.subTest(behavior=behavior):
+                result, home, _ = self.run_session(behavior, setup=old_errors)
+                self.assertEqual(result.returncode, 126, result.stderr)
+                self.assert_refusal(home, "Steam: the game update failed because Steam could not write to disk")
+
+    def test_client_exit_and_login_timeout_have_plain_refusals(self):
+        result, home, _ = self.run_session("client-exit")
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assert_refusal(home, "Steam: the Steam client exited")
+
+        def signed_out(home):
+            shutil.rmtree(home / "userdata")
+
+        result, home, _ = self.run_session("game", setup=signed_out, short_deadlines=True)
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assert_refusal(home, "Steam: still waiting for sign-in after 10 minutes")
+
+    def test_launch_timeout_reports_update_state_or_last_step(self):
+        for behavior, expected in (("no-launch", "Signing in failed"),
+                                   ("update-required", "Steam: this game needs an update")):
+            with self.subTest(behavior=behavior):
+                result, home, _ = self.run_session(behavior, short_deadlines=True)
+                self.assertEqual(result.returncode, 124, result.stderr)
+                self.assert_refusal(home, expected)
+                self.assertTrue((home / "shutdown").exists())
+
+    def test_notify_failure_does_not_mask_the_failure_or_skip_cleanup(self):
+        result, home, _ = self.run_session("launch-error", notify_exit=1)
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assert_refusal(home, "Steam: this game is not owned by the signed-in account")
+        self.assertTrue((home / "shutdown").exists())
+        result, home, _ = self.run_session("launch-error", notify_socket=False)
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertFalse((home / "statuses").exists())
 
     def test_forward_failure_is_classified_and_stops_steam(self):
         result, home, _ = self.run_session("forward-error")

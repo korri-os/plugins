@@ -11,12 +11,6 @@
   hostPackage,
 }:
 let
-  # A store-root string retains the whole Korri checkout as an input. Copy
-  # only the consumed contract so unrelated core files cannot invalidate tsc.
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
   pluginDir = ../plugins + "/${name}";
   tests = pkgs.lib.fileset.toSource {
     root = pluginDir;
@@ -50,7 +44,7 @@ pkgs.runCommand "korri-${name}-plugin-check"
     mkdir -p work/plugins/${name} work/contracts/generated
     cp ${package}/plugin.ts work/plugins/${name}/plugin.ts
     cp -R --no-preserve=mode ${tests}/. work/plugins/${name}/
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cd work
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler plugins/${name}/plugin.ts

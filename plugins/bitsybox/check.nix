@@ -6,10 +6,6 @@
   korridPackage,
 }:
 let
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
   recordArguments = pkgs.writeShellScript "record-bitsybox-launch" ''
     printf '%s\0' "$@" "$PWD"
   '';
@@ -33,7 +29,7 @@ pkgs.runCommand "korri-bitsybox-plugin-check"
     startProbe="$PWD/start-button-probe.so"
     mkdir -p work/plugins/bitsybox work/contracts/generated
     cp ${package}/plugin.ts work/plugins/bitsybox/plugin.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cp ${./launch.test.ts} work/plugins/bitsybox/launch.test.ts
     cd work
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \

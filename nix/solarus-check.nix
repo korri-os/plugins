@@ -7,10 +7,6 @@
   korridPackage,
 }:
 let
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
   recordArguments = pkgs.writeShellScript "record-solarus-launch" ''
     printf '%s\0' "$@" "$HOME" "$PWD"
   '';
@@ -29,7 +25,7 @@ pkgs.runCommand "korri-solarus-plugin-check"
   ''
     mkdir -p work/plugins/solarus work/contracts/generated work/nix
     cp ${package}/plugin.ts work/plugins/solarus/plugin.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cp ${./solarus-check.ts} work/nix/solarus-check.ts
     cd work
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \

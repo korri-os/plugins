@@ -4,10 +4,6 @@
   contract,
 }:
 let
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
   probe = import ./probe.nix { inherit pkgs; };
 in
 pkgs.runCommand "korri-pyxel-native-check"
@@ -28,7 +24,7 @@ pkgs.runCommand "korri-pyxel-native-check"
     export KORRI_NATIVE_PROOF_DIR="$TMPDIR/native-proof"
     mkdir -p "$HOME" work/plugins/pyxel work/contracts/generated
     cp ${package}/plugin.ts work/plugins/pyxel/
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler work/plugins/pyxel/plugin.ts
     cp ${./launch.test.ts} work/plugins/pyxel/launch.test.ts

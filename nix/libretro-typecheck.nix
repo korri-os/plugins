@@ -7,12 +7,6 @@
   catalogue,
 }:
 let
-  # A store-root string retains the whole Korri checkout as an input. Copy
-  # only the consumed contract so unrelated core files cannot invalidate tsc.
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
   # Keep nixpkgs' target restrictions. x86_64 checks every core; other targets
   # must not force unsupported native packages merely to check declarations.
   checkedCatalogue = pkgs.lib.filterAttrs (
@@ -54,7 +48,7 @@ pkgs.runCommand "korri-libretro-helper-typecheck"
     cp ${../plugins/retroarch/policy.ts} work/plugins/libretro/policy.ts
     cp ${../plugins/retroarch/render-settings.ts} work/plugins/libretro/render-settings.ts
     cp ${settings}/settings.ts work/plugins/libretro/settings.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cp ${tsconfig} work/tsconfig.json
     cd work
     tsc --project tsconfig.json

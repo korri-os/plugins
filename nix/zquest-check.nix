@@ -9,10 +9,6 @@
 let
   fixtures = import ./zquest-fixtures.nix { inherit pkgs engine; };
   publicFixture = import ./zquest-public-fixture.nix { inherit pkgs; };
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
   recordArguments = pkgs.writeShellScript "record-zquest-arguments" ''
     printf '%s\0' "$@"
   '';
@@ -56,7 +52,7 @@ pkgs.runCommand "korri-zquest-classic-plugin-check"
     export XDG_CACHE_HOME="$HOME/.cache"
     mkdir -p "$XDG_CACHE_HOME" work/plugins/zquest-classic work/contracts/generated work/nix
     cp ${package}/plugin.ts work/plugins/zquest-classic/plugin.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cp ${./zquest-check.ts} work/nix/zquest-check.ts
     cp ${tsconfig} work/tsconfig.json
     cd work

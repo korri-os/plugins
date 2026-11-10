@@ -31,6 +31,11 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           overlays = [ (_: _: { sunshine = canonicalPkgs.sunshine; }) ];
         };
     pkgs = packageSet nixpkgs;
+    pluginContract = import ./plugin-contract.nix {
+      inherit pkgs;
+      contract = korri.lib.${system}.pluginContract;
+      surface = korri + "/contracts/generated/surface.ts";
+    };
     mkPlugin = korri.lib.${system}.mkPlugin { inherit pkgs; };
     # Temporary split (see flake.nix): every Cemu output builds from the held
     # nixpkgs revision.
@@ -162,7 +167,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           name
           hosts
           ;
-        contract = korri.lib.${system}.pluginContract;
+        contract = pluginContract;
         hostPackage = korri.packages.${system}.korri-plugin-host;
       };
     cemuTurnip = import ../plugins/cemu/turnip.nix { pkgs = heldPkgs; };
@@ -389,7 +394,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-eden-package = import ./eden-check.nix {
           inherit pkgs edenPackage;
           package = edenPlugin;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-eden-admission = import ./eden-admission.nix {
           inherit pkgs;
@@ -401,12 +406,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-native-fantasy-runners = import ../plugins/libretro/native-check/check.nix {
           inherit pkgs;
           packages = fantasyCorePackages;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-pyxel-native = import ../plugins/pyxel/check.nix {
           inherit pkgs;
           package = pyxel.plugin;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-fantasy-runner-admission = import ./fantasy-runner-admission.nix {
           inherit pkgs;
@@ -459,7 +464,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           inherit pkgs;
           package = libretro.packages.korri-plugin-fake08;
           core = libretro.catalogue.fake08.core;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-melonds-admission = import ../plugins/libretro/melonds-admission.nix {
           coreSource = korri;
@@ -495,7 +500,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         };
         korri-steam-declaration = import ../plugins/steam/packages/declaration-check.nix {
           inherit pkgs;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-steam-source = import ../plugins/steam/packages/check.nix { inherit pkgs; };
         korri-pico8-plugin = acquisitionCheck "pico8" pico8Plugin [ "www.lexaloffle.com" ];
@@ -522,13 +527,13 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-gamescope-plugin = import ./gamescope-check.nix {
           inherit pkgs gamescopePackage;
           package = gamescopePlugin;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-cemu-package = import ./cemu-check.nix {
           inherit cemuPackage;
           pkgs = heldPkgs;
           package = cemuPlugin;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-cemu-admission = import ./cemu-admission.nix {
           pkgs = heldPkgs;
@@ -539,14 +544,14 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-bitsybox-plugin = import ../plugins/bitsybox/check.nix {
           inherit pkgs;
           package = bitsyboxPlugin;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
           hostPackage = korri.packages.${system}.korri-plugin-host;
           korridPackage = korri.packages.${system}.korrid;
         };
         korri-solarus-plugin = import ./solarus-check.nix {
           inherit pkgs solarusPackage;
           package = solarusPlugin;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
           hostPackage = korri.packages.${system}.korri-plugin-host;
           korridPackage = korri.packages.${system}.korrid;
         };
@@ -558,7 +563,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           inherit pkgs;
           package = zquestPlugin;
           engine = zquestEngine;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
           hostPackage = korri.packages.${system}.korri-plugin-host;
           korridPackage = korri.packages.${system}.korrid;
         };
@@ -582,7 +587,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-libretro-netplay = import ../plugins/libretro/netplay-check.nix {
           inherit pkgs;
           plugins = libretro.packages;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
         korri-libretro-example = import ../plugins/libretro/example-check.nix {
           inherit pkgs mkPlugin;
@@ -596,7 +601,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           plugins = libretro.packages;
           helper = ../plugins/libretro/retroarch.ts;
           settings = retroarchDefinition.packages.retroarch-settings;
-          contract = korri.lib.${system}.pluginContract;
+          contract = pluginContract;
         };
       };
   }

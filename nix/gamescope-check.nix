@@ -5,10 +5,6 @@
   contract,
 }:
 let
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
   # The option table as built: upstream source plus every package patch.
   patchedSource = pkgs.applyPatches {
     name = "gamescope-${gamescopePackage.version}-patched-source";
@@ -41,7 +37,7 @@ pkgs.runCommand "korri-gamescope-plugin-check"
     mkdir -p work/plugins/gamescope work/contracts/generated
     cp ${package}/*.ts work/plugins/gamescope/
     cp ${../plugins/gamescope/compose.test.ts} work/plugins/gamescope/compose.test.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cd work
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler plugins/gamescope/plugin.ts

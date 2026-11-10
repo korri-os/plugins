@@ -9,9 +9,11 @@ pkgs.runCommand "steam-runtime-declarations-check"
   }
   ''
     mkdir -p work/plugins/{steam,fex,proton} work/contracts/generated
-    cp ${contract} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cp ${../plugin.ts} work/plugins/steam/plugin.ts
     cp ${../plugin.test.ts} work/plugins/steam/plugin.test.ts
+    mkdir -p work/plugins/steam/session
+    cp ${../session/steam-session.sh} work/plugins/steam/session/steam-session.sh
     cp ${../../fex/plugin.ts} work/plugins/fex/plugin.ts
     cp ${../../proton/plugin.ts} work/plugins/proton/plugin.ts
     cd work

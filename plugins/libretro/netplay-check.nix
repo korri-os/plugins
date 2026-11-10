@@ -8,10 +8,6 @@
 let
   snes = plugins.korri-plugin-snes9x2010;
   other = plugins.korri-plugin-fake08;
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
 in
 pkgs.runCommand "korri-libretro-netplay-check"
   {
@@ -36,7 +32,7 @@ pkgs.runCommand "korri-libretro-netplay-check"
     cp ${snes}/*.ts work/plugins/libretro/
     mv work/plugins/libretro/plugin.ts work/plugins/libretro/snes9x2010.ts
     cp ${other}/plugin.ts work/plugins/libretro/fake08.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cd work
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler plugins/libretro/*.ts

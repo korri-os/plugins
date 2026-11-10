@@ -13,7 +13,7 @@ Each batch publishes two independent forms from the same tested source:
   metadata, path lists and offline proofs unchanged for current devices and
   rollback. No cache record or old release is removed.
 
-Core at `14de9e3e5aa17e967b0747cba3e407c886438d83` supplies slim publication,
+Core at `f3aafc91f2e5d5ef485c4329e83df84764574883` supplies slim publication,
 the catalog schema, content-address conversion and in-archive signatures
 (ADRs 0042–0049). Nix owns
 signatures and verifies downloaded contents. Catalogs contain per-record
@@ -737,7 +737,7 @@ Refresh those snapshots from the committed producer, never from a working tree.
 The acquisition port is grounded in Core base
 `129e4381154622579e38819852ee935195ab8161` (ADR 0012). The tool-name check also
 needs Core's `korri-publish declaration` command. The committed Core input is now
-`github:korri-os/korri/14de9e3e5aa17e967b0747cba3e407c886438d83`,
+`github:korri-os/korri/f3aafc91f2e5d5ef485c4329e83df84764574883`,
 which provides that command, the current launch contract and netplay runner
 declarations. Run the checks against
 the checked-in lock, without an input override:
@@ -751,6 +751,14 @@ nix build --no-link \
 
 Publication still needs both architectures to pass again at the exact
 publication source, and separate approval.
+
+The #387 follow-up advances the checked-in Core pin to
+`f3aafc91f2e5d5ef485c4329e83df84764574883`. Publisher typechecks copy Core's
+isolated `pluginContract` and its generated `surface.ts` import together. Only
+those consumed files enter the shared contract directory; unrelated Core files
+do not invalidate the typechecks. This is a pin and check repair, not publication
+or device acceptance. Steam's ordered native steps and failure-status reporting
+are covered by `korri-steam-declaration` and `korri-steam-source`, respectively.
 
 Proton's declaration alone defines the artifact version. Nix evaluation reads
 its tool name from `plugin.ts` and feeds the string to both Proton and Steam

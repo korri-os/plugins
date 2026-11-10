@@ -26,9 +26,9 @@ pkgs.runCommand "steam-session-check"
     cp -r ${./steam-korri/scripts} packages/steam-korri/scripts
     chmod -R u+w session
     python3 -m unittest discover -s session -p 'test_*.py'
-    for script in ${../session/steam-session.sh} ${./steam-korri/scripts}/*; do
+    for script in ${../session}/*.sh ${./steam-korri/scripts}/*; do
       bash -n "$script"
-      shellcheck -s bash "$script"
+      shellcheck -s bash -x "$script"
     done
     $CC -Wall -Wextra -Werror ${./steam-korri/tests/guard-ioctl.c} -o ioctl-probe
     LD_PRELOAD=:${guard}/lib/libkorri-steam-input-guard.so \

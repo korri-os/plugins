@@ -1,10 +1,10 @@
 """A subprocess fixture implementing client IPC and lifecycle log events."""
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 home = Path(os.environ["STEAM_HOME"])
 log = home / "logs/console_log.txt"
@@ -23,6 +23,25 @@ if "-applaunch" in sys.argv:
     count = home / "forwards"
     forwards = int(count.read_text()) + 1 if count.exists() else 1
     count.write_text(str(forwards))
+    if behavior == "launch-error":
+        event('GameAction [AppID 401710, ActionID 1] : LaunchApp failed with error "No subscription"')
+        sys.exit(0)
+    if behavior in ("content-error", "other-app-error", "process-error", "truncated-error", "replaced-error"):
+        app = "4017100" if behavior == "other-app-error" else "401710"
+        path = home / "logs" / ("gameprocess_log.txt" if behavior == "process-error" else "content_log.txt")
+        message = 'LaunchApp failed with error "Missing executable /private/123456789/game"' if behavior == "process-error" else 'update canceled : Disk write failure'
+        if behavior == "replaced-error":
+            path.rename(path.with_suffix(".previous"))
+        with path.open("w" if behavior == "truncated-error" else "a") as stream:
+            if behavior == "replaced-error":
+                stream.write("unscoped padding\n" * 100)
+            stream.write(f"AppID {app} {message}\n")
+        sys.exit(1)
+    if behavior in ("no-launch", "update-required"):
+        if behavior == "update-required":
+            with (home / "logs/content_log.txt").open("a") as stream:
+                stream.write("AppID 401710 state changed : Update Required,Update Queued,\n")
+        sys.exit(0)
     if behavior == "forward-error":
         sys.exit(1)
     if behavior in ("forward-restart", "forward-client-restart", "forward-restart-always") and (
@@ -62,6 +81,8 @@ if behavior == "update":
     time.sleep(2)
     (home / "update-complete").touch()
     event("Update complete, launching Steam...")
+if behavior == "client-exit":
+    sys.exit(7)
 event("Waiting for compat in post-logon")
 while not (home / "shutdown").exists():
     if (home / "restart").exists():
@@ -90,7 +111,7 @@ while not (home / "shutdown").exists():
             manifest.unlink()
         game = subprocess.Popen(
             [sys.executable, "-c",
-             "import time; time.sleep(%d)" % (60 if behavior == "leftover-hold" else 2)],
+             f"import time; time.sleep({60 if behavior == 'leftover-hold' else 2})"],
             env={**os.environ, "SteamAppId": "401710"},
         )
         event("Game process added : AppID 401710")

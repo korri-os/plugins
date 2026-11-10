@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
 import { discovery, handlers, runners } from "./plugin"
 
 const manifest = (fields = "") =>
@@ -26,15 +27,13 @@ const launchInput = () => ({
 })
 
 describe("Steam launch declaration", () => {
-  test("declares the ordered Steam launch steps", () => {
-    expect(runners.steam.steps).toEqual([
-      { key: "start-steam", label: "Starting Steam" },
-      { key: "update", label: "Updating Steam" },
-      { key: "sign-in", label: "Signing in" },
-      { key: "install", label: "Installing the game" },
-      { key: "answer", label: "Waiting for your answer in Steam" },
-      { key: "game", label: "Starting the game" },
-    ])
+  test("keeps the declaration equal to the native session's ordered steps and labels", () => {
+    const session = readFileSync(new URL("./session/steam-session.sh", import.meta.url), "utf8")
+    const keys = session.match(/^launch_steps=\(([^)]*)\)$/m)![1].split(/\s+/)
+    const labels = [...session.match(/^launch_step_labels=\(([^)]*)\)$/m)![1].matchAll(/"([^"]*)"/g)]
+      .map(match => match[1])
+    expect(keys.length).toBe(labels.length)
+    expect(runners.steam.steps).toEqual(keys.map((key, index) => ({ key, label: labels[index] })))
   })
 
   test("lists the FEX rootfs and Proton-CachyOS artifacts korrid must ready first", () => {

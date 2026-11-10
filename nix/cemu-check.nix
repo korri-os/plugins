@@ -4,12 +4,6 @@
   cemuPackage,
   contract,
 }:
-let
-  contractSource = builtins.path {
-    path = contract;
-    name = "korrid.ts";
-  };
-in
 pkgs.runCommand "korri-cemu-package-check"
   {
     nativeBuildInputs = with pkgs; [
@@ -26,7 +20,7 @@ pkgs.runCommand "korri-cemu-package-check"
     mkdir -p work/plugins/cemu work/contracts/generated
     cp ${package}/plugin.ts work/plugins/cemu/plugin.ts
     cp ${../plugins/cemu/plugin.test.ts} work/plugins/cemu/plugin.test.ts
-    cp ${contractSource} work/contracts/generated/korrid.ts
+    cp -r ${contract}/. work/contracts/generated/
     cd work
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler plugins/cemu/plugin.ts

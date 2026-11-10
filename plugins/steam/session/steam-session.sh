@@ -10,7 +10,15 @@ set -Eeuo pipefail
 umask 077
 
 say() { printf 'steam-session: %s\n' "$*" >&2; }
-fail() { say "$2"; exit "$1"; }
+fail() {
+  # Reporting is best-effort; neither notify nor a missing log may mask the
+  # original failure or prevent the EXIT cleanup.
+  trap - ERR
+  set +e
+  say "$2"
+  report_failure "${3:-}"
+  exit "$1"
+}
 trap 'fail 126 "Steam failed: session error at line $LINENO (status $?)"' ERR
 
 appid="$1"
@@ -48,8 +56,52 @@ resends=0
 package_dir="$STEAM_HOME/package"
 client_manifest="$package_dir/steam_client_${STEAM_BETA}_linuxarm64.manifest"
 saved_manifest="$STEAM_HOME/.korri/steam_client_${STEAM_BETA}_linuxarm64.manifest"
+# The declaration check compares these native steps (including labels) with
+# runners.steam.steps. Neither side can change independently.
 launch_steps=(start-steam update sign-in install answer game)
+launch_step_labels=("Starting Steam" "Updating Steam" "Signing in" "Installing the game" "Waiting for your answer in Steam" "Starting the game")
 step_index=-1
+# The source module is checked separately, before substitution.
+# shellcheck source=/dev/null
+source @failure@
+failure_logs=("$console_log" "$STEAM_HOME/logs/content_log.txt" "$STEAM_HOME/logs/gameprocess_log.txt")
+failure_marks=(0 0 0)
+failure_inodes=("" "" "")
+failure_logs_marked=0
+
+mark_failure_logs() {
+  local index
+  for index in "${!failure_logs[@]}"; do
+    if [[ -f "${failure_logs[$index]}" ]]; then
+      failure_marks[index]=$(stat -c %s "${failure_logs[$index]}")
+      failure_inodes[index]=$(stat -c '%d:%i' "${failure_logs[$index]}")
+    fi
+  done
+  failure_logs_marked=1
+}
+report_failure() {
+  local reason="" index mark failure_text
+  if (( failure_logs_marked == 1 )); then
+    reason=$(
+      for index in "${!failure_logs[@]}"; do
+        # This cursor is passed by name to read_log.
+        # shellcheck disable=SC2034
+        mark=${failure_marks[$index]}
+        if [[ -f "${failure_logs[$index]}" &&
+          "$(stat -c '%d:%i' "${failure_logs[$index]}")" != "${failure_inodes[$index]}" ]]; then
+          # shellcheck disable=SC2034
+          mark=0
+        fi
+        read_log "${failure_logs[$index]}" mark failure_text
+        printf '%s\n' "$failure_text"
+      done | steam_failure_reason "$appid"
+    )
+  fi
+  reason=${reason:-${1:-${launch_step_labels[$((step_index < 0 ? 0 : step_index))]} failed}}
+  if [[ -n "${NOTIFY_SOCKET:-}" ]]; then
+    systemd-notify --status="plugin-launch: $reason" || say 'could not report launch failure'
+  fi
+}
 
 reach_step() {
   local index
@@ -77,7 +129,7 @@ login_present() {
 }
 check_login() {
   if ! login_present && (( SECONDS >= login_deadline )); then
-    fail 126 'Steam sign-in required (no login after 600 s)'
+    fail 126 'Steam sign-in required (no login after 600 s)' 'Steam: still waiting for sign-in after 10 minutes'
   fi
 }
 
@@ -215,7 +267,7 @@ check_client() {
       say 'restart: Steam requested update restart (42)'
       start_steam
     else
-      fail 126 "Steam failed: client exited with status $status"
+      fail 126 "Steam failed: client exited with status $status" "Steam: the Steam client exited"
     fi
   fi
 }
@@ -318,6 +370,7 @@ app_process_present() {
 # created below it inherits the bit. The game unit's RestrictSUIDSGID then
 # refuses an extractor's chmod of such a directory, and Steam's own unpacking
 # fails. Clear the bit on every directory this user owns in the Steam home.
+mark_failure_logs
 find "$STEAM_HOME" -xdev -type d -perm -2000 -user "$(id -u)" -exec chmod g-s {} +
 mkdir -p "$STEAM_HOME/logs" "$STEAM_HOME/steamapps"
 if [[ "$uses_fex" == 1 ]]; then mkdir -p "$STEAM_HOME/fex-data"; fi
@@ -391,6 +444,9 @@ while true; do
   check_client
   save_client_manifest
   read_logs
+  if (( saw_added == 0 )) && grep -aqE "GameAction \[AppID $appid, [^]]*\] : LaunchApp failed" <<<"$new_console"; then
+    fail 126 'Steam reported a launch error'
+  fi
   if grep -aqE "GameAction \[AppID $appid," <<<"$new_console"; then
     if (( acted == 0 )) && ! app_installed; then
       # Steam asks the person to confirm an install, then downloads. Both
