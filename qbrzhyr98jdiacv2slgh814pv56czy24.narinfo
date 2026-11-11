@@ -1,0 +1,10 @@
+StorePath: /nix/store/qbrzhyr98jdiacv2slgh814pv56czy24-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-9363f21d62b5-haku-settings/02kcdgnpnsqjlm4b7gdlfzyj1fbjdzim9876klqq3wih4qy49j11.nar.xz
+Compression: xz
+FileHash: sha256:02kcdgnpnsqjlm4b7gdlfzyj1fbjdzim9876klqq3wih4qy49j11
+FileSize: 576
+NarHash: sha256:0z0n1z83f276s83nxc6aablxg5bfabc59xw0p0w2aygy3c8id8fz
+NarSize: 1480
+References: ayvyb2j2s2nn9qvf16mjxm936afnn02y-retroarch-bare-1.22.2 sbp6xbds1dcrs41xqraip3yagvdw1fgp-korri-inputplumber-retroarch-autoconfig-1.22.0 ycs7b5qh0x57z3m8b5ynsw6akiaqvsxp-retroarch-source-checked-settings-1.22.2
+Deriver: 76k4dfyclnwz313kxiqz3c8pdqp6s2mv-korri-plugin.drv
+Sig: korri-plugins-1:VOetn5Y2th9TzuZw0hgzrUn/PfPCb79fWJ+YEwsdZFIhDe7gmktaj7Qcb97ih6M7N25K51EiVDa5O2BQRX/8Aw==
