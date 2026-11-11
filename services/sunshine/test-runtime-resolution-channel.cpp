@@ -53,7 +53,31 @@ int main() {
   assert(!state.finish(*work, true, [] { assert(false); }));
   assert(state.reply());
 
+  // A render-mode change can suspend capture before its resize request arrives.
   resize.id = 6;
+  state.suspend();
+  assert(state.submit(resize, channel::clock::now()).empty());
+  assert(!state.take());
+  state.supported(true);
+  work = state.take();
+  assert(work);
+  auto deadline = work->deadline;
+  assert(state.defer(*work));
+  assert(!state.take());
+  state.supported(true);
+  work = state.take();
+  assert(work && work->deadline == deadline);
+  assert(state.finish(*work, true, [] {}));
+  assert(state.reply());
+  resize.id = 7;
+  state.suspend();
+  assert(state.submit(resize, channel::clock::now()).empty());
+  state.supported(false);
+  assert(!state.take());
+  reply = state.reply();
+  assert(reply && read16(*reply, 16) == static_cast<unsigned>(reason::unsupported_encoder));
+  state.supported(true);
+  resize.id = 8;
   assert(state.submit(resize, channel::clock::now()).empty());
   work = state.take();
   assert(work);

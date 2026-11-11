@@ -1,9 +1,9 @@
 diff --git a/src/runtime-resolution-channel.h b/src/runtime-resolution-channel.h
 new file mode 100644
-index 0000000..762b9f3
+index 0000000..008278e
 --- /dev/null
 +++ b/src/runtime-resolution-channel.h
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,123 @@
 +#pragma once
 +#include "runtime-resolution-wire.h"
 +#include <algorithm>
@@ -27,6 +27,11 @@ index 0000000..762b9f3
 +  void supported(bool value) {
 +    std::lock_guard guard(mutex_);
 +    supported_ = value && !closed_;
++    if (!value && pending_ && !closed_) {
++      auto bytes = resolution_ack(pending_->request.id, status::failed, reason::unsupported_encoder, current_);
++      replies_.emplace_back(bytes.begin(), bytes.end());
++      pending_.reset();
++    }
 +    if (query_id_ && !closed_) {
 +      auto bytes = capabilities(*query_id_, *supported_, bitrate_, fps_, launch_, current_);
 +      replies_.emplace_back(bytes.begin(), bytes.end());
@@ -55,7 +60,7 @@ index 0000000..762b9f3
 +      return std::vector<std::uint8_t>(bytes.begin(), bytes.end());
 +    };
 +    if (request.refusal != reason::none) return refuse(request.refusal);
-+    if (!supported_.value_or(false)) return refuse(reason::unsupported_encoder);
++    if (supported_.has_value() && !*supported_) return refuse(reason::unsupported_encoder);
 +    if (request.id <= last_id_ || pending_ || !replies_.empty()) return refuse(reason::conflict);
 +    last_id_ = request.id;
 +    pending_ = work {request, now + std::chrono::milliseconds(2500)};
@@ -64,9 +69,18 @@ index 0000000..762b9f3
 +  }
 +  std::optional<work> take() {
 +    std::lock_guard guard(mutex_);
-+    if (closed_ || !pending_ || taken_) return std::nullopt;
++    if (closed_ || !supported_.value_or(false) || !pending_ || taken_) return std::nullopt;
 +    taken_ = true;
 +    return pending_;
++  }
++  // Capture reinitialization is expected after the render output changes.
++  // Preserve the original deadline while the next encoder takes over.
++  bool defer(const work &work) {
++    std::lock_guard guard(mutex_);
++    if (closed_ || !pending_ || pending_->request.id != work.request.id || clock::now() >= work.deadline) return false;
++    taken_ = false;
++    supported_.reset();
++    return true;
 +  }
 +  // Commit is performed only after a first candidate IDR has been encoded.
 +  // The callback swaps in the prepared encoder and queues that frame. No GPU
@@ -329,7 +343,7 @@ index fffd776..0995d02 100644
        session->control.cipher = crypto::cipher::gcm_t {
          launch_session.gcm_key,
 diff --git a/src/video.cpp b/src/video.cpp
-index 6421b88..f1ee33f 100644
+index 6421b88..6c1fe2b 100644
 --- a/src/video.cpp
 +++ b/src/video.cpp
 @@ -27,6 +27,7 @@ extern "C" {
@@ -374,7 +388,7 @@ index 6421b88..f1ee33f 100644
      auto session = make_encode_session(disp.get(), encoder, config, disp->width, disp->height, std::move(encode_device));
      if (!session) {
        return;
-@@ -2483,7 +2490,58 @@ namespace video {
+@@ -2483,7 +2490,61 @@ namespace video {
        }
      }
  
@@ -416,6 +430,9 @@ index 6421b88..f1ee33f 100644
 +          }
 +          // Keep the previous encoder alive until the candidate has a real
 +          // IDR. Never drain the global video queue: other streams use it too.
++          if (reinit_event.peek() && !shutdown_event->peek() && runtime->defer(*work)) {
++            continue;
++          }
 +          bool committed = runtime->finish(*work,
 +            prepared && !shutdown_event->peek() && !reinit_event.peek(), [&] {
 +              session.swap(candidate);
@@ -433,7 +450,7 @@ index 6421b88..f1ee33f 100644
        bool requested_idr_frame = false;
  
        while (invalidate_ref_frames_events->peek()) {
-@@ -3008,6 +3066,8 @@ namespace video {
+@@ -3008,6 +3069,8 @@ namespace video {
      if (chosen_encoder->flags & PARALLEL_ENCODING) {
        capture_async(std::move(mail), config, channel_data);
      } else {

@@ -52,7 +52,7 @@ rec {
   v4l2m2mPatchSetSha256 = "4aeb0e1fcd2602fca166659fcff9ad74c37abb6d27797ba4eda0c2ef0b7cdf2e";
   reviewedNvencApiMajor = 13;
   reviewedNvencApiMinor = 1;
-  patchSetSha256 = "65a310e101a1f893459a92b0b907947534a7b3b6e030f0e4ef6339e5f9f5ed1d";
+  patchSetSha256 = "edf475f2360c47a6aaff05947aa28abf137071c761f7c4f5bb58fa64f06f8d73";
   patches = [
     {
       name = "0015-add-korri-input-seat-event-mirror.patch";
@@ -97,7 +97,7 @@ rec {
     {
       name = "0044-live-resolution-control.patch";
       path = ./patches/0044-live-resolution-control.patch;
-      sha256 = "7418076aeabf7d129f90da0c7437a16efe9d2443bb67cd268a5684c4e87083c5";
+      sha256 = "8a4a72e4f3da2a3ab10121f7acf341698184712abda3d9f4be8535f1a95e184e";
     }
   ];
 
@@ -238,5 +238,5 @@ rec {
 
   # Ordered digest of 8 base patches ++ 14 rkmppPatches. Bump after reviewing the
   # complete base-plus-RKMPP patch order.
-  rkmppPatchSetSha256 = "9ed5250bfd082ae9b59357d43813902c94963a8c3f966c7e36c8cdb86fea876e";
+  rkmppPatchSetSha256 = "e344daf4d3b0e5e6b02bb3ec70decb086f0d570a7b4c8ddcd0ad3637c0ebf47b";
 }
