@@ -1,7 +1,8 @@
 """Run the packaged frontend twice: authenticate, then reject a wrong secret.
 
 The original deterministic core needs no third-party game or hardware. Both
-frontends use menu_driver=null, as the deployed Korri runner does.
+frontends use menu_driver=null and desktop_menu_enable=false, as the deployed
+Korri runner does.
 """
 
 import os
@@ -45,6 +46,7 @@ audio_driver = "sdl2"
 input_driver = "sdl2"
 input_joypad_driver = "sdl2"
 menu_driver = "null"
+desktop_menu_enable = "false"
 pause_nonactive = "false"
 video_fullscreen = "false"
 video_vsync = "true"

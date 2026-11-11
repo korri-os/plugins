@@ -824,6 +824,14 @@ The patch changes the RetroArch output path, and each libretro core package
 carries its frontend. Devices get the correction only after a new tested tag,
 dry run and publication of those packages.
 
+A later commit sets `desktop_menu_enable = "false"` in the launch
+configuration and in both netplay fixtures. RetroArch then does not build the
+desktop menu at all. On the x86_64 build host, 30 starts for each value gave a
+median of 1.375 s to the first frame and 221 MiB with the menu, and 1.199 s and
+174 MiB without it. No device was measured. The patch stays, because a raw
+`overrides.config` line can turn the desktop menu on again. This second change
+alters every libretro core package again and needs its own publication.
+
 ## Lock and password-fixture republish cut (2026-10-30)
 
 Core `14de9e3e5aa17e967b0747cba3e407c886438d83` ends the state lock at

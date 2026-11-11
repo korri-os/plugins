@@ -157,6 +157,9 @@ quit_press_twice = "false"
 
 kiosk_mode_enable = "true"
 menu_driver = "null"
+# This Qt 6 frontend otherwise builds its hidden desktop menu at every start.
+# No Korri screen shows it. Measured on x86_64: 0.18 s and 47 MiB per start.
+desktop_menu_enable = "false"
 network_cmd_enable = "true"
 network_cmd_port = "55355"
 # Netplay travels only through korrid's federation forward, including when

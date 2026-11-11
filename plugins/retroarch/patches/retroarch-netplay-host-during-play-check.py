@@ -4,7 +4,8 @@ korrid sends NETPLAY_HOST_TOGGLE to a RetroArch that already plays content.
 The holder must keep its frame count: no core unload, no content reload. A
 client that joins then starts from the holder's state, which the host sends
 as a savestate. The original deterministic core needs no game ROMs, and both
-frontends use menu_driver=null, as the deployed Korri runner does.
+frontends use menu_driver=null and desktop_menu_enable=false, as the deployed
+Korri runner does.
 """
 
 import os
@@ -63,6 +64,7 @@ audio_driver = "null"
 input_driver = "sdl2"
 input_joypad_driver = "sdl2"
 menu_driver = "null"
+desktop_menu_enable = "false"
 pause_nonactive = "false"
 video_fullscreen = "false"
 video_vsync = "true"

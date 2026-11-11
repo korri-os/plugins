@@ -129,6 +129,7 @@ describe("RetroArch nested settings operations", () => {
       'config_save_on_exit = "false"',
       'menu_driver = "null"',
       'kiosk_mode_enable = "true"',
+      'desktop_menu_enable = "false"',
     ])
       expect(plan.files[0].content).toContain(pair)
     expect(launch({ ...input(), saveRoot: "/other" }).files[0].content).not.toContain(root)
@@ -528,6 +529,8 @@ describe("melonDS compositor touch", () => {
     // including native cfg bytes, custom input drivers, option routing and netplay.
     // Rebased once: the shared cfg now sets input_quit_gamepad_combo = "0" so
     // inputd's L1 + R1 + Start + Select hold is the only kill chord.
+    // Rebased again: the shared cfg now sets desktop_menu_enable = "false" and
+    // its two comment lines, so RetroArch does not build the Qt desktop menu.
     const plans = []
     for (const runnerId of ["@korri:mgba/mgba", "@korri:snes9x/snes9x", "@korri:gambatte/gambatte"]) {
       for (const files of [{ autoconfig: "/autoconfig" }, { autoconfig: "/autoconfig", "core-info": "/core-info" }]) {
@@ -544,7 +547,7 @@ describe("melonDS compositor touch", () => {
     }
     expect(plans).toHaveLength(54)
     expect(createHash("sha256").update(JSON.stringify(plans)).digest("hex"))
-      .toBe("b4a2732e711453a59fc9762a80965e8c57e34e98b6cd528f206ac9e6c8ca24fd")
+      .toBe("a4e21966b6792ea5c3278fca1cffa2e6cab0e0406cc19d573ff6297fa88d7b6d")
   })
 })
 
