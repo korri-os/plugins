@@ -84,7 +84,7 @@ try {
       { runnerId: "@other:runner/runner" },
       { corePath: "/core.so" },
       { overrides: { config: { replace: "ignored settings" } } },
-      { overrides: { settings: { fullscreen: true } } },
+      { overrides: { settings: { plugin: { fullscreen: true } } } },
       { contentPath: undefined, ref: "123" },
       { contentPath: "-help" },
       { contentPath: "relative.solarus" },
