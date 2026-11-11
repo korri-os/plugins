@@ -1,0 +1,10 @@
+StorePath: /nix/store/bhgim74qcf93q4dmwqfbv93jxrps7n6c-korri-korri-sunshine-input-setup.service
+URL: https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/1sn9g5ifzg7p245jgzvb84xfn3qxzrd49rxr4dzxsl4h1qgz5h2a.nar.xz
+Compression: xz
+FileHash: sha256:1sn9g5ifzg7p245jgzvb84xfn3qxzrd49rxr4dzxsl4h1qgz5h2a
+FileSize: 712
+NarHash: sha256:1zpbspn1rnsk59vnz4rfjc7j31iyh02mpc9i9nv52m2x05g9r7dq
+NarSize: 1800
+References: c0k3w9c1j09qdz5f95c7nfbpbp6pjj7y-korri-sunshine-input-seat-setup cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12
+Deriver: xngx3y40zs4xk90mp941gprnlhmfcx2w-korri-korri-sunshine-input-setup.service.drv
+Sig: korri-plugins-1:kK8s/NMmsVop1I2yAHyEkCRVq2VKlgbmGCBgkO6+D3U9JVbvYvFyMjP1V7PpuraorsxfOTZvyiyg3rrJnkKwBA==

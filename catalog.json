@@ -1,29 +1,94 @@
 {
   "latest": {
-    "@korri:steam": "build-9d86839635c3-steam-reason"
+    "@korri:gamescope": "build-6a16a09421bf-shared-settings",
+    "@korri:moonlight": "build-6a16a09421bf-shared-settings",
+    "@korri:retroarch": "build-6a16a09421bf-shared-settings",
+    "@korri:sunshine": "build-6a16a09421bf-shared-settings"
   },
   "records": [
     {
-      "archive_sha256": "7d3416447f0d4424ff356272c6c10664b4ef09f1f58d6bf58fede4aa7bf9800a",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-9d86839635c3-steam-reason/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-9d86839635c3-steam-reason-aarch64-linux.tar",
-      "description": "Runs Steam content through the native session program.",
+      "archive_sha256": "f2c3f57ead684aa72db2c3e8fd01a9969ca26c81a29d4bb5b74e40863ab4b93c",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-191ce9cf1c3fdbaaa30811125ee214da2e1b31db6f2213997019dd89643fb34e-build-6a16a09421bf-shared-settings-aarch64-linux.tar",
+      "description": "Runs a game in nested Gamescope with scaling and a frame-rate limit.",
       "platform": "aarch64-linux",
-      "plugin_id": "@korri:steam",
+      "plugin_id": "@korri:gamescope",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-9d86839635c3-steam-reason",
-      "store_path": "/nix/store/815xjdzwjr9f0jg21cz60p52a07gx858-korri-plugin",
-      "title": "Steam"
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/64i2imjq4v1k0qj991i2wg47fkg4h9ag-korri-plugin",
+      "title": "Gamescope"
     },
     {
-      "archive_sha256": "1ddc0ab96fcd50588f8811d1ba4dc428d16499123cef7c1f06e41ddb7a2d8778",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-9d86839635c3-steam-reason/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-9d86839635c3-steam-reason-x86_64-linux.tar",
-      "description": "Runs Steam content through the native session program.",
+      "archive_sha256": "c6e0b80ca42a39f19a5530f9be2d33f484451cff163c9419d66a88e51aee126e",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-191ce9cf1c3fdbaaa30811125ee214da2e1b31db6f2213997019dd89643fb34e-build-6a16a09421bf-shared-settings-x86_64-linux.tar",
+      "description": "Runs a game in nested Gamescope with scaling and a frame-rate limit.",
       "platform": "x86_64-linux",
-      "plugin_id": "@korri:steam",
+      "plugin_id": "@korri:gamescope",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-9d86839635c3-steam-reason",
-      "store_path": "/nix/store/ykkwaaa32h3kxbswb5pg4dynvhsmm4fi-korri-plugin",
-      "title": "Steam"
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/zlcmrbpq2ihcwykjl4vxnldxx7nqcv0k-korri-plugin",
+      "title": "Gamescope"
+    },
+    {
+      "archive_sha256": "bec1f2b4f685f329b7f991d13ea595c07e7be9042d90243a18d2c7e9a469727f",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-6a16a09421bf-shared-settings-aarch64-linux.tar",
+      "platform": "aarch64-linux",
+      "plugin_id": "@korri:moonlight",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/3mbyy5mv66n0qq4k4q6x75fa8hrk51hh-korri-plugin",
+      "title": "Moonlight stream viewer"
+    },
+    {
+      "archive_sha256": "fb96bf26cc93f40be51d994c59c0d02a2c365584b95467d053a4b6f3b2a6eb52",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-6a16a09421bf-shared-settings-x86_64-linux.tar",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:moonlight",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/i0gfznxvgqdgb3d4j37kq62xxz36s2yh-korri-plugin",
+      "title": "Moonlight stream viewer"
+    },
+    {
+      "archive_sha256": "74f322de1a8266236c0147e07c4002aae1321e97a509d479a2cc633b9f31d075",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-5e94ead1d5d15daa4db6f745d6eec1e7083df702c74c228defc6e4319086d903-build-6a16a09421bf-shared-settings-aarch64-linux.tar",
+      "description": "Shared RetroArch settings family.",
+      "platform": "aarch64-linux",
+      "plugin_id": "@korri:retroarch",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/fx0r87bgj968ziy1lqn2jgpkch0v8x5x-korri-plugin",
+      "title": "RetroArch"
+    },
+    {
+      "archive_sha256": "ed7d37b44d9cc407d78d767a78595bc8a9bed39882ee4cefc2a7b34e17c0b907",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-5e94ead1d5d15daa4db6f745d6eec1e7083df702c74c228defc6e4319086d903-build-6a16a09421bf-shared-settings-x86_64-linux.tar",
+      "description": "Shared RetroArch settings family.",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:retroarch",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/q6zhwvbn5nap6j79iklrfs50kn47a3n6-korri-plugin",
+      "title": "RetroArch"
+    },
+    {
+      "archive_sha256": "d1d915e5eeaa7d93fdf31e435819e31eb0b7330eba671418a6b909a2f8a092ea",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-f770f7cc58c9b85aad6d2915238cc6e04df738949a8423df1639aa3cb6c5854d-build-6a16a09421bf-shared-settings-aarch64-linux.tar",
+      "platform": "aarch64-linux",
+      "plugin_id": "@korri:sunshine",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/dzmwgxhbhw3vwlfcfanjf46gy8k0vi15-korri-plugin",
+      "title": "Sunshine streaming host"
+    },
+    {
+      "archive_sha256": "aed361b1aa8f9afb25d5635834a6a2b281144dd986f9765ef68144d667b7384e",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/korri-plugin-f770f7cc58c9b85aad6d2915238cc6e04df738949a8423df1639aa3cb6c5854d-build-6a16a09421bf-shared-settings-x86_64-linux.tar",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:sunshine",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "build-6a16a09421bf-shared-settings",
+      "store_path": "/nix/store/28j7b4c4d7ghgx54mlwi543blvfrr40k-korri-plugin",
+      "title": "Sunshine streaming host"
     }
   ]
 }

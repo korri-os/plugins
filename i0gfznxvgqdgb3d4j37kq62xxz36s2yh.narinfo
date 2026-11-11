@@ -1,0 +1,10 @@
+StorePath: /nix/store/i0gfznxvgqdgb3d4j37kq62xxz36s2yh-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-settings/1aifg8gvhhcs6vhd2raa5wjy0syg1vqxjdqy8i2g1br1qm8r3kpb.nar.xz
+Compression: xz
+FileHash: sha256:1aifg8gvhhcs6vhd2raa5wjy0syg1vqxjdqy8i2g1br1qm8r3kpb
+FileSize: 3680
+NarHash: sha256:1bnzpy087f378pgay4aczx1x9975w2hx0h88a8ifpwsl6pzv1ia7
+NarSize: 11872
+References: jd3wzql0yspldc4ci5q6g76lkvc8fs9d-korri-moonlight-setup.service nnaibbc4m440dj6rdl3n860ljcal4d2k-moonlight-identity-bootstrap ycag8ysjam9a02nxjyvfyazqck9vg7vk-moonlight-embedded-korri-2.7.1-korri
+Deriver: jwr3w60c0axchk7c2310kma04aw722hr-korri-plugin.drv
+Sig: korri-plugins-1:KLDptIIjx0f9kTQztTMtye3LaoQLMHgDIYX/Z5Se3Q0CAQSFQlSqtLGjalEAnNqiL7PzQq3gmsHMg8Ey/AT4Aw==
