@@ -777,6 +777,47 @@ Native package checks are not device or deployment proof. This batch performs
 no publication, VM tests, device tests, deployment, or operational cache reset.
 ADR 0012's cache reset remains an operator action in a later coordinated window.
 
+## RetroArch startup stall cause (2026-11-11, korri-os/korri#431)
+
+The intermittent netplay fixture failures were a RetroArch defect, not a slow
+runner. Every setting constructor in `menu/menu_setting.c` of 1.22.2 returns
+`ui_type` unassigned, so it holds whatever the stack held. This Qt 6 build
+has `desktop_menu_enable` on by default and builds the desktop menu at every
+start, where `FormLayout::add` switches on `ui_type` for each listed setting.
+
+A stalled host in the Nix sandbox had its main thread in
+`UIntRadioButtons::UIntRadioButtons` under `ui_companion_qt_init`, at 91% CPU.
+The setting was the action `rewind_settings` with `ui_type` 5 (radio buttons)
+and `step` 0: a loop that makes radio buttons and never ends. Outside the
+sandbox the same defect crashed in `StringLineEdit::StringLineEdit` for
+`updater_settings`, with `ui_type` 15 and an unassigned target.
+
+It affects every RetroArch start, with or without netplay and with any audio
+backend. That matches the earlier failures: a host that never reached its
+frame, a client that never connected, and a client that never synchronized.
+The launch configuration in `plugins/libretro/retroarch.ts` does not set
+`desktop_menu_enable`, so the published frontend has the same defect. Its rate
+on a device is not measured.
+
+| Program, one host start per run | Runs | Stalled | Crashed |
+| --- | --- | --- | --- |
+| Unpatched, Nix sandbox, fresh Xvfb per run | 1,200 | 7 | 0 |
+| Patched, Nix sandbox, fresh Xvfb per run | 1,200 | 0 | 0 |
+| Unpatched, outside the sandbox | 600 | 0 | 3 |
+| Patched, outside the sandbox | 1,200 | 0 | 0 |
+
+`retroarch-setting-zero-init.patch` declares each result as
+`rarch_setting_t result = {0};`, as RetroArch master does.
+`retroarch-setting-zero-init-check.nix` compiles the ten extracted constructors
+with a pattern fill for unassigned locals. It requires the unpatched source to
+fail and the patched source to pass, and it gates the RetroArch build. The
+fixture assertions and deadlines are unchanged. The earlier dummy-audio and
+serial-precheck changes did not address this cause.
+
+The patch changes the RetroArch output path, and each libretro core package
+carries its frontend. Devices get the correction only after a new tested tag,
+dry run and publication of those packages.
+
 ## Lock and password-fixture republish cut (2026-10-30)
 
 Core `14de9e3e5aa17e967b0747cba3e407c886438d83` ends the state lock at

@@ -22,18 +22,26 @@ let
         retroarchSource = base.src;
         overlayPatch = retroarchOverlayPatch;
       };
+  retroarchZeroInitPatch = ./patches/retroarch-setting-zero-init.patch;
+  retroarchZeroInitCheck =
+    pkgs.buildPackages.callPackage ./patches/retroarch-setting-zero-init-check.nix
+      {
+        retroarchSource = base.src;
+        zeroInitPatch = retroarchZeroInitPatch;
+      };
   retroarch = base.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [
       retroarchReadOnlyPatch
       ./patches/retroarch-netplay-config-password.patch
       ./patches/retroarch-netplay-host-in-place.patch
       retroarchOverlayPatch
-
+      retroarchZeroInitPatch
     ];
     # Keep the actual packaged emulator behind the compiled source regression.
     postPatch = (old.postPatch or "") + ''
       test -e ${retroarchUdevReadOnlyCheck}
       test -e ${retroarchOverlayCheck}
+      test -e ${retroarchZeroInitCheck}
     '';
     passthru = (old.passthru or { }) // {
       coreOptionsOverlayCheck = retroarchOverlayCheck;

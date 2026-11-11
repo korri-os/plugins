@@ -1,0 +1,109 @@
+RetroArch 1.22.2: zero every setting before its constructor fills it.
+
+Each setting constructor in menu/menu_setting.c declares its result without an
+initializer and never assigns ui_type or enum_value_idx. The action, group and
+subgroup constructors also leave value.target and default_value unassigned.
+Those fields then hold whatever the stack held.
+
+A Qt 6 build with desktop_menu_enable (the default) builds the desktop menu at
+every start. FormLayout::add switches on ui_type for each listed setting. For
+an action setting such as rewind_settings the stack value was sometimes
+ST_UI_TYPE_UINT_RADIO_BUTTONS: the frontend then made radio buttons in a loop
+with step 0 and never ran a frame. Sometimes it was ST_UI_TYPE_STRING_LINE_EDIT
+and the frontend read the unassigned target and crashed.
+
+RetroArch master declares the same results as "rarch_setting_t result = {0};".
+This is that change for the ten constructors of the pinned release.
+
+--- a/menu/menu_setting.c
++++ b/menu/menu_setting.c
+@@ -1353,7 +1353,7 @@
+       const char *parent_group,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = ST_ACTION;
+@@ -1415,7 +1415,7 @@
+       enum setting_type type, const char* name,
+       const char *parent_group)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = type;
+@@ -1484,7 +1484,7 @@
+       change_handler_t change_handler, change_handler_t read_handler,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = ST_FLOAT;
+@@ -1558,7 +1558,7 @@
+       change_handler_t change_handler, change_handler_t read_handler,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = ST_UINT;
+@@ -1634,7 +1634,7 @@
+       change_handler_t change_handler, change_handler_t read_handler,
+       bool dont_use_enum_idx, get_string_representation_t string_representation_handler)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = ST_SIZE;
+@@ -1709,7 +1709,7 @@
+       const char *parent_group,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = ST_BIND;
+@@ -1830,7 +1830,7 @@
+       change_handler_t read_handler,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = type;
+@@ -1952,7 +1952,7 @@
+       const char* name, const char *parent_name, const char *parent_group,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = type;
+@@ -2025,7 +2025,7 @@
+       change_handler_t change_handler, change_handler_t read_handler,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = ST_BOOL;
+@@ -2099,7 +2099,7 @@
+       change_handler_t change_handler, change_handler_t read_handler,
+       bool dont_use_enum_idx)
+ {
+-   rarch_setting_t result;
++   rarch_setting_t result = {0};
+ 
+    result.enum_idx                  = MSG_UNKNOWN;
+    result.type                      = ST_INT;
