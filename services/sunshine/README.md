@@ -83,6 +83,22 @@ Current automated gate:
 
 - `nix build --no-link .#checks.$(nix eval --raw --impure --expr builtins.currentSystem).sunshine-korri-input-seat-patch` checks the input-seat source boundary, the approved patch hash, the patched Sunshine build, and a nonblocking transport model/source-invariant check under receiver backpressure. The model does not execute compiled Sunshine behavior.
 
+## Live resolution control
+
+Patch `0044` adds encrypted runtime-resolution requests to the existing stream.
+Only the asynchronous Vulkan and VAAPI paths advertise support. The encoder
+thread builds a replacement and encodes its first IDR before replacing the
+working encoder. Failed preparation keeps the old encoder. Capture
+reinitialization defers the request without extending its original deadline.
+The launch baseline remains fixed, and requests cannot exceed 4096 pixels per
+side. That bound is policy, not a claim that every encoder supports every size.
+
+The wire check links the actual Android C client. The channel check covers
+admission, deferred capture, deadlines and shutdown. The full capture check
+applies the base and ARM patch stacks together. Patch `0033` places its rotation
+probe before the resulting encode loop. Device frame continuity still needs a
+hardware check before this candidate is treated as verified for deployment.
+
 ## Korrid certificate control
 
 The separate [offline all-client retirement executable](OFFLINE-RETIREMENT.md)
@@ -150,8 +166,8 @@ Remove or replace a carried patch when one of these becomes true:
 
 ## RG35XX Pro linear KMS 60 fps candidate
 
-This is a candidate, not a published release. The common patch set has 8
-patches. The combined ARM profile has 22. The four new patches replace the
+This is a candidate, not a published release. The common patch set has 9
+patches. The combined ARM profile has 23. The four new patches replace the
 layered `exp/kms-direct-readback` experiment without its observers or timing
 output. Only guarded RAM-KMS requests FIFO, after its first valid vblank lock.
 It logs the granted backend and priority once per thread lifetime. The generic

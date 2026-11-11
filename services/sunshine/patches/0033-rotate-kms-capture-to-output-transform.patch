@@ -1,4 +1,6 @@
 diff --git a/src/kms_output_transform.h b/src/kms_output_transform.h
+new file mode 100644
+index 0000000..3012d16
 --- /dev/null
 +++ b/src/kms_output_transform.h
 @@ -0,0 +1,51 @@
@@ -54,6 +56,7 @@ diff --git a/src/kms_output_transform.h b/src/kms_output_transform.h
 +  }
 +}  // namespace platf::kms
 diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
+index ec7a418..d54ee37 100644
 --- a/src/platform/linux/kmsgrab.cpp
 +++ b/src/platform/linux/kmsgrab.cpp
 @@ -6,6 +6,12 @@
@@ -69,7 +72,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  #include <future>
  #include <ranges>
  #include <stdexcept>
-@@ -394,6 +400,8 @@
+@@ -394,6 +400,8 @@ namespace platf {
        // Monitor index in the global list
        std::uint32_t monitor_index;  ///< Monitor index.
  
@@ -78,7 +81,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
        platf::touch_port_t viewport;  ///< Viewport.
      };
  
-@@ -1160,6 +1168,8 @@
+@@ -1160,6 +1168,8 @@ namespace platf {
              auto monitor = pos->crtc_to_monitor.find(plane->crtc_id);
              if (monitor != std::end(pos->crtc_to_monitor)) {
                auto &viewport = monitor->second.viewport;
@@ -87,7 +90,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  
                width = viewport.width;
                height = viewport.height;
-@@ -1599,6 +1609,8 @@
+@@ -1599,6 +1609,8 @@ namespace platf {
  
        int img_width;  ///< Img width.
        int img_height;  ///< Img height.
@@ -96,7 +99,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
        int img_offset_x;  ///< Img offset x.
        int img_offset_y;  ///< Img offset y.
  
-@@ -1664,6 +1676,84 @@
+@@ -1664,6 +1676,84 @@ namespace platf {
  
          ctx = std::move(*ctx_opt);
  
@@ -181,7 +184,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          return 0;
        }
  
-@@ -1785,7 +1875,39 @@
+@@ -1785,7 +1875,39 @@ namespace platf {
         * @param cursor Cursor image or visibility state to composite.
         * @return Capture status reported to the streaming pipeline.
         */
@@ -221,7 +224,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          file_t fb_fd[4];
  
          egl::surface_descriptor_t sd;
-@@ -1817,14 +1939,41 @@
+@@ -1817,14 +1939,41 @@ namespace platf {
            return platf::capture_e::interrupted;
          }
  
@@ -253,14 +256,13 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  
          if (cursor && captured_cursor.visible) {
 -          blend_cursor(*img_out);
--        }
--
 +          if (capture_transform) {
 +            blend_rotated_cursor(*img_out);
 +          } else {
 +            blend_cursor(*img_out);
 +          }
-+        }
+         }
+-
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +        capture_samples_ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - capture_start).count());
 +        report_probe_samples(capture_samples_ms, "capture (excludes FPS pacing)");
@@ -268,7 +270,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
          return capture_e::ok;
        }
  
-@@ -1857,6 +2006,28 @@
+@@ -1857,6 +2006,28 @@ namespace platf {
        gbm::gbm_t gbm;  ///< GBM device used for buffer allocation.
        egl::display_t display;  ///< EGL display created from the GBM device.
        egl::ctx_t ctx;  ///< EGL context used to copy KMS frames into RAM.
@@ -297,7 +299,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
      };
  
      /**
-@@ -2268,6 +2439,14 @@
+@@ -2268,6 +2439,14 @@ namespace platf {
            if (monitor_descriptor.index == index && monitor_descriptor.type == type) {
              monitor_descriptor.viewport.offset_x = monitor->viewport.offset_x;
              monitor_descriptor.viewport.offset_y = monitor->viewport.offset_y;
@@ -312,7 +314,7 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
              monitor_descriptor.viewport.logical_width = monitor->viewport.logical_width;
              monitor_descriptor.viewport.logical_height = monitor->viewport.logical_height;
  
-@@ -2281,6 +2460,8 @@
+@@ -2281,6 +2460,8 @@ namespace platf {
                  << monitor_descriptor.viewport.width << 'x' << monitor_descriptor.viewport.height
                  << " vs "sv
                  << monitor->viewport.width << 'x' << monitor->viewport.height;
@@ -322,23 +324,25 @@ diff --git a/src/platform/linux/kmsgrab.cpp b/src/platform/linux/kmsgrab.cpp
  
              BOOST_LOG(info) << "Monitor " << monitor_descriptor.monitor_index << " is "sv << name << ": "sv << monitor->description;
 diff --git a/src/platform/linux/wayland.cpp b/src/platform/linux/wayland.cpp
+index adb5193..08bd986 100644
 --- a/src/platform/linux/wayland.cpp
 +++ b/src/platform/linux/wayland.cpp
-@@ -162,6 +162,10 @@
-     viewport.logical_width = width;
-     viewport.logical_height = height;
+@@ -164,6 +164,10 @@ namespace wl {
      BOOST_LOG(info) << "[wayland] Logical size: "sv << width << 'x' << height;
-+  }
-+
-+  void monitor_t::wl_geometry(wl_output *, std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t, const char *, const char *, std::int32_t transform) {
-+    output_transform = transform;
    }
  
++  void monitor_t::wl_geometry(wl_output *, std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t, const char *, const char *, std::int32_t transform) {
++    output_transform = transform;
++  }
++
    void monitor_t::wl_mode(
+     wl_output *wl_output,
+     std::uint32_t flags,
 diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
+index 989a4dd..079f6a4 100644
 --- a/src/platform/linux/wayland.h
 +++ b/src/platform/linux/wayland.h
-@@ -310,7 +310,7 @@
+@@ -310,7 +310,7 @@ namespace wl {
       * @param model Monitor model string reported by Wayland.
       * @param transform Wayland output transform value.
       */
@@ -347,7 +351,7 @@ diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
  
      /**
       * @brief Store the active pixel mode reported by wl-output.
-@@ -341,6 +341,7 @@
+@@ -341,6 +341,7 @@ namespace wl {
      wl_output *output;  ///< Wayland output associated with this monitor.
      std::string name;  ///< xdg-output name used for display selection.
      std::string description;  ///< xdg-output description used for logs and UI.
@@ -355,7 +359,7 @@ diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
      platf::touch_port_t viewport;  ///< Logical monitor bounds used to scale absolute input.
      wl_output_listener wl_listener;  ///< Callback table for wl-output events.
      zxdg_output_v1_listener xdg_listener;  ///< Callback table for xdg-output events.
-@@ -501,6 +502,7 @@
+@@ -501,6 +502,7 @@ namespace wl {
      wl_output *output;
      std::string name;
      std::string description;
@@ -364,6 +368,7 @@ diff --git a/src/platform/linux/wayland.h b/src/platform/linux/wayland.h
    };
  
 diff --git a/src/video.cpp b/src/video.cpp
+index 29902c3..e445286 100644
 --- a/src/video.cpp
 +++ b/src/video.cpp
 @@ -10,6 +10,7 @@
@@ -374,10 +379,10 @@ diff --git a/src/video.cpp b/src/video.cpp
  
  // lib includes
  #include <boost/pointer_cast.hpp>
-@@ -2523,6 +2524,19 @@
-       }
-     }
- 
+@@ -2534,6 +2535,19 @@ namespace video {
+     // enabled. Sync and untested encoder paths keep the capability absent.
+     if (runtime) runtime->supported(encoder.name == "vulkan"sv || encoder.name == "vaapi"sv);
+     auto runtime_guard = util::fail_guard([&] { if (runtime) runtime->suspend(); });
 +#ifdef SUNSHINE_CAPTURE_ROTATION_PROBE
 +    std::vector<double> conversion_ms;
 +    std::vector<double> encode_ms;
@@ -392,9 +397,9 @@ diff --git a/src/video.cpp b/src/video.cpp
 +    };
 +#endif
      while (true) {
-       bool requested_idr_frame = false;
- 
-@@ -2542,6 +2556,9 @@
+       if (runtime && !shutdown_event->peek() && !reinit_event.peek()) {
+         if (auto work = runtime->take()) {
+@@ -2603,6 +2617,9 @@ namespace video {
        }
  
        std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
@@ -404,7 +409,7 @@ diff --git a/src/video.cpp b/src/video.cpp
  
        // The RKMPP encoder returns immediately in async mode, so without pacing
        // the encode loop spins at the KMS capture rate and burns a full core on
-@@ -2575,7 +2592,14 @@
+@@ -2636,7 +2653,14 @@ namespace video {
        if (!requested_idr_frame || images->peek()) {
          if (auto img = images->pop(max_frametime)) {
            frame_timestamp = img->frame_timestamp;
@@ -420,7 +425,7 @@ diff --git a/src/video.cpp b/src/video.cpp
              BOOST_LOG(error) << "Could not convert image"sv;
              return;
            }
-@@ -2598,7 +2622,22 @@
+@@ -2659,7 +2683,22 @@ namespace video {
          break;
        }
  
