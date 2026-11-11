@@ -1,0 +1,10 @@
+StorePath: /nix/store/07ks73q8jpqmmymb9wv5ff0aylw7yvgg-moonlight-embedded-korri-2.7.1-korri
+URL: https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/01gcbcyjgvhps3p43jmvbgrw7p7p20rqqxqsf552ic2srqxsfbpd.nar.xz
+Compression: xz
+FileHash: sha256:01gcbcyjgvhps3p43jmvbgrw7p7p20rqqxqsf552ic2srqxsfbpd
+FileSize: 252112
+NarHash: sha256:0ylvw3myb5gg5bbgp9slcv93mhzrx38qrvk1z8c774hh5pxdfckp
+NarSize: 1816984
+References: 07ks73q8jpqmmymb9wv5ff0aylw7yvgg-moonlight-embedded-korri-2.7.1-korri 4kj51k0kzrbwx5m4h3fpjkkl5wc2gdbd-alsa-lib-1.2.16.1 6vfgdp14f9w4biy319izarhj03a6k3rr-libevdev-1.13.6 7rx5im6jbgyfhrl0lc0kyxd9yf14rdxc-expat-2.9.0 8pr35af429l2zlmlga9sx7ibbh11qcvx-ffmpeg-9.0.2-lib 9vzh7anns78rpw747b71bjba15sq5zi1-libopus-1.6.1 ajr4r7aw5yn2gpz0ra8h1v5gjjj7hwlc-libcec-8.1.7 b3xa3ynx8025bgwbql3ca23qyh576qhy-util-linux-2.42.4-lib c6b4gyklay36cqap5wmi3p8rqzwbhmf9-libva-2.24.1 f5bymphw4ci3j34w3iw63v32pqpkxkjf-libdrm-2.4.134 lazac5vw20j0pyahzbaxz8z8hyf7m9zf-openssl-3.5.9 nggn56czn1r87ndgb4wslnjv3bvgkl1l-libpulseaudio-17.0 nyxqdvsmx2mnjd9by0s280pf8x1msajc-libvdpau-1.5 p26sgw6f8a56cy4jaawm15vmjgln78yq-sdl2-compat-2.32.74 p9i1b7jgfj4fl5bx557jnwbdsafl434i-curl-8.22.0 pqyiidz5mi73wv5f91d48s9plcqyj5bz-glibc-2.44-57 rck9w8gj3r2w2z1xpw15g1fvpzi8iz9h-libx11-1.8.13 sqhzxndf435ylw3d2mgaa493vh78izgr-systemd-minimal-262 ww5pckflswny9whz04k06xh233jbg5kl-libglvnd-1.7.0 zdi3hvcwrx778xnw7djkwsxi7467qi7q-avahi-0.8
+Deriver: 5qnlfg6nf092gvbnfgvrdr5ci39hg6qv-moonlight-embedded-korri-2.7.1-korri.drv
+Sig: korri-plugins-1:fvA0jSW8hkNpx8UK1ojJ7sBE527rBMNVdFGLZQj5LhHwLl0psetDTy4K2BJ3yPlxDpb+GKfnpZ3GNAv9s0teCg==

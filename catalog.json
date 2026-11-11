@@ -1,29 +1,117 @@
 {
   "latest": {
-    "@korri:snes9x": "build-6a16a09421bf-shared-snes9x"
+    "@korri:gamescope": "live-stream-shape-20261111-v3",
+    "@korri:moonlight": "live-stream-shape-20261111-v3",
+    "@korri:retroarch": "live-stream-shape-20261111-v3",
+    "@korri:snes9x": "live-stream-shape-20261111-v3",
+    "@korri:sunshine": "live-stream-shape-20261111-v3"
   },
   "records": [
     {
+      "archive_sha256": "57f68a6a0afede08ddcfa3b8ce3cea365840c4a5c4bf22879dcce2fa70000fc0",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-191ce9cf1c3fdbaaa30811125ee214da2e1b31db6f2213997019dd89643fb34e-live-stream-shape-20261111-v3-aarch64-linux.tar",
+      "description": "Runs a game in nested Gamescope with scaling and a frame-rate limit.",
+      "platform": "aarch64-linux",
+      "plugin_id": "@korri:gamescope",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/nwp5qa6v3fnlx32z4cm49zkh7asyfya2-korri-plugin",
+      "title": "Gamescope"
+    },
+    {
+      "archive_sha256": "7d661946539329cfd615d5ba47aab45b221ab172af018310b6aac8b8745b497f",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-191ce9cf1c3fdbaaa30811125ee214da2e1b31db6f2213997019dd89643fb34e-live-stream-shape-20261111-v3-x86_64-linux.tar",
+      "description": "Runs a game in nested Gamescope with scaling and a frame-rate limit.",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:gamescope",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/imggf8lhxjj32nrfd0lyyq41fi7wd7qc-korri-plugin",
+      "title": "Gamescope"
+    },
+    {
+      "archive_sha256": "be4d31733e96a9bec1837e7c98fa101426b02ec9c8d82efe12a434dcbb000e0f",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-live-stream-shape-20261111-v3-aarch64-linux.tar",
+      "platform": "aarch64-linux",
+      "plugin_id": "@korri:moonlight",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/iykv4v7cc482ijm3833pjdimcazgc0rb-korri-plugin",
+      "title": "Moonlight stream viewer"
+    },
+    {
+      "archive_sha256": "0f4f555f58ab872e6ba1de94b09f20718dd53135eed2404905ad102151978161",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-live-stream-shape-20261111-v3-x86_64-linux.tar",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:moonlight",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/6z2mbllx4simzgcb1d1idk7yqw5dirm8-korri-plugin",
+      "title": "Moonlight stream viewer"
+    },
+    {
+      "archive_sha256": "74f322de1a8266236c0147e07c4002aae1321e97a509d479a2cc633b9f31d075",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-5e94ead1d5d15daa4db6f745d6eec1e7083df702c74c228defc6e4319086d903-live-stream-shape-20261111-v3-aarch64-linux.tar",
+      "description": "Shared RetroArch settings family.",
+      "platform": "aarch64-linux",
+      "plugin_id": "@korri:retroarch",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/fx0r87bgj968ziy1lqn2jgpkch0v8x5x-korri-plugin",
+      "title": "RetroArch"
+    },
+    {
+      "archive_sha256": "ed7d37b44d9cc407d78d767a78595bc8a9bed39882ee4cefc2a7b34e17c0b907",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-5e94ead1d5d15daa4db6f745d6eec1e7083df702c74c228defc6e4319086d903-live-stream-shape-20261111-v3-x86_64-linux.tar",
+      "description": "Shared RetroArch settings family.",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:retroarch",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/q6zhwvbn5nap6j79iklrfs50kn47a3n6-korri-plugin",
+      "title": "RetroArch"
+    },
+    {
       "archive_sha256": "7ef62a270d3d28b4db95ec2643e55fa97979cb1ba506403aca6eaa65b3ad4791",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-snes9x/korri-plugin-5609d27276d06475e934a3ab0ac8e8ff361861b8c094773e29c5dce9adf11c85-build-6a16a09421bf-shared-snes9x-aarch64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-5609d27276d06475e934a3ab0ac8e8ff361861b8c094773e29c5dce9adf11c85-live-stream-shape-20261111-v3-aarch64-linux.tar",
       "description": "Runs Super Nintendo content with the Snes9x libretro core.",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:snes9x",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-6a16a09421bf-shared-snes9x",
+      "release_version": "live-stream-shape-20261111-v3",
       "store_path": "/nix/store/rmnm39li3rfs0siw1x6zr6fp66hvmvdp-korri-plugin",
       "title": "Snes9x"
     },
     {
       "archive_sha256": "81683fceb1156f4fc35c721f2eb9817b3d41195902220da3ea7a8c7bbe0c3b8d",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-6a16a09421bf-shared-snes9x/korri-plugin-5609d27276d06475e934a3ab0ac8e8ff361861b8c094773e29c5dce9adf11c85-build-6a16a09421bf-shared-snes9x-x86_64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-5609d27276d06475e934a3ab0ac8e8ff361861b8c094773e29c5dce9adf11c85-live-stream-shape-20261111-v3-x86_64-linux.tar",
       "description": "Runs Super Nintendo content with the Snes9x libretro core.",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:snes9x",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-6a16a09421bf-shared-snes9x",
+      "release_version": "live-stream-shape-20261111-v3",
       "store_path": "/nix/store/s5kz9909zz2jmqqbb5wx1zbpvp788r9r-korri-plugin",
       "title": "Snes9x"
+    },
+    {
+      "archive_sha256": "0aedb50ebe21bacd19f51067dcd85a50bdf9b2d6d04ee97bf972ca7f60534da8",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-f770f7cc58c9b85aad6d2915238cc6e04df738949a8423df1639aa3cb6c5854d-live-stream-shape-20261111-v3-aarch64-linux.tar",
+      "platform": "aarch64-linux",
+      "plugin_id": "@korri:sunshine",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/1if4xaiagyxv3py29cz86r4prda86psa-korri-plugin",
+      "title": "Sunshine streaming host"
+    },
+    {
+      "archive_sha256": "8b79771a9e851f5caae7ae5497b79c2eac6229f15f80e5994b8249fd6ac9f189",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/korri-plugin-f770f7cc58c9b85aad6d2915238cc6e04df738949a8423df1639aa3cb6c5854d-live-stream-shape-20261111-v3-x86_64-linux.tar",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:sunshine",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "live-stream-shape-20261111-v3",
+      "store_path": "/nix/store/yvhwh153zwal3br16zvi52aqqim8xpw6-korri-plugin",
+      "title": "Sunshine streaming host"
     }
   ]
 }

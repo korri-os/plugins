@@ -1,0 +1,10 @@
+StorePath: /nix/store/yvhwh153zwal3br16zvi52aqqim8xpw6-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/11r3bll5sszydnnsfrh2wsi7zdjijax9qmiya3zq7sxa142w2y39.nar.xz
+Compression: xz
+FileHash: sha256:11r3bll5sszydnnsfrh2wsi7zdjijax9qmiya3zq7sxa142w2y39
+FileSize: 3972
+NarHash: sha256:1c4hjffhjkcg6n5nay2964bd6dn0qv1b0qrqvidfyk4kbwkl9qqs
+NarSize: 12768
+References: 6gfwzn7sc4bmk683p4fw6q2xwf1q4512-korri-korri-sunshine.service 7yh5j5gzds8qylihwphwipmaw9pkns2s-korri-sunshine-apps 8p51d5ffaaakjs4jr5aqlh0078bh3zzb-korri-korri-sunshine-certificate-control.socket bhgim74qcf93q4dmwqfbv93jxrps7n6c-korri-korri-sunshine-input-setup.service bvz43ydfridi8smy1gyqvzxk5v5xd3rg-sunshine-korri-2026.914.233613-korri c0k3w9c1j09qdz5f95c7nfbpbp6pjj7y-korri-sunshine-input-seat-setup l5lw27ma3mhmaggiq1yxn3r0ihd36kmh-korri-sunshine-input-rules xqha9mh0cnd3n74h04lnwilgk2lr5xs2-korri-sunshine-run
+Deriver: a2wad01975xw853b3ni180hj4fi8ah16-korri-plugin.drv
+Sig: korri-plugins-1:b6gMkpImuf3h+ZTxJv00yapIHUgj1AbrEVyQYHur8hXb4KPMpHxETm9h7Np7NQZVuWn2o2xQiQ8mz6/wBTtSCw==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/3kdnm3ncj0j62pn5ldwsahqk4almwnbp-gamescope-display-change
+URL: https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/10znnjj6vzv73lxvnixplwqs9pgksnihnacv9d914hjcw9qjhglb.nar.xz
+Compression: xz
+FileHash: sha256:10znnjj6vzv73lxvnixplwqs9pgksnihnacv9d914hjcw9qjhglb
+FileSize: 1636
+NarHash: sha256:18ipqnlyrvcb7fm1f78ay5076nfs63pywg9kn78va1hjrim6l6la
+NarSize: 3912
+References: 3rf5354jr3s8386npqkn4ra1hy56c46n-xwininfo-1.1.6 czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 m2ar7c5ylhgg8vp7dfdx9bhjfvki5xdg-coreutils-9.12 nryqcm37cmbfyxh76vdmgvjm6wr681fr-xprop-1.2.8
+Deriver: kq6ahmryspbxgnwzd1akvc0nzb1317dw-gamescope-display-change.drv
+Sig: korri-plugins-1:tP0gyoJhGh1ZN5II4jnAAy0INY8CT/0HNMV9OvzipScYZfepa1j1NMy65/z/G/B/iePT7EOf62dZg4fD8UNmBg==

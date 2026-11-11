@@ -1,0 +1,10 @@
+StorePath: /nix/store/6z2mbllx4simzgcb1d1idk7yqw5dirm8-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/0vaj44sb09mdy0x51dsvdjxp6kykgwi6srjsy2lhc5gq4ph6rf7n.nar.xz
+Compression: xz
+FileHash: sha256:0vaj44sb09mdy0x51dsvdjxp6kykgwi6srjsy2lhc5gq4ph6rf7n
+FileSize: 3680
+NarHash: sha256:1j5vbka5jq8gjad0421533jdag45xhfckq67r14fsx6djv5gghn0
+NarSize: 11872
+References: 07ks73q8jpqmmymb9wv5ff0aylw7yvgg-moonlight-embedded-korri-2.7.1-korri jd3wzql0yspldc4ci5q6g76lkvc8fs9d-korri-moonlight-setup.service nnaibbc4m440dj6rdl3n860ljcal4d2k-moonlight-identity-bootstrap
+Deriver: skhjxbvwx2485jfn9jwqqr99rzfycljj-korri-plugin.drv
+Sig: korri-plugins-1:CcjSy2P9aod1yYoY2ScAuYTsBBCwlpzRSasUUQKUQlx4nwQU/cSo93+niY3kEnsWRONZ2DNQ8Lnkm6BDiU/XCw==

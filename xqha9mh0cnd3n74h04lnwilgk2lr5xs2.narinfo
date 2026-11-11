@@ -1,0 +1,10 @@
+StorePath: /nix/store/xqha9mh0cnd3n74h04lnwilgk2lr5xs2-korri-sunshine-run
+URL: https://github.com/korri-os/plugins/releases/download/live-stream-shape-20261111-v3/0zql0qwqvxkgm3yv50k238xn9drxrazsqddm1aw051v4w2bgw3wx.nar.xz
+Compression: xz
+FileHash: sha256:0zql0qwqvxkgm3yv50k238xn9drxrazsqddm1aw051v4w2bgw3wx
+FileSize: 1576
+NarHash: sha256:15dsknw8d4yzk85xddwlp2nd8qhv8ha0c48906vwdg2089xpnlwq
+NarSize: 3744
+References: 6fy9pj3xqwjvcvr11pcl9fbpc0934l5a-sway-1.12 7yh5j5gzds8qylihwphwipmaw9pkns2s-korri-sunshine-apps 9l0j15jg8634hkb6d4c9y95mpxl0nhrd-jq-1.8.2-bin ar1c2qmqxr64kv7pg8l4yj3473c4dg65-pipewire-1.6.9 bvz43ydfridi8smy1gyqvzxk5v5xd3rg-sunshine-korri-2026.914.233613-korri c3f45pxlb81gzz4w1nym7lpznfypva7s-gnugrep-3.12 cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12 nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20
+Deriver: i5lwckhwg7wj12xax8224b3f85m1zl2z-korri-sunshine-run.drv
+Sig: korri-plugins-1:VUlXbA0S/o/Tf8UKBD1BuRwabRCohYooB+HJPGZPLyhAkw1C/npsXmbHjxtWf33HnlzMGJLRMuRjJeuokm+LDg==
