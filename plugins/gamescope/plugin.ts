@@ -23,7 +23,7 @@ export const title = "Gamescope"
 export const description = "Runs a game in nested Gamescope with scaling and a frame-rate limit."
 
 export const modifiers = {
-  gamescope: { id: "@korri:gamescope/gamescope" },
+  gamescope: { id: "@korri:gamescope/gamescope", displayChange: "display-change" },
 }
 export const handlers = {
   "launch.compose": composeLaunch,

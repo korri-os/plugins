@@ -1,0 +1,82 @@
+--- a/src/connection.c
++++ b/src/connection.c
+@@ -22,6 +22,14 @@
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <signal.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <stddef.h>
++#include <time.h>
++#include <unistd.h>
+ 
+ #ifdef HAVE_SDL
+ #include <SDL.h>
+@@ -34,7 +42,37 @@
+ ConnListenerSetMotionEventState set_motion_event_state_handler = NULL;
+ ConnListenerSetControllerLED set_controller_led_handler = NULL;
+ 
++static int korri_width, korri_height;
++void connection_set_stream_size(int width, int height) {
++  korri_width = width;
++  korri_height = height;
++}
++
++static void korri_notify(const char* status) {
++  const char* path = getenv("NOTIFY_SOCKET");
++  if (!path || !*path) return;
++  struct sockaddr_un address = { .sun_family = AF_UNIX };
++  size_t length = strlen(path);
++  if (length >= sizeof(address.sun_path) || (path[0] != '/' && path[0] != '@')) return;
++  memcpy(address.sun_path, path, length + 1);
++  if (path[0] == '@') address.sun_path[0] = 0;
++  int socket_fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
++  if (socket_fd < 0) return;
++  sendto(socket_fd, status, strlen(status), MSG_NOSIGNAL,
++    (struct sockaddr*)&address, offsetof(struct sockaddr_un, sun_path) + length + (path[0] == '@' ? 0 : 1));
++  close(socket_fd);
++}
++static void connection_started(void) {
++  struct timespec now;
++  if (korri_width <= 0 || korri_height <= 0 || clock_gettime(CLOCK_MONOTONIC, &now)) return;
++  char status[160];
++  snprintf(status, sizeof(status), "STATUS=korri-viewer-connected:%ld:%lld:%ld:%d:%d", (long)getpid(),
++    (long long)now.tv_sec, now.tv_nsec, korri_width, korri_height);
++  korri_notify(status);
++}
++
+ static void connection_terminated(int errorCode) {
++  korri_notify("STATUS=korri-viewer-disconnected");
+   switch (errorCode) {
+   case ML_ERROR_GRACEFUL_TERMINATION:
+     printf("Connection has been terminated gracefully.\n");
+@@ -108,7 +146,7 @@
+   .stageStarting = NULL,
+   .stageComplete = NULL,
+   .stageFailed = NULL,
+-  .connectionStarted = NULL,
++  .connectionStarted = connection_started,
+   .connectionTerminated = connection_terminated,
+   .logMessage = connection_log_message,
+   .rumble = rumble,
+--- a/src/connection.h
++++ b/src/connection.h
+@@ -29,3 +29,5 @@
+ extern ConnListenerRumbleTriggers rumble_triggers_handler;
+ extern ConnListenerSetMotionEventState set_motion_event_state_handler;
+ extern ConnListenerSetControllerLED set_controller_led_handler;
++
++void connection_set_stream_size(int width, int height);
+--- a/src/main.c
++++ b/src/main.c
+@@ -143,6 +143,7 @@
+     loop_init();
+ 
+   platform_start(system);
++  connection_set_stream_size(config->stream.width, config->stream.height);
+   LiStartConnection(&server->serverInfo, &config->stream, &connection_callbacks, platform_get_video(system), platform_get_audio(system, config->audio_device), NULL, drFlags, config->audio_device, 0);
+ 
+   if (IS_EMBEDDED(system)) {

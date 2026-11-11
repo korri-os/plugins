@@ -71,7 +71,7 @@ function refused(input: PluginComposeInput, code: string, reason: RegExp) {
 
 test("declares exactly one launch modifier and compose operation", () => {
   assert.equal(name, "gamescope")
-  assert.deepEqual(modifiers, { gamescope: { id: "@korri:gamescope/gamescope" } })
+  assert.deepEqual(modifiers, { gamescope: { id: "@korri:gamescope/gamescope", displayChange: "display-change" } })
   assert.deepEqual(Object.keys(handlers), [
     "launch.compose",
     "settings.describe",

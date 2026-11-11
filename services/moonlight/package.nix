@@ -77,6 +77,7 @@ stdenv.mkDerivation rec {
     # Korri: stateless decoders through FFmpeg's V4L2 Request hwaccel.
     ./patches/0021-add-v4l2request-stateless-platform.patch
     ./patches/0022-v4l2request-zero-copy-gl-background-window.patch
+    ./patches/0023-report-connected-viewer-status.patch
   ];
 
   nativeBuildInputs = [

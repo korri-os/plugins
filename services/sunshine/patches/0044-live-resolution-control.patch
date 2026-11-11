@@ -1,0 +1,466 @@
+diff --git a/src/runtime-resolution-channel.h b/src/runtime-resolution-channel.h
+new file mode 100644
+index 0000000..762b9f3
+--- /dev/null
++++ b/src/runtime-resolution-channel.h
+@@ -0,0 +1,109 @@
++#pragma once
++#include "runtime-resolution-wire.h"
++#include <algorithm>
++#include <chrono>
++#include <deque>
++#include <mutex>
++#include <vector>
++
++namespace korri::runtime_resolution {
++inline constexpr auto channel_name = "korri-runtime-resolution";
++
++// One instance per authenticated stream. Only the encoder thread takes work.
++// The control thread never changes encoder resources or writes config fields.
++class channel {
++ public:
++  using clock = std::chrono::steady_clock;
++  struct work { ::korri::runtime_resolution::request request; clock::time_point deadline; };
++  channel(size launch, std::uint32_t bitrate, std::uint32_t fps)
++      : launch_(launch), current_(launch), bitrate_(bitrate), fps_(fps) {}
++
++  void supported(bool value) {
++    std::lock_guard guard(mutex_);
++    supported_ = value && !closed_;
++    if (query_id_ && !closed_) {
++      auto bytes = capabilities(*query_id_, *supported_, bitrate_, fps_, launch_, current_);
++      replies_.emplace_back(bytes.begin(), bytes.end());
++      query_id_.reset();
++    }
++  }
++  void suspend() {
++    std::lock_guard guard(mutex_);
++    if (!closed_) supported_.reset();
++  }
++  std::vector<std::uint8_t> submit(const request &request, clock::time_point now) {
++    std::lock_guard guard(mutex_);
++    if (closed_) return {};
++    if (request.operation == query) {
++      if (!supported_.has_value() && request.refusal == reason::none) {
++        query_id_ = std::max(query_id_.value_or(0), request.id);
++        return {};
++      }
++      auto bytes = capabilities(request.id, supported_.value_or(false) && request.refusal == reason::none,
++                                bitrate_, fps_, launch_, current_);
++      return {bytes.begin(), bytes.end()};
++    }
++    if (request.operation != resolution) return {};
++    auto refuse = [&](reason why) {
++      auto bytes = resolution_ack(request.id, status::failed, why, current_);
++      return std::vector<std::uint8_t>(bytes.begin(), bytes.end());
++    };
++    if (request.refusal != reason::none) return refuse(request.refusal);
++    if (!supported_.value_or(false)) return refuse(reason::unsupported_encoder);
++    if (request.id <= last_id_ || pending_ || !replies_.empty()) return refuse(reason::conflict);
++    last_id_ = request.id;
++    pending_ = work {request, now + std::chrono::milliseconds(2500)};
++    taken_ = false;
++    return {};
++  }
++  std::optional<work> take() {
++    std::lock_guard guard(mutex_);
++    if (closed_ || !pending_ || taken_) return std::nullopt;
++    taken_ = true;
++    return pending_;
++  }
++  // Commit is performed only after a first candidate IDR has been encoded.
++  // The callback swaps in the prepared encoder and queues that frame. No GPU
++  // operation belongs in this critical section. A closed/expired request
++  // cannot publish an encoder or a frame after the stream is gone.
++  template<class Commit>
++  bool finish(const work &work, bool success, Commit commit) {
++    std::lock_guard guard(mutex_);
++    if (closed_ || !pending_ || pending_->request.id != work.request.id) return false;
++    success = success && clock::now() < work.deadline;
++    if (success) {
++      commit();
++      current_ = work.request.target;
++    }
++    auto bytes = resolution_ack(work.request.id, success ? status::applied : status::failed,
++                                success ? reason::none : reason::apply_failed, current_);
++    replies_.emplace_back(bytes.begin(), bytes.end());
++    pending_.reset();
++    return success;
++  }
++  std::optional<std::vector<std::uint8_t>> reply() {
++    std::lock_guard guard(mutex_);
++    if (replies_.empty()) return std::nullopt;
++    auto bytes = std::move(replies_.front());
++    replies_.pop_front();
++    return bytes;
++  }
++  void close() {
++    std::lock_guard guard(mutex_);
++    closed_ = true;
++    supported_ = false;
++    pending_.reset();
++    query_id_.reset();
++    replies_.clear();
++  }
++ private:
++  std::mutex mutex_;
++  size launch_, current_;
++  std::uint32_t bitrate_, fps_, last_id_ = 0;
++  std::optional<bool> supported_;
++  std::optional<std::uint32_t> query_id_;
++  bool closed_ = false, taken_ = false;
++  std::optional<work> pending_;
++  std::deque<std::vector<std::uint8_t>> replies_;
++};
++} // namespace korri::runtime_resolution
+diff --git a/src/runtime-resolution-wire.h b/src/runtime-resolution-wire.h
+new file mode 100644
+index 0000000..cc2cd60
+--- /dev/null
++++ b/src/runtime-resolution-wire.h
+@@ -0,0 +1,116 @@
++#pragma once
++
++// Wire boundary for the existing Android SunshineRuntimeSettings request.
++// Packet IDs 0x5504/0x5505 and payload offsets come from
++// moonlight-common-c/src/SunshineRuntimeSettings.{c,h}. No bitrate or FPS
++// mutation is enabled by this implementation.
++#include <array>
++#include <cstdint>
++#include <optional>
++#include <span>
++
++namespace korri::runtime_resolution {
++constexpr std::uint16_t request_packet = 0x5504;
++constexpr std::uint16_t ack_packet = 0x5505;
++constexpr std::uint16_t query = 0;
++constexpr std::uint16_t resolution = 3;
++constexpr std::uint32_t resolution_bit = 1u << resolution;
++
++enum class status : std::uint16_t { applied = 0, failed = 1, invalid = 2 };
++enum class reason : std::uint16_t {
++  none = 0, invalid_bounds = 2, invalid_payload = 3,
++  unsupported_encoder = 4, unsupported_operation = 6, apply_failed = 7,
++  conflict = 10, stream_ended = 12,
++};
++
++struct size {
++  std::uint32_t width;
++  std::uint32_t height;
++  bool operator==(const size &) const = default;
++};
++
++constexpr bool valid(size value) {
++  return value.width > 0 && value.height > 0 && value.width <= 4096 &&
++         value.height <= 4096 && value.width % 2 == 0 && value.height % 2 == 0;
++}
++
++inline std::uint16_t read16(std::span<const std::uint8_t> bytes, unsigned offset) {
++  return bytes[offset] | (std::uint16_t(bytes[offset + 1]) << 8);
++}
++inline std::uint32_t read32(std::span<const std::uint8_t> bytes, unsigned offset) {
++  return read16(bytes, offset) | (std::uint32_t(read16(bytes, offset + 2)) << 16);
++}
++inline void write16(std::span<std::uint8_t> bytes, unsigned offset, std::uint16_t value) {
++  bytes[offset] = value & 0xff;
++  bytes[offset + 1] = value >> 8;
++}
++inline void write32(std::span<std::uint8_t> bytes, unsigned offset, std::uint32_t value) {
++  write16(bytes, offset, value & 0xffff);
++  write16(bytes, offset + 2, value >> 16);
++}
++
++struct request {
++  std::uint32_t id;
++  std::uint16_t operation;
++  size target;
++  reason refusal;
++};
++
++// A truncated header cannot be correlated safely. Invalid complete requests
++// retain their identity so the caller can send a bounded rejection.
++inline std::optional<request> decode(std::span<const std::uint8_t> bytes) {
++  if (bytes.size() < 8) return std::nullopt;
++  request result {read32(bytes, 0), read16(bytes, 4), {0, 0}, reason::none};
++  if (!result.id || read16(bytes, 6) != 0) {
++    result.refusal = reason::invalid_payload;
++  } else if (result.operation == query) {
++    if (bytes.size() != 8) result.refusal = reason::invalid_payload;
++  } else if (result.operation == resolution) {
++    if (bytes.size() != 16) {
++      result.refusal = reason::invalid_payload;
++    } else {
++      result.target = {read32(bytes, 8), read32(bytes, 12)};
++      if (!valid(result.target)) result.refusal = reason::invalid_bounds;
++    }
++  } else {
++    result.refusal = reason::unsupported_operation;
++  }
++  return result;
++}
++
++// Call only with the confirmed encoder size. Queuing a resize is not an ACK.
++inline std::array<std::uint8_t, 20> resolution_ack(
++    std::uint32_t id, status outcome, reason why, size current) {
++  std::array<std::uint8_t, 20> bytes {};
++  write32(bytes, 0, id);
++  write16(bytes, 4, resolution);
++  write16(bytes, 6, static_cast<std::uint16_t>(outcome));
++  write32(bytes, 8, current.width);
++  write32(bytes, 12, current.height);
++  write16(bytes, 16, static_cast<std::uint16_t>(why));
++  return bytes;
++}
++
++// Launch values remain immutable across queries. Bitrate/FPS are observed
++// facts only; their operation bits remain unset.
++inline std::array<std::uint8_t, 64> capabilities(
++    std::uint32_t id, bool supported, std::uint32_t bitrate, std::uint32_t fps,
++    size launch, size current) {
++  std::array<std::uint8_t, 64> bytes {};
++  write32(bytes, 0, id);
++  write16(bytes, 4, query);
++  write16(bytes, 6, static_cast<std::uint16_t>(supported ? status::applied : status::failed));
++  write16(bytes, 8, static_cast<std::uint16_t>(supported ? reason::none : reason::unsupported_encoder));
++  write32(bytes, 12, supported ? resolution_bit : 0);
++  write32(bytes, 28, fps);
++  write32(bytes, 32, bitrate);
++  write32(bytes, 36, fps);
++  write32(bytes, 40, launch.width);
++  write32(bytes, 44, launch.height);
++  write32(bytes, 48, bitrate);
++  write32(bytes, 52, fps);
++  write32(bytes, 56, current.width);
++  write32(bytes, 60, current.height);
++  return bytes;
++}
++} // namespace korri::runtime_resolution
+diff --git a/src/stream.cpp b/src/stream.cpp
+index fffd776..0995d02 100644
+--- a/src/stream.cpp
++++ b/src/stream.cpp
+@@ -24,6 +24,7 @@ extern "C" {
+ 
+ // local includes
+ #include "config.h"
++#include "runtime-resolution-channel.h"
+ #include "display_device.h"
+ #include "globals.h"
+ #include "input.h"
+@@ -488,6 +489,8 @@ namespace stream {
+    */
+   struct session_t {
+     config_t config;  ///< Stream or encoder configuration captured for the worker.
++    std::shared_ptr<korri::runtime_resolution::channel> runtime_resolution;
++    safe::mail_raw_t::event_t<std::shared_ptr<korri::runtime_resolution::channel>> runtime_channel;
+ 
+     safe::mail_t mail;  ///< Mailbox used to distribute packets and lifecycle events.
+ 
+@@ -1162,7 +1165,31 @@ namespace stream {
+    *
+    * @param server RTSP server instance handling the request.
+    */
++  void send_runtime_resolution_ack(session_t *session, std::span<const std::uint8_t> body) {
++    if (!session->control.peer || session->config.controlProtocolType != 13 || body.size() > 64) return;
++    std::array<std::uint8_t, sizeof(control_header_v2) + 64> plaintext {};
++    control_header_v2 header {};
++    header.type = korri::runtime_resolution::ack_packet;
++    header.payloadLength = body.size();
++    std::memcpy(plaintext.data(), &header, sizeof(header));
++    std::memcpy(plaintext.data() + sizeof(header), body.data(), body.size());
++    std::array<std::uint8_t, sizeof(control_encrypted_t) +
++      crypto::cipher::round_to_pkcs7_padded(sizeof(plaintext)) + crypto::cipher::tag_size> encrypted;
++    auto bytes = std::string_view(reinterpret_cast<const char *>(plaintext.data()), sizeof(header) + body.size());
++    auto payload = encode_control(session, bytes, encrypted);
++    session->broadcast_ref->control_server.send(payload, session->control.peer);
++  }
++
+   void controlBroadcastThread(control_server_t *server) {
++    server->map(korri::runtime_resolution::request_packet,
++      [](session_t *session, const std::string_view &payload) {
++        using namespace korri::runtime_resolution;
++        if (session->config.controlProtocolType != 13 || !session->control.peer) return;
++        auto request = decode(std::span(reinterpret_cast<const std::uint8_t *>(payload.data()), payload.size()));
++        if (!request || request->id == 0) return;
++        auto reply = session->runtime_resolution->submit(*request, channel::clock::now());
++        if (!reply.empty()) send_runtime_resolution_ack(session, reply);
++      });
+     server->map(packetTypes[IDX_PERIODIC_PING], [](session_t *session, const std::string_view &payload) {
+       BOOST_LOG(verbose) << "type [IDX_PERIODIC_PING]"sv;
+     });
+@@ -1334,6 +1361,7 @@ namespace stream {
+           }
+ 
+           if (session->state.load(std::memory_order_acquire) == session::state_e::STOPPING) {
++            session->runtime_resolution->close();
+             pos = server->_sessions->erase(pos);
+ 
+             if (session->control.peer) {
+@@ -1362,6 +1390,9 @@ namespace stream {
+               send_feedback_msg(session, *feedback_msg);
+             }
+ 
++            while (auto reply = session->runtime_resolution->reply()) {
++              send_runtime_resolution_ack(session, *reply);
++            }
+             auto &hdr_queue = session->control.hdr_queue;
+             while (session->control.peer && hdr_queue->peek()) {
+               auto hdr_info = hdr_queue->pop();
+@@ -1410,6 +1441,7 @@ namespace stream {
+       }
+ 
+       input::stop(session->input);
++      session->runtime_resolution->close();
+       session->shutdown_event->raise(true);
+       session->controlEnd.raise(true);
+     }
+@@ -2326,6 +2358,13 @@ namespace stream {
+       session->control.connect_data = launch_session.control_connect_data;
+       session->control.feedback_queue = mail->queue<platf::gamepad_feedback_msg_t>(mail::gamepad_feedback);
+       session->control.hdr_queue = mail->event<video::hdr_info_t>(mail::hdr);
++      const auto &mode = session->config.monitor;
++      session->runtime_resolution = std::make_shared<korri::runtime_resolution::channel>(
++        korri::runtime_resolution::size {static_cast<std::uint32_t>(mode.width), static_cast<std::uint32_t>(mode.height)},
++        mode.bitrate, mode.framerate);
++      session->runtime_channel = mail->event<std::shared_ptr<korri::runtime_resolution::channel>>(
++        korri::runtime_resolution::channel_name);
++      session->runtime_channel->raise(session->runtime_resolution);
+       session->control.legacy_input_enc_iv = launch_session.iv;
+       session->control.cipher = crypto::cipher::gcm_t {
+         launch_session.gcm_key,
+diff --git a/src/video.cpp b/src/video.cpp
+index 6421b88..f1ee33f 100644
+--- a/src/video.cpp
++++ b/src/video.cpp
+@@ -27,6 +27,7 @@ extern "C" {
+ // local includes
+ #include "cbs.h"
+ #include "config.h"
++#include "runtime-resolution-channel.h"
+ #include "display_device.h"
+ #include "globals.h"
+ #include "input.h"
+@@ -1921,7 +1922,7 @@ namespace video {
+         packet->frame_timestamp = frame_timestamp;
+       }
+ 
+-      packet->replacements = &session.replacements;
++      packet->own_replacements(session.replacements);
+       packet->channel_data = channel_data;
+       packets->raise(std::move(packet));
+     }
+@@ -2429,17 +2430,23 @@ namespace video {
+    * @param encoder Selected encoder.
+    * @param channel_data Opaque channel data passed to packets.
+    */
++  input::touch_port_t make_port(platf::display_t *display, const config_t &config);
++  std::unique_ptr<platf::encode_device_t> make_encode_device(platf::display_t &disp, const encoder_t &encoder, const config_t &config);
++
+   void encode_run(
+     int &frame_nr,  // Store progress of the frame number
+     safe::mail_t mail,
+     img_event_t images,
+-    config_t config,
++    config_t &config,
+     std::shared_ptr<platf::display_t> disp,
+     std::unique_ptr<platf::encode_device_t> encode_device,
+     safe::signal_t &reinit_event,
+     const encoder_t &encoder,
+     void *channel_data
+   ) {
++    auto runtime_event = mail->event<std::shared_ptr<korri::runtime_resolution::channel>>(
++      korri::runtime_resolution::channel_name);
++    auto runtime = runtime_event->view(0ms);
+     auto session = make_encode_session(disp.get(), encoder, config, disp->width, disp->height, std::move(encode_device));
+     if (!session) {
+       return;
+@@ -2483,7 +2490,58 @@ namespace video {
+       }
+     }
+ 
++    // Only the async Linux encoders used by the initial product case are
++    // enabled. Sync and untested encoder paths keep the capability absent.
++    if (runtime) runtime->supported(encoder.name == "vulkan"sv || encoder.name == "vaapi"sv);
++    auto runtime_guard = util::fail_guard([&] { if (runtime) runtime->suspend(); });
+     while (true) {
++      if (runtime && !shutdown_event->peek() && !reinit_event.peek()) {
++        if (auto work = runtime->take()) {
++          bool prepared = false;
++          auto updated = config;
++          updated.width = work->request.target.width;
++          updated.height = work->request.target.height;
++          std::unique_ptr<encode_session_t> candidate;
++          auto candidate_mail = std::make_shared<safe::mail_raw_t>();
++          auto candidate_packets = candidate_mail->queue<packet_t>(mail::video_packets);
++          std::vector<packet_t> first_frame;
++          int candidate_frames = 0;
++          if (korri::runtime_resolution::channel::clock::now() < work->deadline) {
++            auto device = make_encode_device(*disp, encoder, updated);
++            if (device) candidate = make_encode_session(disp.get(), encoder, updated,
++              disp->width, disp->height, std::move(device));
++            // Hardware encoders can buffer the first input even with no
++            // B-frames. Feed a bounded number of real captured frames rather
++            // than mistaking EAGAIN for a working first keyframe.
++            while (candidate && !prepared && candidate_frames < 8
++                   && korri::runtime_resolution::channel::clock::now() < work->deadline
++                   && !shutdown_event->peek() && !reinit_event.peek()) {
++              auto image = images->pop(max_frametime * 2);
++              if (!image || candidate->convert(*image)) break;
++              candidate->request_idr_frame();
++              if (encode(frame_nr + candidate_frames++, *candidate, candidate_packets, channel_data, image->frame_timestamp)) break;
++              while (auto packet = candidate_packets->pop(0ms)) {
++                if (packet->is_idr()) prepared = true;
++                if (prepared) first_frame.emplace_back(std::move(packet));
++              }
++            }
++          }
++          // Keep the previous encoder alive until the candidate has a real
++          // IDR. Never drain the global video queue: other streams use it too.
++          bool committed = runtime->finish(*work,
++            prepared && !shutdown_event->peek() && !reinit_event.peek(), [&] {
++              session.swap(candidate);
++              config = updated;
++              frame_nr += candidate_frames;
++              session->request_normal_frame();
++              for (auto &packet : first_frame) packets->raise(std::move(packet));
++              mail->event<input::touch_port_t>(mail::touch_port)->raise(make_port(disp.get(), config));
++            });
++          if (committed) {
++            BOOST_LOG(info) << "Runtime resolution applied: " << config.width << 'x' << config.height;
++          }
++        }
++      }
+       bool requested_idr_frame = false;
+ 
+       while (invalidate_ref_frames_events->peek()) {
+@@ -3008,6 +3066,8 @@ namespace video {
+     if (chosen_encoder->flags & PARALLEL_ENCODING) {
+       capture_async(std::move(mail), config, channel_data);
+     } else {
++      auto runtime_event = mail->event<std::shared_ptr<korri::runtime_resolution::channel>>(korri::runtime_resolution::channel_name);
++      if (auto runtime = runtime_event->view(0ms)) runtime->supported(false);
+       safe::signal_t join_event;
+       auto ref = capture_thread_sync.ref();
+       ref->encode_session_ctx_queue.raise(sync_session_ctx_t {
+diff --git a/src/video.h b/src/video.h
+index 5e2bb61..77d2e65 100644
+--- a/src/video.h
++++ b/src/video.h
+@@ -528,6 +528,17 @@ namespace video {
+       }
+     };
+ 
++    // Runtime encoder replacement can destroy its SPS/VPS storage while a
++    // packet is still queued. Keep those bytes with the packet, not the encoder.
++    std::vector<std::pair<std::string, std::string>> replacement_bytes;
++    std::vector<replace_t> owned_replacements;
++    void own_replacements(const std::vector<replace_t> &source) {
++      replacement_bytes.reserve(source.size());
++      owned_replacements.reserve(source.size());
++      for (const auto &entry : source) replacement_bytes.emplace_back(entry.old, entry._new);
++      for (const auto &entry : replacement_bytes) owned_replacements.emplace_back(entry.first, entry.second);
++      replacements = &owned_replacements;
++    }
+     std::vector<replace_t> *replacements = nullptr;  ///< Optional encoded-byte substitutions applied before packetization.
+     void *channel_data = nullptr;  ///< Platform or protocol state carried with this packet.
+     bool after_ref_frame_invalidation = false;  ///< Whether the frame follows reference-frame invalidation.

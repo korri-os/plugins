@@ -42,7 +42,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     # nixpkgs revision.
     heldPkgs = packageSet nixpkgs-held;
     heldMkPlugin = korri.lib.${system}.mkPlugin { pkgs = heldPkgs; };
-    sunshine = import ../services/sunshine { inherit pkgs system; };
+    sunshine = import ../services/sunshine { inherit pkgs system korri; };
     moonlightPackage = pkgs.callPackage ../services/moonlight/package.nix { };
     moonlightDefinition = import ../plugins/moonlight/plugin.nix { inherit pkgs moonlightPackage; };
     moonlightPlugin = mkPlugin {
@@ -97,7 +97,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     gamescopePlugin = mkPlugin {
       publisher.namespace = "@korri";
       source = gamescopeSource;
-      plugin = _: import ../plugins/gamescope/plugin.nix { inherit gamescopePackage; };
+      plugin = _: import ../plugins/gamescope/plugin.nix { inherit gamescopePackage pkgs; };
     };
     # Core ADR 0012: korrid acquires declared artifacts before launch. Steam's
     # manifest still names the exact runtime plugin builds published beside it.
@@ -422,6 +422,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           };
         };
         korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
+        korri-moonlight-viewer-presence = import ../services/moonlight/viewer-presence-check.nix {
+          inherit pkgs moonlightPackage;
+        };
         korri-moonlight-server-pin = import ../services/moonlight/server-pin-check.nix {
           inherit pkgs moonlightPackage;
         };
