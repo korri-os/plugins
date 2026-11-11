@@ -316,11 +316,13 @@ def main():
                     expected_declared = {key for key in baseline['declared_packages']
                                          if key.split(':')[0] in runtime_plugins
                                          and not key.endswith((':autoconfig', ':fake08', ':core-info'))}
-                    # The fixture holds Sunshine's approved package itself, so
-                    # only the plugin around it reaches the fetch graph.
+                    # The fixture holds Sunshine's approved package itself.
+                    # Gamescope's display-change shell hook uses bash, coreutils
+                    # and X tools, not the OpenSSH-backed GTK/SDL fetch graph.
                     expected_declared |= {key for key in baseline['declared_packages']
                                           if key.split(':')[0] in fetch_graph_plugins
-                                          and key != 'korri-plugin-sunshine:sunshine'}
+                                          and key not in {'korri-plugin-sunshine:sunshine',
+                                                          'korri-plugin-gamescope:display-change'}}
                     expected_declared.add('korri-plugin-ssh:openssh')
                 if declared_changes != expected_declared:
                     raise AssertionError(
