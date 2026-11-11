@@ -263,7 +263,7 @@ export function composeLaunch(input: PluginComposeInput): PluginLaunchOutput {
   }
   // Korrid validates and skips bad paths first. Direct callers receive the
   // same warn-and-skip behaviour, never the old setting refusal codes.
-  const settings = acceptedSettings(input.settings)
+  const settings = acceptedSettings(input.settings.plugin ?? {})
   settings["force-composition"] ??= forceCompositionDefault
   if (settings["output-width"] === undefined) {
     if (!positiveInteger(input.display?.width) || !positiveInteger(input.display?.height)) {
@@ -400,8 +400,11 @@ function acceptedSettings(values: unknown): Record<string, unknown> {
 }
 
 export function validateSettings(input: { values?: unknown; revision?: string }) {
-  const { diagnostics } = checkedSettings(input.values === undefined ? {} : input.values)
-  return { valid: diagnostics.length === 0, diagnostics }
+  const values = isRecord(input.values)
+    ? (input.values.plugin === undefined ? {} : input.values.plugin)
+    : (input.values === undefined ? {} : input.values)
+  const { diagnostics } = checkedSettings(values)
+  return { valid: diagnostics.length === 0, diagnostics: diagnostics.map(diagnostic => ({ ...diagnostic, path: ["plugin", ...diagnostic.path] })) }
 }
 
 export function describeSettings(_input: { id: string }) {
@@ -459,5 +462,5 @@ export function describeSettings(_input: { id: string }) {
       height: ["width"],
     }
   }
-  return { schema, revision: "3.16.31" }
+  return { schema, revision: "3.16.31-plugin" }
 }

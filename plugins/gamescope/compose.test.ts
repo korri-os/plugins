@@ -37,7 +37,7 @@ function request(changes: Partial<PluginComposeInput> = {}): PluginComposeInput 
     files: { gamescope: "/package/bin/gamescope" },
     display: { width: 1240, height: 1080 },
     ...changes,
-    settings: nestedFixture(changes.settings ?? {}),
+    settings: { plugin: nestedFixture(changes.settings ?? {}) },
   }
 }
 function refused(input: PluginComposeInput, code: string, reason: RegExp) {
@@ -263,7 +263,7 @@ test("diagnoses non-map settings and non-scalar setting values at the wire bound
       JSON.parse(
         JSON.stringify({
           ...request(),
-          settings: settings && !Array.isArray(settings) ? nestedFixture(settings) : settings,
+          settings: settings && !Array.isArray(settings) ? { plugin: nestedFixture(settings) } : settings,
         }),
       ),
       "gamescope-setting",
@@ -563,7 +563,7 @@ test("a true boolean adds its flag and false omits it", () => {
     )
   }
   refused(
-    JSON.parse(JSON.stringify({ ...request(), settings: { scheduling: { realtime: null } } })),
+    JSON.parse(JSON.stringify({ ...request(), settings: { plugin: { scheduling: { realtime: null } } } })),
     "gamescope-setting",
     /realtime must be true or false/,
   )
@@ -715,7 +715,7 @@ test("string settings accept exactly Gamescope's syntax", () => {
 
 test("describes all 38 nested leaves with metadata, native limits and the pacing default", () => {
   const { schema, revision } = handlers["settings.describe"]({ id: "@korri:gamescope/gamescope" })
-  assert.equal(revision, "3.16.31")
+  assert.equal(revision, "3.16.31-plugin")
   const leaves: string[] = []
   function walk(node: typeof schema, path: string[] = []) {
     assert.ok(node.title)
@@ -745,8 +745,8 @@ test("reads nested positive switches, named touch mode and display fallback", ()
     debug: { xres: false },
     input: { "default-touch-mode": "trackpad" },
   }
-  const input = { ...request(), settings }
-  assert.equal(handlers["settings.validate"]({ values: settings }).valid, true)
+  const input = { ...request(), settings: { plugin: settings } }
+  assert.equal(handlers["settings.validate"]({ values: input.settings }).valid, true)
   const args = compose(input).args
   assert.ok(args.includes("--disable-color-management"))
   assert.ok(args.includes("--disable-xres"))
@@ -764,17 +764,17 @@ test("reports exact nested bad paths, skips them and never rewrites authored val
     input: { "default-touch-mode": 6 },
   }
   const before = structuredClone(settings)
-  const report = handlers["settings.validate"]({ values: settings })
+  const report = handlers["settings.validate"]({ values: { plugin: settings } })
   assert.deepEqual(
     report.diagnostics.map(item => item.path).sort(),
     [
-      ["video", "output", "width"],
-      ["video", "output", "height"],
-      ["video", "scaling", "filter"],
-      ["input", "default-touch-mode"],
+      ["plugin", "video", "output", "width"],
+      ["plugin", "video", "output", "height"],
+      ["plugin", "video", "scaling", "filter"],
+      ["plugin", "input", "default-touch-mode"],
     ].sort(),
   )
-  const args = compose({ ...request(), settings }).args
+  const args = compose({ ...request(), settings: { plugin: settings } }).args
   assert.deepEqual(args.slice(4, 8), output)
   assert.ok(!args.includes("--filter"))
   assert.ok(!args.includes("--default-touch-mode"))
@@ -790,7 +790,7 @@ test("flat names, dotted names, numeric touch codes and malformed sections are d
     { video: false },
     { video: { output: null } },
   ]) {
-    const result = handlers["settings.validate"]({ values })
+    const result = handlers["settings.validate"]({ values: { plugin: values } })
     assert.equal(result.valid, false)
     assert.ok(result.diagnostics.every(item => item.path.length > 0 && item.severity === "error"))
   }

@@ -22,7 +22,7 @@ function input(overrides?: PluginLaunchInput["overrides"]): PluginLaunchInput {
     cacheRoot: "/cache",
     files: { autoconfig: "/autoconfig" },
     artifacts: {},
-    overrides,
+    overrides: overrides === undefined ? undefined : { ...overrides, settings: { plugin: overrides.settings ?? {} } },
   }
 }
 function content(overrides?: PluginLaunchInput["overrides"]): string {
@@ -161,7 +161,7 @@ describe("RetroArch nested settings operations", () => {
       audio: { "volume-db": -3.5 },
     }
     const before = structuredClone(settings)
-    expect(handlers["settings.validate"]({ values: settings }).valid).toBe(true)
+    expect(handlers["settings.validate"]({ values: { plugin: settings } }).valid).toBe(true)
     const plan = launch(input({ settings }))
     expect(plan.args).toEqual(["-v", "--config", "/account/retroarch.cfg", "-L", "/core", "/rom"])
     for (const pair of [
@@ -199,17 +199,18 @@ describe("RetroArch nested settings operations", () => {
         ["input", "ports", "1", "joypad-index"],
       ],
     ] as const) {
-      const report = handlers["settings.validate"]({ values: settings })
+      const report = handlers["settings.validate"]({ values: { plugin: settings } })
       expect(report.valid).toBe(false)
       expect(
-        report.diagnostics.some(item => JSON.stringify(item.path) === JSON.stringify(path)),
+        report.diagnostics.some(item => JSON.stringify(item.path) === JSON.stringify(["plugin", ...path])),
       ).toBe(true)
       expect(JSON.stringify(report)).not.toContain("secret")
       expect(() => content({ settings })).not.toThrow()
     }
     for (const scaler of ["fit", "fill", "stretch"]) {
       const settings = { video: { scaling: { scaler }, "refresh-rate-hz": 60 } }
-      expect(handlers["settings.validate"]({ values: settings }).diagnostics[0].path).toEqual([
+      expect(handlers["settings.validate"]({ values: { plugin: settings } }).diagnostics[0].path).toEqual([
+        "plugin",
         "video",
         "scaling",
         "scaler",
@@ -228,7 +229,7 @@ describe("RetroArch nested settings operations", () => {
       { video: { hdr: [] } },
       { audio: null },
     ]) {
-      const report = handlers["settings.validate"]({ values })
+      const report = handlers["settings.validate"]({ values: { plugin: values } })
       expect(report.valid).toBe(false)
       expect(
         report.diagnostics.every(
@@ -329,9 +330,9 @@ describe("RetroArch nested settings operations", () => {
       "a\udfffb",
     ]) {
       const settings = { menu: { wallpaper: value } }
-      const report = handlers["settings.validate"]({ values: settings })
+      const report = handlers["settings.validate"]({ values: { plugin: settings } })
       expect(report.valid).toBe(false)
-      expect(report.diagnostics[0].path).toEqual(["menu", "wallpaper"])
+      expect(report.diagnostics[0].path).toEqual(["plugin", "menu", "wallpaper"])
       expect(report.diagnostics[0].message).toBe(
         "Unsupported RetroArch string setting: menu_wallpaper",
       )

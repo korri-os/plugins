@@ -113,7 +113,7 @@ function prepareLaunch(input: PluginLaunchInput, runners: RunnerDeclarations): L
     // input contract accepts compact assignments. Preserve native value bytes.
     lines.push(`${key} = ${line.slice(separator + 1).trimStart()}`)
   }
-  const policy = acceptedPolicy(input.overrides?.settings ?? {})
+  const policy = acceptedPolicy(input.overrides?.settings?.plugin ?? {})
   // Evidence belongs to the selected frontend. Never emit an unverified pair.
   const typed = renderRetroArchSettings(policy)
     .filter(([key, value]) => unsupported(key, value) === undefined)
@@ -302,6 +302,7 @@ function evidenceDiagnostics(
 
 function describeSettings(_input: { id: string }) {
   return {
+    shared: [],
     schema: {
       $schema: "https://json-schema.org/draft/2020-12/schema",
       ...titledSchema(RetroArchPolicy),
@@ -350,6 +351,15 @@ export function createHandlers(runners: RunnerDeclarations) {
   return {
     "launch.prepare": (input: PluginLaunchInput) => prepareLaunch(input, runners),
     "settings.describe": describeSettings,
-    "settings.validate": validateSettings,
+    "settings.validate": (input: { values?: unknown; revision?: string }) => {
+      const values = isRecord(input.values) ? input.values.plugin ?? {} : {}
+      const report = validateSettings({ ...input, values })
+      return {
+        ...report,
+        diagnostics: report.diagnostics.map(item => item.path
+          ? { ...item, path: ["plugin", ...item.path] }
+          : item),
+      }
+    },
   }
 }

@@ -35,9 +35,12 @@ automatically approve the changed plugin.
 
 ## Typed launch service settings
 
-Settings live under `services.'@korri:sunshine/sunshine'.settings` in launch
-places, including runner-scoped places (ADR 0038). They are nested objects;
-dots in the table name leaf paths, not literal YAML keys. The service has no
+Settings live under `services.'@korri:sunshine/sunshine'.settings.plugin` in
+launch places, including runner-scoped places (ADR 0038 and ADR 0057).
+Table paths are relative to that bucket, not literal YAML keys. The host wraps
+the native schema; callbacks read the bucket and diagnostics start with
+`plugin`. Migrate old records explicitly and deploy the matching core and
+plugin together. The service has no
 `enabled` setting and does not wrap the game's command. korrid resolves the
 settings before the game starts, validates them, warns and skips bad paths,
 then calls `settings.render`. It atomically writes changed arguments to

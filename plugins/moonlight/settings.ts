@@ -40,7 +40,7 @@ interface Rule {
   args: (value: SettingValue) => string[]
 }
 const intMax = 2_147_483_647
-const revision = "2"
+const revision = "3"
 const integer = (minimum = 0, maximum = intMax): Schema => ({
   type: "integer",
   title: "",
@@ -223,9 +223,9 @@ export function validateSettings(input: SettingsValidateInput): {
   valid: boolean
   diagnostics: Diagnostic[]
 } {
-  const { settings, diagnostics } = collect(input.values)
+  const { settings, diagnostics } = collect(input.values.plugin ?? {})
   resolutionPair(settings, diagnostics)
-  return { valid: diagnostics.length === 0, diagnostics }
+  return { valid: diagnostics.length === 0, diagnostics: diagnostics.map(diagnostic => ({ ...diagnostic, path: ["plugin", ...diagnostic.path] })) }
 }
 // config.c at the pinned revision: pixel bands and kbps per 30 fps.
 // Twice the native default: cedrus looked soft at 640x480, 2026-10-25.
@@ -252,7 +252,7 @@ function defaultBitrate(settings: Map<string, SettingValue>): number {
 }
 export function renderSettings(input: SettingsRenderInput): { args: string[] } {
   checkId(input.id)
-  const { settings, diagnostics } = collect(input.settings)
+  const { settings, diagnostics } = collect(input.settings.plugin ?? {})
   resolutionPair(settings, diagnostics)
   const display = input.display
   if (

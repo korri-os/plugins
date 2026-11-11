@@ -32,7 +32,12 @@ merges one leaf at a time from device through the launch cascade, retaining
 siblings. `config.append` does not merge: the last place that sets it replaces
 all lower append text.
 
-`settings.describe({ id })` returns nested JSON Schema and revision `3.16.31`.
+`settings.describe({ id })` returns native JSON Schema and revision
+`3.16.31-plugin`. The host puts it under `settings.plugin` (ADR 0057).
+Table paths below are relative to that bucket. Callbacks read the bucket;
+validation paths include `plugin`. Migrate old records explicitly and deploy
+the matching core and plugin together. Gamescope values stay separate from
+the runner's shared settings.
 Every object rejects additional properties. Leaves carry titles, descriptions,
 types, choices, numeric limits, and the existing force-composition default.
 `settings.validate({ values, revision })` reports diagnostics with path segments.

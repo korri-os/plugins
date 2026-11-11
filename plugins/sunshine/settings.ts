@@ -40,7 +40,7 @@ interface Rule {
   args: (value: SettingValue) => string[]
 }
 const intMax = 2_147_483_647
-const revision = "1"
+const revision = "2"
 const integer = (minimum = 0, maximum = intMax): Schema => ({
   type: "integer",
   title: "",
@@ -258,12 +258,12 @@ export function validateSettings(input: SettingsValidateInput): {
   valid: boolean
   diagnostics: Diagnostic[]
 } {
-  const { diagnostics } = collect(input.values)
-  return { valid: diagnostics.length === 0, diagnostics }
+  const { diagnostics } = collect(input.values.plugin ?? {})
+  return { valid: diagnostics.length === 0, diagnostics: diagnostics.map(diagnostic => ({ ...diagnostic, path: ["plugin", ...diagnostic.path] })) }
 }
 export function renderSettings(input: SettingsRenderInput): { args: string[] } {
   checkId(input.id)
-  const { settings } = collect(input.settings)
+  const { settings } = collect(input.settings.plugin ?? {})
   const args: string[] = []
   for (const [path, rule] of Object.entries(rules)) {
     const value = settings.get(path)

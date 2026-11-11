@@ -4,8 +4,8 @@ import { handlers, runners } from "./plugin"
 
 const id = "@korri:moonlight/moonlight"
 const render = (settings = {}, display?: { width: number; height: number }) =>
-  handlers["settings.render"]({ id, settings, display }).args
-const validate = (values: Record<string, unknown>) => handlers["settings.validate"]({ values })
+  handlers["settings.render"]({ id, settings: { plugin: settings }, display }).args
+const validate = (values: Record<string, unknown>) => handlers["settings.validate"]({ values: { plugin: values } })
 const paths = [
   "video.resolution.width",
   "video.resolution.height",
@@ -192,9 +192,9 @@ describe("Moonlight nested settings", () => {
     for (const resolution of [{ width: 640 }, { height: 480 }, { width: 0, height: 480 }]) {
       const result = validate({ video: { resolution } })
       expect(result.valid).toBe(false)
-      expect(result.diagnostics.map((d) => d.path)).toContainEqual(["video", "resolution", "width"])
+      expect(result.diagnostics.map((d) => d.path)).toContainEqual(["plugin", "video", "resolution", "width"])
       expect(result.diagnostics.map((d) => d.path)).toContainEqual([
-        "video",
+        "plugin", "video",
         "resolution",
         "height",
       ])

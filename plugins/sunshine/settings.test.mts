@@ -3,8 +3,8 @@ import type { Schema } from "./settings"
 import { handlers } from "./plugin"
 
 const id = "@korri:sunshine/sunshine"
-const render = (settings = {}) => handlers["settings.render"]({ id, settings }).args
-const validate = (values: Record<string, unknown>) => handlers["settings.validate"]({ values })
+const render = (settings = {}) => handlers["settings.render"]({ id, settings: { plugin: settings } }).args
+const validate = (values: Record<string, unknown>) => handlers["settings.validate"]({ values: { plugin: values } })
 const paths = [
   "logging.level",
   "input.controller",
@@ -176,7 +176,7 @@ describe("Sunshine nested launch service settings", () => {
       const result = validate(values)
       expect(result.valid).toBe(false)
       expect(result.diagnostics).toContainEqual(
-        expect.objectContaining({ severity: "error", path: [...path] }),
+        expect.objectContaining({ severity: "error", path: ["plugin", ...path] }),
       )
       expect(render(values).every((arg) => /^[a-z0-9_]+=[^\r\n\0]*$/.test(arg))).toBe(true)
     }

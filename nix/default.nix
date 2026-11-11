@@ -35,6 +35,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       inherit pkgs;
       contract = korri.lib.${system}.pluginContract;
       surface = korri + "/contracts/generated/surface.ts";
+      settings = korri.lib.${system}.pluginSettingsContract;
     };
     mkPlugin = korri.lib.${system}.mkPlugin { inherit pkgs; };
     # Temporary split (see flake.nix): every Cemu output builds from the held

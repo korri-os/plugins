@@ -37,8 +37,11 @@ keydir. Game units still cannot read the identity directory.
 
 Runner `@korri:moonlight/moonlight` declares `program: moonlight` and no
 systems or releases. It is a stream viewer, not a local runner choice.
-Device and game launch settings use nested objects; dots below name leaf
-paths, not literal YAML keys. `settings.describe`, `settings.validate` and
+Device and game launch settings use nested objects under `settings.plugin`
+(ADR 0057). Paths below are relative to that bucket, not literal YAML keys.
+The host wraps the native schema; callbacks read the bucket and diagnostics
+include its `plugin` path segment. Old root-level values need the explicit
+core migration before this plugin and the new core deploy together. `settings.describe`, `settings.validate` and
 `settings.render` own the schema, diagnostics and argument rendering.
 Validation reports path segments; korrid warns and skips bad values.
 
