@@ -3,6 +3,8 @@
 import copy
 import hashlib
 import importlib.util
+import os
+import subprocess
 from pathlib import Path
 import re
 import tempfile
@@ -31,7 +33,7 @@ def passed_run():
         "conclusion": "success",
         "actor": {"login": "simonwjackson"},
         "triggering_actor": {"login": "simonwjackson"},
-        "display_title": f"Dry run {TAG} at {SHA}: {PACKAGES}",
+        "display_title": f"Dry run {TAG} at {SHA} selection {hashlib.sha256(PACKAGES.encode()).hexdigest()}",
     }
 
 
@@ -71,9 +73,41 @@ class DryRun(unittest.TestCase):
             line.strip('"')
             .replace("${{ inputs.tag }}", TAG)
             .replace("${{ inputs.expected_source_sha }}", SHA)
-            .replace("${{ inputs.packages }}", PACKAGES)
+            .replace("${{ inputs.selection_sha256 }}", hashlib.sha256(PACKAGES.encode()).hexdigest())
         )
         self.assertEqual(rendered, dry_run.run_name(TAG, SHA, PACKAGES))
+
+    def test_large_selection_binds_even_the_last_package_without_truncation(self):
+        packages = " ".join(f"korri-plugin-core-{index}" for index in range(60))
+        run = passed_run()
+        run["display_title"] = dry_run.run_name(TAG, SHA, packages)
+        self.assertLess(len(run["display_title"]), 512)
+        self.assertEqual(check(run=run, packages=packages), [])
+        self.assertTrue(check(run=run, packages=packages + " korri-plugin-other"))
+        self.assertTrue(check(run=run, packages=packages + " "))
+
+    def test_workflow_refuses_a_digest_not_bound_to_the_actual_input(self):
+        workflow = (Path(__file__).parent.parent / ".github/workflows/plugin-repository.yml").read_text()
+        body = re.search(
+            r"      - name: Verify package selection digest\n        run: \|\n((?:          .*\n)+)",
+            workflow,
+        ).group(1)
+        commands = "".join(line[10:] for line in body.splitlines(keepends=True))
+        digest = hashlib.sha256(PACKAGES.encode()).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / "verify-selection.sh"
+            script.write_text("#!/usr/bin/env nix-shell\n#! nix-shell -i bash -p bash coreutils\nset -euo pipefail\n" + commands)
+            for packages, selection, succeeds in [
+                (PACKAGES, digest, True),
+                (PACKAGES + " ", digest, False),
+                (PACKAGES + " korri-plugin-other", digest, False),
+                (PACKAGES, "0" * 64, False),
+                (PACKAGES, digest.upper(), False),
+                (PACKAGES, "", False),
+            ]:
+                with self.subTest(packages=packages, selection=selection):
+                    result = subprocess.run(["bash", str(script)], env={**os.environ, "PACKAGES": packages, "SELECTION_SHA256": selection})
+                    self.assertEqual(result.returncode == 0, succeeds)
 
     def test_job_names_match_the_workflow(self):
         workflow = (

@@ -90,8 +90,9 @@ test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
 ```
 
 Tag the tested source, dispatch `plugin-repository.yml` (the dry run) from
-`main` with `expected_source_sha`, `tag` and the selected `packages`, and wait
-for success. Then dispatch `plugin-publish.yml` from `main` with the dry run's
+`main` with `expected_source_sha`, `tag`, the selected `packages`, and
+`selection_sha256`, the SHA-256 of the exact UTF-8 `packages` input without an
+added newline. Wait for success. Then dispatch `plugin-publish.yml` from `main` with the dry run's
 run ID as `dry_run_id` and the same three inputs, `packages` exactly as
 dispatched. A source change needs a new tag and a new dry run. Both workflows
 accept only `simonwjackson` as both actor and triggering actor. Publication
@@ -105,7 +106,12 @@ proves what they are, from GitHub's own run records:
 - Every job of that attempt (both builds, `lifecycle`, `assemble`) succeeded.
   A skipped job would also leave the run successful, so this is checked per job.
 - The run title equals the dry run's `run-name`, which GitHub renders from the
-  dispatch inputs. It names the tag, the full source SHA and the packages.
+  dispatch inputs. It names the tag, the full source SHA and the SHA-256 of
+  the exact packages input. Both architecture jobs verify this digest before
+  building. The publisher recomputes it from its packages input. GitHub
+  truncates long titles at 512 characters, so listing every package in the
+  title cannot bind a full image batch. A changed package or whitespace must
+  still fail the exact title check.
 - Each artifact (`cache-x86_64-linux`, `cache-aarch64-linux`, `merged-catalog`)
   exists, has not expired, and its downloaded bytes match the SHA-256 digest
   GitHub recorded at upload. A mismatch stops publication;

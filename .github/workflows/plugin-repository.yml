@@ -1,13 +1,17 @@
 name: Dry run a plugin batch
 # plugin-publish.yml checks this title, which GitHub renders from the inputs,
 # before it publishes this run's artifacts. Change both sides together.
-run-name: "Dry run ${{ inputs.tag }} at ${{ inputs.expected_source_sha }}: ${{ inputs.packages }}"
+run-name: "Dry run ${{ inputs.tag }} at ${{ inputs.expected_source_sha }} selection ${{ inputs.selection_sha256 }}"
 
 on:
   workflow_dispatch:
     inputs:
       expected_source_sha:
         description: "Full 40-character SHA of the tested source; all jobs check out this exact commit"
+        required: true
+        type: string
+      selection_sha256:
+        description: "SHA-256 of the exact packages input bytes, with no added newline"
         required: true
         type: string
       packages:
@@ -31,6 +35,7 @@ env:
   NAR_TAG: ${{ inputs.tag }}
   INDEX_BRANCH: cache-index
   PACKAGES: ${{ inputs.packages }}
+  SELECTION_SHA256: ${{ inputs.selection_sha256 }}
 
 jobs:
   build:
@@ -62,6 +67,10 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           # Match verified local tooling; newer Nix needs a separate CI check.
           install_url: https://releases.nixos.org/nix/nix-2.34.1/install
+      - name: Verify package selection digest
+        run: |
+          [[ "$SELECTION_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          test "$(printf %s "$PACKAGES" | sha256sum | cut -d ' ' -f1)" = "$SELECTION_SHA256"
       - name: Read the existing signed publisher cache
         run: |
           [[ "$EXPECTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]

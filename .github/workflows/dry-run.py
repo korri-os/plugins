@@ -35,7 +35,8 @@ ARTIFACTS = {"cache-x86_64-linux", "cache-aarch64-linux", "merged-catalog"}
 
 def run_name(tag, source_sha, packages):
     """Must match `run-name` in plugin-repository.yml character for character."""
-    return f"Dry run {tag} at {source_sha}: {packages}"
+    selection = hashlib.sha256(packages.encode("utf-8")).hexdigest()
+    return f"Dry run {tag} at {source_sha} selection {selection}"
 
 
 def check(repo, run, jobs, artifacts, tag, source_sha, packages):
