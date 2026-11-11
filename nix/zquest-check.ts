@@ -85,7 +85,7 @@ for (const contentPath of [
     { contentPath: undefined, ref: "123" },
     { corePath: "/core.so" },
     { overrides: { config: { replace: "unsupported" } } },
-    { overrides: { settings: { unsupported: true } } },
+    { overrides: { settings: { plugin: { unsupported: true } } } },
   ]) {
     assert.throws(() =>
       handlers["launch.prepare"]({ ...input, ...unsupported }),
