@@ -100,7 +100,7 @@ for (const contentPath of [
       ],
       { encoding: "utf8" },
     )
-    assert.notEqual(rejected.status, 0)
+    assert.notEqual(rejected.status, 0, `accepted ${JSON.stringify(unsupported)}; stderr=${rejected.stderr}; stdout=${rejected.stdout}`)
     assert.equal(rejected.stdout, "")
   }
 }

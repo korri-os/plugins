@@ -98,7 +98,7 @@ try {
         "plugin-run", join(packagePath, "plugin.ts"), JSON.stringify(invalid),
         JSON.stringify({ modifiers: [] }), "fixture",
       ], { encoding: "utf8", timeout: 30_000 })
-      assert.notEqual(rejected.status, 0)
+      assert.notEqual(rejected.status, 0, `accepted ${JSON.stringify(unsupported)}; stderr=${rejected.stderr}; stdout=${rejected.stdout}`)
       assert.equal(rejected.stdout, "")
     }
   }
