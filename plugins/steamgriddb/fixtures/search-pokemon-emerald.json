@@ -1,0 +1,74 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 34971,
+      "name": "Pokémon Emerald Version",
+      "verified": true,
+      "types": [],
+      "release_date": 1095292800
+    },
+    {
+      "id": 5359852,
+      "name": "Pokémon Emerald Cross",
+      "verified": true,
+      "types": [],
+      "release_date": 1640995200
+    },
+    {
+      "id": 5360224,
+      "name": "Pokémon Emerald Kaizo",
+      "verified": true,
+      "types": []
+    },
+    {
+      "id": 5361485,
+      "name": "Pokémon Emerald Rogue",
+      "verified": true,
+      "types": [],
+      "release_date": 1640995200
+    },
+    {
+      "id": 5410869,
+      "name": "Pokémon Emerald Crest",
+      "verified": true,
+      "types": [],
+      "release_date": 1652054400
+    },
+    {
+      "id": 5438963,
+      "name": "Pokémon Emerald Enhanced",
+      "verified": true,
+      "types": [],
+      "release_date": 1546732800
+    },
+    {
+      "id": 5462842,
+      "name": "Pokémon Emerald Seaglass",
+      "verified": true,
+      "types": [],
+      "release_date": 1724371200
+    },
+    {
+      "id": 5477805,
+      "name": "Pokémon Emerald Imperium",
+      "verified": true,
+      "types": [],
+      "release_date": 1737676800
+    },
+    {
+      "id": 5478349,
+      "name": "Pokémon Emerald Mini",
+      "verified": true,
+      "types": [],
+      "release_date": 1741219200
+    },
+    {
+      "id": 5479192,
+      "name": "Pokémon Emerald Legacy",
+      "verified": true,
+      "types": [],
+      "release_date": 1733961600
+    }
+  ]
+}

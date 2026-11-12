@@ -159,6 +159,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     # Korri ADR 0054: declarations only, for Android devices.
     androidAppPlugin = acquisitionPlugin "android-app";
     retrobrewsPlugin = acquisitionPlugin "retrobrews";
+    # Core ADR 0032: artwork, not acquisition, but built the same way: source
+    # only, with declared hosts. `credentialHost` is Core ADR 0034.
+    steamgriddbPlugin = acquisitionPlugin "steamgriddb";
     acquisitionCheck =
       name: package: hosts:
       import ./acquisition-plugin-check.nix {
@@ -328,6 +331,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-homebrewhub = homebrewhubPlugin;
       korri-plugin-android-app = androidAppPlugin;
       korri-plugin-retrobrews = retrobrewsPlugin;
+      korri-plugin-steamgriddb = steamgriddbPlugin;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cemu-bench = cemuBench;
@@ -531,6 +535,14 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         ];
         korri-homebrewhub-plugin = acquisitionCheck "homebrewhub" homebrewhubPlugin [ ];
         korri-retrobrews-plugin = acquisitionCheck "retrobrews" retrobrewsPlugin [ ];
+        korri-steamgriddb-plugin = import ../plugins/steamgriddb/check.nix {
+          inherit pkgs;
+          package = steamgriddbPlugin;
+          shared = acquisitionCheck "steamgriddb" steamgriddbPlugin [
+            "www.steamgriddb.com"
+            "cdn2.steamgriddb.com"
+          ];
+        };
         korri-gamescope-plugin = import ./gamescope-check.nix {
           inherit pkgs gamescopePackage;
           package = gamescopePlugin;
