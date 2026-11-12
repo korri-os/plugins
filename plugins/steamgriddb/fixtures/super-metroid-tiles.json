@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "page": 0,
+  "total": 2,
+  "limit": 50,
+  "data": [
+    {
+      "id": 800051,
+      "score": 0,
+      "style": "alternate",
+      "width": 512,
+      "height": 512,
+      "nsfw": false,
+      "humor": false,
+      "notes": null,
+      "mime": "image/png",
+      "language": "en",
+      "url": "https://cdn2.steamgriddb.com/grid/2581b4f20b66604537f96b64e27429e5.png",
+      "thumb": "https://cdn2.steamgriddb.com/thumb/2581b4f20b66604537f96b64e27429e5.jpg",
+      "lock": false,
+      "epilepsy": false,
+      "upvotes": 0,
+      "downvotes": 0
+    },
+    {
+      "id": 727609,
+      "score": 0,
+      "style": "alternate",
+      "width": 512,
+      "height": 512,
+      "nsfw": false,
+      "humor": false,
+      "notes": null,
+      "mime": "image/png",
+      "language": "en",
+      "url": "https://cdn2.steamgriddb.com/grid/a2f3322f801d9fa81b0fd34a02d1e202.png",
+      "thumb": "https://cdn2.steamgriddb.com/thumb/a2f3322f801d9fa81b0fd34a02d1e202.jpg",
+      "lock": false,
+      "epilepsy": false,
+      "upvotes": 0,
+      "downvotes": 0
+    }
+  ]
+}
