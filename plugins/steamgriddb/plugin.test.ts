@@ -16,6 +16,8 @@ const fixture = (name: string) =>
 const superMetroidSearch = fixture("search-super-metroid.json")
 const pokemonSearch = fixture("search-pokemon-emerald.json")
 const angunaSearch = fixture("search-anguna.json")
+const tetrisSearch = fixture("search-tetris.json")
+const tetrisLogos = fixture("tetris-logos.json")
 const emptySearch = fixture("search-empty.json")
 const tiles = fixture("constructed-tiles.json")
 const pokemonPosters = fixture("pokemon-emerald-posters.json")
@@ -256,22 +258,22 @@ describe("candidates", () => {
         hero("15907", 1920, 620),
         hero("142599", 1920, 620),
         hero("145705", 3840, 1240),
-        // logo: no wider than 1024 px first (official with English first,
-        // then white), then the wider ones in the same order.
+        // logo: 480 to 1024 px wide first (official with English first, then
+        // white), then the wider ones in the same order, then the narrow one.
         logo("122408", 830, 355),
         logo("151629", 1000, 616),
-        logo("80111", 231, 84),
         logo("185519", 654, 343),
         logo("6894", 3611, 1877),
         logo("163959", 1596, 886),
         logo("123823", 7682, 1922),
         logo("146694", 1088, 735),
         logo("163962", 1596, 958),
+        logo("80111", 231, 84),
       ],
     })
   })
 
-  test("orders by preferred size, then style, then English, then the API's order", () => {
+  test("orders by size group, then style, then English, then the API's order", () => {
     const output = call(POKEMON, pokemonArt())
     expect(idsOf(output, "tile")).toEqual(["4", "3", "2", "6"])
     expect(idsOf(output, "poster")).toEqual([
@@ -291,15 +293,15 @@ describe("candidates", () => {
       "145705", // alternate 3840x1240
     ])
     expect(idsOf(output, "logo")).toEqual([
-      "122408", // official en 830x355
+      "122408", // 480 to 1024 px: official en 830x355
       "151629", // official es 1000x616
-      "80111", // official zh 231x84
       "185519", // white en 654x343
-      "6894", // official en 3611x1877
+      "6894", // wider: official en 3611x1877
       "163959", // official en 1596x886
       "123823", // official ja 7682x1922
       "146694", // custom en 1088x735
       "163962", // custom it 1596x958
+      "80111", // narrower: official zh 231x84
     ])
   })
 
@@ -371,9 +373,8 @@ describe("candidates", () => {
     expect(idsOf(call(POKEMON, pokemonArt({ hero: heroes })), "hero")).toEqual(["3", "1", "2"])
   })
 
-  test("puts a logo no wider than 1024 px before a 3611x1877 one: Pokémon Emerald", () => {
-    // Observed: the API lists the 3611x1877 logo first. It is 27 MB once
-    // decoded, more than the shell keeps for a whole surface.
+  test("picks a logo 480 to 1024 px wide over a 3611x1877 one: Pokémon Emerald", () => {
+    // Observed: the API lists the 3611x1877 logo first.
     const logos = candidatesOf(call(POKEMON, pokemonArt())).filter(
       candidate => candidate.role === "logo",
     )
@@ -391,11 +392,51 @@ describe("candidates", () => {
         url: "https://cdn2.steamgriddb.com/logo/5fc6bba3b49d8765a27712ef46444a54.png",
       },
     })
-    const widths = logos.map(candidate => candidate.width ?? Infinity)
-    const firstWide = widths.findIndex(width => width > 1024)
-    expect(firstWide).toBe(4)
-    expect(widths.slice(firstWide).every(width => width > 1024)).toBe(true)
-    expect(logos[firstWide].source.id).toBe("6894")
+    // Three groups, in this order: 480 to 1024 px, wider, narrower.
+    const group = (width = 0) => (width < 480 ? 2 : width <= 1024 ? 0 : 1)
+    expect(logos.map(candidate => group(candidate.width))).toEqual([0, 0, 0, 1, 1, 1, 1, 1, 2])
+  })
+
+  test("picks a wide logo over a narrow one: Tetris (Game Boy)", () => {
+    // Observed: Tetris has no logo from 480 to 1024 px wide. The 463x144 one
+    // would be drawn scaled up and soft, so both wider ones come before it.
+    // The other three lists do not matter: the observed empty list stands in.
+    const output = call("Tetris (Game Boy)", [
+      ok(tetrisSearch),
+      ok(angunaHeroes),
+      ok(angunaHeroes),
+      ok(angunaHeroes),
+      ok(tetrisLogos),
+    ])
+    expect(candidatesOf(output)).toStrictEqual([
+      {
+        role: "logo",
+        width: 2364,
+        height: 704,
+        source: {
+          id: "24679",
+          url: "https://cdn2.steamgriddb.com/logo/07b4498a303789d2829445c725dae35a.png",
+        },
+      },
+      {
+        role: "logo",
+        width: 1155,
+        height: 361,
+        source: {
+          id: "3826",
+          url: "https://cdn2.steamgriddb.com/logo/a292f1c5874b2be8395ffd75f313937f.png",
+        },
+      },
+      {
+        role: "logo",
+        width: 463,
+        height: 144,
+        source: {
+          id: "14389",
+          url: "https://cdn2.steamgriddb.com/logo/5dae854cd11d11715c91b6ce80f46b7c.png",
+        },
+      },
+    ])
   })
 
   test("still lists the wider logos when a game has no other: Anguna", () => {
@@ -413,13 +454,35 @@ describe("candidates", () => {
     ])
   })
 
-  test("puts a logo of unknown width after one known to be no wider than 1024 px", () => {
+  test("still lists the narrow logos when a game has no other", () => {
+    // No observed game has only narrow logos: Tetris's three, made narrow.
+    const narrow = edited(tetrisLogos, assets => [
+      { ...assets[0], width: 400, height: 119, language: "ja" },
+      { ...assets[1], style: "custom" },
+      { ...assets[2], width: 240, height: 75 },
+    ])
+    expect(idsOf(call(POKEMON, pokemonArt({ logo: narrow })), "logo")).toEqual([
+      "3826", // official en
+      "24679", // official ja
+      "14389", // custom en
+    ])
+  })
+
+  test("groups a logo by its width: 480 to 1024 px, then wider, then narrower or unknown", () => {
     const logos = edited(pokemonLogos, assets => [
       { ...assets[0], id: 1, width: null },
-      { ...assets[0], id: 2, width: 1025 },
-      { ...assets[0], id: 3, width: 1024 },
+      { ...assets[0], id: 2, width: 479 },
+      { ...assets[0], id: 3, width: 1025 },
+      { ...assets[0], id: 4, width: 1024 },
+      { ...assets[0], id: 5, width: 480 },
     ])
-    expect(idsOf(call(POKEMON, pokemonArt({ logo: logos })), "logo")).toEqual(["3", "1", "2"])
+    expect(idsOf(call(POKEMON, pokemonArt({ logo: logos })), "logo")).toEqual([
+      "4",
+      "5",
+      "3",
+      "1",
+      "2",
+    ])
   })
 
   test("puts a 600x900 poster before a larger one, whatever its style", () => {
@@ -564,7 +627,7 @@ describe("candidates", () => {
     expect(
       candidatesOf(call(POKEMON, pokemonArt({ logo }))).filter(candidate => candidate.role === "logo"),
     ).toStrictEqual([
-      // The one logo known to be no wider than 1024 px comes first.
+      // The one logo known to be 480 to 1024 px wide comes first.
       { role: "logo", width: 640, source: { id: "3", url } },
       { role: "logo", source: { id: "1", url } },
       { role: "logo", source: { id: "2", url } },

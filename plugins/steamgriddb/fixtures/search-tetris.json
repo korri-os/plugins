@@ -1,0 +1,78 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 5249689,
+      "name": "Tetris (Game Boy)",
+      "verified": true,
+      "types": [],
+      "release_date": 613785600
+    },
+    {
+      "id": 5259994,
+      "name": "Tetris (NES)",
+      "verified": true,
+      "types": [],
+      "release_date": 625881600
+    },
+    {
+      "id": 5259995,
+      "name": "Tetris: The Soviet Mind Game",
+      "verified": true,
+      "types": [],
+      "release_date": 611366400
+    },
+    {
+      "id": 5214,
+      "name": "Tetris Ultimate",
+      "verified": true,
+      "types": [
+        "steam"
+      ],
+      "release_date": 1449766721
+    },
+    {
+      "id": 29914,
+      "name": "Tetris 2",
+      "verified": true,
+      "types": [],
+      "release_date": 748569600
+    },
+    {
+      "id": 34351,
+      "name": "Tetris 4D",
+      "verified": true,
+      "types": [],
+      "release_date": 914371200
+    },
+    {
+      "id": 34571,
+      "name": "Tetris Attack",
+      "verified": true,
+      "types": [
+        "eshop"
+      ],
+      "release_date": 839721600
+    },
+    {
+      "id": 34820,
+      "name": "Tetris DS",
+      "verified": true,
+      "types": [],
+      "release_date": 1142812800
+    },
+    {
+      "id": 35576,
+      "name": "Tetris Party",
+      "verified": true,
+      "types": [],
+      "release_date": 1223942400
+    },
+    {
+      "id": 35710,
+      "name": "Tetris Blast",
+      "verified": true,
+      "types": []
+    }
+  ]
+}
