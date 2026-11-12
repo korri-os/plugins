@@ -50,6 +50,13 @@ jobs:
           nix run ".#ci.tools.$SYSTEM.korri-retroarch-check"
           nix eval --json ".#ci.checks.$SYSTEM" --apply builtins.attrNames > "$RUNNER_TEMP/check-names.json"
           python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))))' "$RUNNER_TEMP/check-names.json" > "$RUNNER_TEMP/check-names.txt"
+          # GitHub's hosted ARM runner has no usable KVM, and Core's plugin-host
+          # VM test requires the `kvm` system feature, so Nix refuses to start it
+          # there. The x86_64 job still runs it. Owner decision, 2026-11-12.
+          if [ "$SYSTEM" = aarch64-linux ]; then
+            grep -vx korri-runtime-plugin-host "$RUNNER_TEMP/check-names.txt" > "$RUNNER_TEMP/check-names.kept" || true
+            mv "$RUNNER_TEMP/check-names.kept" "$RUNNER_TEMP/check-names.txt"
+          fi
           # In particular, VM boot and native window tests must not compete with
           # unrelated Nix builds on the same small hosted runner.
           failed=0
