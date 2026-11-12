@@ -151,6 +151,7 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
   "pyxelgallery"
   "homebrewhub"
   "retrobrews"
+  "steamgriddb"
 ]) (package: [ "korri-${lib.removePrefix "korri-plugin-" package}-plugin" ])
 // lib.optionalAttrs (sunshinePackages ? sunshine-korri-v4l2m2m) {
   sunshine-korri-v4l2m2m = sunshine;

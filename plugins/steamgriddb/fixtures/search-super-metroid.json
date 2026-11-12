@@ -1,0 +1,75 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 38157,
+      "name": "Super Metroid",
+      "verified": true,
+      "types": [
+        "eshop"
+      ],
+      "release_date": 764035200
+    },
+    {
+      "id": 5275853,
+      "name": "Super Metroid and A Link to the Past Randomizer",
+      "verified": true,
+      "types": []
+    },
+    {
+      "id": 5316824,
+      "name": "Super Metroid: Kaizo Edition",
+      "verified": true,
+      "types": [],
+      "release_date": 1279584000
+    },
+    {
+      "id": 5316833,
+      "name": "Super Metroid Practice Hack",
+      "verified": true,
+      "types": []
+    },
+    {
+      "id": 5375098,
+      "name": "Super Metroid Ascent",
+      "verified": true,
+      "types": [],
+      "release_date": 1558915200
+    },
+    {
+      "id": 5375100,
+      "name": "Super Metroid: Subversion",
+      "verified": true,
+      "types": [],
+      "release_date": 1661904000
+    },
+    {
+      "id": 5440977,
+      "name": "Super Metroid: Justin Bailey",
+      "verified": true,
+      "types": [],
+      "release_date": 1197417600
+    },
+    {
+      "id": 5441239,
+      "name": "Super Metroid Phazon",
+      "verified": true,
+      "types": [],
+      "release_date": 1325030400
+    },
+    {
+      "id": 5441325,
+      "name": "Super Metroid: Darkholme Hospital",
+      "verified": true,
+      "types": [],
+      "release_date": 1335830400
+    },
+    {
+      "id": 5490591,
+      "name": "Super Metroid Redux",
+      "verified": true,
+      "types": [],
+      "release_date": 1582588800
+    }
+  ]
+}
