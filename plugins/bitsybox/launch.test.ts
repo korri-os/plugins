@@ -95,7 +95,7 @@ try {
     { runnerId: "@other:runner/runner" },
     { corePath: "/core.so" },
     { overrides: { config: { replace: "ignored" } } },
-    { overrides: { settings: { fullscreen: true } } },
+    { overrides: { settings: { plugin: { fullscreen: true } } } },
     { contentPath: undefined, ref: "123" },
     { contentPath: "-help" },
     { contentPath: "relative.bitsy" },

@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix="eden-contract-") as work:
         assert Path(saves + "/nand/user/save").is_dir()
         for invalid in [dict(runnerId="wrong"), dict(corePath="/core.so"),
                         dict(contentPath="relative"), dict(saveRoot="relative"),
-                        dict(overrides={"settings": {"fullscreen": False}})]:
+                        dict(overrides={"settings": {"plugin": {"fullscreen": False}}})]:
             rejected = run(launch | invalid)
             assert rejected.returncode != 0 and not rejected.stdout
 print("Eden manifest, host admission and real sandbox launch passed for two accounts")
