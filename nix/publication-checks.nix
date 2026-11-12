@@ -55,6 +55,7 @@ let
   bitsybox = [ "korri-bitsybox-plugin" ];
   moonlight = [
     "korri-moonlight-viewer-presence"
+    "korri-moonlight-x11-vaapi-size"
     "korri-moonlight-server-pin"
     "korri-moonlight-plugin-native"
   ];
