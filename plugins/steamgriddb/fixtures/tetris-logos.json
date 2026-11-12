@@ -1,0 +1,62 @@
+{
+  "success": true,
+  "page": 0,
+  "total": 3,
+  "limit": 50,
+  "data": [
+    {
+      "id": 24679,
+      "score": 0,
+      "style": "official",
+      "width": 2364,
+      "height": 704,
+      "nsfw": false,
+      "humor": false,
+      "notes": null,
+      "mime": "image/png",
+      "language": "en",
+      "url": "https://cdn2.steamgriddb.com/logo/07b4498a303789d2829445c725dae35a.png",
+      "thumb": "https://cdn2.steamgriddb.com/logo_thumb/07b4498a303789d2829445c725dae35a.png",
+      "lock": false,
+      "epilepsy": false,
+      "upvotes": 0,
+      "downvotes": 0
+    },
+    {
+      "id": 14389,
+      "score": 0,
+      "style": "official",
+      "width": 463,
+      "height": 144,
+      "nsfw": false,
+      "humor": false,
+      "notes": null,
+      "mime": "image/png",
+      "language": "en",
+      "url": "https://cdn2.steamgriddb.com/logo/5dae854cd11d11715c91b6ce80f46b7c.png",
+      "thumb": "https://cdn2.steamgriddb.com/logo_thumb/5dae854cd11d11715c91b6ce80f46b7c.png",
+      "lock": false,
+      "epilepsy": false,
+      "upvotes": 0,
+      "downvotes": 0
+    },
+    {
+      "id": 3826,
+      "score": 0,
+      "style": "official",
+      "width": 1155,
+      "height": 361,
+      "nsfw": false,
+      "humor": false,
+      "notes": null,
+      "mime": "image/png",
+      "language": "en",
+      "url": "https://cdn2.steamgriddb.com/logo/a292f1c5874b2be8395ffd75f313937f.png",
+      "thumb": "https://cdn2.steamgriddb.com/logo_thumb/a292f1c5874b2be8395ffd75f313937f.png",
+      "lock": false,
+      "epilepsy": false,
+      "upvotes": 0,
+      "downvotes": 0
+    }
+  ]
+}

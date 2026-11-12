@@ -81,14 +81,14 @@ interface ArtList {
   readonly query: Readonly<Record<string, string>>
   readonly styleRank: ReadonlyMap<string, number>
   readonly keepsStyle: (style: string | undefined) => boolean
-  // An asset known to be no larger than this comes before every other one:
-  // art no larger than a 1920x1080 screen needs. korrid takes the first
-  // candidate, and the shell keeps 24 MiB of decoded pixels for a surface: a
-  // 3840x1240 hero alone is 19 MB once decoded, a 1920x620 one is under 5 MB.
-  readonly preferredSize?: { readonly width: number; readonly height?: number }
+  // The asset's size group, lower first. korrid takes the first candidate, so
+  // the first group holds the size a 1920x1080 screen needs. Every other
+  // asset still follows: a game that has only those keeps its art.
+  readonly sizeGroup: (asset: ArtAsset) => number
 }
 
 const anyStyle = () => true
+const anySize = () => 0
 
 // In request order: turn 2's responses arrive in this order.
 const ART_LISTS: readonly ArtList[] = [
@@ -99,6 +99,7 @@ const ART_LISTS: readonly ArtList[] = [
     query: { dimensions: "512x512", styles: "alternate,blurred,material,no_logo" },
     styleRank: GRID_STYLE_RANK,
     keepsStyle: style => style === undefined || TILE_STYLES.has(style),
+    sizeGroup: anySize,
   },
   {
     role: "poster",
@@ -107,7 +108,7 @@ const ART_LISTS: readonly ArtList[] = [
     styleRank: GRID_STYLE_RANK,
     keepsStyle: anyStyle,
     // The size the request asks for.
-    preferredSize: { width: 600, height: 900 },
+    sizeGroup: noLargerThan(600, 900),
   },
   {
     role: "hero",
@@ -115,7 +116,9 @@ const ART_LISTS: readonly ArtList[] = [
     query: {},
     styleRank: GRID_STYLE_RANK,
     keepsStyle: anyStyle,
-    preferredSize: { width: 1920 },
+    // The shell keeps 24 MiB of decoded pixels for a surface. A 3840x1240
+    // hero alone is 19 MB once decoded; a 1920x620 one is under 5 MB.
+    sizeGroup: noLargerThan(1920),
   },
   {
     role: "logo",
@@ -123,9 +126,7 @@ const ART_LISTS: readonly ArtList[] = [
     query: { mimes: "image/png" },
     styleRank: LOGO_STYLE_RANK,
     keepsStyle: anyStyle,
-    // A 1920 px screen shows a logo at most about 960 px wide. Observed logos
-    // reach 7682 px, and a 3611x1877 one is 27 MB once decoded.
-    preferredSize: { width: 1024 },
+    sizeGroup: logoSizeGroup,
   },
 ]
 
@@ -275,23 +276,38 @@ function artAssets(response: PluginHttpResponse, role: GameAssetRole): ArtAsset[
   })
 }
 
-function hasPreferredSize(list: ArtList, asset: ArtAsset): boolean {
-  const size = list.preferredSize
-  if (size === undefined) return true
-  if (!isPixelCount(asset.width) || asset.width > size.width) return false
-  return size.height === undefined || (isPixelCount(asset.height) && asset.height <= size.height)
+// Assets known to be no larger than this first, then every other one. An
+// asset whose size is not known counts as larger.
+function noLargerThan(width: number, height?: number): (asset: ArtAsset) => number {
+  return asset => {
+    const fits =
+      isPixelCount(asset.width) &&
+      asset.width <= width &&
+      (height === undefined || (isPixelCount(asset.height) && asset.height <= height))
+    return fits ? 0 : 1
+  }
 }
 
-// The role's preferred size first, then style preference, then English, then
-// the API's own order. A larger asset still follows, so a game that has only
-// larger ones keeps its art. Not `score`: it was 0 on all 444 assets observed.
+const LOGO_MIN_WIDTH = 480
+const LOGO_MAX_WIDTH = 1024
+
+// A 1920 px screen shows a logo at most about 960 px wide. First a logo of
+// about that width. Then a wider one: it is only heavier. Last a narrower one
+// or one of unknown width: it would be drawn scaled up and soft.
+function logoSizeGroup(asset: ArtAsset): number {
+  if (!isPixelCount(asset.width) || asset.width < LOGO_MIN_WIDTH) return 2
+  return asset.width <= LOGO_MAX_WIDTH ? 0 : 1
+}
+
+// The role's size group first, then style preference, then English, then the
+// API's own order. Not `score`: it was 0 on all 444 assets observed.
 function roleCandidates(list: ArtList, assets: readonly ArtAsset[]): GameAssetCandidate[] {
   return assets
     .filter(asset => list.keepsStyle(asset.style))
     .map((asset, apiOrder) => ({
       asset,
       apiOrder,
-      size: hasPreferredSize(list, asset) ? 0 : 1,
+      size: list.sizeGroup(asset),
       style: (asset.style === undefined ? undefined : list.styleRank.get(asset.style)) ?? UNRANKED_STYLE,
       language: asset.language === "en" ? 0 : 1,
     }))
