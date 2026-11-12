@@ -21,6 +21,7 @@ const tiles = fixture("constructed-tiles.json")
 const pokemonPosters = fixture("pokemon-emerald-posters.json")
 const pokemonHeroes = fixture("pokemon-emerald-heroes.json")
 const pokemonLogos = fixture("pokemon-emerald-logos.json")
+const superMetroidHeroes = fixture("super-metroid-heroes.json")
 const angunaPosters = fixture("anguna-posters.json")
 const angunaHeroes = fixture("anguna-heroes.json")
 const angunaLogos = fixture("anguna-logos.json")
@@ -249,11 +250,12 @@ describe("candidates", () => {
         poster("341136"),
         poster("274559"),
         poster("858678"),
-        // hero: alternate before material, each in the API's order.
+        // hero: no wider than 1920 px first (alternate, then material), then
+        // the wider one.
         hero("2748", 1920, 620),
         hero("15907", 1920, 620),
-        hero("145705", 3840, 1240),
         hero("142599", 1920, 620),
+        hero("145705", 3840, 1240),
         // logo: official (English first), white, custom.
         logo("6894", 3611, 1877),
         logo("163959", 1596, 886),
@@ -267,7 +269,7 @@ describe("candidates", () => {
     })
   })
 
-  test("orders by style, then English, then the API's order", () => {
+  test("orders by preferred size, then style, then English, then the API's order", () => {
     const output = call(POKEMON, pokemonArt())
     expect(idsOf(output, "tile")).toEqual(["4", "3", "2", "6"])
     expect(idsOf(output, "poster")).toEqual([
@@ -280,7 +282,12 @@ describe("candidates", () => {
       "274559", // white_logo en
       "858678", // no_logo en
     ])
-    expect(idsOf(output, "hero")).toEqual(["2748", "15907", "145705", "142599"])
+    expect(idsOf(output, "hero")).toEqual([
+      "2748", // alternate 1920x620
+      "15907", // alternate 1920x620
+      "142599", // material 1920x620
+      "145705", // alternate 3840x1240
+    ])
     expect(idsOf(output, "logo")).toEqual([
       "6894", // official en
       "163959", // official en
@@ -315,6 +322,61 @@ describe("candidates", () => {
       { ...assets[0], id: 4, style: "official" },
     ])
     expect(idsOf(call(POKEMON, pokemonArt({ logo: logos })), "logo")).toEqual(["4", "3", "2", "1"])
+  })
+
+  test("puts a 1920x620 hero before a 3840x1240 one: Super Metroid", () => {
+    // Observed: positions 11, 12, 15, 18 and 26 of Super Metroid's 27 heroes.
+    // The API lists a 3840x1240 hero first here. It is 19 MB once decoded, and
+    // korrid takes the first candidate. The other three lists do not matter:
+    // the observed empty list stands in for them.
+    const output = call("Super Metroid", [
+      ok(superMetroidSearch),
+      ok(angunaHeroes),
+      ok(angunaHeroes),
+      ok(superMetroidHeroes),
+      ok(angunaHeroes),
+    ])
+    expect(candidatesOf(output)).toStrictEqual([
+      superMetroidHero("59734", 1920, 620), // alternate
+      superMetroidHero("158930", 1600, 650), // alternate
+      superMetroidHero("181998", 1920, 620), // blurred
+      superMetroidHero("77659", 3840, 1240), // alternate, first in the API's order
+      superMetroidHero("17374", 3840, 1240), // alternate
+    ])
+    expect(candidatesOf(output)[0]).toStrictEqual({
+      role: "hero",
+      width: 1920,
+      height: 620,
+      source: {
+        id: "59734",
+        url: "https://cdn2.steamgriddb.com/hero/7b1c718f91de50d902e00762ad5cac28.jpg",
+      },
+    })
+  })
+
+  test("still lists the wider heroes when a game has no other", () => {
+    const wide = edited(superMetroidHeroes, assets => assets.filter(asset => asset.width === 3840))
+    expect(idsOf(call(POKEMON, pokemonArt({ hero: wide })), "hero")).toEqual(["77659", "17374"])
+  })
+
+  test("puts a hero of unknown width after one known to be no wider than 1920 px", () => {
+    const heroes = edited(superMetroidHeroes, assets => [
+      { ...assets[1], id: 1, width: null },
+      { ...assets[1], id: 2, width: 1921 },
+      { ...assets[1], id: 3, width: 1920 },
+    ])
+    expect(idsOf(call(POKEMON, pokemonArt({ hero: heroes })), "hero")).toEqual(["3", "1", "2"])
+  })
+
+  test("puts a 600x900 poster before a larger one, whatever its style", () => {
+    const posters = edited(pokemonPosters, assets => [
+      { ...assets[0], id: 1, width: 1200, height: 1800 },
+      { ...assets[0], id: 2, width: 600, height: 1800 },
+      ...assets,
+    ])
+    const expected = [...idsOf(call(POKEMON, pokemonArt()), "poster"), "1", "2"]
+    expect(idsOf(call(POKEMON, pokemonArt({ poster: posters })), "poster")).toEqual(expected)
+    expect(expected.at(-3)).toBe("858678") // a 600x900 no_logo poster is still before them
   })
 
   test("does not order by score", () => {
@@ -524,6 +586,10 @@ function poster(id: string): Candidate {
 
 function hero(id: string, width: number, height: number): Candidate {
   return { role: "hero", width, height, source: { id, url: assetUrl(pokemonHeroes, id) } }
+}
+
+function superMetroidHero(id: string, width: number, height: number): Candidate {
+  return { role: "hero", width, height, source: { id, url: assetUrl(superMetroidHeroes, id) } }
 }
 
 function logo(id: string, width: number, height: number): Candidate {
