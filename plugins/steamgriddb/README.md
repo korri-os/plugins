@@ -68,7 +68,14 @@ requests; Core ADR 0016 allows four calls and eight requests a turn.
 | 2 | `heroes/game/<id>` | `hero` |
 | 2 | `logos/game/<id>?mimes=image/png` | `logo` |
 
-Every turn 2 request also has `types=static`, `nsfw=false` and `humor=false`.
+Every turn 2 request also has `types=static`, `nsfw=false`, `humor=false`
+and `epilepsy=false`. SteamGridDB's API description
+(`https://www.steamgriddb.com/static/openapi.yml`, read 2026-11-12) lists
+`nsfw`, `humor` and `epilepsy` as query parameters of `grids/game/{gameId}`,
+`heroes/game/{gameId}` and `logos/game/{gameId}`. Each is a string with
+default `false`. For `epilepsy` it says: "Set to `false` to filter out
+epilepsy, `true` to only include epilepsy, `any` to include both."
+
 The tile's `dimensions` and `styles` are those of main's `grids_for_game`. In
 the search path, `/` and `?` in the title become spaces (main's
 `url_path_segment`) and the rest is percent-encoded.
@@ -97,9 +104,10 @@ The result is `{ candidates }`. Each candidate is
 the asset's, `source.id` is the asset id as a string, and `source.url` is the
 asset's `url`, unchanged. korrid takes the first candidate of each role.
 
-- **Dropped:** an asset whose `nsfw`, `humor` or `epilepsy` flag is anything
-  but `false` or absent, and an asset whose `tags` list names one of them
-  (main's `safe_grid_tags`).
+- **Dropped:** the requests ask SteamGridDB to filter `nsfw`, `humor` and
+  `epilepsy` out. The plugin also drops an asset whose `nsfw`, `humor` or
+  `epilepsy` flag is anything but `false` or absent, and an asset whose
+  `tags` list names one of them (main's `safe_grid_tags`).
 - **Tile styles:** main's `choose_grid` keeps a tile only when its style is
   `alternate`, `blurred`, `material`, `white` or `black`, or it has none.
   This is ported as it is. It means a `no_logo` tile, which the request asks
@@ -142,7 +150,7 @@ turns and for the image download.
 | Host | Use | Evidence |
 |---|---|---|
 | `www.steamgriddb.com` | the API; the only host that receives the key | SteamGridDB OpenAPI |
-| `cdn2.steamgriddb.com` | images | The `url` of all 444 assets in the responses observed on 2026-11-11 (24 lists, 6 games) is `https://cdn2.steamgriddb.com/…`, with no query and no fragment. |
+| `cdn2.steamgriddb.com` | images | The `url` of all 444 assets in the responses observed on 2026-11-11 (24 lists, 6 games) is `https://cdn2.steamgriddb.com/…`, with no query and no fragment. So is the `url` of both assets in the live tile list of 2026-11-12. |
 
 If SteamGridDB moves its images to another host, korrid refuses the
 download, and `plugin.nix` needs the new host and a new approval.
@@ -154,6 +162,8 @@ download, and `plugin.nix` needs the new host and a new approval.
   `types=game`. The responses observed on 2026-11-11 answer plain titles.
 - The order is preferred size, style, language, API order. Main ordered by
   `score`.
+- Every art request sends `nsfw=false`, `humor=false` and `epilepsy=false`.
+  Main sent none of them.
 - The asset's `nsfw`, `humor` and `epilepsy` flags are read. Main read only
   `tags`, which no observed response has.
 - No title is proposed, no retry waits, and no attempt is recorded. Core
@@ -162,9 +172,10 @@ download, and `plugin.nix` needs the new host and a new approval.
 ## Fixtures
 
 `fixtures/` holds excerpts of SteamGridDB API v2 responses observed on
-2026-11-11 with a personal key. The key travelled only in the request header
-and is in no file. Each asset's `author` is removed and its `notes` is `null`.
-No image is committed. The unit tests read only these files.
+2026-11-11 with a personal key, and one live answer to this plugin's own
+tile request, saved on 2026-11-12. The key travelled only in the request
+header and is in no file. Each asset's `author` is removed and its `notes` is
+`null`. No image is committed. The unit tests read only these files.
 
 | File | Content |
 |---|---|
@@ -176,10 +187,12 @@ No image is committed. The unit tests read only these files.
 | `pokemon-emerald-posters.json` | 8 of the 50 assets returned (`total` 114), in the API's order: positions 0, 1, 3, 29, 32, 40, 41, 42. |
 | `pokemon-emerald-heroes.json` | 4 of 20: positions 0, 1, 3, 13. |
 | `pokemon-emerald-logos.json` | 9 of 35: positions 0, 1, 5, 8, 10, 11, 15, 16, 24. The first is a 3611x1877 logo. |
+| `super-metroid-tiles.json` | The live answer, status 200, to the tile request as korrid sent it: `grids/game/38157?dimensions=512x512&humor=false&nsfw=false&styles=alternate%2Cblurred%2Cmaterial%2Cno_logo&types=static`. Every asset: 2 tiles, both 512x512. The request was sent before `epilepsy=false` was added. |
+| `super-metroid-posters.json` | 4 of the 50 assets returned (`total` 136): positions 0, 1, 4, 43. |
 | `super-metroid-heroes.json` | 5 of 27: positions 11, 12, 15, 18, 26. The first is a 3840x1240 hero. |
+| `super-metroid-logos.json` | 4 of 17: positions 0, 4, 7, 12. |
 | `tetris-logos.json` | Every asset: 3 logos, 2364, 463 and 1155 px wide. |
 | `anguna-posters.json`, `anguna-heroes.json`, `anguna-logos.json` | Every asset: 2 posters, 0 heroes, 2 logos. |
-| `constructed-tiles.json` | **Not an observed response.** No `dimensions=512x512` list was recorded. This list is written by hand in the observed asset shape; its ids and URLs name nothing real. |
 
 There is no live probe: a probe needs a key.
 

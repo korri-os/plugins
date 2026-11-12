@@ -24,24 +24,37 @@ const API_BASE_URL = "https://www.steamgriddb.com/api/v2"
 const JSON_HEADERS = { accept: "application/json" } as const
 
 // --- the operation's wire (Core ADR 0032, section 1) ----------------------
-// Core's generated contract does not carry these types at the pinned
-// revision, so they are stated here from the ADR.
+// These mirror `GameAssetRole`, `GameAssetCandidateSource`,
+// `GameAssetCandidate`, `GameAssetCandidates`,
+// `PluginGameAssetCandidatesInput` and `PluginGameAssetCandidatesOutput` in
+// Korri's `contracts/generated/korrid.ts`. Imports of those types replace
+// them when this repository pins a Korri that has them.
 
+// An enum in the generated contract; these are its values.
 type GameAssetRole = "tile" | "poster" | "hero" | "logo"
+
+interface GameAssetCandidateSource {
+  id?: string
+  url: string
+}
 
 interface GameAssetCandidate {
   role: GameAssetRole
   width?: number
   height?: number
-  source: { id?: string; url: string }
+  source: GameAssetCandidateSource
 }
 
-interface GameAssetCandidatesInput {
+interface GameAssetCandidates {
+  candidates: GameAssetCandidate[]
+}
+
+interface PluginGameAssetCandidatesInput {
   title: string
   responses: PluginHttpResponse[]
 }
 
-type GameAssetCandidatesOutput = PluginHttpRequests | { candidates: GameAssetCandidate[] }
+type PluginGameAssetCandidatesOutput = PluginHttpRequests | GameAssetCandidates
 
 // --- the four art lists of turn 2 -----------------------------------------
 
@@ -143,17 +156,21 @@ function searchRequest(gameTitle: string): PluginHttpRequest {
   }
 }
 
+// SteamGridDB's API description (static/openapi.yml) lists `nsfw`, `humor`
+// and `epilepsy` for all three endpoints. `false` filters them out.
 function artListRequest(list: ArtList, gameId: number): PluginHttpRequest {
   return {
     url: `${API_BASE_URL}/${list.endpoint}/game/${gameId}`,
-    query: { ...list.query, types: "static", nsfw: "false", humor: "false" },
+    query: { ...list.query, types: "static", nsfw: "false", humor: "false", epilepsy: "false" },
     headers: JSON_HEADERS,
   }
 }
 
 // --- handler --------------------------------------------------------------
 
-function gameAssetCandidates(input: GameAssetCandidatesInput): GameAssetCandidatesOutput {
+function gameAssetCandidates(
+  input: PluginGameAssetCandidatesInput,
+): PluginGameAssetCandidatesOutput {
   const gameTitle = typeof input.title === "string" ? input.title : ""
   const wanted = normalizedMatchName(gameTitle)
   // A title with no letter or digit can match no name.
