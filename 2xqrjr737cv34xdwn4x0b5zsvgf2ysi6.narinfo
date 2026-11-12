@@ -1,0 +1,10 @@
+StorePath: /nix/store/2xqrjr737cv34xdwn4x0b5zsvgf2ysi6-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-e146798ee654-moonlight-vaapi-size/1fj8qjmjakkbdqy3bxi9759wrbaldbzi22hs122ibk6qjwi9rj57.nar.xz
+Compression: xz
+FileHash: sha256:1fj8qjmjakkbdqy3bxi9759wrbaldbzi22hs122ibk6qjwi9rj57
+FileSize: 3676
+NarHash: sha256:0fqx6kyx2wz44x2jg101vfjrcs6hvxqa6iqplmqxpabfg3bvn0fk
+NarSize: 11872
+References: 8b9j4fn3kh2kpl4ijiv6maakkfrdpaw0-moonlight-embedded-korri-2.7.1-korri bg8sbhlz9crqsgkirbkcavdgg80h5jiy-moonlight-identity-bootstrap yp29vicq9lrv02rbr73rfx5jj9a0md8d-korri-moonlight-setup.service
+Deriver: aih5prdwmvk47956l65wjhicmy7kzv8i-korri-plugin.drv
+Sig: korri-plugins-1:Gz+zx6DTQMrZnTrOv+Czy6zVGmbSJZcKlVUtwZfjEyShjDWpvg+1GsO6LSWzc6SxoAtd5zCnmz/Hs0lWMeoSAg==
