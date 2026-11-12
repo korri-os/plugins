@@ -81,6 +81,11 @@ interface ArtList {
   readonly query: Readonly<Record<string, string>>
   readonly styleRank: ReadonlyMap<string, number>
   readonly keepsStyle: (style: string | undefined) => boolean
+  // An asset known to be no larger than this comes before every other one.
+  // korrid takes the first candidate, and the shell keeps 24 MiB of decoded
+  // pixels for a surface: a 3840x1240 hero alone is 19 MB once decoded, a
+  // 1920x620 one is under 5 MB.
+  readonly preferredSize?: { readonly width: number; readonly height?: number }
 }
 
 const anyStyle = () => true
@@ -101,6 +106,8 @@ const ART_LISTS: readonly ArtList[] = [
     query: { dimensions: "600x900" },
     styleRank: GRID_STYLE_RANK,
     keepsStyle: anyStyle,
+    // The size the request asks for.
+    preferredSize: { width: 600, height: 900 },
   },
   {
     role: "hero",
@@ -108,6 +115,7 @@ const ART_LISTS: readonly ArtList[] = [
     query: {},
     styleRank: GRID_STYLE_RANK,
     keepsStyle: anyStyle,
+    preferredSize: { width: 1920 },
   },
   {
     role: "logo",
@@ -264,18 +272,33 @@ function artAssets(response: PluginHttpResponse, role: GameAssetRole): ArtAsset[
   })
 }
 
-// Style preference, then English, then the API's own order. Not `score`: it
-// was 0 on all 444 assets observed.
+function hasPreferredSize(list: ArtList, asset: ArtAsset): boolean {
+  const size = list.preferredSize
+  if (size === undefined) return true
+  if (!isPixelCount(asset.width) || asset.width > size.width) return false
+  return size.height === undefined || (isPixelCount(asset.height) && asset.height <= size.height)
+}
+
+// The role's preferred size first, then style preference, then English, then
+// the API's own order. A larger asset still follows, so a game that has only
+// larger ones keeps its art. Not `score`: it was 0 on all 444 assets observed.
 function roleCandidates(list: ArtList, assets: readonly ArtAsset[]): GameAssetCandidate[] {
   return assets
     .filter(asset => list.keepsStyle(asset.style))
     .map((asset, apiOrder) => ({
       asset,
       apiOrder,
+      size: hasPreferredSize(list, asset) ? 0 : 1,
       style: (asset.style === undefined ? undefined : list.styleRank.get(asset.style)) ?? UNRANKED_STYLE,
       language: asset.language === "en" ? 0 : 1,
     }))
-    .sort((a, b) => a.style - b.style || a.language - b.language || a.apiOrder - b.apiOrder)
+    .sort(
+      (a, b) =>
+        a.size - b.size ||
+        a.style - b.style ||
+        a.language - b.language ||
+        a.apiOrder - b.apiOrder,
+    )
     .map(({ asset }) => ({
       role: list.role,
       ...(isPixelCount(asset.width) ? { width: asset.width } : {}),
