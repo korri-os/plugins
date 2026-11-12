@@ -131,6 +131,24 @@
       "downvotes": 0
     },
     {
+      "id": 122408,
+      "score": 0,
+      "style": "official",
+      "width": 830,
+      "height": 355,
+      "nsfw": false,
+      "humor": false,
+      "notes": null,
+      "mime": "image/png",
+      "language": "en",
+      "url": "https://cdn2.steamgriddb.com/logo/5fc6bba3b49d8765a27712ef46444a54.png",
+      "thumb": "https://cdn2.steamgriddb.com/logo_thumb/5fc6bba3b49d8765a27712ef46444a54.png",
+      "lock": false,
+      "epilepsy": false,
+      "upvotes": 0,
+      "downvotes": 0
+    },
+    {
       "id": 80111,
       "score": 0,
       "style": "official",

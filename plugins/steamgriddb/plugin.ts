@@ -81,10 +81,10 @@ interface ArtList {
   readonly query: Readonly<Record<string, string>>
   readonly styleRank: ReadonlyMap<string, number>
   readonly keepsStyle: (style: string | undefined) => boolean
-  // An asset known to be no larger than this comes before every other one.
-  // korrid takes the first candidate, and the shell keeps 24 MiB of decoded
-  // pixels for a surface: a 3840x1240 hero alone is 19 MB once decoded, a
-  // 1920x620 one is under 5 MB.
+  // An asset known to be no larger than this comes before every other one:
+  // art no larger than a 1920x1080 screen needs. korrid takes the first
+  // candidate, and the shell keeps 24 MiB of decoded pixels for a surface: a
+  // 3840x1240 hero alone is 19 MB once decoded, a 1920x620 one is under 5 MB.
   readonly preferredSize?: { readonly width: number; readonly height?: number }
 }
 
@@ -123,6 +123,9 @@ const ART_LISTS: readonly ArtList[] = [
     query: { mimes: "image/png" },
     styleRank: LOGO_STYLE_RANK,
     keepsStyle: anyStyle,
+    // A 1920 px screen shows a logo at most about 960 px wide. Observed logos
+    // reach 7682 px, and a 3611x1877 one is 27 MB once decoded.
+    preferredSize: { width: 1024 },
   },
 ]
 
