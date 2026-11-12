@@ -3,14 +3,25 @@ let
   source = pkgs.applyPatches {
     name = "moonlight-x11-vaapi-size-source";
     inherit (moonlightPackage) src patches;
-    patchFlags = [ "-p1" "--fuzz=0" ];
+    patchFlags = [
+      "-p1"
+      "--fuzz=0"
+    ];
   };
 in
 pkgs.stdenv.mkDerivation {
   name = "moonlight-x11-vaapi-size-check";
   dontUnpack = true;
-  nativeBuildInputs = [ pkgs.pkg-config pkgs.xvfb-run ];
-  buildInputs = [ pkgs.ffmpeg pkgs.libva pkgs.libX11 pkgs.libglvnd ];
+  nativeBuildInputs = [
+    pkgs.pkg-config
+    pkgs.xvfb-run
+  ];
+  buildInputs = [
+    pkgs.ffmpeg
+    pkgs.libva
+    pkgs.libX11
+    pkgs.libglvnd
+  ];
   buildPhase = ''
     $CC -std=gnu11 -DHAVE_X11 -DHAVE_VAAPI \
       -ffunction-sections -fdata-sections -Wl,--gc-sections \

@@ -1,0 +1,29 @@
+From: Korri contributors
+Subject: [PATCH] x11: present VA-API frames at the current window size
+
+The compositor can make a windowed viewer fullscreen after setup. Its output
+size can differ from the encoded stream, and can change again during playback.
+Use the real window geometry at presentation time, not setup's stream size.
+Leave decoder dimensions and the software EGL path unchanged.
+
+--- a/src/video/x11.c
++++ b/src/video/x11.c
+@@ -60,8 +60,16 @@
+     if (ffmpeg_decoder == SOFTWARE)
+       egl_draw(frame->data);
+     #ifdef HAVE_VAAPI
+-    else if (ffmpeg_decoder == VAAPI)
+-      vaapi_queue(frame, window, display_width, display_height);
++    else if (ffmpeg_decoder == VAAPI) {
++      /* Windowed setup uses the encoded size, but a compositor can resize
++       * that window independently (including fullscreen on another output).
++       * Query here so presentation follows the actual render target without
++       * relying on input event handling or changing decoder dimensions. */
++      XWindowAttributes attributes;
++      if (XGetWindowAttributes(display, window, &attributes) &&
++          attributes.width > 0 && attributes.height > 0)
++        vaapi_queue(frame, window, attributes.width, attributes.height);
++    }
+     #endif
+   }
+ 

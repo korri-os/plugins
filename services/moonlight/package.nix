@@ -78,6 +78,8 @@ stdenv.mkDerivation rec {
     ./patches/0021-add-v4l2request-stateless-platform.patch
     ./patches/0022-v4l2request-zero-copy-gl-background-window.patch
     ./patches/0023-report-connected-viewer-status.patch
+    # X11 VA-API must follow compositor fullscreen/resizes, not encoded size.
+    ./patches/0024-x11-vaapi-present-to-current-window-size.patch
   ];
 
   nativeBuildInputs = [
