@@ -107,13 +107,15 @@ asset's `url`, unchanged. korrid takes the first candidate of each role.
 - **Order within a role:** the preferred size, then style, then `language`
   `en` first, then the API's own order. `score` is not used: it was 0 on all
   444 assets observed.
-- **Preferred size:** a hero no wider than 1920 px comes before every wider
-  one, and a poster no larger than 600x900 before every larger one. korrid
-  takes the first candidate, and the shell keeps 24 MiB of decoded pixels for
-  a surface. A 3840x1240 hero is 19 MB once decoded; a 1920x620 one is under
+- **Preferred size:** the plugin prefers art no larger than a 1920x1080
+  screen needs. A hero no wider than 1920 px comes before every wider one, a
+  logo no wider than 1024 px before every wider one, and a poster no larger
+  than 600x900 before every larger one. korrid takes the first candidate, and
+  the shell keeps 24 MiB of decoded pixels for a surface. A 3840x1240 hero is
+  19 MB once decoded and a 3611x1877 logo is 27 MB; a 1920x620 hero is under
   5 MB. A larger asset still follows, so a game that has only larger ones
-  keeps its art. An asset whose size is not known counts as larger. Tiles and
-  logos have no preferred size.
+  keeps its art. An asset whose size is not known counts as larger. Tiles
+  have no preferred size: the request asks for 512x512 only.
 
 | Role | Style order |
 |---|---|
@@ -169,7 +171,7 @@ No image is committed. The unit tests read only these files.
 | `search-empty.json` | The answer for "µCity": no names. |
 | `pokemon-emerald-posters.json` | 8 of the 50 assets returned (`total` 114), in the API's order: positions 0, 1, 3, 29, 32, 40, 41, 42. |
 | `pokemon-emerald-heroes.json` | 4 of 20: positions 0, 1, 3, 13. |
-| `pokemon-emerald-logos.json` | 8 of 35: positions 0, 1, 5, 8, 10, 11, 15, 24. |
+| `pokemon-emerald-logos.json` | 9 of 35: positions 0, 1, 5, 8, 10, 11, 15, 16, 24. The first is a 3611x1877 logo. |
 | `super-metroid-heroes.json` | 5 of 27: positions 11, 12, 15, 18, 26. The first is a 3840x1240 hero. |
 | `anguna-posters.json`, `anguna-heroes.json`, `anguna-logos.json` | Every asset: 2 posters, 0 heroes, 2 logos. |
 | `constructed-tiles.json` | **Not an observed response.** No `dimensions=512x512` list was recorded. This list is written by hand in the observed asset shape; its ids and URLs name nothing real. |
