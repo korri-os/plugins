@@ -10,10 +10,23 @@
 // plugin.nix names as `credentialHost` (Core ADR 0034).
 
 import type {
+  GameAssetCandidate,
+  GameAssetCandidates,
+  GameAssetRole,
+  PluginGameAssetCandidatesInput,
   PluginHttpRequest,
   PluginHttpRequests,
   PluginHttpResponse,
 } from "../../contracts/generated/korrid"
+
+// The wire enum is type-only: the sandbox cannot import generated Rust code.
+// So a role is written as the enum's string value, and the output is
+// `PluginGameAssetCandidatesOutput` with that role.
+type Role = `${GameAssetRole}`
+type Candidate = Omit<GameAssetCandidate, "role"> & { role: Role }
+type CandidatesOutput =
+  | PluginHttpRequests
+  | (Omit<GameAssetCandidates, "candidates"> & { candidates: Candidate[] })
 
 export const name = "steamgriddb"
 export const title = "SteamGridDB"
@@ -22,39 +35,6 @@ export const description =
 
 const API_BASE_URL = "https://www.steamgriddb.com/api/v2"
 const JSON_HEADERS = { accept: "application/json" } as const
-
-// --- the operation's wire (Core ADR 0032, section 1) ----------------------
-// These mirror `GameAssetRole`, `GameAssetCandidateSource`,
-// `GameAssetCandidate`, `GameAssetCandidates`,
-// `PluginGameAssetCandidatesInput` and `PluginGameAssetCandidatesOutput` in
-// Korri's `contracts/generated/korrid.ts`. Imports of those types replace
-// them when this repository pins a Korri that has them.
-
-// An enum in the generated contract; these are its values.
-type GameAssetRole = "tile" | "poster" | "hero" | "logo"
-
-interface GameAssetCandidateSource {
-  id?: string
-  url: string
-}
-
-interface GameAssetCandidate {
-  role: GameAssetRole
-  width?: number
-  height?: number
-  source: GameAssetCandidateSource
-}
-
-interface GameAssetCandidates {
-  candidates: GameAssetCandidate[]
-}
-
-interface PluginGameAssetCandidatesInput {
-  title: string
-  responses: PluginHttpResponse[]
-}
-
-type PluginGameAssetCandidatesOutput = PluginHttpRequests | GameAssetCandidates
 
 // --- the four art lists of turn 2 -----------------------------------------
 
@@ -89,7 +69,7 @@ const TILE_STYLES: ReadonlySet<string> = new Set([
 ])
 
 interface ArtList {
-  readonly role: GameAssetRole
+  readonly role: Role
   readonly endpoint: "grids" | "heroes" | "logos"
   readonly query: Readonly<Record<string, string>>
   readonly styleRank: ReadonlyMap<string, number>
@@ -170,7 +150,7 @@ function artListRequest(list: ArtList, gameId: number): PluginHttpRequest {
 
 function gameAssetCandidates(
   input: PluginGameAssetCandidatesInput,
-): PluginGameAssetCandidatesOutput {
+): CandidatesOutput {
   const gameTitle = typeof input.title === "string" ? input.title : ""
   const wanted = normalizedMatchName(gameTitle)
   // A title with no letter or digit can match no name.
@@ -274,7 +254,7 @@ function isSafe(asset: Record<string, unknown>): boolean {
   return !tags.some(tag => typeof tag === "string" && UNSAFE.includes(tag.toLowerCase()))
 }
 
-function artAssets(response: PluginHttpResponse, role: GameAssetRole): ArtAsset[] {
+function artAssets(response: PluginHttpResponse, role: Role): ArtAsset[] {
   return dataList(response, `${role} list`).flatMap(entry => {
     if (!isRecord(entry) || !isId(entry.id) || typeof entry.url !== "string" || entry.url === "") {
       throw new Error(`SteamGridDB ${role} list returned an unexpected asset`)
@@ -318,7 +298,7 @@ function logoSizeGroup(asset: ArtAsset): number {
 
 // The role's size group first, then style preference, then English, then the
 // API's own order. Not `score`: it was 0 on all 444 assets observed.
-function roleCandidates(list: ArtList, assets: readonly ArtAsset[]): GameAssetCandidate[] {
+function roleCandidates(list: ArtList, assets: readonly ArtAsset[]): Candidate[] {
   return assets
     .filter(asset => list.keepsStyle(asset.style))
     .map((asset, apiOrder) => ({

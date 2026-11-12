@@ -211,7 +211,5 @@ bun test plugins/steamgriddb/plugin.test.ts
 
 The package and its Nix check need a Core that knows `credentialHost` (Core
 ADR 0034) and admits `hosts` for a plugin with a `game-assets.candidates`
-handler (Core ADR 0032). Core `0d0a2513`, the pin when this plugin was
-written, has neither: its builder refuses `credentialHost`, and its host
-refuses `hosts` without a `providers` export. `bun test` and `tsc` need no
-Core change.
+handler (Core ADR 0032). The pinned Core has both since `5d7faee5`. `plugin.ts`
+imports the operation's types from Core's generated contract.
