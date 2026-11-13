@@ -14,8 +14,7 @@ pkgs.runCommand "moonlight-vaapi-check"
     nativeBuildInputs = [
       pkgs.stdenv.cc
       pkgs.pkg-config
-      pkgs.xorg.xorgserver
-      pkgs.xorg.xauth
+      pkgs.xvfb-run
     ];
     # The V4L2 Request extension does not change the VA-API interface. Use
     # the unmodified FFmpeg at the same pin to keep this check small.
@@ -30,14 +29,6 @@ pkgs.runCommand "moonlight-vaapi-check"
       ${source}/src/video/ffmpeg_vaapi.c ${./test-vaapi.c} \
       $(pkg-config --cflags --libs libavcodec libavutil libva-x11 x11) -o check-vaapi
     export HOME="$TMPDIR" LIBVA_DRIVER_NAME=korri_missing_driver
-    Xvfb :79 -screen 0 640x480x24 -nolisten tcp &
-    server=$!
-    trap 'kill "$server"; wait "$server" || true' EXIT
-    export DISPLAY=:79
-    for attempt in $(seq 1 50); do
-      if test -S /tmp/.X11-unix/X79; then break; fi
-      sleep .1
-    done
-    ./check-vaapi
+    xvfb-run -a -s '-screen 0 640x480x24 -nolisten tcp' ./check-vaapi
     touch "$out"
   ''
