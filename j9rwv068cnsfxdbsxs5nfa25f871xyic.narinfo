@@ -1,0 +1,10 @@
+StorePath: /nix/store/j9rwv068cnsfxdbsxs5nfa25f871xyic-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-2094c1e77471-moonlight-latest-frame/0xvccj8ar2i2v3v0az6qzyl2ri8b8k0y4v3zaglfhvx0q061j5ai.nar.xz
+Compression: xz
+FileHash: sha256:0xvccj8ar2i2v3v0az6qzyl2ri8b8k0y4v3zaglfhvx0q061j5ai
+FileSize: 3680
+NarHash: sha256:0xqrzxkbygdr0qp7hvizgz9w2vbgcsafxmpjx92s06x3hlxhvifh
+NarSize: 11872
+References: 38crl2m37akjqqscrmnq1gbwrp8l3rcx-moonlight-embedded-korri-2.7.1-korri jd3wzql0yspldc4ci5q6g76lkvc8fs9d-korri-moonlight-setup.service nnaibbc4m440dj6rdl3n860ljcal4d2k-moonlight-identity-bootstrap
+Deriver: vyxh2hkl9jkzwj2r1llpjw2f8x88y52l-korri-plugin.drv
+Sig: korri-plugins-1:CpINk7LyPSfuiTdEXQeRHoBH6E641mZgNgCIImVaYImjhnVJVkHbNpqyV0rZPAaRyyKTQ8v6SHWcoORydejJDA==

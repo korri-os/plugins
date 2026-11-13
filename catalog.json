@@ -1,26 +1,26 @@
 {
   "latest": {
-    "@korri:moonlight": "build-01aa869233bd-moonlight-vaapi"
+    "@korri:moonlight": "build-2094c1e77471-moonlight-latest-frame"
   },
   "records": [
     {
-      "archive_sha256": "a10f8cf78b72f35f7e936dfb8a280b766b44fea563ae30b4668b47e516d383d4",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-01aa869233bd-moonlight-vaapi/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-01aa869233bd-moonlight-vaapi-aarch64-linux.tar",
+      "archive_sha256": "47375a9a534b3e96d07c1e2d8fb5b139e975bd3ad92001060ac7b43110eb99e7",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-2094c1e77471-moonlight-latest-frame/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-2094c1e77471-moonlight-latest-frame-aarch64-linux.tar",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:moonlight",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-01aa869233bd-moonlight-vaapi",
-      "store_path": "/nix/store/ajg2xfchl04r2gf0sxvrlgmw6ikhq9ma-korri-plugin",
+      "release_version": "build-2094c1e77471-moonlight-latest-frame",
+      "store_path": "/nix/store/injra37hf1fdjyqxqyigw7w9qpnd0jig-korri-plugin",
       "title": "Moonlight stream viewer"
     },
     {
-      "archive_sha256": "844bebdb0171d0114b433d84480e2756b33cdea287409f802c32fbe3a33b0127",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-01aa869233bd-moonlight-vaapi/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-01aa869233bd-moonlight-vaapi-x86_64-linux.tar",
+      "archive_sha256": "5af042ac93d66a39751518aad67e3c96ccadda25df8027073a4c4f34661ae000",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-2094c1e77471-moonlight-latest-frame/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-2094c1e77471-moonlight-latest-frame-x86_64-linux.tar",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:moonlight",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-01aa869233bd-moonlight-vaapi",
-      "store_path": "/nix/store/sr9al63p9cd3f7v85ap2q8d6cs92d4d1-korri-plugin",
+      "release_version": "build-2094c1e77471-moonlight-latest-frame",
+      "store_path": "/nix/store/j9rwv068cnsfxdbsxs5nfa25f871xyic-korri-plugin",
       "title": "Moonlight stream viewer"
     }
   ]
