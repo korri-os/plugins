@@ -72,12 +72,16 @@ int main(void) {
     frame.pts = id;
     queue_frame(&frame);
   }
+  assert(av_buffer_get_ref_count(frame.buf[0]) == 2);
   frame.pts = 2000;
   arrive_during_presentation = &frame;
   assert(frame_handle(pipefd[0]) == LOOP_OK);
   assert(presentations == before + 1);
   assert(presented_pts == 1999);
   assert(pending_frame != NULL);
+  assert(av_buffer_get_ref_count(frame.buf[0]) == 2);
+  AVBufferRef* retained = av_buffer_ref(frame.buf[0]);
+  assert(retained);
   av_frame_unref(&frame);
   assert(frame_handle(pipefd[0]) == LOOP_OK);
   assert(presented_pts == 2000);
@@ -85,6 +89,8 @@ int main(void) {
   assert(pending_frame == NULL);
   assert(frame_handle(pipefd[0]) == LOOP_OK);
   assert(presentations == before + 2);
+  assert(av_buffer_get_ref_count(retained) == 1);
+  av_buffer_unref(&retained);
 
   close(pipefd[0]);
   close(pipefd[1]);
