@@ -54,6 +54,7 @@ let
   gamescope = [ "korri-gamescope-plugin" ];
   bitsybox = [ "korri-bitsybox-plugin" ];
   moonlight = [
+    "korri-moonlight-vaapi"
     "korri-moonlight-viewer-presence"
     "korri-moonlight-x11-vaapi-size"
     "korri-moonlight-server-pin"

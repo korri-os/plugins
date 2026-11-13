@@ -432,6 +432,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         korri-moonlight-x11-vaapi-size = import ../services/moonlight/x11-vaapi-size-check.nix {
           inherit pkgs moonlightPackage;
         };
+        korri-moonlight-vaapi = import ../services/moonlight/vaapi-check.nix {
+          inherit pkgs moonlightPackage;
+        };
         korri-moonlight-server-pin = import ../services/moonlight/server-pin-check.nix {
           inherit pkgs moonlightPackage;
         };

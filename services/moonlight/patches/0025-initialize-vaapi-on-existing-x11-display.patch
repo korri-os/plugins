@@ -1,0 +1,122 @@
+Moonlight: initialize VA-API on the existing X11 display (#439)
+
+FFmpeg 9.0.2 in nixpkgs has no Xlib device factory. A DRM-created VA
+
+display cannot present X drawables through vaPutSurface. Reuse the X
+
+connection opened by x11_init instead, and initialize an externally
+
+provided VA display using the public FFmpeg hardware-context API.
+
+This respects DISPLAY, including the private cadence X server. The X
+
+connection outlives both decoder frames and the VA device.
+
+
+
+Cost: Korri carries one more Moonlight patch until upstream changes.
+
+No FFmpeg rebuild or additional runtime dependency is needed.
+
+diff --git a/src/video/ffmpeg_vaapi.c b/src/video/ffmpeg_vaapi.c
+index 702a27f..192b367 100644
+--- a/src/video/ffmpeg_vaapi.c
++++ b/src/video/ffmpeg_vaapi.c
+@@ -44,11 +44,11 @@ static enum AVPixelFormat va_get_format(AVCodecContext* context, const enum AVPi
+
+   if (av_hwframe_ctx_init(hw_ctx) < 0) {
+     fprintf(stderr, "Failed to initialize VAAPI frame context");
++    av_buffer_unref(&hw_ctx);
+     return AV_PIX_FMT_NONE;
+   }
+
+   context->pix_fmt = AV_PIX_FMT_VAAPI;
+-  context->hw_device_ctx = device_ref;
+   context->hw_frames_ctx = hw_ctx;
+   context->slice_flags = SLICE_FLAG_CODED_ORDER | SLICE_FLAG_ALLOW_FIELD;
+   return AV_PIX_FMT_VAAPI;
+@@ -58,11 +58,50 @@ static int va_get_buffer(AVCodecContext* context, AVFrame* frame, int flags) {
+   return av_hwframe_get_buffer(context->hw_frames_ctx, frame, 0);
+ }
+
+-int vaapi_init_lib() {
+-  return av_hwdevice_ctx_create(&device_ref, AV_HWDEVICE_TYPE_VAAPI, ":0", NULL, 0);
++static void vaapi_device_free(AVHWDeviceContext* device) {
++  AVVAAPIDeviceContext* va_ctx = device->hwctx;
++  if (va_ctx->display)
++    vaTerminate(va_ctx->display);
++}
++
++void vaapi_cleanup_lib(void) {
++  av_buffer_unref(&device_ref);
++}
++
++int vaapi_init_lib(Display* display) {
++  device_ref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_VAAPI);
++  if (!device_ref)
++    return AVERROR(ENOMEM);
++
++  AVHWDeviceContext* device = (AVHWDeviceContext*)device_ref->data;
++  AVVAAPIDeviceContext* va_ctx = device->hwctx;
++  device->free = vaapi_device_free;
++  // Decode and vaPutSurface must use the same X11-backed VA display.
++  // FFmpeg's device-create helper is built without Xlib in nixpkgs.
++  va_ctx->display = vaGetDisplay(display);
++  if (!va_ctx->display) {
++    vaapi_cleanup_lib();
++    return AVERROR(ENODEV);
++  }
++
++  int major, minor;
++  VAStatus status = vaInitialize(va_ctx->display, &major, &minor);
++  if (status != VA_STATUS_SUCCESS) {
++    fprintf(stderr, "Failed to initialize X11 VAAPI display: %s\n", vaErrorStr(status));
++    vaapi_cleanup_lib();
++    return AVERROR(EIO);
++  }
++
++  int result = av_hwdevice_ctx_init(device_ref);
++  if (result < 0)
++    vaapi_cleanup_lib();
++  return result;
+ }
+
+ int vaapi_init(AVCodecContext* decoder_ctx) {
++  decoder_ctx->hw_device_ctx = av_buffer_ref(device_ref);
++  if (!decoder_ctx->hw_device_ctx)
++    return AVERROR(ENOMEM);
+   decoder_ctx->get_format = va_get_format;
+   decoder_ctx->get_buffer2 = va_get_buffer;
+   return 0;
+diff --git a/src/video/ffmpeg_vaapi.h b/src/video/ffmpeg_vaapi.h
+index f87fcd7..0188275 100644
+--- a/src/video/ffmpeg_vaapi.h
++++ b/src/video/ffmpeg_vaapi.h
+@@ -20,6 +20,7 @@
+ #include <va/va.h>
+ #include <X11/Xlib.h>
+
+-int vaapi_init_lib();
++int vaapi_init_lib(Display* display);
++void vaapi_cleanup_lib(void);
+ int vaapi_init(AVCodecContext* decoder_ctx);
+ void vaapi_queue(AVFrame* dec_frame, Window win, int width, int height);
+diff --git a/src/video/x11.c b/src/video/x11.c
+index 80c586c..574fbdf 100644
+--- a/src/video/x11.c
++++ b/src/video/x11.c
+@@ -160,7 +160,13 @@ int x11_setup_vaapi(int videoFormat, int width, int height, int redrawRate, void
+
+ void x11_cleanup() {
+   ffmpeg_destroy();
+-  egl_destroy();
++  if (ffmpeg_decoder == SOFTWARE)
++    egl_destroy();
++  #ifdef HAVE_VAAPI
++  vaapi_cleanup_lib();
++  #endif
++  XCloseDisplay(display);
++  display = NULL;
+ }
+
+ int x11_submit_decode_unit(PDECODE_UNIT decodeUnit) {

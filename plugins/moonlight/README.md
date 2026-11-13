@@ -107,3 +107,38 @@ The native check also typechecks the handlers and runs their unit tests.
 
 Tests use `.mts` so the pinned builder does not ship the test modules in its
 plugin source inventory. Production source remains TypeScript `.ts`.
+
+## PC VA-API display (#439)
+
+Patch 0025 gives FFmpeg an externally initialized VA-API device on the X
+connection that `x11.c` opens with `XOpenDisplay(NULL)`. It uses
+`av_hwdevice_ctx_alloc`, `vaGetDisplay`, `vaInitialize`, then
+`av_hwdevice_ctx_init`. It does not use FFmpeg's device-name factory, which
+cannot open the upstream literal `":0"` with nixpkgs' `--disable-xlib`.
+Both decoding and `vaPutSurface` now use that same X11-backed VA display.
+`DISPLAY` selects the connection, including the cadence fixture's private X.
+libva's X11 backend obtains the render-node connection through DRI.
+
+Grounding: Moonlight `775444287305849ebdf4736c75298ad0713e2d5d`,
+`src/video/ffmpeg_vaapi.c` and `x11.c`; FFmpeg 9.0.2,
+`libavutil/hwcontext_vaapi.c` (`vaapi_device_create`, `vaapi_device_init`);
+libva 2.24.1, `va/x11/va_x11.c` (`vaGetDisplay`, `vaPutSurface`) and its
+DRI backends. Passing NULL to FFmpeg's factory would select a DRM VA display,
+not the X11 display expected by the existing presentation path. Building
+FFmpeg with Xlib would work but would rebuild a large dependency and still
+need to replace the hardcoded display name. Reusing the already linked
+libva-x11 keeps the change inside Moonlight, without a new dependency.
+Cost: one more downstream patch; this remains an X11 viewer, not a new
+DRM-to-EGL renderer.
+
+The decoder holds its own device reference. Cleanup releases decoder frames,
+then the VA device, then the X connection. Initialization failure releases
+the partial device and returns an error, so the existing X11/SDL software
+fallback remains available. The native check exercises failure repeatedly
+against a real Xvfb and missing VA driver, including the caller's retained
+X connection. Successful hardware decode and presentation need the separate
+stream-cadence device proof.
+
+```sh
+nix build --no-link .#checks.x86_64-linux.korri-moonlight-vaapi
+```
