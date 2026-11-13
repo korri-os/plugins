@@ -81,6 +81,7 @@ stdenv.mkDerivation rec {
     # X11 VA-API must follow compositor fullscreen/resizes, not encoded size.
     ./patches/0024-x11-vaapi-present-to-current-window-size.patch
     ./patches/0025-initialize-vaapi-on-existing-x11-display.patch
+    ./patches/0026-vaapi-latest-frame.patch
   ];
 
   nativeBuildInputs = [

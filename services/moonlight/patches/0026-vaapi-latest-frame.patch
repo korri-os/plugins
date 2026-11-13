@@ -1,0 +1,296 @@
+Moonlight: isolate VA-API presentation and keep only the newest frame (#466)
+
+vaPutSurface waits for X Present while holding Mesa's VA display mutex.
+With decode on that display, CAPABILITY_DIRECT_SUBMIT stalls UDP reception
+behind vblank. The backlog grows in the socket, not the X11 pointer pipe.
+SDL instead keeps decoding while its presentation thread waits for vblank.
+
+Use an independent X11-backed VA display for presentation, and share decoded
+surfaces through DMA-buf. Cache imports for the lifetime of their frame pool.
+The X11 hand-off retains exactly one pending frame and owns every frame it
+presents, independent of the decoder's reusable AVFrame wrappers.
+
+VA's export contract requires synchronization before external reads; keep
+that synchronization and the decoded frame alive until rendering completes.
+Cost: a second VA display and roughly 1.5 ms of decode synchronization on aka.
+No FFmpeg rebuild, renderer change, driver-specific toggle or new dependency.
+
+--- a/src/video/x11.c
++++ b/src/video/x11.c
+@@ -37,6 +37,8 @@
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <poll.h>
++#include <pthread.h>
++#include <errno.h>
+
+ #define X11_VDPAU_ACCELERATION ENABLE_HARDWARE_ACCELERATION_1
+ #define X11_VAAPI_ACCELERATION ENABLE_HARDWARE_ACCELERATION_2
+@@ -49,13 +51,46 @@
+ static Window window;
+
+ static int pipefd[2];
++static pthread_mutex_t frame_mutex = PTHREAD_MUTEX_INITIALIZER;
++static AVFrame* pending_frame;
++
++// Own the decoded buffer until presentation ends. The decoder reuses its
++// AVFrame wrappers, so neither the slot nor the renderer may borrow one.
++static void queue_frame(AVFrame* frame) {
++  AVFrame* owned = av_frame_clone(frame);
++  if (!owned) {
++    fprintf(stderr, "Couldn't retain decoded frame\n");
++    return;
++  }
++  pthread_mutex_lock(&frame_mutex);
++  bool notify = pending_frame == NULL;
++  av_frame_free(&pending_frame);
++  pending_frame = owned;
++  if (notify) {
++    char notification = 0;
++    ssize_t result;
++    do {
++      result = write(pipefd[1], &notification, sizeof(notification));
++    } while (result < 0 && errno == EINTR);
++    if (result != sizeof(notification)) {
++      perror("Couldn't notify presentation loop");
++      av_frame_free(&pending_frame);
++    }
++  }
++  pthread_mutex_unlock(&frame_mutex);
++}
+
+ static int display_width;
+ static int display_height;
+
+ static int frame_handle(int pipefd) {
+   AVFrame* frame = NULL;
+-  while (read(pipefd, &frame, sizeof(void*)) > 0);
++  char notification;
++  while (read(pipefd, &notification, sizeof(notification)) > 0);
++  pthread_mutex_lock(&frame_mutex);
++  frame = pending_frame;
++  pending_frame = NULL;
++  pthread_mutex_unlock(&frame_mutex);
+   if (frame) {
+     if (ffmpeg_decoder == SOFTWARE)
+       egl_draw(frame->data);
+@@ -73,6 +108,7 @@
+     #endif
+   }
+
++  av_frame_free(&frame);
+   return LOOP_OK;
+ }
+
+@@ -152,6 +188,7 @@
+   }
+   loop_add_fd(pipefd[0], &frame_handle, POLLIN);
+   fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
++  fcntl(pipefd[1], F_SETFL, O_NONBLOCK);
+
+   x11_input_init(display, window);
+
+@@ -167,6 +204,11 @@
+ }
+
+ void x11_cleanup() {
++  // The connection has stopped submissions before renderer cleanup.
++  av_frame_free(&pending_frame);
++  loop_remove_fd(pipefd[0]);
++  close(pipefd[0]);
++  close(pipefd[1]);
+   ffmpeg_destroy();
+   if (ffmpeg_decoder == SOFTWARE)
+     egl_destroy();
+@@ -193,7 +235,7 @@
+
+   AVFrame* frame = ffmpeg_get_frame(true);
+   if (frame != NULL)
+-    write(pipefd[1], &frame, sizeof(void*));
++    queue_frame(frame);
+
+   return DR_OK;
+ }
+--- a/src/video/ffmpeg_vaapi.c
++++ b/src/video/ffmpeg_vaapi.c
+@@ -19,6 +19,9 @@
+
+ #include <va/va.h>
+ #include <va/va_x11.h>
++#include <va/va_drmcommon.h>
++#include <unistd.h>
++#include <stdlib.h>
+ #include <libavcodec/avcodec.h>
+ #include <libavutil/hwcontext.h>
+ #include <libavutil/hwcontext_vaapi.h>
+@@ -27,6 +30,28 @@
+ #define MAX_SURFACES 16
+
+ static AVBufferRef* device_ref;
++static AVBufferRef* presentation_ref;
++static Display* presentation_x11;
++static AVBufferRef* presentation_frames;
++static struct imported_surface {
++  VASurfaceID decoded, surface;
++  struct imported_surface* next;
++} *imported_surfaces;
++
++static VADisplay device_display(AVBufferRef* ref) {
++  AVHWDeviceContext* device = (AVHWDeviceContext*)ref->data;
++  return ((AVVAAPIDeviceContext*)device->hwctx)->display;
++}
++
++static void clear_imports(void) {
++  while (imported_surfaces) {
++    struct imported_surface* entry = imported_surfaces;
++    imported_surfaces = entry->next;
++    vaDestroySurfaces(device_display(presentation_ref), &entry->surface, 1);
++    free(entry);
++  }
++  av_buffer_unref(&presentation_frames);
++}
+
+ static enum AVPixelFormat va_get_format(AVCodecContext* context, const enum AVPixelFormat* pixel_format) {
+   AVBufferRef* hw_ctx = av_hwframe_ctx_alloc(device_ref);
+@@ -65,22 +90,27 @@
+ }
+
+ void vaapi_cleanup_lib(void) {
++  clear_imports();
++  av_buffer_unref(&presentation_ref);
++  if (presentation_x11) {
++    XCloseDisplay(presentation_x11);
++    presentation_x11 = NULL;
++  }
+   av_buffer_unref(&device_ref);
+ }
+
+-int vaapi_init_lib(Display* display) {
+-  device_ref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_VAAPI);
+-  if (!device_ref)
++static int create_device(Display* display, AVBufferRef** ref) {
++  *ref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_VAAPI);
++  if (!*ref)
+     return AVERROR(ENOMEM);
+
+-  AVHWDeviceContext* device = (AVHWDeviceContext*)device_ref->data;
++  AVHWDeviceContext* device = (AVHWDeviceContext*)(*ref)->data;
+   AVVAAPIDeviceContext* va_ctx = device->hwctx;
+   device->free = vaapi_device_free;
+-  // Decode and vaPutSurface must use the same X11-backed VA display.
+   // FFmpeg's device-create helper is built without Xlib in nixpkgs.
+   va_ctx->display = vaGetDisplay(display);
+   if (!va_ctx->display) {
+-    vaapi_cleanup_lib();
++    av_buffer_unref(ref);
+     return AVERROR(ENODEV);
+   }
+
+@@ -88,11 +118,29 @@
+   VAStatus status = vaInitialize(va_ctx->display, &major, &minor);
+   if (status != VA_STATUS_SUCCESS) {
+     fprintf(stderr, "Failed to initialize X11 VAAPI display: %s\n", vaErrorStr(status));
+-    vaapi_cleanup_lib();
++    av_buffer_unref(ref);
+     return AVERROR(EIO);
+   }
+
+-  int result = av_hwdevice_ctx_init(device_ref);
++  int result = av_hwdevice_ctx_init(*ref);
++  if (result < 0)
++    av_buffer_unref(ref);
++  return result;
++}
++
++int vaapi_init_lib(Display* display) {
++  int result = create_device(display, &device_ref);
++  if (result < 0)
++    return result;
++
++  // vaPutSurface can wait for vblank while holding the VA driver's mutex.
++  // An independent VA display keeps that wait out of the decode/UDP thread.
++  presentation_x11 = XOpenDisplay(DisplayString(display));
++  if (!presentation_x11) {
++    vaapi_cleanup_lib();
++    return AVERROR(ENODEV);
++  }
++  result = create_device(presentation_x11, &presentation_ref);
+   if (result < 0)
+     vaapi_cleanup_lib();
+   return result;
+@@ -107,9 +155,71 @@
+   return 0;
+ }
+
++static VAStatus import_surface(VASurfaceID decoded, VASurfaceID* surface) {
++  for (struct imported_surface* entry = imported_surfaces; entry; entry = entry->next) {
++    if (entry->decoded == decoded) {
++      *surface = entry->surface;
++      return VA_STATUS_SUCCESS;
++    }
++  }
++  VADRMPRIMESurfaceDescriptor descriptor;
++  VAStatus status = vaExportSurfaceHandle(device_display(device_ref), decoded,
++      VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2,
++      VA_EXPORT_SURFACE_READ_ONLY | VA_EXPORT_SURFACE_COMPOSED_LAYERS, &descriptor);
++  if (status != VA_STATUS_SUCCESS)
++    return status;
++
++  VASurfaceAttrib attributes[] = {
++    {.type = VASurfaceAttribMemoryType, .flags = VA_SURFACE_ATTRIB_SETTABLE,
++     .value = {.type = VAGenericValueTypeInteger,
++               .value.i = VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2}},
++    {.type = VASurfaceAttribExternalBufferDescriptor, .flags = VA_SURFACE_ATTRIB_SETTABLE,
++     .value = {.type = VAGenericValueTypePointer, .value.p = &descriptor}},
++  };
++  status = vaCreateSurfaces(device_display(presentation_ref), VA_RT_FORMAT_YUV420,
++      descriptor.width, descriptor.height, surface, 1, attributes, 2);
++  for (uint32_t i = 0; i < descriptor.num_objects; ++i)
++    close(descriptor.objects[i].fd);
++  if (status != VA_STATUS_SUCCESS)
++    return status;
++
++  struct imported_surface* entry = malloc(sizeof(*entry));
++  if (!entry) {
++    vaDestroySurfaces(device_display(presentation_ref), surface, 1);
++    return VA_STATUS_ERROR_ALLOCATION_FAILED;
++  }
++  *entry = (struct imported_surface){decoded, *surface, imported_surfaces};
++  imported_surfaces = entry;
++  return VA_STATUS_SUCCESS;
++}
++
+ void vaapi_queue(AVFrame* dec_frame, Window win, int width, int height) {
+-  VASurfaceID surface = (VASurfaceID)(uintptr_t)dec_frame->data[3];
+-  AVHWDeviceContext* device = (AVHWDeviceContext*) device_ref->data;
+-  AVVAAPIDeviceContext *va_ctx = device->hwctx;
+-  vaPutSurface(va_ctx->display, surface, win, 0, 0, dec_frame->width, dec_frame->height, 0, 0, width, height, NULL, 0, 0);
++  // The frame pool owns surface IDs. Retain that pool while imports exist,
++  // and discard its imports when the decoder changes pools (e.g. a resize).
++  if (!presentation_frames || presentation_frames->data != dec_frame->hw_frames_ctx->data) {
++    clear_imports();
++    presentation_frames = av_buffer_ref(dec_frame->hw_frames_ctx);
++    if (!presentation_frames) {
++      fprintf(stderr, "Couldn't retain VAAPI frame pool\n");
++      return;
++    }
++  }
++  VASurfaceID decoded = (VASurfaceID)(uintptr_t)dec_frame->data[3];
++  VADisplay target = device_display(presentation_ref);
++  VAStatus status = vaSyncSurface(device_display(device_ref), decoded);
++  if (status != VA_STATUS_SUCCESS)
++    goto error;
++  VASurfaceID surface;
++  status = import_surface(decoded, &surface);
++  if (status != VA_STATUS_SUCCESS)
++    goto error;
++  status = vaPutSurface(target, surface, win, 0, 0, dec_frame->width,
++      dec_frame->height, 0, 0, width, height, NULL, 0, 0);
++  // Keep the decoded buffer alive until the GPU has finished reading it.
++  if (status == VA_STATUS_SUCCESS)
++    status = vaSyncSurface(target, surface);
++  if (status == VA_STATUS_SUCCESS)
++    return;
++error:
++  fprintf(stderr, "VAAPI presentation failed: %s\n", vaErrorStr(status));
+ }

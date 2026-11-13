@@ -6,6 +6,8 @@
 static int presented_width;
 static int presented_height;
 static int presentations;
+static int64_t presented_pts;
+static AVFrame* arrive_during_presentation;
 enum decoders ffmpeg_decoder = VAAPI;
 
 void vaapi_queue(AVFrame* frame, Window target, int width, int height) {
@@ -13,14 +15,22 @@ void vaapi_queue(AVFrame* frame, Window target, int width, int height) {
   assert(target == window);
   presented_width = width;
   presented_height = height;
+  assert(frame->buf[0] != NULL);
+  presented_pts = frame->pts;
   presentations++;
+  if (arrive_during_presentation) {
+    // A blocked presenter must not hold the producer's mailbox lock.
+    AVFrame* next = arrive_during_presentation;
+    arrive_during_presentation = NULL;
+    queue_frame(next);
+  }
 }
 
 static void present_at(AVFrame* frame, int width, int height) {
   XResizeWindow(display, window, width, height);
   XSync(display, False);
   int before = presentations;
-  assert(write(pipefd[1], &frame, sizeof(frame)) == sizeof(frame));
+  queue_frame(frame);
   assert(frame_handle(pipefd[0]) == LOOP_OK);
   assert(presentations == before + 1);
   assert(presented_width == width);
@@ -37,7 +47,10 @@ int main(void) {
   assert(pipe(pipefd) == 0);
   assert(fcntl(pipefd[0], F_SETFL, O_NONBLOCK) == 0);
 
-  AVFrame frame = {.width = 1920, .height = 1080};
+  AVFrame frame = {.format = AV_PIX_FMT_YUV420P, .width = 3840, .height = 2160};
+  assert(av_frame_get_buffer(&frame, 32) == 0);
+  frame.width = 1920;
+  frame.height = 1080;
   // The windowed setup starts with stream dimensions. Korri's compositor then
   // expands that same window to the output, without changing decoded frames.
   display_width = frame.width;
@@ -51,6 +64,27 @@ int main(void) {
   frame.height = display_height = 2160;
   present_at(&frame, 1280, 720);
   present_at(&frame, 1920, 1080);
+
+  // A burst replaces the single pending frame, rather than filling a pipe
+  // or keeping decoder-owned wrappers. The renderer sees only the newest ID.
+  int before = presentations;
+  for (int id = 0; id < 2000; ++id) {
+    frame.pts = id;
+    queue_frame(&frame);
+  }
+  frame.pts = 2000;
+  arrive_during_presentation = &frame;
+  assert(frame_handle(pipefd[0]) == LOOP_OK);
+  assert(presentations == before + 1);
+  assert(presented_pts == 1999);
+  assert(pending_frame != NULL);
+  av_frame_unref(&frame);
+  assert(frame_handle(pipefd[0]) == LOOP_OK);
+  assert(presented_pts == 2000);
+  assert(presentations == before + 2);
+  assert(pending_frame == NULL);
+  assert(frame_handle(pipefd[0]) == LOOP_OK);
+  assert(presentations == before + 2);
 
   close(pipefd[0]);
   close(pipefd[1]);
