@@ -1,26 +1,26 @@
 {
   "latest": {
-    "@korri:moonlight": "build-e146798ee654-moonlight-vaapi-size"
+    "@korri:moonlight": "build-01aa869233bd-moonlight-vaapi"
   },
   "records": [
     {
-      "archive_sha256": "3bf610495aa43b7ed3ef3f87c6093c0dfe6c9146dd185642bc110a34d81c7fe0",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-e146798ee654-moonlight-vaapi-size/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-e146798ee654-moonlight-vaapi-size-aarch64-linux.tar",
+      "archive_sha256": "a10f8cf78b72f35f7e936dfb8a280b766b44fea563ae30b4668b47e516d383d4",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-01aa869233bd-moonlight-vaapi/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-01aa869233bd-moonlight-vaapi-aarch64-linux.tar",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:moonlight",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-e146798ee654-moonlight-vaapi-size",
-      "store_path": "/nix/store/2xqrjr737cv34xdwn4x0b5zsvgf2ysi6-korri-plugin",
+      "release_version": "build-01aa869233bd-moonlight-vaapi",
+      "store_path": "/nix/store/ajg2xfchl04r2gf0sxvrlgmw6ikhq9ma-korri-plugin",
       "title": "Moonlight stream viewer"
     },
     {
-      "archive_sha256": "89306d1a6ad8106ff20a50af5f9784171d0e6a6ff145eda202ae029e5cfb5552",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-e146798ee654-moonlight-vaapi-size/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-e146798ee654-moonlight-vaapi-size-x86_64-linux.tar",
+      "archive_sha256": "844bebdb0171d0114b433d84480e2756b33cdea287409f802c32fbe3a33b0127",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-01aa869233bd-moonlight-vaapi/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-01aa869233bd-moonlight-vaapi-x86_64-linux.tar",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:moonlight",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-e146798ee654-moonlight-vaapi-size",
-      "store_path": "/nix/store/cjrw31vp6rm47pmjzq1d9z1p3h4jb08v-korri-plugin",
+      "release_version": "build-01aa869233bd-moonlight-vaapi",
+      "store_path": "/nix/store/sr9al63p9cd3f7v85ap2q8d6cs92d4d1-korri-plugin",
       "title": "Moonlight stream viewer"
     }
   ]

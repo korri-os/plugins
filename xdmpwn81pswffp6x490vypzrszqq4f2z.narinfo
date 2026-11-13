@@ -1,0 +1,10 @@
+StorePath: /nix/store/xdmpwn81pswffp6x490vypzrszqq4f2z-moonlight-embedded-korri-2.7.1-korri
+URL: https://github.com/korri-os/plugins/releases/download/build-01aa869233bd-moonlight-vaapi/0pgn2xwzrcnv5mlp1z4bds8kak2gwypw1bv1irdl7z6gfi15hdq4.nar.xz
+Compression: xz
+FileHash: sha256:0pgn2xwzrcnv5mlp1z4bds8kak2gwypw1bv1irdl7z6gfi15hdq4
+FileSize: 230544
+NarHash: sha256:1dbpsann6sz7yxszb5qd68an0453a5f7m0l2b2r1lai9yn219rss
+NarSize: 1924512
+References: 146p48bxbq5bi1ml0cgb5hxcggzr5zic-libvdpau-1.5 2pjfyrkyg58l7pvgq2sp1n7k9bxdvn9c-libva-2.24.1 33r0n37000780rlkipq2zna6yn0aw20f-openssl-3.5.9 9drcxizh69156rz75arx94jk4qsr0djn-alsa-lib-1.2.16.1 9qkvx8c89fqsz63f4z9gngk9hpi00ss4-sdl2-compat-2.32.74 cgkb2rrqpimj60nlgjx1pi73amr2pvs0-libglvnd-1.7.0 clhw30lq5sdyxp5g4qrwgj8q0hkh0xaf-libcec-8.1.7 dr4a9i5phq957h32aqp3zcq032pipn4w-libevdev-1.13.6 fswvlms7shl7g7zz6akl26h0h9v32hp5-libpulseaudio-17.0 gdvix6m2w7m3xiglxhib9lcifmna8xv7-systemd-minimal-262 h9qbcz1xnvmgc9ss15qfmp068ira786k-libopus-1.6.1 jv85lpz4741w4g3fy9ydaq1d43p7sc72-avahi-0.8 l8xpwwa62pxa48ng6bzv18qwskp8ln7s-expat-2.9.0 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 ps10cr1hswz0nkcdxjvh9zlcsrjilqlk-libdrm-2.4.134 r5w60683qmv7p1lzdj6xd9i0lms8b42i-curl-8.22.0 wxl16fwrvss9l7zsdvg812wafshsvs45-ffmpeg-9.0.2-lib xdmpwn81pswffp6x490vypzrszqq4f2z-moonlight-embedded-korri-2.7.1-korri yll8jid7z53niibrabd32lyqrzakad8q-util-linux-2.42.4-lib z3zmyjnprxn412i0hsrbxdczwxjbam0p-libx11-1.8.13
+Deriver: nyf6iyirmv1xrlmzy98zqlwcw1336si3-moonlight-embedded-korri-2.7.1-korri.drv
+Sig: korri-plugins-1:Gs0erNDHJHNs8sJhT9HXdCGfyzOm+Ux+S2JehzVGKgjY52iq1L5gyhD8DfqEpZCsikOdQDdxmJu+G/Ej65ItBA==
