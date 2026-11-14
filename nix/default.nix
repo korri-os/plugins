@@ -50,6 +50,25 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = ../plugins/moonlight;
       plugin = _: moonlightDefinition;
     };
+    # @korri:viewer is built from the Korri input (ADR 0061). Only its PC
+    # picture paths have a proof; the aarch64 v4l2request path has none on a
+    # bench device yet (ADR 0063), so x86_64 alone exports it.
+    viewer = import "${korri}/clients/viewer" { inherit pkgs; };
+    viewerDefinition = import ../plugins/viewer/plugin.nix { inherit pkgs viewer; };
+    # One settings source for both viewers (#435): Moonlight's, answering for
+    # the viewer's runner. Its schema and arguments are not redesigned.
+    viewerSource = pkgs.runCommand "korri-viewer-plugin-source" { } ''
+      mkdir -p "$out"
+      cp ${../plugins/viewer/plugin.ts} "$out/plugin.ts"
+      substitute ${../plugins/moonlight/settings.ts} "$out/settings.ts" \
+        --replace-fail '"@korri:moonlight/moonlight"' '"@korri:viewer/viewer"'
+    '';
+    viewerPlugin = mkPlugin {
+      publisher.namespace = "@korri";
+      source = viewerSource;
+      plugin = _: viewerDefinition;
+    };
+    hasViewer = pkgs.stdenv.hostPlatform.isx86_64;
     sshPackage = mkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/ssh;
@@ -235,7 +254,30 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         tailscalePackage
         sshPackage
         sunshinePlugin
+        moonlightPlugin
+        hasViewer
+        viewerPlugin
         ;
+      # The same plugin with one byte of its treaty changed: korrid must
+      # refuse it and keep Moonlight.
+      viewerOtherContract = mkPlugin {
+        publisher.namespace = "@korri";
+        source = viewerSource;
+        plugin =
+          _:
+          viewerDefinition
+          // {
+            files = viewerDefinition.files // {
+              treaty = "${
+                pkgs.runCommand "korri-viewer-other-treaty" { } ''
+                  mkdir -p "$out/share"
+                  ${pkgs.python3}/bin/python3 -c 'import sys; data = bytearray(open(sys.argv[1], "rb").read()); data[0] ^= 1; open(sys.argv[2], "wb").write(data)' \
+                    ${viewerDefinition.files.treaty} "$out/share/viewer.ts"
+                ''
+              }/share/viewer.ts";
+            };
+          };
+      };
       gameRuntime = libretro.packages.korri-plugin-mgba;
     };
     retroarchCheck = pkgs.writeShellApplication {
@@ -338,6 +380,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-cache = cacheTool;
       korri-plugin-churn-check = churnCheck;
     }
+    // pkgs.lib.optionalAttrs hasViewer {
+      korri-plugin-viewer = viewerPlugin;
+      korri-viewer = viewer.package;
+    }
     // libretro.packages
     // sunshine.packages
     // integration.packages;
@@ -387,6 +433,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     ) libretro.catalogue;
     publicationChecks = import ./publication-checks.nix {
       inherit (pkgs) lib;
+      inherit hasViewer;
       libretroPackages = libretro.packages;
       sunshineChecks = sunshine.checks;
       sunshinePackages = sunshine.packages;
@@ -394,6 +441,18 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     checks =
       sunshine.checks
       // integration.checks
+      // pkgs.lib.optionalAttrs hasViewer {
+        korri-viewer-plugin-native = import ../plugins/viewer/native-check.nix {
+          inherit pkgs korri;
+          plugin = viewerDefinition;
+          package = viewerPlugin;
+          hostPackage = korri.packages.${system}.korri-plugin-host;
+          moonlightSource = moonlightPlugin;
+        };
+        # Korri's checks of the binary, with the package set it ships with.
+        korri-viewer-picture = viewer.pictureCheck;
+        korri-viewer-io = viewer.ioCheck;
+      }
       // {
         korri-eden-bench = edenBench;
         korri-eden-package = import ./eden-check.nix {

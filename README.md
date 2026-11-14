@@ -49,6 +49,8 @@ does not update device images or grant permission approval. See
 | `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
 | `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |
+| `korri-plugin-viewer` | `@korri:viewer` (x86_64 only) | `plugins/viewer/` and the Korri input's `clients/viewer/` |
+| `korri-viewer` | Standalone Korri viewer, GPL-3.0-or-later | The Korri input's `clients/viewer/` |
 
 Sunshine is a build candidate. Do not publish it until the ARM build and
 plugin lifecycle gates pass. Its presence in a release does not establish

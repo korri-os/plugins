@@ -6,6 +6,10 @@
   tailscalePackage,
   sshPackage,
   sunshinePlugin,
+  moonlightPlugin,
+  hasViewer,
+  viewerPlugin,
+  viewerOtherContract,
   gameRuntime,
 }:
 let
@@ -39,6 +43,22 @@ in
         gameRuntime
         ;
       korridPackage = korri.packages.${system}.korrid;
+      hostModule = korri.nixosModules.korri-plugin-host;
+    };
+  }
+  // pkgs.lib.optionalAttrs hasViewer {
+    # #435: korrid starts, observes and stops @korri:viewer through its
+    # socket, falls back to Moonlight, and refuses another viewer contract.
+    korri-viewer-lifecycle = import "${korri}/services/korrid/viewer-vm-test.nix" {
+      inherit
+        pkgs
+        hostPackage
+        moonlightPlugin
+        viewerPlugin
+        ;
+      otherContractPlugin = viewerOtherContract;
+      korridPackage = korri.packages.${system}.korrid;
+      korridModule = korri.nixosModules.korrid-linux-device;
       hostModule = korri.nixosModules.korri-plugin-host;
     };
   };

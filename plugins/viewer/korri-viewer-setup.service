@@ -1,0 +1,25 @@
+[Unit]
+Description=Korri viewer client identity directory
+
+[Service]
+Type=exec
+User=korri
+Group=korri
+ExecStartPre=+@coreutils@/bin/install -d -m 0700 -o korri -g korri /home/korri/.config/moonlight
+ExecStart=@coreutils@/bin/sleep infinity
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/korri/.config
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

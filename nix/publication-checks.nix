@@ -3,6 +3,7 @@
 # native runtime/admission gates when that runtime is actually in the batch.
 {
   lib,
+  hasViewer,
   libretroPackages,
   sunshineChecks,
   sunshinePackages,
@@ -59,6 +60,14 @@ let
     "korri-moonlight-x11-vaapi-size"
     "korri-moonlight-server-pin"
     "korri-moonlight-plugin-native"
+  ];
+  # The plugin's own gates, Korri's checks of its binary, and the cold-host
+  # proof that korrid selects, runs and refuses it (#435).
+  viewer = [
+    "korri-viewer-plugin-native"
+    "korri-viewer-picture"
+    "korri-viewer-io"
+    "korri-viewer-lifecycle"
   ];
   sunshine = builtins.attrNames sunshineChecks ++ [
     "korri-sunshine-plugin-native"
@@ -157,4 +166,8 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
 // lib.optionalAttrs (sunshinePackages ? sunshine-korri-v4l2m2m) {
   sunshine-korri-v4l2m2m = sunshine;
   sunshine-v4l2m2m-probe = sunshine;
+}
+// lib.optionalAttrs hasViewer {
+  korri-plugin-viewer = viewer;
+  korri-viewer = viewer;
 }
