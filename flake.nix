@@ -2,7 +2,7 @@
   description = "Korri plugin packages and release preparation";
 
   inputs = {
-    korri.url = "github:korri-os/korri/af4419d7d40fe40648341828b3a7a1b4211130c5";
+    korri.url = "github:korri-os/korri/00823ab8f5a9dec7ac662d045711bccada48bd4b";
     nixpkgs-eden.url = "github:NixOS/nixpkgs/02c087f3fe673c9e317f206a627cb6b910336dbe";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     # Temporary: the previous nixpkgs lock, held for the plugins that cannot
