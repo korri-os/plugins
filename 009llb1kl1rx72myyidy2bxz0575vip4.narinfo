@@ -1,0 +1,10 @@
+StorePath: /nix/store/009llb1kl1rx72myyidy2bxz0575vip4-korri-viewer-identity-bootstrap
+URL: https://github.com/korri-os/plugins/releases/download/build-3a7bcbc0835f-viewer/05svf25kj1hbn5afpmcr2aahxwb9jfvwhnq27rrnfc880vihklqz.nar.xz
+Compression: xz
+FileHash: sha256:05svf25kj1hbn5afpmcr2aahxwb9jfvwhnq27rrnfc880vihklqz
+FileSize: 1436
+NarHash: sha256:1ic6d49fqfvfg83k9bh682ci964f2a4l372xq6gj8qcdz3f5fq6a
+NarSize: 3216
+References: xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8
+Deriver: 123p5x3anzxavkvsc94h6gfm4za8cwzp-korri-viewer-identity-bootstrap.drv
+Sig: korri-plugins-1:W12yF4NnkTCDQKNhDS6PG5jdfykE3epIScB/1Ovi39V/1P1yHwIZ09QrFu8yLiWi+93V0cjOx4KOPVN2/fhnBw==

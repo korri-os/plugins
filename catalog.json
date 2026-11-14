@@ -1,27 +1,38 @@
 {
   "latest": {
-    "@korri:moonlight": "build-2094c1e77471-moonlight-latest-frame"
+    "@korri:moonlight": "build-3a7bcbc0835f-viewer",
+    "@korri:viewer": "build-3a7bcbc0835f-viewer"
   },
   "records": [
     {
       "archive_sha256": "47375a9a534b3e96d07c1e2d8fb5b139e975bd3ad92001060ac7b43110eb99e7",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-2094c1e77471-moonlight-latest-frame/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-2094c1e77471-moonlight-latest-frame-aarch64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-3a7bcbc0835f-viewer/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-3a7bcbc0835f-viewer-aarch64-linux.tar",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:moonlight",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-2094c1e77471-moonlight-latest-frame",
+      "release_version": "build-3a7bcbc0835f-viewer",
       "store_path": "/nix/store/injra37hf1fdjyqxqyigw7w9qpnd0jig-korri-plugin",
       "title": "Moonlight stream viewer"
     },
     {
       "archive_sha256": "5af042ac93d66a39751518aad67e3c96ccadda25df8027073a4c4f34661ae000",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-2094c1e77471-moonlight-latest-frame/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-2094c1e77471-moonlight-latest-frame-x86_64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-3a7bcbc0835f-viewer/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-3a7bcbc0835f-viewer-x86_64-linux.tar",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:moonlight",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-2094c1e77471-moonlight-latest-frame",
+      "release_version": "build-3a7bcbc0835f-viewer",
       "store_path": "/nix/store/j9rwv068cnsfxdbsxs5nfa25f871xyic-korri-plugin",
       "title": "Moonlight stream viewer"
+    },
+    {
+      "archive_sha256": "e7f53442235df16ad0b278404b12112392d5428e0fa343cad6a0d2f06681dade",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-3a7bcbc0835f-viewer/korri-plugin-768a94a9e7fe0f78e5e64e761b490200c0686cc7dc2ab47cc98536e654eae898-build-3a7bcbc0835f-viewer-x86_64-linux.tar",
+      "platform": "x86_64-linux",
+      "plugin_id": "@korri:viewer",
+      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
+      "release_version": "build-3a7bcbc0835f-viewer",
+      "store_path": "/nix/store/nvapdqn0knb31171sylpnnrg6jkr1gkw-korri-plugin",
+      "title": "Korri viewer"
     }
   ]
 }

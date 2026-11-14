@@ -1,0 +1,10 @@
+StorePath: /nix/store/03m734fg8q8l6h6wwwjb45hqiz8kvglg-korri-viewer-setup.service
+URL: https://github.com/korri-os/plugins/releases/download/build-3a7bcbc0835f-viewer/1a79ik1y6ynyw29906z50ch1kflyn84dmfgkg400ax6fmj8122wv.nar.xz
+Compression: xz
+FileHash: sha256:1a79ik1y6ynyw29906z50ch1kflyn84dmfgkg400ax6fmj8122wv
+FileSize: 596
+NarHash: sha256:0k9r1zrvci7phzn2wk72h0iv60kfpnswhibcpl4dpxdks601l66f
+NarSize: 1488
+References: cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12
+Deriver: c0r4l62k0nnry310r0crs5d8idgwpz0z-korri-viewer-setup.service.drv
+Sig: korri-plugins-1:/5vtb4BPgJESoydj4uPjzHy/0wKLMx7fYaKoKu/MbJyQ2DsBfCcnjMfYW+D0PEy8nXshpz2wG4LOfDZ4RmTXBw==
