@@ -200,11 +200,19 @@ Libretro package selection also reads each core's existing Nix platform
 metadata, through the derived `publicationPlatforms` output. It does not force
 an unsupported plugin manifest merely to inspect availability. A requested core
 is built only on architectures where `lib.meta.availableOn` accepts its actual
-core package. The selector refuses a package unavailable on both publication
-architectures, and logs each architecture-specific omission. Other outputs are
-not skipped by this core-specific filter. Each architecture job still requires
-at least one supported selected output. No platform restriction, plugin ID,
-recipe, signature check or runtime gate is changed by filtering.
+core package. The selector also skips an output on an architecture whose flake
+`packages` do not export it: `korri-plugin-viewer` and `korri-viewer` exist
+for x86_64 only, the `sunshine-korri-v4l2m2m` tools for aarch64 only. Each
+system's `publicationChecks` has exactly that system's package outputs, so a
+name that is in neither system's set is still refused as unknown. The selector
+refuses a package unavailable on both publication architectures, and logs each
+architecture-specific omission with its reason. Other outputs are not skipped.
+Each architecture job still requires at least one supported selected output, and
+publication still requires both architecture artifacts. A batch with an
+x86_64-only output therefore also selects an output that aarch64 exports; the
+first `@korri:viewer` batch adds the unchanged `korri-plugin-moonlight`.
+No platform restriction, plugin ID, recipe, signature check or runtime gate is
+changed by filtering.
 
 In particular, BlastEm, LRPS2 (`pcsx2`) and ParaLLEl N64 retain their existing
 IDs and x86_64 outputs without inventing ARM builds. Nixpkgs restricts the first

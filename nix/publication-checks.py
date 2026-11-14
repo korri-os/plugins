@@ -19,13 +19,25 @@ def select_checks(mapping, packages):
     return sorted(set(SHARED).union(*(mapping[name] for name in packages)))
 
 
+def available(mappings, platforms, name, system):
+    # Each system's mapping has exactly that system's flake package outputs,
+    # so an output that only one architecture exports (@korri:viewer on
+    # x86_64, the V4L2 M2M Sunshine tools on aarch64) is absent elsewhere.
+    return name in mappings[system] and platforms[system].get(name, True)
+
+
 def select_packages(mappings, platforms, packages, system):
     # Unknown outputs fail before filtering. A platform restriction must not
     # turn a typo or an entirely unsupported plugin into a successful batch.
-    select_checks(mappings[system], packages)
+    if not packages:
+        raise ValueError("At least one package is required")
+    known = set().union(*(mappings[target] for target in SYSTEMS))
+    unknown = sorted(set(packages) - known)
+    if unknown:
+        raise ValueError("No reviewed publication gates for: " + ", ".join(unknown))
     unavailable = [
         name for name in packages
-        if not any(platforms[target].get(name, True) for target in SYSTEMS)
+        if not any(available(mappings, platforms, name, target) for target in SYSTEMS)
     ]
     if unavailable:
         raise ValueError(
@@ -34,7 +46,7 @@ def select_packages(mappings, platforms, packages, system):
         )
     return [
         name for name in dict.fromkeys(packages)
-        if platforms[system].get(name, True)
+        if available(mappings, platforms, name, system)
     ]
 
 
@@ -64,7 +76,12 @@ def main():
     except ValueError as error:
         parser.error(str(error))
     for package in sorted(set(args.packages) - set(packages)):
-        print(f"Skipping {package} on {args.system}: core platform metadata", file=sys.stderr)
+        reason = (
+            "core platform metadata"
+            if package in mappings[args.system]
+            else f"no {args.system} package output"
+        )
+        print(f"Skipping {package} on {args.system}: {reason}", file=sys.stderr)
     if args.packages_file:
         args.packages_file.write_text("\n".join(packages) + "\n")
     for check in checks:
