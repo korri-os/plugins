@@ -28,9 +28,10 @@ deployment or hardware acceptance follows from these package checks.
 
 korrid compares `files.treaty` with its own copy of
 `contracts/generated/viewer.ts`, byte for byte. Equal bytes: korrid uses this
-viewer. Other bytes, or no `treaty` file: korrid refuses the plugin, names
-both SHA-256 hashes, and keeps Moonlight as the viewer. Without Moonlight the
-refusal is the start's error.
+viewer. Other bytes: korrid refuses the plugin and names both SHA-256 hashes.
+No `treaty` file: korrid refuses the plugin and names only its own hash.
+Either way Moonlight stays the viewer. Without Moonlight the refusal is the
+start's error.
 
 Cost: the treaty file holds the wire types only. A change to the launch
 arguments, or to behaviour that keeps the wire types, is not caught before
