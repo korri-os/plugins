@@ -16,6 +16,15 @@ let
     extraProfile = ''
       export LD_PRELOAD=:${native.guard}/lib/libkorri-steam-input-guard.so
     '';
+    # Native Linux games whose launch scripts replace LD_LIBRARY_PATH load
+    # these from the FHS, not the Steam Runtime. Dead Cells' HashLink SDL
+    # module needs all three and exits at once without them.
+    extraLibraries =
+      p: with p; [
+        libxscrnsaver
+        libxxf86vm
+        libdecor
+      ];
   };
   platform =
     if arm then
