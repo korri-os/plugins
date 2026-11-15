@@ -104,6 +104,14 @@ frame of each new encoder: the encoder kept encoding one surface (Korri issue
 VAAPI device take its own context back before it converts a frame and before
 it is destroyed. The Vulkan encoder uses no EGL context.
 
+The NVENC VRAM device (`gl_cuda_vram_t` in `src/platform/linux/cuda.cpp`)
+has the same pattern: its own `egl::ctx_t`, made current by `egl::make_ctx`,
+and textures, framebuffers and imported images that it deletes when it is
+destroyed. Patch 0044 does not give it the fix, because NVENC does not offer
+live resolution (only `vaapi` and `vulkan` do). If live resolution is ever
+enabled for NVENC, give `gl_cuda_vram_t` the same change: make its own
+context current before it converts a frame and before it is destroyed.
+
 The wire check links the actual Android C client. The channel check covers
 admission, deferred capture, deadlines and shutdown. The full capture check
 applies the base and ARM patch stacks together. Patch `0033` places its rotation
