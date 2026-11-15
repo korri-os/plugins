@@ -1,0 +1,10 @@
+StorePath: /nix/store/76kkz01y37r3vc4ahyr5l8132y97bgv9-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-7e9c19c99b6f-sunshine-resize/0xcpwdwklyha6gp69fdc9mh98wzzw5fb18p2a4zaa7a763k464cc.nar.xz
+Compression: xz
+FileHash: sha256:0xcpwdwklyha6gp69fdc9mh98wzzw5fb18p2a4zaa7a763k464cc
+FileSize: 13788
+NarHash: sha256:1s4566ffprkxqkfryjy18m4sh030qgiphmazqn6p8f28850psmad
+NarSize: 56856
+References: 0jn7zjq62zb2r6nql2vhnaf321mi5qgw-retroarch-bare-1.22.2 2qnmgyncjwqbvglpqw8bbxr0i45v48ps-libretro-mgba-0-unstable-2026-07-28 7fmg8lgg5wv5msb0hlqbh5v54jqd6c4j-libretro-core-info-1.22.2 95h079dqxg7hj5h20wcnrv4ydiiz3f2d-retroarch-source-checked-settings-1.22.2 r2jfkg289bjbpylmdw1w3ajrm1l7qi6l-korri-inputplumber-retroarch-autoconfig-1.22.0
+Deriver: 9nqgdax8js2bvxqchjncsrfmr1n8yjk1-korri-plugin.drv
+Sig: korri-plugins-1:8vwofGRizh5trrdOuPrf9+PrhRILl3L5tTq7x/cZEt9xdcJEijRcbUDVffty34iUfsdBGa4GtqDojnHI1+sfBw==

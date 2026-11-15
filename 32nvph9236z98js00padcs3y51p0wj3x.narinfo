@@ -1,0 +1,10 @@
+StorePath: /nix/store/32nvph9236z98js00padcs3y51p0wj3x-korri-korri-sunshine.service
+URL: https://github.com/korri-os/plugins/releases/download/build-7e9c19c99b6f-sunshine-resize/110y8m6zwkzdw461hwph24rrxakawyxf88sirz79669kyxxlscs8.nar.xz
+Compression: xz
+FileHash: sha256:110y8m6zwkzdw461hwph24rrxakawyxf88sirz79669kyxxlscs8
+FileSize: 1140
+NarHash: sha256:1lf2ngxlsjvla2l456jvfmcc16hjz8h8pysk3dvdgsy8bghl34v5
+NarSize: 2952
+References: 2gwxb9a2q4psb66ac804rhpnjyh1ihcp-korri-sunshine-run im2r56556pb4rzp8fqzbz8is70ric8qs-korri-sunshine-input-seat-setup
+Deriver: fz0m8996axpqjag0lf476m3lqj3v134x-korri-korri-sunshine.service.drv
+Sig: korri-plugins-1:5Rbph2PWS7wHjDBU7uJPRxLtwOi22qd7qTBKTT3vT73VJKEsyjSlZQ9zLOv+vGXJHhIs1Yu2HxVR8Rc8oIXyDA==
