@@ -481,3 +481,81 @@ index 5e2bb61..77d2e65 100644
      std::vector<replace_t> *replacements = nullptr;  ///< Optional encoded-byte substitutions applied before packetization.
      void *channel_data = nullptr;  ///< Platform or protocol state carried with this packet.
      bool after_ref_frame_invalidation = false;  ///< Whether the frame follows reference-frame invalidation.
+diff --git a/src/platform/linux/vaapi.cpp b/src/platform/linux/vaapi.cpp
+index c98f0b82..a8f5614b 100644
+--- a/src/platform/linux/vaapi.cpp
++++ b/src/platform/linux/vaapi.cpp
+@@ -152,6 +152,37 @@ namespace va {
+    */
+   class va_t: public platf::avcodec_encode_device_t {
+   public:
++    /**
++     * @brief Release this device's OpenGL objects in this device's own EGL context.
++     */
++    ~va_t() override {
++      make_current();
++    }
++
++    /**
++     * @brief Make this device's EGL context current on the calling thread.
++     *
++     * A live resolution change builds a second encode device on the encoder
++     * thread, then destroys one of the two. Creating a device makes its context
++     * current, and destroying one releases the current context (egl::ctx_t).
++     * The surviving device takes its own context back before it touches OpenGL,
++     * and a device being destroyed deletes its OpenGL names in its own context,
++     * never in the other device's.
++     *
++     * @return 0 on success; -1 when the context cannot be made current.
++     */
++    int make_current() {
++      auto context = std::get<1>(ctx.el);
++      if (!context || eglGetCurrentContext() == context) {
++        return 0;
++      }
++      if (!eglMakeCurrent(display.get(), EGL_NO_SURFACE, EGL_NO_SURFACE, context)) {
++        BOOST_LOG(error) << "Couldn't make the VAAPI encode device's EGL context current"sv;
++        return -1;
++      }
++      return 0;
++    }
++
+     /**
+      * @brief Initialize VAAPI display, EGL, and conversion resources.
+      *
+@@ -531,6 +562,10 @@ namespace va {
+      * @return Conversion status.
+      */
+     int convert(platf::img_t &img) override {
++      if (make_current()) {
++        return -1;
++      }
++
+       sws.load_ram(img);
+ 
+       sws.convert_nv12(nv12->buf);
+@@ -543,6 +578,13 @@ namespace va {
+    */
+   class va_vram_t: public va_t {
+   public:
++    /**
++     * @brief Release the imported RGB image in this device's own EGL context.
++     */
++    ~va_vram_t() override {
++      make_current();
++    }
++
+     /**
+      * @brief Convert a captured VAAPI frame into GPU encoder input.
+      *
+@@ -550,6 +592,10 @@ namespace va {
+      * @return Conversion status.
+      */
+     int convert(platf::img_t &img) override {
++      if (make_current()) {
++        return -1;
++      }
++
+       auto &descriptor = (egl::img_descriptor_t &) img;
+ 
+       if (descriptor.sequence == 0) {

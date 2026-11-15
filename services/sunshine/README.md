@@ -93,6 +93,17 @@ reinitialization defers the request without extending its original deadline.
 The launch baseline remains fixed, and requests cannot exceed 4096 pixels per
 side. That bound is policy, not a claim that every encoder supports every size.
 
+The VAAPI encode device converts frames with OpenGL in its own EGL context,
+on the encoder thread. A replacement makes a second device there, which makes
+its context current, and then destroys one of the two. Sunshine's context
+wrapper (`egl::ctx_t`) releases the current context when it is destroyed, and
+the destroyed device's textures and framebuffers are deleted in whatever
+context is current. Before this was handled, the picture froze on the first
+frame of each new encoder: the encoder kept encoding one surface (Korri issue
+#476, emulator proof in `clients/android/evidence/476`). The patch makes each
+VAAPI device take its own context back before it converts a frame and before
+it is destroyed. The Vulkan encoder uses no EGL context.
+
 The wire check links the actual Android C client. The channel check covers
 admission, deferred capture, deadlines and shutdown. The full capture check
 applies the base and ARM patch stacks together. Patch `0033` places its rotation
