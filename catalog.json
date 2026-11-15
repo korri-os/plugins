@@ -1,38 +1,29 @@
 {
   "latest": {
-    "@korri:moonlight": "build-9be8b2f164ca-viewer-egl",
-    "@korri:viewer": "build-9be8b2f164ca-viewer-egl"
+    "@korri:steam": "build-1c5818a1ff22-steam-native-libs"
   },
   "records": [
     {
-      "archive_sha256": "47375a9a534b3e96d07c1e2d8fb5b139e975bd3ad92001060ac7b43110eb99e7",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-9be8b2f164ca-viewer-egl/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-9be8b2f164ca-viewer-egl-aarch64-linux.tar",
+      "archive_sha256": "7d3416447f0d4424ff356272c6c10664b4ef09f1f58d6bf58fede4aa7bf9800a",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-1c5818a1ff22-steam-native-libs/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-1c5818a1ff22-steam-native-libs-aarch64-linux.tar",
+      "description": "Runs Steam content through the native session program.",
       "platform": "aarch64-linux",
-      "plugin_id": "@korri:moonlight",
+      "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-9be8b2f164ca-viewer-egl",
-      "store_path": "/nix/store/injra37hf1fdjyqxqyigw7w9qpnd0jig-korri-plugin",
-      "title": "Moonlight stream viewer"
+      "release_version": "build-1c5818a1ff22-steam-native-libs",
+      "store_path": "/nix/store/815xjdzwjr9f0jg21cz60p52a07gx858-korri-plugin",
+      "title": "Steam"
     },
     {
-      "archive_sha256": "5af042ac93d66a39751518aad67e3c96ccadda25df8027073a4c4f34661ae000",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-9be8b2f164ca-viewer-egl/korri-plugin-3b3a41970c4fcebfb538e4af666ffd3d51f138c247c5871d878e7b5aa0df5b22-build-9be8b2f164ca-viewer-egl-x86_64-linux.tar",
+      "archive_sha256": "1808bf360f4a66ed94d48676e35b88198a48aefa263411c24ec05e65ec125a26",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-1c5818a1ff22-steam-native-libs/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-1c5818a1ff22-steam-native-libs-x86_64-linux.tar",
+      "description": "Runs Steam content through the native session program.",
       "platform": "x86_64-linux",
-      "plugin_id": "@korri:moonlight",
+      "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-9be8b2f164ca-viewer-egl",
-      "store_path": "/nix/store/j9rwv068cnsfxdbsxs5nfa25f871xyic-korri-plugin",
-      "title": "Moonlight stream viewer"
-    },
-    {
-      "archive_sha256": "a9bddb9754a2bd5139e4e2b7e817f20dba6ab38353de8793ca62daf63630aed4",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-9be8b2f164ca-viewer-egl/korri-plugin-768a94a9e7fe0f78e5e64e761b490200c0686cc7dc2ab47cc98536e654eae898-build-9be8b2f164ca-viewer-egl-x86_64-linux.tar",
-      "platform": "x86_64-linux",
-      "plugin_id": "@korri:viewer",
-      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-9be8b2f164ca-viewer-egl",
-      "store_path": "/nix/store/0n1ndrc3pflcs2xcjxibizr90dadjflm-korri-plugin",
-      "title": "Korri viewer"
+      "release_version": "build-1c5818a1ff22-steam-native-libs",
+      "store_path": "/nix/store/s88zhm0fndk8bzim87kv13yflbhx08a3-korri-plugin",
+      "title": "Steam"
     }
   ]
 }
