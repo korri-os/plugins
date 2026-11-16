@@ -31,7 +31,10 @@ def write_files(root, token, nix, hosts=HOSTS, origins=None):
             file=sys.stderr,
         )
         raise ValueError("GITHUB_TOKEN has an unexpected format")
-    root.mkdir(mode=0o700)
+    # Setup mounts a private tmpfs here first; a test root does not exist yet.
+    root.mkdir(mode=0o700, exist_ok=True)
+    if any(root.iterdir()):
+        raise FileExistsError(f"{root} is not empty")
     credentials = root / "netrc"
     descriptor = os.open(credentials, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o400)
     with os.fdopen(descriptor, "w") as stream:
@@ -144,6 +147,26 @@ def setup(nix):
     if config["sandbox"]["value"] is not True:
         raise RuntimeError("GitHub source authentication requires Nix sandboxing")
     group = grp.getgrnam("nixbld")
+    # Nix executes the hook from this directory. Runner image
+    # ubuntu24/20261111.127 mounts /run noexec, and Nix then reports only that
+    # the hook "failed with exit code 1" (dry run 43888141736). A private tmpfs
+    # keeps the credentials in memory and lets the hook run, whatever /run's
+    # own mount options are.
+    root.mkdir(mode=0o700)
+    subprocess.run(
+        [
+            "mount",
+            "-t",
+            "tmpfs",
+            "-o",
+            "mode=0700,nosuid,nodev,size=1m",
+            "korri-github-source-auth",
+            str(root),
+        ],
+        check=True,
+    )
+    if os.statvfs(root).f_flag & os.ST_NOEXEC:
+        raise RuntimeError("Nix cannot execute a hook from a noexec mount")
     write_files(root, token, nix)
     os.chown(root, 0, group.gr_gid)
     root.chmod(0o711)
@@ -176,6 +199,9 @@ def setup(nix):
 
 def cleanup():
     root = DIRECTORY
+    if root.is_mount():
+        # Unmounting the private tmpfs discards every credential file at once.
+        subprocess.run(["umount", str(root)], check=True)
     if root.exists():
         shutil.rmtree(root)
     removed = {f"pre-build-hook = {root}/hook", f"netrc-file = {root}/netrc"}
