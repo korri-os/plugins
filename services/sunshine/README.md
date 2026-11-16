@@ -118,6 +118,33 @@ applies the base and ARM patch stacks together. Patch `0033` places its rotation
 probe before the resulting encode loop. Device frame continuity still needs a
 hardware check before this candidate is treated as verified for deployment.
 
+## HTTPS close without waiting for the peer
+
+Patch `0045` changes how Sunshine closes an HTTPS connection. Upstream
+`nvhttp::SunshineHTTPS` closes TLS with a blocking `shutdown()` in its
+destructor: it sends `close_notify`, then waits in `poll()` until the peer
+sends its own. Sunshine serves all HTTPS on one I/O thread (`nvhttp::47984`),
+and almost every response closes its connection. A peer that stays connected
+but never answers, such as a handheld asleep on Wi-Fi, holds that thread
+forever. Every other client then times out until Sunshine restarts (Korri
+issue #443; gdb on aka, 2026-11-11).
+
+The patch puts the TCP socket in non-blocking mode before the same
+`shutdown()`. Sunshine still sends `close_notify` when the socket can take it,
+and stops at the first read that would block. TLS does not require the closing
+side to wait for the peer's reply (RFC 8446, section 6.1). A reply that has
+already arrived is still read.
+
+`sunshine-korri-https-silent-peer` runs the shipped binary in a VM. A paired
+peer asks for serverinfo, reads the answer and Sunshine's `close_notify`, then
+stays silent with its connection open. A second paired client must still get
+serverinfo within 5 seconds. Without the patch the second client times out.
+The peer also fails if Sunshine closes TCP without `close_notify`.
+
+Upstream `master` still has the blocking shutdown (checked 2026-11-16). The
+patch is a candidate for upstreaming. Remove it when upstream stops waiting for
+the peer.
+
 ## Korrid certificate control
 
 The separate [offline all-client retirement executable](OFFLINE-RETIREMENT.md)

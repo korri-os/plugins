@@ -1,0 +1,20 @@
+diff --git a/src/nvhttp.h b/src/nvhttp.h
+index 13d9faea..48e0ad71 100644
+--- a/src/nvhttp.h
++++ b/src/nvhttp.h
+@@ -102,8 +102,14 @@ namespace nvhttp {
+     }
+ 
+     virtual ~SunshineHTTPS() {
+-      // Gracefully shutdown the TLS connection
++      // Send close_notify, but never wait for the peer's reply. All HTTPS
++      // clients share one I/O thread, and a blocking read here holds it for as
++      // long as a silent peer keeps its connection open. In non-blocking mode
++      // the shutdown writes close_notify if the socket can take it, and stops
++      // at the first read that would block. TLS does not require the closing
++      // side to wait for the reply (RFC 8446, section 6.1).
+       SimpleWeb::error_code ec;
++      lowest_layer().non_blocking(true, ec);
+       shutdown(ec);
+     }
+   };

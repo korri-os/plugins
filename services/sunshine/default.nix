@@ -36,9 +36,11 @@ let
   sunshineApprovedDeviceBaseDerivation =
     sunshineApprovedPatches.approvedDeviceBaseDerivations.${sunshinePackage.korriBuildProfile} or null;
   sunshineOfflineRetirement = import ./offline-retirement.nix { inherit pkgs; };
+  sunshinePluginPackage =
+    if sunshineV4l2m2mPackage != null then sunshineV4l2m2mPackage else sunshinePackage;
 in
 {
-  pluginPackage = if sunshineV4l2m2mPackage != null then sunshineV4l2m2mPackage else sunshinePackage;
+  pluginPackage = sunshinePluginPackage;
   packages = {
     sunshine-korri = sunshinePackage;
     sunshine-retire-all-clients = sunshineOfflineRetirement;
@@ -114,6 +116,11 @@ in
     sunshine-korri-input-presence =
       (import ./input-seat-presence-check.nix {
         inherit pkgs;
+      }).vm;
+    sunshine-korri-https-silent-peer =
+      (import ./https-silent-peer-check.nix {
+        inherit pkgs;
+        sunshinePackage = sunshinePluginPackage;
       }).vm;
     sunshine-korri-input-seat-patch = import ./input-seat-patch-check.nix {
       inherit pkgs sunshinePackage;
