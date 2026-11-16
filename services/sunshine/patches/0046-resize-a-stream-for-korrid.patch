@@ -1,0 +1,478 @@
+Let korrid resize the encoder of one running stream (korri#476, Route C).
+The certificate-control socket of patch 0020 takes a "resize" request. Sunshine
+finds the running session whose client certificate has the request's
+fingerprint and gives patch 0044's resolution request to that session's
+channel. The answer goes back to korrid, never to the stream's client.
+
+diff --git a/src/korri_certificate_control.cpp b/src/korri_certificate_control.cpp
+index cdf27f65..5f29bb08 100644
+--- a/src/korri_certificate_control.cpp
++++ b/src/korri_certificate_control.cpp
+@@ -12,6 +12,7 @@
+ #include <cstring>
+ #include <filesystem>
+ #include <fstream>
++#include <limits>
+ #include <memory>
+ #include <optional>
+ #include <sstream>
+@@ -376,6 +377,71 @@ namespace korri_certificate_control {
+     return response.dump();
+   }
+ 
++  std::optional<resize_request> parse_resize_request(
++      const std::string &frame,
++      const std::string_view expected_host_uuid) {
++    if (frame.empty() || frame.size() > max_frame_bytes || frame.find('\0') != std::string::npos) {
++      return std::nullopt;
++    }
++    const auto document = nlohmann::json::parse(frame, nullptr, false);
++    if (document.is_discarded() || !document.is_object()) {
++      return std::nullopt;
++    }
++    const auto operation_name = document.find("operation");
++    if (operation_name == document.end() || !operation_name->is_string() ||
++        operation_name->get_ref<const std::string &>() != "resize") {
++      return std::nullopt;
++    }
++    const auto host = document.find("hostUuid");
++    const auto certificate = document.find("certificate");
++    const auto display = document.find("display");
++    if (document.size() != 4 || host == document.end() || !host->is_string() ||
++        certificate == document.end() || !certificate->is_string() ||
++        display == document.end() || !display->is_object() || display->size() != 2) {
++      throw protocol_error("InvalidFrame", "resize request has an invalid shape");
++    }
++    const auto width = display->find("width");
++    const auto height = display->find("height");
++    constexpr std::uint64_t most = std::numeric_limits<std::uint32_t>::max();
++    if (width == display->end() || height == display->end() ||
++        !width->is_number_unsigned() || !height->is_number_unsigned() ||
++        width->get<std::uint64_t>() > most || height->get<std::uint64_t>() > most) {
++      throw protocol_error("InvalidFrame", "resize request has an invalid display");
++    }
++    if (host->get_ref<const std::string &>() != expected_host_uuid) {
++      throw protocol_error("HostMismatch", "requested host identity does not match this Sunshine instance");
++    }
++    return resize_request {
++        validate_single_certificate(certificate->get<std::string>()).fingerprint,
++        {static_cast<std::uint32_t>(width->get<std::uint64_t>()),
++         static_cast<std::uint32_t>(height->get<std::uint64_t>())},
++    };
++  }
++
++  std::string resize_response(const korri::runtime_resolution::local_result &result) {
++    using korri::runtime_resolution::reason;
++    if (result.outcome == korri::runtime_resolution::status::applied) {
++      auto response = nlohmann::json::object();
++      response["status"] = "ok";
++      response["display"] = {{"width", result.current.width}, {"height", result.current.height}};
++      return response.dump();
++    }
++    switch (result.why) {
++      case reason::invalid_bounds:
++        return error_response("InvalidBounds");
++      case reason::unsupported_encoder:
++        return error_response("UnsupportedEncoder");
++      case reason::apply_failed:
++        return error_response("ApplyFailed");
++      case reason::conflict:
++        return error_response("Conflict");
++      case reason::stream_ended:
++        return error_response("StreamEnded");
++      default:
++        return error_response("InternalError");
++    }
++  }
++
+   std::string build_state_document(
+       const std::string_view existing_document,
+       const std::string_view unique_id,
+diff --git a/src/korri_certificate_control.h b/src/korri_certificate_control.h
+index e8606a1c..e566e606 100644
+--- a/src/korri_certificate_control.h
++++ b/src/korri_certificate_control.h
+@@ -1,5 +1,7 @@
+ #pragma once
+ 
++#include "runtime-resolution-channel.h"
++
+ #include <openssl/x509.h>
+ 
+ #include <nlohmann/json.hpp>
+@@ -172,6 +174,41 @@ namespace korri_certificate_control {
+   std::string success_response(const std::string &server_certificate, bool changed);
+   std::string error_response(std::string_view code);
+ 
++  // Patch 0046: resize the encoder of the stream whose client certificate
++  // matches. The request has patch 0020's mutation fields (operation,
++  // hostUuid, certificate) and the viewer treaty's Resize display.
++  struct resize_request {
++    std::string fingerprint;
++    korri::runtime_resolution::size display;
++  };
++
++  // nullopt: the frame does not ask for a resize, and handle_serialized_request
++  // answers it as before.
++  std::optional<resize_request> parse_resize_request(
++      const std::string &frame,
++      std::string_view expected_host_uuid);
++  // Applied: the encoder's confirmed size. Otherwise patch 0044's reason as the code.
++  std::string resize_response(const korri::runtime_resolution::local_result &result);
++
++  template<typename Resize>
++  std::optional<std::string> handle_resize_request(
++      const std::string &frame,
++      const std::string_view expected_host_uuid,
++      Resize &&resize) {
++    try {
++      const auto parsed = parse_resize_request(frame, expected_host_uuid);
++      if (!parsed) {
++        return std::nullopt;
++      }
++      return resize_response(
++          std::invoke(std::forward<Resize>(resize), parsed->fingerprint, parsed->display));
++    } catch (const protocol_error &error) {
++      return error_response(error.code());
++    } catch (const std::exception &) {
++      return error_response("InternalError");
++    }
++  }
++
+   std::string build_state_document(
+       std::string_view existing_document,
+       std::string_view unique_id,
+diff --git a/src/nvhttp.cpp b/src/nvhttp.cpp
+index 61e51e8a..8a545186 100644
+--- a/src/nvhttp.cpp
++++ b/src/nvhttp.cpp
+@@ -507,10 +507,43 @@ namespace nvhttp {
+     return output;
+   }
+ 
++  /**
++   * @brief Korri patch 0046: resize the encoder of the one running stream of a client certificate.
++   *
++   * @param fingerprint SHA-256 fingerprint of the client certificate (patch 0020).
++   * @param display The size that the encoder is to take.
++   * @return The encoder's answer, or a refusal when that client has no running stream or more than one.
++   */
++  korri::runtime_resolution::local_result resize_korri_stream(
++    const std::string &fingerprint,
++    const korri::runtime_resolution::size display
++  ) {
++    namespace rr = korri::runtime_resolution;
++    const auto channels = rtsp_stream::runtime_resolution_channels([&](const std::string &certificate) {
++      try {
++        return korri_certificate_control::validate_single_certificate(certificate).fingerprint == fingerprint;
++      } catch (const std::exception &) {
++        return false;
++      }
++    });
++    // No client has two streams today. Refuse rather than choose one.
++    if (channels.size() != 1) {
++      return {rr::status::failed, channels.empty() ? rr::reason::stream_ended : rr::reason::conflict, {0, 0}};
++    }
++    const auto result = channels.front()->resize(display, rr::channel::lifetime + 500ms);
++    BOOST_LOG(info) << "Korri certificate control: resize to "sv << display.width << 'x' << display.height
++                    << (result.outcome == rr::status::applied ? " applied"sv : " refused, reason "sv)
++                    << (result.outcome == rr::status::applied ? ""s : std::to_string(static_cast<int>(result.why)));
++    return result;
++  }
++
+   std::string handle_korri_certificate_request(const std::string &frame) {
+     if (client_state_integrity_failed.load()) {
+       return korri_certificate_control::error_response("StateIntegrityFailed");
+     }
++    if (auto resized = korri_certificate_control::handle_resize_request(frame, http::unique_id, resize_korri_stream)) {
++      return *resized;
++    }
+     return korri_certificate_control::handle_serialized_request(
+         frame,
+         http::unique_id,
+diff --git a/src/rtsp.cpp b/src/rtsp.cpp
+index c7135ddf..0363cd2a 100644
+--- a/src/rtsp.cpp
++++ b/src/rtsp.cpp
+@@ -684,6 +684,26 @@ namespace rtsp_stream {
+       }
+     }
+ 
++    /**
++     * @brief Korri patch 0046: the live-resolution channels of the running sessions whose client certificate matches.
++     *
++     * @param matches Called with each running session's PEM client certificate.
++     * @return One channel for each matching session.
++     */
++    std::vector<std::shared_ptr<korri::runtime_resolution::channel>> runtime_resolution_channels(
++      const std::function<bool(const std::string &)> &matches
++    ) {
++      std::vector<std::shared_ptr<korri::runtime_resolution::channel>> channels;
++      auto lg = _session_slots.lock();
++      for (const auto &slot : *_session_slots) {
++        if (stream::session::state(*slot) == stream::session::state_e::RUNNING &&
++            matches(stream::session::client_cert(*slot))) {
++          channels.push_back(stream::session::runtime_resolution(*slot));
++        }
++      }
++      return channels;
++    }
++
+     /**
+      * @brief Removes the provided session from the set of sessions.
+      * @param session The session to remove.
+@@ -770,6 +790,12 @@ namespace rtsp_stream {
+     input::terminate_gamepads(cert);
+   }
+ 
++  std::vector<std::shared_ptr<korri::runtime_resolution::channel>> runtime_resolution_channels(
++    const std::function<bool(const std::string &)> &matches
++  ) {
++    return server.runtime_resolution_channels(matches);
++  }
++
+   /**
+    * @brief Send the serialized response over the active socket.
+    *
+diff --git a/src/rtsp.h b/src/rtsp.h
+index 1018893c..b0ff6770 100644
+--- a/src/rtsp.h
++++ b/src/rtsp.h
+@@ -6,11 +6,19 @@
+ 
+ // standard includes
+ #include <atomic>
++#include <functional>
++#include <memory>
++#include <string>
++#include <vector>
+ 
+ // local includes
+ #include "crypto.h"
+ #include "thread_safe.h"
+ 
++namespace korri::runtime_resolution {
++  class channel;
++}  // namespace korri::runtime_resolution
++
+ namespace rtsp_stream {
+   constexpr auto RTSP_SETUP_PORT = 21;  ///< GameStream base-port offset used for the RTSP setup listener.
+ 
+@@ -77,6 +85,16 @@ namespace rtsp_stream {
+    */
+   void terminate_sessions_by_cert(std::string_view cert);
+ 
++  /**
++   * @brief Korri patch 0046: the live-resolution channels of the running sessions whose client certificate matches.
++   *
++   * @param matches Called with each running session's PEM client certificate.
++   * @return One channel for each matching session.
++   */
++  std::vector<std::shared_ptr<korri::runtime_resolution::channel>> runtime_resolution_channels(
++    const std::function<bool(const std::string &)> &matches
++  );
++
+   /**
+    * @brief Runs the RTSP server loop.
+    */
+diff --git a/src/runtime-resolution-channel.h b/src/runtime-resolution-channel.h
+index 008278ea..5bdf8961 100644
+--- a/src/runtime-resolution-channel.h
++++ b/src/runtime-resolution-channel.h
+@@ -2,19 +2,37 @@
+ #include "runtime-resolution-wire.h"
+ #include <algorithm>
+ #include <chrono>
++#include <condition_variable>
+ #include <deque>
+ #include <mutex>
++#include <utility>
+ #include <vector>
+ 
+ namespace korri::runtime_resolution {
+ inline constexpr auto channel_name = "korri-runtime-resolution";
+ 
++// The outcome of a resize that korrid asked for (patch 0046): the fields of
++// resolution_ack, without the client's request ID.
++struct local_result {
++  status outcome;
++  reason why;
++  size current;
++};
++
+ // One instance per authenticated stream. Only the encoder thread takes work.
+ // The control thread never changes encoder resources or writes config fields.
+ class channel {
+  public:
+   using clock = std::chrono::steady_clock;
+-  struct work { ::korri::runtime_resolution::request request; clock::time_point deadline; };
++  static constexpr auto lifetime = std::chrono::milliseconds(2500);
++  // `sequence` names one accepted request. A local request has no client ID,
++  // so finish and defer match on it. `local` sends the reply to korrid.
++  struct work {
++    ::korri::runtime_resolution::request request;
++    clock::time_point deadline;
++    std::uint64_t sequence = 0;
++    bool local = false;
++  };
+   channel(size launch, std::uint32_t bitrate, std::uint32_t fps)
+       : launch_(launch), current_(launch), bitrate_(bitrate), fps_(fps) {}
+ 
+@@ -22,8 +40,7 @@ class channel {
+     std::lock_guard guard(mutex_);
+     supported_ = value && !closed_;
+     if (!value && pending_ && !closed_) {
+-      auto bytes = resolution_ack(pending_->request.id, status::failed, reason::unsupported_encoder, current_);
+-      replies_.emplace_back(bytes.begin(), bytes.end());
++      answer(pending_->sequence, pending_->local, pending_->request.id, status::failed, reason::unsupported_encoder);
+       pending_.reset();
+     }
+     if (query_id_ && !closed_) {
+@@ -57,10 +74,34 @@ class channel {
+     if (supported_.has_value() && !*supported_) return refuse(reason::unsupported_encoder);
+     if (request.id <= last_id_ || pending_ || !replies_.empty()) return refuse(reason::conflict);
+     last_id_ = request.id;
+-    pending_ = work {request, now + std::chrono::milliseconds(2500)};
++    pending_ = work {request, now + lifetime, ++sequence_};
+     taken_ = false;
+     return {};
+   }
++  // Patch 0046: a resize that korrid asks for on its certificate-control
++  // socket. It takes the client's admission and the same encoder path, and
++  // its result goes to the caller, never to the stream's client. The caller
++  // waits at most `wait`. A request that is still pending then is withdrawn:
++  // finish refuses it, so the encoder cannot change after a failure is told.
++  local_result resize(size target, clock::duration wait) {
++    std::unique_lock guard(mutex_);
++    auto refuse = [&](reason why) { return local_result {status::failed, why, current_}; };
++    if (closed_) return refuse(reason::stream_ended);
++    if (!valid(target)) return refuse(reason::invalid_bounds);
++    if (supported_.has_value() && !*supported_) return refuse(reason::unsupported_encoder);
++    if (pending_ || !replies_.empty()) return refuse(reason::conflict);
++    auto mine = ++sequence_;
++    pending_ = work {{0, resolution, target, reason::none}, clock::now() + lifetime, mine, true};
++    taken_ = false;
++    local_.reset();
++    auto answered = [&] { return closed_ || (local_ && local_->first == mine); };
++    if (!local_done_.wait_for(guard, wait, answered)) {
++      if (pending_ && pending_->sequence == mine) pending_.reset();
++      return refuse(reason::apply_failed);
++    }
++    if (local_ && local_->first == mine) return local_->second;
++    return refuse(reason::stream_ended);
++  }
+   std::optional<work> take() {
+     std::lock_guard guard(mutex_);
+     if (closed_ || !supported_.value_or(false) || !pending_ || taken_) return std::nullopt;
+@@ -71,7 +112,7 @@ class channel {
+   // Preserve the original deadline while the next encoder takes over.
+   bool defer(const work &work) {
+     std::lock_guard guard(mutex_);
+-    if (closed_ || !pending_ || pending_->request.id != work.request.id || clock::now() >= work.deadline) return false;
++    if (closed_ || !pending_ || pending_->sequence != work.sequence || clock::now() >= work.deadline) return false;
+     taken_ = false;
+     supported_.reset();
+     return true;
+@@ -83,15 +124,14 @@ class channel {
+   template<class Commit>
+   bool finish(const work &work, bool success, Commit commit) {
+     std::lock_guard guard(mutex_);
+-    if (closed_ || !pending_ || pending_->request.id != work.request.id) return false;
++    if (closed_ || !pending_ || pending_->sequence != work.sequence) return false;
+     success = success && clock::now() < work.deadline;
+     if (success) {
+       commit();
+       current_ = work.request.target;
+     }
+-    auto bytes = resolution_ack(work.request.id, success ? status::applied : status::failed,
+-                                success ? reason::none : reason::apply_failed, current_);
+-    replies_.emplace_back(bytes.begin(), bytes.end());
++    answer(work.sequence, work.local, work.request.id, success ? status::applied : status::failed,
++           success ? reason::none : reason::apply_failed);
+     pending_.reset();
+     return success;
+   }
+@@ -109,15 +149,29 @@ class channel {
+     pending_.reset();
+     query_id_.reset();
+     replies_.clear();
++    local_done_.notify_all();
+   }
+  private:
++  // Call with the mutex held and only with the confirmed encoder size.
++  void answer(std::uint64_t sequence, bool local, std::uint32_t id, status outcome, reason why) {
++    if (local) {
++      local_ = {sequence, {outcome, why, current_}};
++      local_done_.notify_all();
++      return;
++    }
++    auto bytes = resolution_ack(id, outcome, why, current_);
++    replies_.emplace_back(bytes.begin(), bytes.end());
++  }
+   std::mutex mutex_;
++  std::condition_variable local_done_;
+   size launch_, current_;
+   std::uint32_t bitrate_, fps_, last_id_ = 0;
++  std::uint64_t sequence_ = 0;
+   std::optional<bool> supported_;
+   std::optional<std::uint32_t> query_id_;
+   bool closed_ = false, taken_ = false;
+   std::optional<work> pending_;
++  std::optional<std::pair<std::uint64_t, local_result>> local_;
+   std::deque<std::vector<std::uint8_t>> replies_;
+ };
+ } // namespace korri::runtime_resolution
+diff --git a/src/stream.cpp b/src/stream.cpp
+index 0995d026..ebe6cdf9 100644
+--- a/src/stream.cpp
++++ b/src/stream.cpp
+@@ -2228,6 +2228,13 @@ namespace stream {
+       return session.client_cert;
+     }
+ 
++    /**
++     * @brief Return the session's live-resolution channel.
++     */
++    std::shared_ptr<korri::runtime_resolution::channel> runtime_resolution(session_t &session) {
++      return session.runtime_resolution;
++    }
++
+     /**
+      * @brief Stop the active streaming session and prevent new packets from being queued.
+      */
+diff --git a/src/stream.h b/src/stream.h
+index c0b0f962..1cf03029 100644
+--- a/src/stream.h
++++ b/src/stream.h
+@@ -5,6 +5,7 @@
+ #pragma once
+ 
+ // standard includes
++#include <memory>
+ #include <utility>
+ 
+ // lib includes
+@@ -15,6 +16,10 @@
+ #include "crypto.h"
+ #include "video.h"
+ 
++namespace korri::runtime_resolution {
++  class channel;
++}  // namespace korri::runtime_resolution
++
+ namespace stream {
+   constexpr auto VIDEO_STREAM_PORT = 9;  ///< GameStream base-port offset used for the video UDP stream.
+   constexpr auto CONTROL_PORT = 10;  ///< GameStream base-port offset used for the control channel.
+@@ -94,5 +99,12 @@ namespace stream {
+      * @return PEM certificate associated with the session's client.
+      */
+     const std::string &client_cert(session_t &session);
++    /**
++     * @brief Return the session's live-resolution channel (Korri patches 0044 and 0046).
++     *
++     * @param session Active streaming session for the request.
++     * @return The channel that the session's encoder takes resize requests from.
++     */
++    std::shared_ptr<korri::runtime_resolution::channel> runtime_resolution(session_t &session);
+   }  // namespace session
+ }  // namespace stream

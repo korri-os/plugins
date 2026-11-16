@@ -112,6 +112,59 @@ live resolution (only `vaapi` and `vulkan` do). If live resolution is ever
 enabled for NVENC, give `gl_cuda_vram_t` the same change: make its own
 context current before it converts a frame and before it is destroyed.
 
+### Korrid's resize request (patch 0046)
+
+Patch `0046-resize-a-stream-for-korrid.patch` lets the holder's korrid ask
+for a stream's new encode size (Korri issue #476, Route C). It is Korri-only
+and experimental; it is not meant for upstream.
+
+- **The request.** The certificate-control socket of patch `0020` takes one
+  more operation, `resize`, with that patch's mutation fields and the viewer
+  treaty's display: `{"operation":"resize","hostUuid":UUID,"certificate":PEM,
+  "display":{"width":W,"height":H}}`. The peer, frame, size and host checks
+  of patch `0020` apply unchanged. korrid sends the certificate that it
+  provisioned for the viewer's device (its `CertificateGrant`).
+- **The stream.** Sunshine compares the request certificate's SHA-256
+  fingerprint (patch `0020`'s `validate_single_certificate`) with the client
+  certificate of each running session. No match is `StreamEnded`; more than
+  one match is `Conflict`, because no client has two streams today.
+- **The encoder.** The request goes to that session's patch `0044` channel
+  with the client's admission and the same encoder path: the same bounds, the
+  same refusal of a second pending request in either direction, the same
+  2.5 s deadline and capture deferral. Its answer goes back to the socket,
+  never to the stream's client. Sunshine waits at most 3 s. A request that is
+  still pending then is withdrawn, and the encoder thread can no longer commit
+  it, so no encoder changes after a refusal is answered. Requests carry a
+  sequence number, because a local request has no client ID.
+- **The answer.** `{"status":"ok","display":{...}}` with the encoder's
+  confirmed size, or `{"status":"error","code":C}` with patch `0044`'s
+  reason: `InvalidBounds`, `UnsupportedEncoder`, `ApplyFailed`, `Conflict`
+  or `StreamEnded`.
+- **One connection at a time.** The socket serves one connection at a time,
+  and a resize holds it for up to 3 s. A client that connects meanwhile waits
+  in the listen queue while its own deadline runs. If that deadline passes,
+  the client gives up, but Sunshine still reads its frame later and applies
+  it: a provision becomes trust that the client never saw confirmed, and a
+  resize changes the encoder after the client reported a failure. korrid
+  therefore sends one operation at a time and starts each deadline when the
+  operation has the socket. It waits 4 s for a resize. It treats a resize
+  whose answer it did not read as unknown and confirms the previous size, and
+  it keeps the `CertificateGrant` of a provision whose answer it did not read
+  (Korri `services/korrid/src/host/moonlight_certificate.rs`). A client
+  outside korrid gets none of this.
+- **The log.** Sunshine logs one line per request, with the size and the
+  result, never the certificate.
+- **Patch `0045`.** Its non-blocking TLS close changes only the HTTPS TCP
+  connections. The certificate-control socket is a Unix `SOCK_SEQPACKET`
+  socket with its own thread and loop, which `0045` does not touch.
+
+Checks: `sunshine-korri-stream-resize` (the request, the refusals and the
+answers, compiled against the patched source with real certificates) and the
+channel tests in `sunshine-runtime-resolution` (answer, refusal, withdrawal,
+deferral and teardown). Evidence: Korri `clients/android-app/proof/android-app-476`.
+Remove the patch when korrid no longer asks for a stream size, or when an
+upstream Sunshine offers an equivalent local control.
+
 The wire check links the actual Android C client. The channel check covers
 admission, deferred capture, deadlines and shutdown. The full capture check
 applies the base and ARM patch stacks together. Patch `0033` places its rotation
@@ -212,8 +265,8 @@ Remove or replace a carried patch when one of these becomes true:
 
 ## RG35XX Pro linear KMS 60 fps candidate
 
-This is a candidate, not a published release. The common patch set has 9
-patches. The combined ARM profile has 23. The four new patches replace the
+This is a candidate, not a published release. The common patch set has 11
+patches. The combined ARM profile has 25. The four new patches replace the
 layered `exp/kms-direct-readback` experiment without its observers or timing
 output. Only guarded RAM-KMS requests FIFO, after its first valid vblank lock.
 It logs the granted backend and priority once per thread lifetime. The generic

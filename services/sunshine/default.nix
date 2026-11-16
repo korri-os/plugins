@@ -137,6 +137,12 @@ in
       packagePath = ./package.nix;
       testPath = ./test-certificate-control.cpp;
     };
+    sunshine-korri-stream-resize = import ./stream-resize-check.nix {
+      inherit pkgs sunshinePackage;
+      approvedPatchesPath = ./approved-patches.nix;
+      patchPath = ./patches/0046-resize-a-stream-for-korrid.patch;
+      testPath = ./test-stream-resize.cpp;
+    };
     sunshine-korri-v4l2m2m = import ./v4l2m2m-check.nix {
       inherit pkgs sunshinePackage sunshineV4l2m2mPackage;
       approvedPatchesPath = ./approved-patches.nix;
