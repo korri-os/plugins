@@ -29,6 +29,65 @@ def run(*command, **kwargs):
     )
 
 
+# Runs as root in a private mount namespace (or a user namespace's root): a
+# real tmpfs, real umount and a real process whose current directory is in it.
+CLEANUP_CHILD = """
+import importlib.util, json, os, subprocess, sys
+from pathlib import Path
+
+source, work, token = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
+spec = importlib.util.spec_from_file_location("source_auth", source)
+auth = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(auth)
+root = work / "auth"
+root.mkdir()
+options = "mode=0700,nosuid,nodev,size=1m"
+if subprocess.run(["mount", "-t", "tmpfs", "-o", options, "source-auth-test", str(root)]).returncode:
+    sys.exit(77)
+auth.write_files(root, token, sys.executable)
+holder = subprocess.Popen(
+    [sys.executable, "-c", HOLDER],
+    cwd=root,
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    text=True,
+)
+assert holder.stdout.readline() == "ready\\n"
+busy = subprocess.run(
+    ["umount", str(root)], capture_output=True, text=True, env=os.environ | {"LC_ALL": "C"}
+)
+if busy.returncode == 0 or "busy" not in busy.stderr:
+    sys.exit("the holder did not keep the tmpfs busy: " + busy.stderr)
+os.environ["GITHUB_ENV"] = str(work / "github-env")
+os.environ["NIX_CONFIG"] = f"keep = 1\\npre-build-hook = {root}/hook\\nnetrc-file = {root}/netrc\\n"
+auth.cleanup(root)
+holder.stdin.write("report\\n")
+holder.stdin.flush()
+seen = json.loads(holder.stdout.readline())
+holder.wait()
+held = bytes.fromhex(seen["held"])
+print(json.dumps({
+    "listing": seen["listing"],
+    "held_size": len(held),
+    "held_token": token.encode() in held,
+    "held_nonzero": any(held),
+    "root_exists": root.exists(),
+    "mounted": f" {root} " in Path("/proc/self/mountinfo").read_text(),
+    "github_env": (work / "github-env").read_text(),
+}))
+""".replace(
+    "HOLDER",
+    repr(
+        "import json, os, sys\n"
+        "held = os.open('netrc', os.O_RDONLY)\n"
+        "print('ready', flush=True)\n"
+        "sys.stdin.readline()\n"
+        "print(json.dumps({'listing': sorted(os.listdir('.')),"
+        " 'held': os.pread(held, 1 << 16, 0).hex()}), flush=True)\n"
+    ),
+)
+
+
 class SourceAuthTests(unittest.TestCase):
     @unittest.skipUnless("--integration" in sys.argv, "requires local Nix daemon")
     def test_ci_build_requires_the_canonical_output_path(self):
@@ -137,6 +196,41 @@ class SourceAuthTests(unittest.TestCase):
                 auth.write_files(
                     Path(temporary) / "invalid", "bad\ncredential", shutil.which("nix")
                 )
+
+    def test_cleanup_erases_a_busy_tmpfs_before_detaching_it(self):
+        token = secrets.token_hex(24)
+        namespace = ["unshare", "--mount", "--propagation", "private"]
+        if os.geteuid() != 0:
+            namespace[1:1] = ["--user", "--map-root-user"]
+        if shutil.which("unshare") is None or run(*namespace, "true").returncode:
+            self.skipTest("needs root or an unprivileged user namespace")
+        with tempfile.TemporaryDirectory(prefix="source-auth-cleanup-") as temporary:
+            result = run(
+                *namespace,
+                sys.executable,
+                "-c",
+                CLEANUP_CHILD,
+                str(HERE / "source-auth.py"),
+                temporary,
+                token,
+                timeout=60,
+            )
+        if result.returncode == 77:
+            self.skipTest("this namespace cannot mount a tmpfs")
+        self.assertNotIn(token, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout.splitlines()[-1])
+        # The holder's current directory is still the detached tmpfs: it is empty.
+        self.assertEqual(report["listing"], [])
+        # Its open netrc descriptor reads only the zeros written over the token.
+        self.assertGreater(report["held_size"], 0)
+        self.assertFalse(report["held_token"])
+        self.assertFalse(report["held_nonzero"])
+        self.assertFalse(report["root_exists"])
+        self.assertFalse(report["mounted"])
+        self.assertIn("keep = 1", report["github_env"])
+        self.assertNotIn("pre-build-hook", report["github_env"])
+        self.assertNotIn("netrc-file", report["github_env"])
 
     @unittest.skipUnless(
         "--integration" in sys.argv,

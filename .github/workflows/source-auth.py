@@ -9,7 +9,6 @@ import netrc
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 from urllib.parse import urlsplit
@@ -31,7 +30,7 @@ def write_files(root, token, nix, hosts=HOSTS, origins=None):
             file=sys.stderr,
         )
         raise ValueError("GITHUB_TOKEN has an unexpected format")
-    # Setup mounts a private tmpfs here first; a test root does not exist yet.
+    # Setup mounts a dedicated tmpfs here first; a test root does not exist yet.
     root.mkdir(mode=0o700, exist_ok=True)
     if any(root.iterdir()):
         raise FileExistsError(f"{root} is not empty")
@@ -149,7 +148,7 @@ def setup(nix):
     group = grp.getgrnam("nixbld")
     # Nix executes the hook from this directory. Runner image
     # ubuntu24/20261111.127 mounts /run noexec, and Nix then reports only that
-    # the hook "failed with exit code 1" (dry run 43888141736). A private tmpfs
+    # the hook "failed with exit code 1" (dry run 43888141736). A dedicated tmpfs
     # keeps the credentials in memory and lets the hook run, whatever /run's
     # own mount options are.
     root.mkdir(mode=0o700)
@@ -197,13 +196,50 @@ def setup(nix):
     )
 
 
-def cleanup():
-    root = DIRECTORY
+def erase(root):
+    """Overwrite every regular file under root with zeros, then remove the tree.
+
+    A process that still holds a file open, or has its current directory in
+    root, can then read neither the token nor any other credential file.
+    """
+    for directory, subdirectories, files in os.walk(root, topdown=False):
+        for name in files:
+            path = Path(directory) / name
+            # The nix entry is a symlink into the store: remove the link only.
+            if not path.is_symlink() and path.is_file():
+                path.chmod(0o600)
+                size = path.stat().st_size
+                with path.open("r+b") as stream:
+                    stream.write(bytes(size))
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            path.unlink()
+        for name in subdirectories:
+            (Path(directory) / name).rmdir()
+
+
+def cleanup(root=DIRECTORY):
     if root.is_mount():
-        # Unmounting the private tmpfs discards every credential file at once.
-        subprocess.run(["umount", str(root)], check=True)
+        # Erase while the dedicated tmpfs is still mounted. A lazy unmount only
+        # detaches it, and a process inside it could read what it still held.
+        erase(root)
+        unmounted = subprocess.run(
+            ["umount", str(root)],
+            capture_output=True,
+            text=True,
+            check=False,
+            # The busy test below reads util-linux's untranslated message.
+            env=os.environ | {"LC_ALL": "C"},
+        )
+        if unmounted.returncode:
+            if "busy" not in unmounted.stderr:
+                raise RuntimeError("Cannot unmount the source authentication tmpfs")
+            # A process still has its current directory or a file there. The
+            # tmpfs is already empty; detach it and let the kernel free it.
+            subprocess.run(["umount", "--lazy", str(root)], check=True)
     if root.exists():
-        shutil.rmtree(root)
+        erase(root)
+        root.rmdir()
     removed = {f"pre-build-hook = {root}/hook", f"netrc-file = {root}/netrc"}
     settings = (
         "\n".join(

@@ -399,13 +399,17 @@ and Nix store, under `/run/korri-github-source-auth`. Only root, the job runner
 and the Nix build group can read their contents. Header values are masked. `NIX_CONFIG` contains
 only paths, never credentials. An `always()` step removes the files and settings.
 
-Setup mounts a private 1 MiB tmpfs at that path before it writes the files.
+Setup mounts a dedicated 1 MiB tmpfs at that path before it writes the files.
 Nix executes the pre-build hook from there. Runner image
 `ubuntu24/20261111.127` mounts `/run` with `noexec`; there the hook could
 not start, and Nix reported only `failed with exit code 1` (dry run
 43888141736, x86 build and lifecycle). The tmpfs keeps the credentials in
 memory and lets the hook run whatever the host's `/run` options are. Setup
-refuses a `noexec` result. Cleanup unmounts it.
+refuses a `noexec` result. Cleanup overwrites every file there with zeros and
+deletes it while the tmpfs is still mounted, then unmounts it. If a process
+still has its current directory or a file there, cleanup detaches the empty
+tmpfs with `umount --lazy`; that process can then read neither the token nor
+the hook.
 
 A pre-build hook mounts these files only for fixed-output derivations whose
 source URLs name `github.com`, `api.github.com` or `codeload.github.com` over
