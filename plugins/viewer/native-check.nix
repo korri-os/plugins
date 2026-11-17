@@ -45,6 +45,8 @@ pkgs.runCommand "korri-viewer-native-check"
     test ${toString (builtins.length (builtins.attrNames plugin.services))} -eq 1
     ${plugin.files.viewer} --help > help
     grep -F 'GPL-3.0-or-later' help
+    # With nightjar-core the binary is GPL-3.0-only (korri#391).
+    grep -F 'GPL-3.0-only' help
     test -s ${plugin.packages.viewer}/share/licenses/korri-viewer/LICENSE
     # GPL-3 corresponding source, in the same closure as the binary.
     tar -tJf ${plugin.packages.source}/share/korri-viewer/korri-viewer-source.tar.xz > sources
@@ -56,12 +58,20 @@ pkgs.runCommand "korri-viewer-native-check"
       korri-viewer-source/korri/clients/viewer/src/main.rs \
       korri-viewer-source/korri/contracts/viewer/src/lib.rs \
       korri-viewer-source/moonlight-common-c/src/Limelight.h \
-      korri-viewer-source/moonlight-common-c/CMakeLists.txt
+      korri-viewer-source/moonlight-common-c/CMakeLists.txt \
+      korri-viewer-source/korri/clients/viewer/vendor/README.md \
+      korri-viewer-source/korri/clients/viewer/vendor/nightjar/protocol/client/Cargo.toml
     do
       grep -Fx "$expected" sources
     done
     grep -q '^korri-viewer-source/moonlight-common-c/enet/' sources
     grep -q '^korri-viewer-source/vendor/openssl-[0-9]' sources
+    # The binary streams with nightjar-core and draws with the Rust EGL
+    # presenter and X11 window (Korri's ADR 0062 switch); the source says
+    # how to build those features.
+    tar -xJOf ${plugin.packages.source}/share/korri-viewer/korri-viewer-source.tar.xz \
+      korri-viewer-source/BUILDING.txt > building
+    grep -F -- '--features nightjar,rust-egl-presenter,rust-x11-window' building
     # Moonlight's settings, answering for this runner. Moonlight's plugin
     # sits beside it so the test compares the two.
     mkdir -p settings-check/viewer settings-check/moonlight

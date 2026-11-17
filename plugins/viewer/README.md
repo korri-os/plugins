@@ -41,10 +41,21 @@ arguments into the contract crate, so that the same check covers them.
 ### Corresponding source
 
 `packages.source` is `share/korri-viewer/korri-viewer-source.tar.xz`. It holds
-the Korri files that build the viewer, with its Nix recipe, the network core
+the Korri files that build the viewer, with its Nix recipe and its vendored
+network core nightjar-core (GPL-3.0-only), the C network core
 `moonlight-common-c` with its ENet, and the Rust crates of its `Cargo.lock`.
-`BUILDING.txt` in it says how to build. It is in the same closure as the
-binary, so each archive that carries the viewer carries its source too.
+`BUILDING.txt` in it says how to build, with the cargo features of the
+binary. It is in the same closure as the binary, so each archive that carries
+the viewer carries its source too.
+
+### Network core and Rust parts
+
+The viewer streams with nightjar-core and draws with its Rust EGL presenter
+and Rust X11 window: each measured equal to the C it replaced (korri-os/korri
+ADR 0062, #391 steps E and F). `-networkcore c`, `-eglpresenter c` and
+`-x11window c` keep the C. This plugin passes none of these options, so
+korrid's launches take the defaults. With nightjar-core the binary is
+GPL-3.0-only.
 
 ### Client identity
 
