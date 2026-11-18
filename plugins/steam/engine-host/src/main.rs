@@ -2110,6 +2110,92 @@ fn spawn_qr(
 /// list-apps: the account's licences (IClientUser::GetSubscribedApps), named
 /// and typed from the engine's appinfo cache. Only games are reported.
 /// `owned`: licensed without free licences; `free`: the rest.
+/// Device proof: right after `signed_in` GetSubscribedApps returned no app at
+/// all; Steam delivers the account's licences some seconds after the logon.
+/// So list-apps first waits until the licence count is non-zero and has not
+/// changed for LICENCE_SETTLE, at most LICENCE_TIMEOUT (an account with no
+/// licences then lists nothing). Then, if some licensed apps have no record in
+/// the engine's appinfo cache on disk, it waits once for the engine to write
+/// appinfo.vdf again (APPINFO_SETTLE after the write), at most APPINFO_TIMEOUT.
+const LICENCE_SETTLE: Duration = Duration::from_secs(3);
+const LICENCE_TIMEOUT: Duration = Duration::from_secs(45);
+const LICENCE_POLL: Duration = Duration::from_millis(500);
+const APPINFO_SETTLE: Duration = Duration::from_secs(1);
+const APPINFO_TIMEOUT: Duration = Duration::from_secs(30);
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ListWait {
+    Licences {
+        since: Instant,
+        last: Option<usize>,
+        stable_since: Instant,
+    },
+    Appinfo {
+        since: Instant,
+        baseline: Option<std::time::SystemTime>,
+        changed_at: Option<Instant>,
+    },
+}
+impl ListWait {
+    fn new(now: Instant) -> Self {
+        ListWait::Licences {
+            since: now,
+            last: None,
+            stable_since: now,
+        }
+    }
+}
+/// One poll of the licence wait: true when the licences have settled or the
+/// wait is over.
+fn licences_settled(wait: &mut ListWait, now: Instant, count: usize) -> bool {
+    let ListWait::Licences {
+        since,
+        last,
+        stable_since,
+    } = wait
+    else {
+        return true;
+    };
+    if *last != Some(count) {
+        *last = Some(count);
+        *stable_since = now;
+    }
+    (count > 0 && now.duration_since(*stable_since) >= LICENCE_SETTLE)
+        || now.duration_since(*since) >= LICENCE_TIMEOUT
+}
+/// One poll of the appinfo wait: true when appinfo.vdf was written again and
+/// settled, or the wait is over.
+fn appinfo_written(
+    wait: &mut ListWait,
+    now: Instant,
+    current: Option<std::time::SystemTime>,
+) -> bool {
+    let ListWait::Appinfo {
+        since,
+        baseline,
+        changed_at,
+    } = wait
+    else {
+        return true;
+    };
+    if current.is_some() && current != *baseline {
+        let at = *changed_at.get_or_insert(now);
+        if now.duration_since(at) >= APPINFO_SETTLE {
+            return true;
+        }
+    }
+    now.duration_since(*since) >= APPINFO_TIMEOUT
+}
+/// Licensed apps with no record in the appinfo cache on disk.
+fn apps_without_appinfo(apps: &[u32], steam: &Path) -> usize {
+    let known = std::fs::read(steam.join("appcache/appinfo.vdf"))
+        .map_err(|_| "no appinfo.vdf".to_string())
+        .and_then(|bytes| appinfo::read(&bytes))
+        .unwrap_or_default();
+    apps.iter()
+        .filter(|appid| !known.contains_key(appid))
+        .count()
+}
+
 fn list_apps(
     out: &mut File,
     subscribed: &dyn Fn(bool) -> Vec<u32>,
@@ -2459,6 +2545,8 @@ fn run(out: &mut File) -> Result<(), String> {
         let mut pending: Vec<CloudCommand> = Vec::new();
         let mut app_pending: Vec<AppCommand> = Vec::new();
         let mut list_pending = false;
+        let mut list_wait: Option<ListWait> = None;
+        let mut next_list_poll = Instant::now();
         let frame: NoArgs = slot(engine, ENGINE_RUN_FRAME.0);
         let state: StateQuery = slot(user, USER_LOGON_STATE.0);
         let logged: BoolQuery = slot(user, USER_LOGGED_ON.0);
@@ -2901,9 +2989,54 @@ fn run(out: &mut File) -> Result<(), String> {
                         }
                     }
                 }
-                if list_pending {
-                    list_pending = false;
-                    list_apps(out, &subscribed, &steam)?;
+                if list_pending && now >= next_list_poll {
+                    next_list_poll = now + LICENCE_POLL;
+                    let wait = list_wait.get_or_insert_with(|| ListWait::new(now));
+                    let mut ready = false;
+                    match wait {
+                        ListWait::Licences { since, .. } => {
+                            let since = *since;
+                            let all = subscribed(true);
+                            if licences_settled(wait, now, all.len()) {
+                                json(
+                                    out,
+                                    &format!(
+                                        r#"{{"event":"licences","count":{},"seconds":{:.1}}}"#,
+                                        all.len(),
+                                        now.duration_since(since).as_secs_f32()
+                                    ),
+                                )?;
+                                let missing = apps_without_appinfo(&all, &steam);
+                                if missing == 0 {
+                                    ready = true;
+                                } else {
+                                    json(
+                                        out,
+                                        &format!(
+                                            r#"{{"event":"appinfo_wait","missing":{missing}}}"#
+                                        ),
+                                    )?;
+                                    *wait = ListWait::Appinfo {
+                                        since: now,
+                                        baseline: file_time(&steam.join("appcache/appinfo.vdf")),
+                                        changed_at: None,
+                                    };
+                                }
+                            }
+                        }
+                        ListWait::Appinfo { .. } => {
+                            ready = appinfo_written(
+                                wait,
+                                now,
+                                file_time(&steam.join("appcache/appinfo.vdf")),
+                            );
+                        }
+                    }
+                    if ready {
+                        list_pending = false;
+                        list_wait = None;
+                        list_apps(out, &subscribed, &steam)?;
+                    }
                 }
                 for command in pending.drain(..) {
                     cloud.start(out, command)?;
@@ -4344,6 +4477,61 @@ mod tests {
             |_| 76561197960265770,
         );
         assert_eq!(started, Ok((account.into(), 76561197960265770)));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn list_apps_waits_for_the_licences_to_arrive_and_settle() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut wait = ListWait::new(start);
+        // Signed in, no licence yet (the device case): keep waiting.
+        assert!(!licences_settled(&mut wait, at(0), 0));
+        assert!(!licences_settled(&mut wait, at(5_000), 0));
+        // Licences arrive in batches; the count must hold still.
+        assert!(!licences_settled(&mut wait, at(6_000), 120));
+        assert!(!licences_settled(&mut wait, at(7_000), 480));
+        assert!(!licences_settled(&mut wait, at(9_000), 480));
+        assert!(licences_settled(&mut wait, at(10_000), 480));
+        // An account with no licence at all lists nothing after the limit.
+        let mut wait = ListWait::new(start);
+        assert!(!licences_settled(&mut wait, at(10_000), 0));
+        assert!(licences_settled(&mut wait, start + LICENCE_TIMEOUT, 0));
+    }
+    #[test]
+    fn list_apps_waits_once_for_missing_appinfo_records() {
+        use std::time::UNIX_EPOCH;
+        let start = Instant::now();
+        let before = Some(UNIX_EPOCH + Duration::from_secs(10));
+        let after = Some(UNIX_EPOCH + Duration::from_secs(20));
+        let mut wait = ListWait::Appinfo {
+            since: start,
+            baseline: before,
+            changed_at: None,
+        };
+        assert!(!appinfo_written(&mut wait, start, before));
+        assert!(!appinfo_written(
+            &mut wait,
+            start + Duration::from_secs(2),
+            after
+        ));
+        assert!(appinfo_written(
+            &mut wait,
+            start + Duration::from_secs(2) + APPINFO_SETTLE,
+            after
+        ));
+        let mut wait = ListWait::Appinfo {
+            since: start,
+            baseline: None,
+            changed_at: None,
+        };
+        assert!(appinfo_written(&mut wait, start + APPINFO_TIMEOUT, None));
+        // Counting is against the cache on disk.
+        let dir = std::env::temp_dir().join(format!("korri-appinfo-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("appcache")).unwrap();
+        use appinfo::tests::{Writer, W::*};
+        let file = Writer::file(&[(10, O(vec![("common", O(vec![("name", S("A"))]))]))]);
+        std::fs::write(dir.join("appcache/appinfo.vdf"), file).unwrap();
+        assert_eq!(apps_without_appinfo(&[10, 20, 30], &dir), 2);
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
