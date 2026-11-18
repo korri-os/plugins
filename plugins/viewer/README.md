@@ -20,7 +20,7 @@ deployment or hardware acceptance follows from these package checks.
 | `mapping` | file | The controller database that korrid passes with `-mapping` |
 | `identity-bootstrap` | file | Prints the public client certificate (below) |
 | `treaty` | file | The viewer's wire contract, `contracts/generated/viewer.ts` |
-| `viewer` | package | The viewer, GPL-3.0-or-later |
+| `viewer` | package | The viewer, GPL-3.0-only on x86_64: GPL-3.0-or-later code with nightjar-core, which is GPL-3.0-only |
 | `source` | package | Its corresponding source (ADR 0059) |
 | `korri-viewer-setup` | service | Creates the client identity directory |
 
