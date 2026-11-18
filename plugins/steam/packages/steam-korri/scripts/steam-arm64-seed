@@ -20,6 +20,7 @@ Optional environment:
 Modes:
   --dry-run         Print intended network/filesystem actions (default)
   --apply           Download/extract Steam ARM64 runtime and client into STEAM_HOME
+  --relink          Point the seed's absolute links at STEAM_HOME again; no download
 EOF
 }
 
@@ -27,6 +28,7 @@ mode=dry-run
 case "${1:-}" in
   ""|--dry-run) mode=dry-run ;;
   --apply) mode=apply ;;
+  --relink) mode=relink ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
@@ -113,7 +115,7 @@ install_runtime() {
 
 link_runtime_libibus() {
   local target=""
-  if [ "$mode" = apply ]; then
+  if [ "$mode" != dry-run ]; then
     target=$(find "$RUNTIME_DIR" -path '*/files/lib/aarch64-linux-gnu/libibus-1.0.so.5.*' -type f | sort | head -n 1)
     if [ -z "$target" ]; then
       echo "error: could not find runtime libibus under $RUNTIME_DIR" >&2
@@ -123,7 +125,7 @@ link_runtime_libibus() {
     target="$RUNTIME_DIR/steamrt3c_platform_*/files/lib/aarch64-linux-gnu/libibus-1.0.so.5.*"
   fi
   run mkdir -p "$STEAM_HOME/lib/aarch64-linux-gnu"
-  run ln -sf "$target" "$STEAM_HOME/lib/aarch64-linux-gnu/libibus-1.0.so.5"
+  run ln -sfn "$target" "$STEAM_HOME/lib/aarch64-linux-gnu/libibus-1.0.so.5"
 }
 
 resolve_client_zip() {
@@ -166,6 +168,15 @@ install_links_and_metadata() {
   run mkdir -p "$STEAM_GAMES_ROOT" "$STEAM_DOT" "$STEAM_HOME/compatibilitytools.d"
   STEAM_BETA="$STEAM_BETA" "$script_dir/steam-arm64-bootstrap" "--$mode"
 }
+
+# korri #498: the links are absolute, and the account root that holds
+# STEAM_HOME can move. The session relinks on every launch of a seeded home.
+if [ "$mode" = relink ]; then
+  say "steam-arm64-seed mode=relink STEAM_HOME=$STEAM_HOME"
+  if [ -d "$RUNTIME_DIR" ]; then link_runtime_libibus; fi
+  STEAM_BETA="$STEAM_BETA" "$script_dir/steam-arm64-bootstrap" --relink
+  exit 0
+fi
 
 say "steam-arm64-seed mode=$mode"
 say "STEAM_HOME=$STEAM_HOME"

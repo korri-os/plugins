@@ -81,6 +81,14 @@ if behavior in ("update", "all-steps"):
     time.sleep(2)
     (home / "update-complete").touch()
     event("Update complete, launching Steam...")
+if behavior in ("slow-update", "stalled-update"):
+    # Steam's bootstrapper prints only this line while it downloads (#498).
+    # Seven seconds of download outlast the test's three-second deadline.
+    for step in range(14):
+        done = (step + 1) * 1000 if behavior == "slow-update" else 1000
+        event(f"Downloading update ({done:,} of 14,000 KB)...")
+        time.sleep(0.5)
+    event("Update complete, launching Steam...")
 if behavior == "client-exit":
     sys.exit(7)
 event("Waiting for compat in post-logon")

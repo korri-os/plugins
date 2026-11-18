@@ -109,5 +109,41 @@ class SteamSettingsTests(unittest.TestCase):
         self.assertEqual(self.config.stat().st_mode & 0o777, 0o640)
 
 
+    def run_library(self):
+        return subprocess.run(
+            [os.environ.get("PYTHON", "python3"), str(self.helper), "--library", str(self.home)],
+            text=True, capture_output=True, check=False,
+        )
+
+    def test_library_points_folder_zero_at_this_home_and_keeps_other_folders(self):
+        # korri #498: the account root moved; Steam's list still named the old home.
+        old = '"libraryfolders"\n{\n\t"0"\n\t{\n\t\t"path"\t\t"/var/lib/korri/users/default/steam"\n\t\t"label"\t\t""\n\t}\n\t"1"\n\t{\n\t\t"path"\t\t"/run/media/sd"\n\t}\n}\n'
+        for relative in ("steamapps/libraryfolders.vdf", "config/libraryfolders.vdf"):
+            path = self.home / relative
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(old)
+        result = self.run_library()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for relative in ("steamapps/libraryfolders.vdf", "config/libraryfolders.vdf"):
+            text = (self.home / relative).read_text()
+            self.assertIn(f'"path"\t\t"{self.home}"', text)
+            self.assertIn('"/run/media/sd"', text)
+            self.assertNotIn("/users/default/", text)
+            self.assertIn('"label"\t\t""', text)
+        first = (self.home / "steamapps/libraryfolders.vdf").read_bytes()
+        self.assertEqual(self.run_library().returncode, 0)
+        self.assertEqual((self.home / "steamapps/libraryfolders.vdf").read_bytes(), first)
+
+    def test_library_creates_nothing_and_refuses_a_broken_file(self):
+        result = self.run_library()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.home / "steamapps/libraryfolders.vdf").exists())
+        broken = self.home / "config/libraryfolders.vdf"
+        broken.write_text('"libraryfolders" { "0" {')
+        result = self.run_library()
+        self.assertEqual(result.returncode, 126)
+        self.assertEqual(broken.read_text(), '"libraryfolders" { "0" {')
+
+
 if __name__ == "__main__":
     unittest.main()

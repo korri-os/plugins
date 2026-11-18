@@ -272,9 +272,19 @@ check_client() {
     fi
   fi
 }
+# A client self-update can download for longer than any fixed deadline on a
+# slow link (#498: 468 MB at about 1 MB/s). While the downloaded byte count
+# keeps growing, readiness and sign-in get this long past the last growth.
+update_progress_window=300
+# The last "Downloading update (N of M KB)" count in the given log text, digits only.
+update_download_kb() {
+  grep -aoE 'Downloading update \([0-9,]+ of [0-9,]+ KB\)' <<<"$1" | tail -n 1 |
+    sed -E 's/^Downloading update \(([0-9,]+) of.*/\1/' | tr -d ',' || true
+}
 wait_for_steam_ready() {
   local deadline=$((SECONDS + 600)) desktop_since=-1 desktop_pid="" pid=""
   local updating=0 ready_log=0 old_generation="$generation" update_seen=0
+  local downloaded="" downloaded_max=-1 download_seen=0
   say 'warm: waiting for Steam readiness'
   while (( SECONDS < deadline )); do
     check_login
@@ -285,6 +295,19 @@ wait_for_steam_ready() {
       old_generation="$generation"
     fi
     read_logs
+    downloaded=$(update_download_kb "$new_console$new_bootstrap")
+    if [[ -n "$downloaded" ]] && (( 10#$downloaded > downloaded_max )); then
+      downloaded_max=$((10#$downloaded))
+      reach_step update
+      updating=1
+      desktop_since=-1; ready_log=0
+      if (( download_seen == 0 )); then
+        say "warm: client update downloading; deadlines follow its progress (${update_progress_window} s past the last growth)"
+        download_seen=1
+      fi
+      (( deadline >= SECONDS + update_progress_window )) || deadline=$((SECONDS + update_progress_window))
+      (( login_deadline >= SECONDS + update_progress_window )) || login_deadline=$((SECONDS + update_progress_window))
+    fi
     if grep -aqE 'Found pending update|Installing update\.\.\.|Extracting package' <<<"$new_console$new_bootstrap"; then
       reach_step update
       updating=1
@@ -375,6 +398,32 @@ mark_failure_logs
 find "$STEAM_HOME" -xdev -type d -perm -2000 -user "$(id -u)" -exec chmod g-s {} +
 mkdir -p "$STEAM_HOME/logs" "$STEAM_HOME/steamapps"
 if [[ "$uses_fex" == 1 ]]; then mkdir -p "$STEAM_HOME/fex-data"; fi
+# Links that Steam and Proton made inside the home name it by its absolute
+# path: the seed's library links and each Wine prefix's drive links. After the
+# account root moved, move the ones that name the previous home. Game files
+# are not searched.
+repoint_moved_links() {
+  local old="$1" link target prefix
+  local links=()
+  while IFS= read -r -d '' link; do links+=("$link"); done < <(
+    find "$STEAM_HOME" -xdev -maxdepth 3 -path "$STEAM_HOME/steamapps" -prune -o -type l -print0
+  )
+  for prefix in "$STEAM_HOME"/steamapps/compatdata/*/pfx/dosdevices; do
+    [[ -d "$prefix" ]] || continue
+    while IFS= read -r -d '' link; do links+=("$link"); done < <(
+      find "$prefix" -maxdepth 1 -type l -print0
+    )
+  done
+  for link in "${links[@]}"; do
+    target=$(readlink "$link")
+    if [[ "$target" == "$old" ]]; then
+      ln -sfn "$STEAM_HOME" "$link"
+    elif [[ "$target" == "$old"/* ]]; then
+      ln -sfn "$STEAM_HOME/${target#"$old"/}" "$link"
+    fi
+  done
+}
+
 # korrid discovers installed games from steamapps/appmanifest_*.acf (Korri
 # ADR 0011). It is the owner of the account root above this home, and gets
 # no access to a directory this user creates. Grant it listing of the home
@@ -400,9 +449,21 @@ reach_step start-steam
 if [[ "$uses_fex" == 1 ]]; then
   export FEX_ROOTFS="$KORRI_FEX_ROOTFS"
   say 'seed: preparing ARM64 runtime and client'
+  # The home this user's links named before this launch. It differs from
+  # STEAM_HOME after the account root moved (#498).
+  previous_home=$(readlink "$STEAM_DOT/steam" 2>/dev/null || true)
   if [[ ! -x "$STEAM_HOME/steamrtarm64/steam" ]]; then
     @helpers@/bin/steam-arm64-seed --apply >>"$STEAM_HOME/logs/session_log.txt" 2>&1 \
       || fail 126 'Steam failed: ARM64 seed failed (see logs/session_log.txt)'
+  else
+    # The seed's links are absolute. Point them at this STEAM_HOME on every
+    # launch, as the x86_64 branch does for its own links.
+    @helpers@/bin/steam-arm64-seed --relink >>"$STEAM_HOME/logs/session_log.txt" 2>&1 \
+      || fail 126 'Steam failed: ARM64 seed links failed (see logs/session_log.txt)'
+  fi
+  if [[ "$previous_home" == /* && "$previous_home" != "$STEAM_HOME" ]]; then
+    say 'seed: the Steam home moved; repointing its links'
+    repoint_moved_links "$previous_home"
   fi
 else
   # Valve's bootstrap starts the client that ~/.steam/steam points to, and
@@ -424,6 +485,8 @@ mkdir -p "$STEAM_HOME/compatibilitytools.d"
 ln -sfn "$KORRI_PROTON_CACHYOS" "$STEAM_HOME/compatibilitytools.d/@protonToolName@"
 say 'settings: merging Proton, Steam Input and first-launch seeds'
 @settings@/bin/steam-vdf-settings "$STEAM_HOME" "$appid"
+# Steam's own library list names this home by its absolute path (#498).
+@settings@/bin/steam-vdf-settings --library "$STEAM_HOME"
 if ! login_present; then say 'login: Steam sign-in required; waiting up to 600 s for manual sign-in'; fi
 # Runtime preparation and client/runtime downloads must not consume the
 # manual sign-in window.

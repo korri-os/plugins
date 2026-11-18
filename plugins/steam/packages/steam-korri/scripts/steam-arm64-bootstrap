@@ -20,6 +20,7 @@ Optional environment:
 Modes:
   --dry-run         Print intended actions without writing anything (default)
   --apply           Perform metadata/resource writes
+  --relink          Only point the ~/.steam links at STEAM_HOME
 EOF
 }
 
@@ -27,6 +28,7 @@ mode=dry-run
 case "${1:-}" in
   ""|--dry-run) mode=dry-run ;;
   --apply) mode=apply ;;
+  --relink) mode=relink ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
@@ -88,6 +90,24 @@ atomic_write() {
   fi
 }
 
+# Keep the conventional ~/.steam layout pointing at the Korri-managed Steam
+# home. Proton/lsteamclient and Steam Runtime helpers still discover pieces via
+# these historic names even when STEAM_HOME is explicit.
+link_steam_dot() {
+  run mkdir -p "$STEAM_DOT"
+  run ln -sfn "$STEAM_HOME" "$STEAM_DOT/root"
+  run ln -sfn "$STEAM_HOME" "$STEAM_DOT/steam"
+  run ln -sfn "$STEAM_HOME/ubuntu12_32" "$STEAM_DOT/bin32"
+  run ln -sfn "$STEAM_HOME/ubuntu12_64" "$STEAM_DOT/bin64"
+  run ln -sfn "$STEAM_HOME/linux32" "$STEAM_DOT/sdk32"
+  run ln -sfn "$STEAM_HOME/linux64" "$STEAM_DOT/sdk64"
+  run ln -sfn "$STEAM_HOME/linuxarm64" "$STEAM_DOT/sdkarm64"
+}
+if [ "$mode" = relink ]; then
+  link_steam_dot
+  exit 0
+fi
+
 say "steam-arm64-bootstrap mode=$mode"
 say "STEAM_HOME=$STEAM_HOME"
 say "STEAM_GAMES_ROOT=$STEAM_GAMES_ROOT"
@@ -103,16 +123,7 @@ run mkdir -p \
   "$STEAM_GAMES_ROOT" \
   "$STEAM_DOT"
 
-# Keep the conventional ~/.steam layout pointing at the Korri-managed Steam
-# home. Proton/lsteamclient and Steam Runtime helpers still discover pieces via
-# these historic names even when STEAM_HOME is explicit.
-run ln -sfn "$STEAM_HOME" "$STEAM_DOT/root"
-run ln -sfn "$STEAM_HOME" "$STEAM_DOT/steam"
-run ln -sfn "$STEAM_HOME/ubuntu12_32" "$STEAM_DOT/bin32"
-run ln -sfn "$STEAM_HOME/ubuntu12_64" "$STEAM_DOT/bin64"
-run ln -sfn "$STEAM_HOME/linux32" "$STEAM_DOT/sdk32"
-run ln -sfn "$STEAM_HOME/linux64" "$STEAM_DOT/sdk64"
-run ln -sfn "$STEAM_HOME/linuxarm64" "$STEAM_DOT/sdkarm64"
+link_steam_dot
 
 printf '%s\n' "$STEAM_BETA" | atomic_write "$STEAM_HOME/package/beta"
 if [ -e "$STEAM_DOT/registry.vdf" ]; then

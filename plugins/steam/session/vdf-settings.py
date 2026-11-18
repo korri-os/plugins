@@ -183,11 +183,39 @@ def seed_registry(path: Path) -> int:
     return 0
 
 
+def repoint_library(home: Path) -> int:
+    # korri #498: Steam's library list names its own home ("0") by absolute
+    # path. Keep it STEAM_HOME, in both files Steam keeps, when they exist.
+    # Other library folders are other disks; they stay as Steam wrote them.
+    try:
+        changes = []
+        for path in (home / "steamapps/libraryfolders.vdf", home / "config/libraryfolders.vdf"):
+            if not path.exists():
+                continue
+            text = path.read_bytes().decode("utf-8")
+            root = parse(text)
+            folders = [v for k, v in root.entries if k.value.lower() == "libraryfolders"]
+            if len(folders) != 1 or not isinstance(folders[0], Object):
+                continue
+            if not any(k.value == "0" and isinstance(v, Object) for k, v in folders[0].entries):
+                continue
+            changes.append(prepare(path, {"libraryfolders": {"0": {"path": str(home)}}}))
+        for change in changes:
+            write(change)
+    except (OSError, ValueError) as error:
+        print(f"steam-session: library folder settings failed: {error}", file=sys.stderr)
+        return 126
+    return 0
+
+
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--registry":
         return seed_registry(Path(sys.argv[2]))
+    if len(sys.argv) == 3 and sys.argv[1] == "--library":
+        return repoint_library(Path(sys.argv[2]))
     if len(sys.argv) != 3 or not re.fullmatch(r"[1-9][0-9]*", sys.argv[2]):
-        print("usage: steam-vdf-settings <steam-home> <appid> | --registry <path>", file=sys.stderr)
+        print("usage: steam-vdf-settings <steam-home> <appid> | --registry <path> | --library <steam-home>",
+              file=sys.stderr)
         return 2
     home, appid = Path(sys.argv[1]), sys.argv[2]
     mapping = {key: {"name": TOOL, "config": "", "priority": "250"} for key in ("0", appid)}

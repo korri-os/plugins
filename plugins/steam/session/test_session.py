@@ -43,7 +43,8 @@ class SteamSessionTests(unittest.TestCase):
         self.assert_steps(home, [step["key"] for step in self.declared_steps])
 
     def run_session(self, behavior, seeded=True, setup=None, installed=True, shm=None,
-                    copy_behavior=None, platform="aarch64-linux", notify_socket=True, short_deadlines=False, notify_exit=0):
+                    copy_behavior=None, platform="aarch64-linux", notify_socket=True, short_deadlines=False, notify_exit=0,
+                    short_ready=False):
         arm = platform == "aarch64-linux"
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -116,6 +117,10 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
             for name, seconds in (("login", 600), ("launch", 180), ("launch", 3600)):
                 script = script.replace(f"{name}_deadline=$((SECONDS + {seconds}))",
                                         f"{name}_deadline=$((SECONDS + 2))")
+        if short_ready:
+            script = script.replace("local deadline=$((SECONDS + 600))",
+                                    "local deadline=$((SECONDS + 3))")
+            script = script.replace("update_progress_window=300", "update_progress_window=3")
         # Never touch the host's real shared memory.
         (root / "shm").mkdir()
         script = script.replace("/dev/shm", str(root / "shm"))
@@ -141,6 +146,53 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
     def assert_steps(self, home, keys):
         self.assertEqual((home / "statuses").read_text().splitlines(),
                          [f"--status=korri-step: {key}" for key in keys])
+
+    def test_a_moved_home_is_relinked_before_steam_starts(self):
+        # korri #498: the seed ran under the old account root.
+        old = "/var/lib/korri/users/default/steam"
+        def moved(home):
+            dot = home.parent / ".steam"
+            dot.mkdir()
+            (dot / "steam").symlink_to(old)
+            lib = home / "lib/aarch64-linux-gnu"
+            lib.mkdir(parents=True)
+            (lib / "libibus-1.0.so.5").symlink_to(f"{old}/steam-runtime-steamrt-arm64/x/libibus.so")
+            dosdevices = home / "steamapps/compatdata/401710/pfx/dosdevices"
+            dosdevices.mkdir(parents=True)
+            (dosdevices / "s:").symlink_to(old)
+            (dosdevices / "z:").symlink_to("/")
+            (home / "config").mkdir()
+            for relative in ("steamapps/libraryfolders.vdf", "config/libraryfolders.vdf"):
+                (home / relative).write_text(f'"libraryfolders" {{ "0" {{ "path" "{old}" }} }}\n')
+        result, home, _ = self.run_session("game", setup=moved)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("the Steam home moved", result.stderr)
+        self.assertEqual((home / "relinks").read_text(), "relink\n")
+        self.assertEqual(os.readlink(home / "lib/aarch64-linux-gnu/libibus-1.0.so.5"),
+                         f"{home}/steam-runtime-steamrt-arm64/x/libibus.so")
+        dosdevices = home / "steamapps/compatdata/401710/pfx/dosdevices"
+        self.assertEqual(os.readlink(dosdevices / "s:"), str(home))
+        self.assertEqual(os.readlink(dosdevices / "z:"), "/")
+        for relative in ("steamapps/libraryfolders.vdf", "config/libraryfolders.vdf"):
+            self.assertIn(f'"path" "{home}"', (home / relative).read_text())
+
+    def test_a_seeded_home_in_place_is_only_relinked(self):
+        result, home, _ = self.run_session("game")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((home / "relinks").read_text(), "relink\n")
+        self.assertNotIn("the Steam home moved", result.stderr)
+
+    def test_a_growing_client_download_extends_the_readiness_deadline(self):
+        # korri #498: a slow self-update ran past the fixed readiness deadline.
+        result, home, _ = self.run_session("slow-update", short_ready=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("client update downloading", result.stderr)
+        self.assert_steps(home, ["start-steam", "update", "sign-in", "game"])
+
+    def test_a_stalled_client_download_still_times_out(self):
+        result, home, _ = self.run_session("stalled-update", short_ready=True)
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertIn("readiness timeout", result.stderr)
 
     def test_no_notify_socket_sends_no_status(self):
         result, home, _ = self.run_session("game", notify_socket=False)

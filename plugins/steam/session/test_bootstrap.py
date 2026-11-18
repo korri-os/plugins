@@ -137,5 +137,26 @@ class SteamBootstrapTests(unittest.TestCase):
         self.assertEqual(list((self.home / "compatibilitytools.d").iterdir()), [self.existing_tool])
 
 
+    def test_seed_relink_points_every_seed_link_at_the_current_home(self):
+        # korri #498: the account root moved after the seed wrote absolute links.
+        old = self.root / "users/default/steam"
+        for name in ("root", "steam", "sdkarm64", "bin32"):
+            (self.dot / name).symlink_to(old / name)
+        libibus = self.home / "lib/aarch64-linux-gnu/libibus-1.0.so.5"
+        libibus.parent.mkdir(parents=True)
+        libibus.symlink_to(old / "steam-runtime-steamrt-arm64/x/libibus-1.0.so.5.0")
+        result = self.run_helper("steam-arm64-seed", "--relink")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(os.readlink(self.dot / "steam"), str(self.home))
+        self.assertEqual(os.readlink(self.dot / "root"), str(self.home))
+        self.assertEqual(os.readlink(self.dot / "sdkarm64"), str(self.home / "linuxarm64"))
+        self.assertEqual(os.readlink(self.dot / "bin32"), str(self.home / "ubuntu12_32"))
+        self.assertTrue(os.readlink(libibus).startswith(str(self.home / "steam-runtime-steamrt-arm64/")))
+        self.assertTrue(libibus.exists())
+        # Links only: no registry, channel or manifest was written.
+        self.assertFalse((self.dot / "registry.vdf").exists())
+        self.assertFalse((self.home / "package").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
