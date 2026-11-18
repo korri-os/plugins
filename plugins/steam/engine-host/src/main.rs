@@ -2005,6 +2005,54 @@ fn start_login(
     }
     Ok((name, id))
 }
+/// After a QR sign-in the engine saves the login in two of its stores:
+/// `local.vdf` (ConnectCache) at SetLoginToken, and `config/config.vdf` (store
+/// "install") about 0.5 s after the logon (spike results/qr, run 3: 23:48:08.38
+/// and 23:48:08.90). A host that stops between the two leaves a login that a
+/// new process cannot select: on the Mini the QR job got `shutdown` right after
+/// `signed_in`, config.vdf kept its old time and the next host started signed
+/// out. So after a QR sign-in the host reports `signed_in`, and stops, only
+/// once the engine has written config.vdf, or after LOGIN_SAVE_TIMEOUT.
+/// The host only looks at the files' times; it never reads them.
+const LOGIN_SAVE_TIMEOUT: Duration = Duration::from_secs(30);
+/// The engine may flush the store more than once; let the last write land.
+const LOGIN_SAVE_SETTLE: Duration = Duration::from_secs(1);
+const INSTALL_STORE: &str = "config/config.vdf";
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LoginSave {
+    since: Instant,
+    /// config.vdf's time when the token was handed over (None: no file).
+    baseline: Option<std::time::SystemTime>,
+    changed_at: Option<Instant>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SaveStep {
+    Wait,
+    Saved,
+    Unconfirmed,
+}
+fn file_time(path: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path).and_then(|m| m.modified()).ok()
+}
+/// `install_store`: config.vdf's time now; `login_store`: local.vdf exists.
+fn login_save_step(
+    save: &mut LoginSave,
+    now: Instant,
+    install_store: Option<std::time::SystemTime>,
+    login_store: bool,
+) -> SaveStep {
+    if login_store && install_store.is_some() && install_store != save.baseline {
+        let at = *save.changed_at.get_or_insert(now);
+        if now.duration_since(at) >= LOGIN_SAVE_SETTLE {
+            return SaveStep::Saved;
+        }
+    }
+    if now.duration_since(save.since) >= LOGIN_SAVE_TIMEOUT {
+        SaveStep::Unconfirmed
+    } else {
+        SaveStep::Wait
+    }
+}
 /// The engine's own store that holds its saved login (ConnectCache, spike
 /// results/qr: written at SetLoginToken). Removed unread at `signout`.
 const LOGIN_STORE: &str = "local.vdf";
@@ -2477,6 +2525,9 @@ fn run(out: &mut File) -> Result<(), String> {
         let mut previous = None;
         let mut account_setting_reported = false;
         let mut signed_in_reported = false;
+        // After a QR sign-in: wait for the engine's login stores (LoginSave).
+        let mut login_save: Option<LoginSave> = None;
+        let mut stop_after_save = false;
         let mut next_offline_check = Instant::now();
         let mut offline_check_reported: Option<i32> = None;
         let qr_cancel = std::sync::Arc::new(AtomicBool::new(false));
@@ -2498,6 +2549,8 @@ fn run(out: &mut File) -> Result<(), String> {
             // swap: a second SIGTERM sets the flag again and is seen as a repeat.
             if STOP.swap(false, Ordering::Relaxed) {
                 match stop.signal(now) {
+                    // A fresh login is saved first (LoginSave), at most 30 s.
+                    StopAction::StopNow if login_save.is_some() => stop_after_save = true,
                     StopAction::StopNow => break 'pump,
                     StopAction::Wait {
                         pending: apps,
@@ -2613,6 +2666,11 @@ fn run(out: &mut File) -> Result<(), String> {
                                 cloud.saves.steam_id = id;
                                 account = Some(name);
                                 connect_failure = None;
+                                login_save = Some(LoginSave {
+                                    since: Instant::now(),
+                                    baseline: file_time(&steam.join(INSTALL_STORE)),
+                                    changed_at: None,
+                                });
                                 phase = start_logon(out, id)?;
                             }
                         }
@@ -2686,7 +2744,30 @@ fn run(out: &mut File) -> Result<(), String> {
                 | LogonPhase::Qr => {}
             }
             if !signed_in_reported && matches!(phase, LogonPhase::Online | LogonPhase::Offline) {
-                if let Some(name) = &account {
+                let step = login_save.as_mut().map(|save| {
+                    login_save_step(
+                        save,
+                        now,
+                        file_time(&steam.join(INSTALL_STORE)),
+                        steam.join(LOGIN_STORE).exists(),
+                    )
+                });
+                let report = match step {
+                    None => true,
+                    Some(SaveStep::Wait) => false,
+                    Some(step) => {
+                        login_save = None;
+                        json(
+                            out,
+                            &format!(
+                                r#"{{"event":"login_saved","confirmed":{}}}"#,
+                                step == SaveStep::Saved
+                            ),
+                        )?;
+                        true
+                    }
+                };
+                if let Some(name) = account.as_ref().filter(|_| report) {
                     signed_in_reported = true;
                     json(
                         out,
@@ -2697,9 +2778,19 @@ fn run(out: &mut File) -> Result<(), String> {
                     )?;
                 }
             }
+            if stop_after_save && login_save.is_none() {
+                break 'pump;
+            }
             let ready = session_ready(phase, current.1);
             while let Ok(received) = commands.try_recv() {
                 match received {
+                    Ok(Command::Shutdown) if login_save.is_some() => {
+                        json(
+                            out,
+                            r#"{"event":"command","command":"shutdown","deferred":"login_save"}"#,
+                        )?;
+                        stop_after_save = true;
+                    }
                     Ok(Command::Shutdown) => {
                         json(out, r#"{"event":"command","command":"shutdown"}"#)?;
                         break 'pump;
@@ -2860,6 +2951,7 @@ fn run(out: &mut File) -> Result<(), String> {
                 || !app_pending.is_empty()
                 || list_pending
                 || qr.is_some()
+                || login_save.is_some()
                 || matches!(
                     phase,
                     LogonPhase::Connecting { .. } | LogonPhase::LeavingNetwork { .. }
@@ -4170,5 +4262,88 @@ mod tests {
             Err(CommandError::ExtraArguments)
         );
         assert_eq!(CommandError::InvalidReason.name(), "invalid_reason");
+    }
+    #[test]
+    fn a_qr_login_counts_as_saved_only_after_the_engine_writes_config_vdf() {
+        use std::time::{Duration as D, SystemTime};
+        let start = Instant::now();
+        let before = SystemTime::UNIX_EPOCH + D::from_secs(1000);
+        let after = before + D::from_secs(5);
+        let mut save = LoginSave {
+            since: start,
+            baseline: Some(before),
+            changed_at: None,
+        };
+        // local.vdf written at SetLoginToken, config.vdf not yet: wait.
+        assert_eq!(
+            login_save_step(&mut save, start, Some(before), true),
+            SaveStep::Wait
+        );
+        // config.vdf written: wait for the settle time, then saved.
+        let t = start + D::from_millis(500);
+        assert_eq!(
+            login_save_step(&mut save, t, Some(after), true),
+            SaveStep::Wait
+        );
+        assert_eq!(
+            login_save_step(&mut save, t + LOGIN_SAVE_SETTLE, Some(after), true),
+            SaveStep::Saved
+        );
+        // Without local.vdf the login is not saved, whatever config.vdf does.
+        let mut save = LoginSave {
+            since: start,
+            baseline: None,
+            changed_at: None,
+        };
+        assert_eq!(
+            login_save_step(&mut save, start + D::from_secs(5), Some(after), false),
+            SaveStep::Wait
+        );
+        // A first config.vdf counts as a write.
+        assert_eq!(
+            login_save_step(&mut save, start + D::from_secs(5), Some(after), true),
+            SaveStep::Wait
+        );
+        assert_eq!(
+            login_save_step(&mut save, start + D::from_secs(7), Some(after), true),
+            SaveStep::Saved
+        );
+        // Nothing written: give up after the limit, unconfirmed.
+        let mut save = LoginSave {
+            since: start,
+            baseline: Some(before),
+            changed_at: None,
+        };
+        assert_eq!(
+            login_save_step(&mut save, start + LOGIN_SAVE_TIMEOUT, Some(before), true),
+            SaveStep::Unconfirmed
+        );
+    }
+    /// A login saved by one host process is found by the next: the account
+    /// name file outlives the process, and start_login reads it back.
+    #[test]
+    fn a_saved_login_is_selected_by_a_new_host_process() {
+        let dir = std::env::temp_dir().join(format!("korri-relogin-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(ACCOUNT_FILE);
+        let account = c"player_one";
+        // The QR host process writes the name and exits.
+        let writer = std::process::Command::new("sh")
+            .arg("-c")
+            .arg("umask 077; printf %s \"$1\" > \"$2\"")
+            .arg("sh")
+            .arg(account.to_str().unwrap())
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(writer.success());
+        // A new process reads it, and the engine's cached login selects it.
+        let started = start_login(
+            read_account(&path),
+            |name| name == account,
+            |_| 76561197960265770,
+        );
+        assert_eq!(started, Ok((account.into(), 76561197960265770)));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }
