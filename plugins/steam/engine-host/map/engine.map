@@ -1,0 +1,6 @@
+# Public engine map for korri-steam-host: empty on purpose (ADR 0083).
+# The real map is built privately on aka and passed to the Nix build as the
+# flake input `steam-engine-map`. A host built from this file reports
+# engine_map_missing at start.
+format korri-steam-engine-map 1
+status missing

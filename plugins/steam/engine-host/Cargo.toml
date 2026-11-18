@@ -1,0 +1,23 @@
+[package]
+name = "korri-steam-host"
+version = "0.1.0"
+edition = "2021"
+description = "Runs Valve's Steam engine (steamclient.so) for one Korri session or job, with no Steam client (ADR 0083)."
+build = "build.rs"
+publish = false
+
+[[bin]]
+name = "korri-steam-host"
+path = "src/main.rs"
+
+[dependencies]
+# QR sign-in: HTTPS to api.steampowered.com (rustls, bundled webpki roots).
+ureq = { version = "2.12", default-features = false, features = ["tls"] }
+# The engine file's sha256 against the map's, before dlopen.
+sha2 = "0.10"
+# save_export archives (plain ustar; korrid reads them with the same crate).
+tar = { version = "0.4", default-features = false }
+
+[profile.release]
+strip = true
+panic = "abort"
