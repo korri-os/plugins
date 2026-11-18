@@ -35,6 +35,21 @@ fail() {
   notify "plugin-launch: $2"
   exit "$1"
 }
+# A refusal the host has not reported itself. A wrapper in the game unit
+# (gamescope) can end with 0 around this program's exit and take the STATUS
+# text with it, so the session host reports the refusal in its events
+# (`launch_refused`), where korrid reads it. Only a word from the host's
+# closed list is sent. Best effort: a host that is gone cannot report.
+# $1: the word; the rest as for fail.
+refuse() {
+  local word="$1"
+  shift
+  # The inner shell expands its own arguments.
+  # shellcheck disable=SC2016
+  timeout 5 sh -c 'printf "%s\n" "$1" >"$2"' _ "refused $word" "$fifo" 7>&- 2>/dev/null ||
+    say "could not report the refusal $word to the engine host"
+  fail "$@"
+}
 
 # The generated steps of runners.engine.steps; steps only move forward.
 # shellcheck source=/dev/null
@@ -57,7 +72,7 @@ reach_step() {
 # Wine process that outlives the game cannot hold it. The game unit's cgroup
 # goes into the file for the host's pid translation (truncating keeps the lock).
 exec 7>>"$channel/session.lock"
-flock -w 30 7 || fail 126 'Steam engine: another session holds this launch' 'session lock busy'
+flock -w 30 7 || refuse session_busy 126 'Steam engine: another session holds this launch' 'session lock busy'
 sed -n 's/^0:://p' /proc/self/cgroup >"$channel/session.lock"
 
 # Events of the host, from byte offset $1 on, one JSON object per line.
@@ -89,7 +104,7 @@ say "waiting for the engine host"
 deadline=$((SECONDS + 1800))
 until events_from 0 | grep -aqE '"event":"logon_state".*("logged_on":true|"offline":true)'; do
   host_gone || true
-  (( SECONDS < deadline )) || fail 124 'Steam engine: no Steam sign-in' 'no signed-in engine within 1800 s'
+  (( SECONDS < deadline )) || refuse signin_timeout 124 'Steam engine: no Steam sign-in' 'no signed-in engine within 1800 s'
   sleep 0.5
 done
 
@@ -107,15 +122,15 @@ while [[ -z "$result" ]]; do
   done < <(events_from "$mark")
   [[ -n "$result" ]] && break
   host_gone || true
-  (( SECONDS < deadline )) || fail 124 'Steam engine: the game update did not finish' 'install timeout'
+  (( SECONDS < deadline )) || refuse install_timeout 124 'Steam engine: the game update did not finish' 'install timeout'
   sleep 0.5
 done
 case "$result" in
   installed|already_installed) ;;
   offline)
     [[ -f "$steam/steamapps/appmanifest_$appid.acf" ]] ||
-      fail 126 'Steam engine: the game is not installed and Steam is offline' "install result $result" ;;
-  *) fail 126 'Steam engine: Steam could not install or update the game' "install result $result" ;;
+      refuse not_installed_offline 126 'Steam engine: the game is not installed and Steam is offline' "install result $result" ;;
+  *) refuse install_failed 126 'Steam engine: Steam could not install or update the game' "install result $result" ;;
 esac
 
 # 4. The launch sync. A Steam Cloud conflict starts no game: korrid turns it
@@ -148,12 +163,12 @@ os=windows
 if ! entry=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --os windows 2>/dev/null); then
   os=linux
   entry=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --os linux) ||
-    fail 126 'Steam engine: Steam has no launch entry for this game' "no launch entry for $appid"
+    refuse no_launch_entry 126 'Steam engine: Steam has no launch entry for this game' "no launch entry for $appid"
 fi
 EXE="" WORKDIR="" INSTALLDIR="" ARGV=()
 eval "$entry"
 install="$steam/steamapps/common/${installdir:-$INSTALLDIR}"
-[[ -n "$EXE" && -d "$install" ]] || fail 126 'Steam engine: the game files are missing' "no $install"
+[[ -n "$EXE" && -d "$install" ]] || refuse game_files_missing 126 'Steam engine: the game files are missing' "no $install"
 
 account=""
 [[ -f "$home/.korri-steam-account" ]] && account=$(head -c 64 "$home/.korri-steam-account")
@@ -200,7 +215,7 @@ if [[ -n "${DISPLAY:-}" ]]; then
 fi
 
 if [[ -n "$WORKDIR" ]]; then cwd="$install/$WORKDIR"; else cwd=$(dirname "$install/$EXE"); fi
-cd "$cwd" || fail 126 'Steam engine: the game files are missing' "cannot enter $cwd"
+cd "$cwd" || refuse game_files_missing 126 'Steam engine: the game files are missing' "cannot enter $cwd"
 say "AppID $appid: $os entry, $EXE"
 if [[ "$os" == windows ]]; then
   "$fhs" python3 "$KORRI_PROTON_CACHYOS/proton" waitforexitandrun "$install/$EXE" "${ARGV[@]}" 7>&- &

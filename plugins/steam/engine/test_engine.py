@@ -33,12 +33,18 @@ emit(event="logon_state", state=4, logged_on=True, connected=True, offline=False
 while True:
     with open(os.path.join(channel, "commands")) as fifo:
         for line in fifo:
-            verb, appid = line.split()
-            appid = int(appid)
-            emit(event="command", command=verb, appid=appid, queued=False)
             with open(os.path.join(channel, "received"), "a") as seen:
                 seen.write(line)
-            if verb == "install":
+            verb, word = line.split()
+            if verb == "refused":
+                emit(event="launch_refused", reason=word)
+                continue
+            appid = int(word)
+            emit(event="command", command=verb, appid=appid, queued=False)
+            if verb == "install" and behavior == "install-fails":
+                emit(event="app_job_finished", appid=appid, kind="install",
+                     result="install_refused", state=1, seconds=0)
+            elif verb == "install":
                 emit(event="app_job_started", appid=appid, kind="install")
                 emit(event="app_progress", appid=appid, kind="install", state=1026)
                 time.sleep(0.3)
@@ -167,6 +173,16 @@ class EngineSessionTests(unittest.TestCase):
         self.root, self.channel = root, channel
         return result
 
+    def wait_for(self, name, text):
+        """The host stand-in reads the FIFO on its own; give it a moment."""
+        path = self.channel / name
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if path.exists() and text in path.read_text():
+                return path.read_text()
+            time.sleep(0.05)
+        return path.read_text() if path.exists() else ""
+
     def statuses(self):
         path = self.root / "statuses"
         return path.read_text().splitlines() if path.exists() else []
@@ -188,6 +204,22 @@ class EngineSessionTests(unittest.TestCase):
         self.assertEqual(game["env"]["STEAM_COMPAT_DATA_PATH"], f"{steam}/steamapps/compatdata/401710")
         # The lock file names this session's cgroup for the host's pid translation.
         self.assertTrue((self.channel / "session.lock").read_text().startswith("/"))
+
+    def test_a_failed_install_is_reported_through_the_engine_host(self):
+        result = self.run_session("install-fails")
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertEqual(self.wait_for("received", "refused"),
+                         "install 401710\nrefused install_failed\n")
+        self.assertIn("--status=plugin-launch: Steam engine: Steam could not install or update the game",
+                      self.statuses())
+        events = self.wait_for("events.jsonl", "launch_refused")
+        self.assertIn('"event":"launch_refused","reason":"install_failed"', events)
+        self.assertFalse((self.root / "game.json").exists())
+
+    def test_a_missing_launch_entry_is_reported_through_the_engine_host(self):
+        result = self.run_session(entry={"executable": "game.exe", "config": {"oslist": "macos"}})
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
 
     def test_a_cloud_conflict_starts_no_game(self):
         result = self.run_session("conflict")
