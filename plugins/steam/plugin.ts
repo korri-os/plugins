@@ -9,20 +9,22 @@ export const name = "steam"
 export const title = "Steam"
 export const description = "Runs Steam content through the native session program."
 
+// Ids in this file are local (ADR 0045): korrid prefixes them with this
+// plugin's own id P, whatever its publisher namespace. The discovery provider
+// is P/installed-apps, the runners P/steam and P/engine, the engine package
+// P/engine-package, and the Steam provider is P itself.
 export const discovery = [
-  { id: "@korri:steam/installed-apps", title: "Steam installed apps" },
+  { id: "installed-apps", title: "Steam installed apps" },
 ]
 
 export const systems = {
   steam: { title: "Steam" },
 }
 
-// Korri ADR 0083: @korri:steam is also a provider. korrid serves its search
-// and listing from korri-steam-host's `list-apps` for the current person and
-// runs Get and Remove download as host jobs; this declaration only names it.
-export const providers = {
-  "@korri:steam": { id: "@korri:steam", title: "Steam" },
-}
+// Korri ADR 0083: this plugin is also the Steam provider. korrid derives its
+// id from the plugin's own id, serves its search and listing from
+// korri-steam-host's `list-apps` for the current person, and runs Get and
+// Remove download as host jobs. Nothing is declared for it here.
 
 // Korri ADR 0083: Valve's engine package, by its fixed name on Valve's update
 // servers and its `sha2vz`, for the pinned client 1792618285 (steamdeck_stable
@@ -32,11 +34,12 @@ export const providers = {
 // itself; the runner uses only linuxarm64/steamclient.so. Grounding: the
 // spike's results/pin-age (engines.tsv, retention.tsv: HTTP 200, sha2vz
 // verified) and results/min-home/pkg-contents.txt.
+/** This plugin's engine artifact, by its local key. */
+const ENGINE_PACKAGE_KEY = "engine-package"
 const ENGINE_PACKAGE =
   "bins_sdk_linuxarm64_linuxarm64.zip.vz.1424aaa33c34c7aa1b6f356fcda3678c210a62d6_10044409"
 export const artifacts = {
   "engine-package": {
-    id: "@korri:steam/engine-package",
     title: "Steam engine (Valve)",
     platforms: {
       "aarch64-linux": {
@@ -82,7 +85,8 @@ export const runners = {
       { key: "sync", label: "Syncing saves" },
       { key: "game", label: "Starting the game" },
     ],
-    artifacts: ["@korri:fex/rootfs", "@korri:proton/cachyos", "@korri:steam/engine-package"],
+    // Required plugins' artifacts by full id; this plugin's own by its key.
+    artifacts: ["@korri:fex/rootfs", "@korri:proton/cachyos", ENGINE_PACKAGE_KEY],
   },
 }
 
@@ -97,8 +101,15 @@ function requiredPath(paths: Record<string, string>, key: string): string {
   return path
 }
 
+/** The plugin id P of a runner id P/<key>, as korrid passes it. */
+function pluginIdOf(runnerId: string): string {
+  const slash = runnerId.lastIndexOf("/")
+  if (slash <= 0) throw new Error("Steam requires its runner id")
+  return runnerId.slice(0, slash)
+}
+
 function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
-  if (input.runnerId === "@korri:steam/engine") return prepareEngineLaunch(input)
+  if (input.runnerId === `${pluginIdOf(input.runnerId)}/engine`) return prepareEngineLaunch(input)
   if (!input.ref) {
     throw new Error("Steam requires a provider ref")
   }
@@ -149,7 +160,8 @@ function prepareEngineLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   if (overrides?.settings !== undefined && Object.keys(overrides.settings).length > 0) {
     throw new Error("Steam runner does not implement typed settings yet")
   }
-  requiredPath(input.artifacts, "@korri:steam/engine-package")
+  // korrid passes this plugin's own artifacts under their local keys.
+  requiredPath(input.artifacts, ENGINE_PACKAGE_KEY)
   const engineHome = `${input.accountRoot}/${ENGINE_FOLDER}`
   const env: Record<string, string> = {
     STEAM_ENGINE_HOME: engineHome,
@@ -230,9 +242,18 @@ function parseVdf(content: string): VdfObject {
   return object(false, 0)
 }
 
+// korrid adds the plugin's own id to the discovery input (ADR 0045: no
+// namespace in plugin source). The intersection keeps this file valid against
+// contracts generated before that field.
+type DiscoveryInput = ReleaseDiscoveryInput & { pluginId: string }
+
 function discoverInstalledApps(
-  input: ReleaseDiscoveryInput,
+  input: DiscoveryInput,
 ): ProviderRefReleaseObservation[] {
+  const pluginId = input.pluginId
+  if (typeof pluginId !== "string" || !/^@[^/:\s]+:[^/:\s]+$/.test(pluginId)) {
+    throw new Error("Steam discovery requires the plugin id")
+  }
   const observations: ProviderRefReleaseObservation[] = []
   for (const file of input.files) {
     const match = /^steamapps\/appmanifest_(\d+)\.acf$/.exec(file.relativePath)
@@ -258,9 +279,9 @@ function discoverInstalledApps(
         kind: "provider-ref-release",
         confidence: "high",
         source: { relativePath: file.relativePath },
-        target: { provider: "@korri:steam", ref: appid },
+        target: { provider: pluginId, ref: appid },
         release: { id: "steam", title, system: "steam" },
-        launch: { use: "@korri:steam/steam" },
+        launch: { use: `${pluginId}/steam` },
       })
     } catch {
       // A partial manifest is not an installed game.

@@ -1,4 +1,4 @@
-# The @korri:steam/engine runner's native files (ADR 0083): korri-steam-host
+# The Steam plugin's engine runner (P/engine) native files (ADR 0083): korri-steam-host
 # built from an engine map, its start wrapper, the session program, and the
 # Steam FHS they run games and the engine in.
 #

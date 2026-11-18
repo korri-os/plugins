@@ -1,6 +1,6 @@
 # Steam
 
-The `@korri:steam/steam` runner admits system `steam` and passes the selected
+The plugin's `steam` runner admits system `steam` and passes the selected
 provider `ref` to the packaged `steam-session <appid>` program. It declares
 `STEAM_HOME=${accountRoot}/steam` and that directory. `plugin.ts` performs no
 effects.
@@ -102,15 +102,21 @@ Sway/Xwayland without gamescope. Steam Input is off; the game uses Korri Seat P1
 Steam stops with the game session. The existing game-unit sandbox is unchanged.
 
 The current catalog is `catalog/library.yaml`: a release uses `system: steam`
-and `identity: {kind: provider, value: '@korri:steam/401710'}`. Its `device.yaml`
-location is `{provider: '@korri:steam', ref: '401710'}` under that identity key.
+and `identity: {kind: provider, value: '<plugin id>/401710'}`. Its `device.yaml`
+location is `{provider: '<plugin id>', ref: '401710'}` under that identity key.
 These reuse the existing provider release-key and location shapes.
 
 No discovery, installation flow, sign-in automation, typed settings, raw config
 overrides, other games or session controls are implemented by this slice.
 Sign-in, when needed, remains a manual step in Steam.
 
-## Engine runner (`@korri:steam/engine`, Core ADR 0083)
+## Engine runner (`engine`, Core ADR 0083)
+
+Every id in `plugin.ts` is local (Core ADR 0045). korrid prefixes it with
+the plugin's own id P, so the plugin works under any publisher namespace:
+runners `P/steam` and `P/engine`, artifact `P/engine-package`, discovery
+`P/installed-apps`, and the provider `P`. The handlers build the ids they
+return from `runnerId` and the discovery input's `pluginId`.
 
 A second, opt-in runner that plays Steam games through Valve's engine
 (`steamclient.so`) with no Steam client and no Steam UI. The client runner
@@ -119,8 +125,8 @@ above stays the default. ARM64 only.
 | Part | Where |
 |---|---|
 | Runner, steps `update`, `sync`, `game` | `plugin.ts` `runners.engine` |
-| Engine package `@korri:steam/engine-package` (Valve's `bins_sdk_linuxarm64_linuxarm64` for client 1792618285, by name and `sha2vz`; no `unpack`) | `plugin.ts` `artifacts` |
-| Provider `@korri:steam` (korrid serves search and listing from `list-apps`) | `plugin.ts` `providers` |
+| Engine package `engine-package` (Valve's `bins_sdk_linuxarm64_linuxarm64` for client 1792618285, by name and `sha2vz`; no `unpack`) | `plugin.ts` `artifacts` |
+| The Steam provider: the plugin's own id (korrid derives it and serves search and listing from `list-apps`) | korrid |
 | `korri-steam-host` (Rust, from an engine map) | `engine-host/`, `packages/engine-host.nix` |
 | Its start wrapper: the person's engine folder, then the host in the Steam FHS | `engine/host-run.sh` |
 | `steam-engine-session <appid>`: the game unit's program | `engine/session.sh`, `engine/launch-entry.py`, `engine/x-placeholder.py` |

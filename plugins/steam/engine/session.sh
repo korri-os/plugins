@@ -1,4 +1,4 @@
-# steam-engine-session <appid>: the @korri:steam/engine runner's session
+# steam-engine-session <appid>: the Steam plugin's engine runner (P/engine) session
 # program, in the game unit (ADR 0083, contract of korri#518). It is the
 # product form of the spike's scripts/mini/steam-shim.sh: no Valve client and
 # no Steam UI run. korrid has started korri-steam-host for this session
