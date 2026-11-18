@@ -50,8 +50,10 @@ the viewer carries its source too.
 
 ### Network core and Rust parts
 
-The viewer streams with nightjar-core and draws with its Rust EGL presenter
-and Rust X11 window: each measured equal to the C it replaced (korri-os/korri
+The viewer streams with nightjar-core, opens a Rust X11 window, and draws
+pictures with bars through its Rust EGL presenter (a picture that fills the
+window still goes through `vaPutSurface`, and the SDL fallback uses neither
+Rust picture part): each measured equal to the C it replaced (korri-os/korri
 ADR 0062, #391 steps E and F). `-networkcore c`, `-eglpresenter c` and
 `-x11window c` keep the C. This plugin passes none of these options, so
 korrid's launches take the defaults. With nightjar-core the binary is
