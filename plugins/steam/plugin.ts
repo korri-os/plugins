@@ -242,13 +242,10 @@ function parseVdf(content: string): VdfObject {
   return object(false, 0)
 }
 
-// korrid adds the plugin's own id to the discovery input (ADR 0045: no
-// namespace in plugin source). The intersection keeps this file valid against
-// contracts generated before that field.
-type DiscoveryInput = ReleaseDiscoveryInput & { pluginId: string }
-
+// korrid passes the plugin's own id in the discovery input (ADR 0045: no
+// namespace in plugin source).
 function discoverInstalledApps(
-  input: DiscoveryInput,
+  input: ReleaseDiscoveryInput,
 ): ProviderRefReleaseObservation[] {
   const pluginId = input.pluginId
   if (typeof pluginId !== "string" || !/^@[^/:\s]+:[^/:\s]+$/.test(pluginId)) {
