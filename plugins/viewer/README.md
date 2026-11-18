@@ -48,6 +48,13 @@ network core nightjar-core (GPL-3.0-only), the C network core
 binary. It is in the same closure as the binary, so each archive that carries
 the viewer carries its source too.
 
+### Notices
+
+The viewer package holds `share/licenses/korri-viewer/NOTICES.txt` beside
+its `LICENSE` (korri-os/korri#521): the licences of what its recipe builds in
+that other people wrote, for the binary's own features. The source archive
+holds the same file as `licenses/NOTICES.txt`. The native check reads both.
+
 ### Network core and Rust parts
 
 The viewer streams with nightjar-core, opens a Rust X11 window, and draws

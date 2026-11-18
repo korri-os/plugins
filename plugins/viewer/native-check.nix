@@ -48,11 +48,21 @@ pkgs.runCommand "korri-viewer-native-check"
     # With nightjar-core the binary is GPL-3.0-only (korri#391).
     grep -F 'GPL-3.0-only' help
     test -s ${plugin.packages.viewer}/share/licenses/korri-viewer/LICENSE
+    # The notices of what the binary's recipe builds in (korri#521), for its
+    # own feature set: the crates of nightjar-core and the Rust parts, and
+    # nanors' licence, which nightjar-core's Reed-Solomon code ports.
+    notices=${plugin.packages.viewer}/share/licenses/korri-viewer/NOTICES.txt
+    grep -Fx 'RUST CRATES IN THE BINARY (x86_64-unknown-linux-gnu, features nightjar,rust-egl-presenter,rust-x11-window)' "$notices"
+    grep -Fx 'nanors' "$notices"
+    grep -F 'Copyright (c) 2021 Joseph Calderon' "$notices"
+    grep -Fx '  nightjar-core 0.1.0' "$notices"
     # GPL-3 corresponding source, in the same closure as the binary.
     tar -tJf ${plugin.packages.source}/share/korri-viewer/korri-viewer-source.tar.xz > sources
     for expected in \
       korri-viewer-source/BUILDING.txt \
+      korri-viewer-source/licenses/NOTICES.txt \
       korri-viewer-source/korri/clients/viewer/default.nix \
+      korri-viewer-source/korri/clients/viewer/notices.nix \
       korri-viewer-source/korri/clients/viewer/Cargo.lock \
       korri-viewer-source/korri/clients/viewer/LICENSE \
       korri-viewer-source/korri/clients/viewer/src/main.rs \
