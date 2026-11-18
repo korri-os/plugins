@@ -443,6 +443,64 @@ enum Command {
     Signout,
     /// Report the account's licensed games.
     ListApps,
+    /// The session program refused the launch before the game started.
+    Refused(Refusal),
+}
+
+/// Why steam-engine-session refused a launch, from a closed list: the
+/// program sends only the word, and the host reports it with its own text,
+/// so no line from the game unit is ever echoed. korrid reports `message`
+/// as the session's failure (contract of korri#518: a wrapper such as
+/// gamescope can end with 0 around the session program's refusal).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Refusal {
+    SessionBusy,
+    SigninTimeout,
+    InstallTimeout,
+    InstallFailed,
+    NotInstalledOffline,
+    NoLaunchEntry,
+    GameFilesMissing,
+}
+impl Refusal {
+    const ALL: [Refusal; 7] = [
+        Refusal::SessionBusy,
+        Refusal::SigninTimeout,
+        Refusal::InstallTimeout,
+        Refusal::InstallFailed,
+        Refusal::NotInstalledOffline,
+        Refusal::NoLaunchEntry,
+        Refusal::GameFilesMissing,
+    ];
+    fn name(self) -> &'static str {
+        match self {
+            Refusal::SessionBusy => "session_busy",
+            Refusal::SigninTimeout => "signin_timeout",
+            Refusal::InstallTimeout => "install_timeout",
+            Refusal::InstallFailed => "install_failed",
+            Refusal::NotInstalledOffline => "not_installed_offline",
+            Refusal::NoLaunchEntry => "no_launch_entry",
+            Refusal::GameFilesMissing => "game_files_missing",
+        }
+    }
+    /// The words the person sees; the same as the session program's own
+    /// STATUS=plugin-launch text.
+    fn message(self) -> &'static str {
+        match self {
+            Refusal::SessionBusy => "Steam engine: another session holds this launch",
+            Refusal::SigninTimeout => "Steam engine: no Steam sign-in",
+            Refusal::InstallTimeout => "Steam engine: the game update did not finish",
+            Refusal::InstallFailed => "Steam engine: Steam could not install or update the game",
+            Refusal::NotInstalledOffline => {
+                "Steam engine: the game is not installed and Steam is offline"
+            }
+            Refusal::NoLaunchEntry => "Steam engine: Steam has no launch entry for this game",
+            Refusal::GameFilesMissing => "Steam engine: the game files are missing",
+        }
+    }
+    fn parse(word: &str) -> Option<Refusal> {
+        Refusal::ALL.into_iter().find(|r| r.name() == word)
+    }
 }
 // Errors name the fault only. The input line is never echoed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -455,6 +513,8 @@ enum CommandError {
     NotUtf8,
     /// `resolve` without `local` or `cloud`.
     InvalidSide,
+    /// `refused` without a known reason word.
+    InvalidReason,
 }
 impl CommandError {
     fn name(self) -> &'static str {
@@ -466,6 +526,7 @@ impl CommandError {
             CommandError::LineTooLong => "line_too_long",
             CommandError::NotUtf8 => "not_utf8",
             CommandError::InvalidSide => "invalid_side",
+            CommandError::InvalidReason => "invalid_reason",
         }
     }
 }
@@ -494,6 +555,17 @@ fn parse_command(line: &str) -> Result<Option<Command>, CommandError> {
         "signin-qr" => return bare(Command::SigninQr),
         "signout" => return bare(Command::Signout),
         "list-apps" => return bare(Command::ListApps),
+        "refused" => {
+            let refusal = words
+                .next()
+                .and_then(Refusal::parse)
+                .ok_or(CommandError::InvalidReason)?;
+            return if words.next().is_some() {
+                Err(CommandError::ExtraArguments)
+            } else {
+                Ok(Some(Command::Refused(refusal)))
+            };
+        }
         _ => return Err(CommandError::UnknownCommand),
     };
     let appid = words.next().ok_or(CommandError::MissingAppId)?;
@@ -1894,6 +1966,45 @@ fn write_account(path: &Path, name: &CStr) -> Result<(), String> {
         .map_err(|_| "cannot write the account file")?;
     std::fs::rename(&temporary, path).map_err(|_| "cannot write the account file".into())
 }
+/// Why the host starts signed out. The account name and the login are never
+/// part of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SignedOutReason {
+    /// No readable account name file beside HOME.
+    NoAccountFile,
+    /// The engine has no cached login for the saved name
+    /// (BHasCachedCredentials is false).
+    NoSavedLogin,
+    /// SetAccountNameForCachedCredentialLogin failed or gave no SteamID.
+    SelectFailed,
+}
+impl SignedOutReason {
+    fn name(self) -> &'static str {
+        match self {
+            SignedOutReason::NoAccountFile => "no_account_file",
+            SignedOutReason::NoSavedLogin => "no_saved_login",
+            SignedOutReason::SelectFailed => "select_failed",
+        }
+    }
+}
+/// The saved login to start with: the account name and its SteamID, or why
+/// there is none. `cached` asks the engine for a cached login; `select`
+/// selects the account and returns its SteamID (0 on failure).
+fn start_login(
+    account: Option<CString>,
+    cached: impl FnOnce(&CStr) -> bool,
+    select: impl FnOnce(&CStr) -> u64,
+) -> Result<(CString, u64), SignedOutReason> {
+    let name = account.ok_or(SignedOutReason::NoAccountFile)?;
+    if !cached(&name) {
+        return Err(SignedOutReason::NoSavedLogin);
+    }
+    let id = select(&name);
+    if id == 0 || id as u32 == 0 {
+        return Err(SignedOutReason::SelectFailed);
+    }
+    Ok((name, id))
+}
 /// The engine's own store that holds its saved login (ConnectCache, spike
 /// results/qr: written at SetLoginToken). Removed unread at `signout`.
 const LOGIN_STORE: &str = "local.vdf";
@@ -2308,19 +2419,22 @@ fn run(out: &mut File) -> Result<(), String> {
         let can_logon_offline: CanLogonOffline = slot(user, USER_CAN_LOGON_OFFLINE.0);
         let logon_offline: LogOnOffline = slot(user, USER_LOGON_OFFLINE.0);
         // The saved login, when the engine still has one for the saved account name.
-        let mut account: Option<CString> =
-            read_account(&account_file).filter(|name| has_cached(user, name.as_ptr()));
-        let mut id: u64 = 0;
+        let saved = start_login(
+            read_account(&account_file),
+            |name| has_cached(user, name.as_ptr()),
+            |name| {
+                if select(user, name.as_ptr(), false) {
+                    get_id(user)
+                } else {
+                    0
+                }
+            },
+        );
+        let (mut account, mut id, signed_out) = match saved {
+            Ok((name, steam_id)) => (Some(name), steam_id, None),
+            Err(reason) => (None, 0, Some(reason)),
+        };
         let mut phase = LogonPhase::SignedOut;
-        if let Some(name) = &account {
-            if select(user, name.as_ptr(), false) {
-                id = get_id(user);
-            }
-            if id == 0 || id as u32 == 0 {
-                account = None;
-                id = 0;
-            }
-        }
         // LogOn with the saved account, or report that nobody is signed in.
         let start_logon = |out: &mut File, id: u64| -> Result<LogonPhase, String> {
             let result = logon(user, id);
@@ -2348,11 +2462,15 @@ fn run(out: &mut File) -> Result<(), String> {
                 deadline: Instant::now() + logon_timeout,
             })
         };
-        if account.is_some() {
-            cloud.saves.steam_id = id;
-            phase = start_logon(out, id)?;
-        } else {
-            json(out, r#"{"event":"signed_out"}"#)?;
+        match signed_out {
+            None => {
+                cloud.saves.steam_id = id;
+                phase = start_logon(out, id)?;
+            }
+            Some(reason) => json(
+                out,
+                &format!(r#"{{"event":"signed_out","reason":"{}"}}"#, reason.name()),
+            )?,
         }
         let mut connect_failure: Option<i32> = None;
         let mut stop = StopControl::new(stop_grace);
@@ -2585,6 +2703,16 @@ fn run(out: &mut File) -> Result<(), String> {
                     Ok(Command::Shutdown) => {
                         json(out, r#"{"event":"command","command":"shutdown"}"#)?;
                         break 'pump;
+                    }
+                    Ok(Command::Refused(refusal)) => {
+                        json(
+                            out,
+                            &format!(
+                                r#"{{"event":"launch_refused","reason":"{}","message":{}}}"#,
+                                refusal.name(),
+                                json_string(refusal.message())
+                            ),
+                        )?;
                     }
                     Ok(Command::SigninQr) => {
                         json(out, r#"{"event":"command","command":"signin-qr"}"#)?;
@@ -3981,5 +4109,66 @@ mod tests {
         std::fs::write(dir.join("plain"), "").unwrap();
         assert!(make_fifo(&dir.join("plain")).is_err());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn start_login_names_why_it_is_signed_out() {
+        let never = |_: &CStr| -> bool { unreachable!() };
+        let no_select = |_: &CStr| -> u64 { unreachable!() };
+        assert_eq!(
+            start_login(None, never, no_select),
+            Err(SignedOutReason::NoAccountFile)
+        );
+        assert_eq!(
+            start_login(Some(c"player".into()), |_| false, no_select),
+            Err(SignedOutReason::NoSavedLogin)
+        );
+        assert_eq!(
+            start_login(Some(c"player".into()), |_| true, |_| 0),
+            Err(SignedOutReason::SelectFailed)
+        );
+        // A SteamID whose account part is 0 is no account.
+        assert_eq!(
+            start_login(Some(c"player".into()), |_| true, |_| 1 << 52),
+            Err(SignedOutReason::SelectFailed)
+        );
+        assert_eq!(
+            start_login(
+                Some(c"player".into()),
+                |name| name == c"player",
+                |_| 76561197960265770
+            ),
+            Ok((c"player".into(), 76561197960265770))
+        );
+        let names: Vec<&str> = [
+            SignedOutReason::NoAccountFile,
+            SignedOutReason::NoSavedLogin,
+            SignedOutReason::SelectFailed,
+        ]
+        .map(SignedOutReason::name)
+        .to_vec();
+        assert_eq!(
+            names,
+            ["no_account_file", "no_saved_login", "select_failed"]
+        );
+    }
+    #[test]
+    fn refused_takes_only_a_known_reason_word() {
+        for refusal in Refusal::ALL {
+            assert_eq!(
+                parse_command(&format!("refused {}", refusal.name())),
+                Ok(Some(Command::Refused(refusal)))
+            );
+            assert!(refusal.message().starts_with("Steam engine: "));
+        }
+        assert_eq!(parse_command("refused"), Err(CommandError::InvalidReason));
+        assert_eq!(
+            parse_command("refused Steam engine: free text"),
+            Err(CommandError::InvalidReason)
+        );
+        assert_eq!(
+            parse_command("refused install_failed now"),
+            Err(CommandError::ExtraArguments)
+        );
+        assert_eq!(CommandError::InvalidReason.name(), "invalid_reason");
     }
 }
