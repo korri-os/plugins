@@ -1,7 +1,16 @@
-{ pkgs, helpers }:
+# The client runner's FHS (runScript steam-guest-run). The engine runner reuses
+# the same rootfs with its own name, run script and extra packages
+# (packages/engine.nix).
+{
+  pkgs,
+  helpers,
+  name ? "korri-steam-arm64-fhs",
+  executableName ? "steam-arm64-fhs",
+  runScript ? "${helpers}/bin/steam-guest-run",
+  extraMultiPkgs ? (_: [ ]),
+}:
 pkgs.buildFHSEnv {
-  name = "korri-steam-arm64-fhs";
-  executableName = "steam-arm64-fhs";
+  inherit name executableName runScript;
   privateTmp = true;
   includeClosures = true;
 
@@ -93,13 +102,12 @@ pkgs.buildFHSEnv {
       xorg.libxcb
       xorg.libxshmfence
       zlib
-    ];
+    ]
+    ++ extraMultiPkgs p;
 
   profile = ''
     unset GIO_EXTRA_MODULES
   '';
-
-  runScript = "${helpers}/bin/steam-guest-run";
 
   # Steam expects /sbin/ldconfig to exist. Copy rather than symlink to avoid
   # nested-runtime symlink loops, matching nixpkgs' Steam FHS wrapper.

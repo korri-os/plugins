@@ -4,6 +4,7 @@
   nixpkgs-held,
   nixpkgs-eden,
   flake-utils,
+  steam-engine-map,
   gitConfigFile ? null,
 }:
 flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
@@ -154,6 +155,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
             protonPlugin
             protonToolName
             ;
+          engineMap = steam-engine-map;
         };
     };
     # Acquisition plugins (Core ADR 0013/0014): source only. pico8 is a search
@@ -384,6 +386,20 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-viewer = viewerPlugin;
       korri-viewer = viewer.package;
     }
+    # ADR 0083: korri-steam-host from the `steam-engine-map` input. aka, which
+    # is x86_64, cross-builds the device's aarch64 host from the same source.
+    // {
+      korri-steam-host = import ../plugins/steam/packages/engine-host.nix {
+        inherit pkgs;
+        engineMap = steam-engine-map;
+      };
+    }
+    // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isx86_64 {
+      korri-steam-host-aarch64 = import ../plugins/steam/packages/engine-host.nix {
+        pkgs = pkgs.pkgsCross.aarch64-multiplatform;
+        engineMap = steam-engine-map;
+      };
+    }
     // libretro.packages
     // sunshine.packages
     // integration.packages;
@@ -576,6 +592,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           contract = pluginContract;
         };
         korri-steam-source = import ../plugins/steam/packages/check.nix { inherit pkgs; };
+        # ADR 0083: the engine host's tests with the public empty map. The
+        # private map's build and tests run only on aka.
+        korri-steam-engine-host = import ../plugins/steam/packages/engine-check.nix {
+          inherit pkgs;
+          engineMap = ../plugins/steam/engine-host/map;
+        };
         korri-pico8-plugin = acquisitionCheck "pico8" pico8Plugin [ "www.lexaloffle.com" ];
         korri-itchio-plugin = acquisitionCheck "itchio" itchioPlugin [
           "itch.io"

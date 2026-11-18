@@ -1,0 +1,65 @@
+# korri-steam-host, as korrid starts it (contract of korri#518):
+#   korri-steam-host --commands FIFO --host-lock FILE [--session-lock FILE] DIR/steamclient.so
+# with HOME = <person>/steam-engine/home. This wrapper prepares the person's
+# engine-only Steam folder (the spike's minimal home, FINDINGS.md section 11),
+# then runs the host inside the Steam FHS. packages/engine.nix substitutes the
+# @...@ paths. It never reads the engine's sign-in stores.
+#
+# Layout of <person>/steam-engine:
+#   steam/                        the Steam root the engine writes
+#   steam/linuxarm64/steamclient.so  link to the engine package's file
+#   steam/compatibilitytools.d/@protonToolName@  link to korrid's Proton
+#   home/                         HOME of the host and the game
+#   home/.steam/steam             link to steam/
+#   home/.steam/sdkarm64          link to steam/linuxarm64 (Proton's lsteamclient)
+set -Eeuo pipefail
+umask 077
+
+say() { printf 'korri-steam-host: %s\n' "$*" >&2; }
+fail() { say "$1"; exit "${2:-1}"; }
+
+[[ "$#" -ge 1 ]] || fail 'usage: korri-steam-host --commands FIFO --host-lock FILE [--session-lock FILE] DIR/steamclient.so' 2
+engine=${!#}
+[[ "$engine" == /*/steamclient.so && -f "$engine" ]] ||
+  fail 'the last argument must be the engine package'\''s absolute steamclient.so path' 2
+[[ "${HOME:-}" == /*/home ]] || fail 'HOME must be <person>/steam-engine/home' 2
+root=${HOME%/home}
+steam="$root/steam"
+
+# One engine per Steam folder: a session host and a job host of the same
+# person must not run the engine on one folder at once. The lock is on the
+# folder, held by this process and the host it becomes.
+mkdir -p "$root"
+exec 8>>"$root/.korri-engine.lock"
+flock -w 30 8 || fail "another engine host uses this Steam folder" 1
+
+mkdir -p "$steam/linuxarm64" "$steam/compatibilitytools.d" "$steam/steamapps" "$HOME/.steam"
+ln -sfn "$engine" "$steam/linuxarm64/steamclient.so"
+ln -sfn "$steam" "$HOME/.steam/steam"
+ln -sfn "$steam/linuxarm64" "$HOME/.steam/sdkarm64"
+# Windows games install and run only with a compatibility tool registered
+# (InstallApp 29 "Invalid platform" without it, spike section 11).
+if [[ "${KORRI_PROTON_CACHYOS:-}" == /* && -d "$KORRI_PROTON_CACHYOS" ]]; then
+  ln -sfn "$KORRI_PROTON_CACHYOS" "$steam/compatibilitytools.d/@protonToolName@"
+fi
+# The folder's own compat-tool mapping, merged into the config the engine
+# writes; no other value of that file changes.
+@settings@/bin/steam-vdf-settings --engine "$steam" || fail 'cannot write the compat-tool mapping' 1
+
+# The account root is setgid; directories made below it inherit the bit.
+find "$root" -xdev -type d -perm -2000 -user "$(id -u)" -exec chmod g-s {} + 2>/dev/null || true
+# korrid discovers installed games from steamapps/appmanifest_*.acf and owns
+# the account root above this folder. Grant it listing of the path to
+# steamapps and reading of the manifests, nothing more.
+daemon_uid=$(stat -c %u "$(dirname "$root")")
+if [[ "$daemon_uid" != "$(id -u)" ]]; then
+  setfacl -m "u:$daemon_uid:x" "$root"
+  setfacl -m "u:$daemon_uid:rx" "$steam"
+  setfacl -m "u:$daemon_uid:rx" -m "d:u:$daemon_uid:r" "$steam/steamapps"
+  find "$steam/steamapps" -maxdepth 1 -name 'appmanifest_*.acf' -exec setfacl -m "u:$daemon_uid:r" {} +
+fi
+
+# The engine must never see a game's identity, display or session bus.
+unset SteamAppId SteamGameId SteamOverlayGameId DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
+cd "$steam"
+exec @fhs@/bin/korri-steam-engine-fhs @host@/bin/korri-steam-host "$@"

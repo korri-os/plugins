@@ -14,6 +14,7 @@ pkgs.runCommand "steam-session-check"
       acl
       bash
       bun
+      jq
       shellcheck
       python3
       procps
@@ -28,10 +29,12 @@ pkgs.runCommand "steam-session-check"
     cp -r ${./steam-korri/scripts} packages/steam-korri/scripts
     cp ${../plugin.ts} plugin.ts
     cp ${./session-steps.ts} packages/session-steps.ts
+    cp -r ${../engine} engine
     export STEAM_SESSION_STEPS=${steps}
-    chmod -R u+w session
+    chmod -R u+w session engine
     python3 -m unittest discover -s session -p 'test_*.py'
-    for script in ${../session}/*.sh ${./steam-korri/scripts}/*; do
+    python3 -m unittest discover -s engine -p 'test_*.py'
+    for script in ${../session}/*.sh ${../engine}/*.sh ${./steam-korri/scripts}/*; do
       bash -n "$script"
       shellcheck -s bash -x "$script"
     done

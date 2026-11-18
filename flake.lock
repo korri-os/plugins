@@ -178,7 +178,8 @@
         "korri": "korri",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-eden": "nixpkgs-eden",
-        "nixpkgs-held": "nixpkgs-held"
+        "nixpkgs-held": "nixpkgs-held",
+        "steam-engine-map": "steam-engine-map"
       }
     },
     "rust-overlay": {
@@ -201,6 +202,18 @@
         "repo": "rust-overlay",
         "type": "github"
       }
+    },
+    "steam-engine-map": {
+      "flake": false,
+      "locked": {
+        "path": "./plugins/steam/engine-host/map",
+        "type": "path"
+      },
+      "original": {
+        "path": "./plugins/steam/engine-host/map",
+        "type": "path"
+      },
+      "parent": []
     },
     "systems": {
       "locked": {

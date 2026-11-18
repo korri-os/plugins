@@ -145,5 +145,23 @@ class SteamSettingsTests(unittest.TestCase):
         self.assertEqual(broken.read_text(), '"libraryfolders" { "0" {')
 
 
+    def test_engine_mapping_creates_or_merges_only_the_default_tool(self):
+        steam = self.home / "engine"
+        run = lambda: subprocess.run(
+            [os.environ.get("PYTHON", "python3"), str(self.helper), "--engine", str(steam)],
+            text=True, capture_output=True, check=False,
+        )
+        result = run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = (steam / "config/config.vdf").read_text()
+        self.assertIn(f'"name"\t\t"{TOOL}"', config)
+        self.assertNotIn("SteamController", config)
+        self.assertEqual((steam / "config/config.vdf").stat().st_mode & 0o777, 0o600)
+        engine_written = config.replace('"InstallConfigStore"\n{', '"InstallConfigStore"\n{\n\t"Other"\t\t"kept"', 1)
+        (steam / "config/config.vdf").write_text(engine_written)
+        self.assertEqual(run().returncode, 0)
+        self.assertEqual((steam / "config/config.vdf").read_text(), engine_written)
+
+
 if __name__ == "__main__":
     unittest.main()

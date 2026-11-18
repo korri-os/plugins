@@ -45,6 +45,8 @@ does not update device images or grant permission approval. See
 | `korri-plugin-pyxel` | `@korri:pyxel` (native `.pyxapp` runner candidate) | `plugins/pyxel/` |
 | `korri-plugin-homebrewhub` | `@korri:homebrewhub` (declared games with pinned artifacts) | `plugins/homebrewhub/` |
 | `korri-plugin-retrobrews` | `@korri:retrobrews` (declared games with pinned artifacts) | `plugins/retrobrews/` |
+| `korri-steam-host` | The `@korri:steam/engine` runner's engine host, built from the `steam-engine-map` input (the public map is empty) | `plugins/steam/engine-host/` |
+| `korri-steam-host-aarch64` (x86_64 only) | The same host, cross-built for aarch64 | `plugins/steam/engine-host/` |
 | `korri-plugin-steamgriddb` | `@korri:steamgriddb` (artwork candidates; declared hosts `www.steamgriddb.com` and `cdn2.steamgriddb.com`; ships no API key) | `plugins/steamgriddb/` |
 | `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |

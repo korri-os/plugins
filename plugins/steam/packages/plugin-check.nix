@@ -29,6 +29,18 @@ pkgs.runCommand "steam-plugin-package-check"
     for required, keys in ((fex, ['config', 'fex-unpack']), (proton, ['cachyos-unpack'])):
         files = json.loads((required / 'manifest.json').read_text())['files']
         assert sorted(files) == keys, files
+    assert sorted(manifest['files']) == ['korri-steam-host', 'steam-engine-session', 'steam-session'], manifest['files']
+    # The engine runner's programs refuse a bad start before they touch anything.
+    host = manifest['files']['korri-steam-host']
+    result = subprocess.run([host], env={'HOME': '/nonexistent/home'}, capture_output=True)
+    assert result.returncode == 2 and b'usage' in result.stderr, result.stderr
+    result = subprocess.run([host, '/nonexistent/linuxarm64/steamclient.so'], env={'HOME': '/x/home'},
+                            capture_output=True)
+    assert result.returncode == 2 and b'steamclient.so' in result.stderr, result.stderr
+    engine_session = manifest['files']['steam-engine-session']
+    assert subprocess.run([engine_session], capture_output=True).returncode == 2
+    result = subprocess.run([engine_session, '401710'], env={}, capture_output=True)
+    assert result.returncode == 2 and b'STEAM_ENGINE_HOME' in result.stderr, result.stderr
     runner = manifest['files']['steam-session']
     assert Path(runner).is_file()
     assert subprocess.run([runner], capture_output=True).returncode == 2

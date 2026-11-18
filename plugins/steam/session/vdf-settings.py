@@ -208,13 +208,31 @@ def repoint_library(home: Path) -> int:
     return 0
 
 
+def engine_compat_mapping(steam: Path) -> int:
+    # ADR 0083: the engine runner's folder carries its own compat-tool mapping
+    # (spike FINDINGS section 11: without a tool Windows games do not install).
+    # Only this key is merged; every other value the engine wrote stays.
+    desired = {"InstallConfigStore": {"Software": {"Valve": {"Steam": {
+        "CompatToolMapping": {"0": {"name": TOOL, "config": "", "priority": "250"}},
+    }}}}}
+    try:
+        write(prepare(steam / "config/config.vdf", desired))
+    except (OSError, ValueError) as error:
+        print(f"korri-steam-host: compat-tool mapping failed: {error}", file=sys.stderr)
+        return 126
+    return 0
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--engine":
+        return engine_compat_mapping(Path(sys.argv[2]))
     if len(sys.argv) == 3 and sys.argv[1] == "--registry":
         return seed_registry(Path(sys.argv[2]))
     if len(sys.argv) == 3 and sys.argv[1] == "--library":
         return repoint_library(Path(sys.argv[2]))
     if len(sys.argv) != 3 or not re.fullmatch(r"[1-9][0-9]*", sys.argv[2]):
-        print("usage: steam-vdf-settings <steam-home> <appid> | --registry <path> | --library <steam-home>",
+        print("usage: steam-vdf-settings <steam-home> <appid> | --registry <path> | --library <steam-home>"
+              " | --engine <steam-root>",
               file=sys.stderr)
         return 2
     home, appid = Path(sys.argv[1]), sys.argv[2]

@@ -109,3 +109,45 @@ These reuse the existing provider release-key and location shapes.
 No discovery, installation flow, sign-in automation, typed settings, raw config
 overrides, other games or session controls are implemented by this slice.
 Sign-in, when needed, remains a manual step in Steam.
+
+## Engine runner (`@korri:steam/engine`, Core ADR 0083)
+
+A second, opt-in runner that plays Steam games through Valve's engine
+(`steamclient.so`) with no Steam client and no Steam UI. The client runner
+above stays the default. ARM64 only.
+
+| Part | Where |
+|---|---|
+| Runner, steps `update`, `sync`, `game` | `plugin.ts` `runners.engine` |
+| Engine package `@korri:steam/engine-package` (Valve's `bins_sdk_linuxarm64_linuxarm64` for client 1792618285, by name and `sha2vz`; no `unpack`) | `plugin.ts` `artifacts` |
+| Provider `@korri:steam` (korrid serves search and listing from `list-apps`) | `plugin.ts` `providers` |
+| `korri-steam-host` (Rust, from an engine map) | `engine-host/`, `packages/engine-host.nix` |
+| Its start wrapper: the person's engine folder, then the host in the Steam FHS | `engine/host-run.sh` |
+| `steam-engine-session <appid>`: the game unit's program | `engine/session.sh`, `engine/launch-entry.py`, `engine/x-placeholder.py` |
+
+The engine map is the flake input `steam-engine-map`. The public map
+(`engine-host/map/engine.map`) is empty, and a host built from it reports
+`{"event":"engine_map_missing"}` and exits 1. The pinned engine's map is made
+privately on aka and is in no repository; a real build passes it with
+`--override-input steam-engine-map path:<folder>`. At start the host compares
+the engine file's sha256 with the map's and reports `engine_mismatch` on a
+difference, before it loads the engine.
+
+The person's folder is `<account root>/steam-engine`: `steam/` is the Steam
+root the engine writes (its own `config/config.vdf` and `local.vdf`), `home/`
+is HOME, and `home/.steam/{steam,sdkarm64}` are links. The wrapper links the
+engine file and korrid's Proton into it and merges only the compat-tool
+mapping into the engine's config. It grants the account root's owner reading
+of `steam/steamapps/appmanifest_*.acf`, as the client runner does.
+
+The launch channel `$KORRI_STEAM_ENGINE_CHANNEL` holds `commands` (the host's
+FIFO), `session.lock`, `host.lock`, `events.jsonl` (the host's stdout) and
+`saves/` (the `save_export` archives). The session program takes the session
+lock, sends `install`, then `launched`, starts no game on a Steam Cloud
+`conflict` (`STATUS=plugin-launch: steam-cloud-conflict`), plays the game
+through Proton with the x-placeholder window, and sends `exited`.
+
+Checks: `korri-steam-engine-host` (rustfmt, unit tests, clippy and the
+`engine_map_missing` start with the empty map), `korri-steam-source` (the
+session program's tests), `korri-steam-declaration` and `korri-steam-package`.
+The aarch64 cross-builds with both maps run on aka (`korri-steam-host-aarch64`).

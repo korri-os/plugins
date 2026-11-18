@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { discovery, handlers, runners } from "./plugin"
+import { artifacts, discovery, handlers, providers, runners } from "./plugin"
 
 const manifest = (fields = "") =>
   `"AppState" { "appid" "401710" "StateFlags" "4" "name" "Flinthook" ${fields} }`
@@ -97,5 +97,69 @@ describe("Steam installed manifest declaration", () => {
     expect(discover(manifest('"type" "gAmE" "InstalledDepots" { "1" { "manifest" "2" } }'))).toHaveLength(1)
     expect(discover(manifest().replace('"4"', '"04"'))).toHaveLength(1)
     expect(discover(manifest().replace('"Flinthook"', '"Flint \\"hook\\""'))[0]?.release.title).toBe('Flint "hook"')
+  })
+})
+
+const engineInput = () => ({
+  ...launchInput(),
+  runnerId: "@korri:steam/engine",
+  program: "/nix/store/steam/bin/steam-engine-session",
+  artifacts: {
+    ...launchInput().artifacts,
+    "@korri:steam/engine-package": "/var/lib/korri/cache/steam/engine-package/1792618285",
+  },
+})
+
+describe("Steam engine runner declaration (ADR 0083)", () => {
+  test("is a second, ARM64-only runner with its own steps and the engine package", () => {
+    expect(runners.engine.program).toBe("steam-engine-session")
+    expect(runners.engine.systems).toEqual(["steam"])
+    expect(runners.engine.platforms).toEqual(["aarch64-linux"])
+    expect(runners.engine.steps.map(step => step.key)).toEqual(["update", "sync", "game"])
+    expect(runners.engine.steps[0].label).toBe("Updating")
+    expect(runners.engine.artifacts).toEqual([
+      "@korri:fex/rootfs", "@korri:proton/cachyos", "@korri:steam/engine-package",
+    ])
+  })
+
+  test("pins Valve's engine package by name, sha2vz and size, with no unpack program", () => {
+    const engine = artifacts["engine-package"]
+    expect(engine.id).toBe("@korri:steam/engine-package")
+    expect("unpack" in engine).toBe(false)
+    const build = engine.platforms["aarch64-linux"]
+    expect(build.version).toBe("1792618285")
+    expect(build.files).toEqual([{
+      url: "https://client-update.steamstatic.com/bins_sdk_linuxarm64_linuxarm64.zip.vz.1424aaa33c34c7aa1b6f356fcda3678c210a62d6_10044409",
+      sha256: "sha256:e043d05b4e7bcc43e22cc2be3e8872ed1132e79e989cbbe181eb3a5d3f849df7",
+      bytes: 10044409,
+    }])
+    expect(Object.keys(engine.platforms)).toEqual(["aarch64-linux"])
+  })
+
+  test("declares the Steam provider", () => {
+    expect(providers).toEqual({ "@korri:steam": { id: "@korri:steam", title: "Steam" } })
+  })
+
+  test("hands the session the person's engine folder, Proton and FEX", () => {
+    const input = engineInput()
+    expect(handlers["launch.prepare"](input)).toEqual({
+      command: input.program,
+      args: ["401710"],
+      env: {
+        STEAM_ENGINE_HOME: "/var/lib/korri/accounts/a/steam-engine",
+        KORRI_PROTON_CACHYOS: "/var/lib/korri/cache/proton/cachyos/11.0-20260601-slr-arm64",
+        KORRI_FEX_CONFIG: "/nix/store/fex/share/fex-emu",
+        KORRI_FEX_ROOTFS: "/var/lib/korri/cache/fex/rootfs/archlinux-2026-01-08-mesa-26.1.2",
+      },
+      directories: ["/var/lib/korri/accounts/a/steam-engine"],
+      envUnset: [],
+    })
+  })
+
+  test("refuses a launch without the engine package or with a ref that is not an appid", () => {
+    const noEngine = engineInput()
+    delete (noEngine.artifacts as Record<string, string>)["@korri:steam/engine-package"]
+    expect(() => handlers["launch.prepare"](noEngine)).toThrow("Steam requires @korri:steam/engine-package")
+    expect(() => handlers["launch.prepare"]({ ...engineInput(), ref: "401710;x" })).toThrow("provider ref")
   })
 })
