@@ -35,6 +35,14 @@ fail() {
   notify "plugin-launch: $2"
   exit "$1"
 }
+# One line to the host's FIFO. open() waits until the host reads, so it is
+# bounded. The writer is this program's own bash ($BASH, an absolute store
+# path): the game unit has no sh on its PATH.
+to_host() {
+  # The inner shell expands its own arguments.
+  # shellcheck disable=SC2016
+  timeout "$2" "$BASH" -c 'printf "%s\n" "$1" >"$2"' _ "$1" "$fifo" 7>&-
+}
 # A refusal the host has not reported itself. A wrapper in the game unit
 # (gamescope) can end with 0 around this program's exit and take the STATUS
 # text with it, so the session host reports the refusal in its events
@@ -44,9 +52,7 @@ fail() {
 refuse() {
   local word="$1"
   shift
-  # The inner shell expands its own arguments.
-  # shellcheck disable=SC2016
-  timeout 5 sh -c 'printf "%s\n" "$1" >"$2"' _ "refused $word" "$fifo" 7>&- 2>/dev/null ||
+  to_host "refused $word" 5 2>/dev/null ||
     say "could not report the refusal $word to the engine host"
   fail "$@"
 }
@@ -80,9 +86,7 @@ events_from() { tail -c +"$(( $1 + 1 ))" "$events" 2>/dev/null || true; }
 events_size() { stat -c %s "$events" 2>/dev/null || echo 0; }
 send() {
   say "command: $1"
-  # The inner shell expands its own arguments.
-  # shellcheck disable=SC2016
-  timeout 10 sh -c 'printf "%s\n" "$1" >"$2"' _ "$1" "$fifo" 7>&- ||
+  to_host "$1" 10 ||
     fail 126 'Steam engine: the engine host does not answer' "cannot write '$1' to the host"
 }
 # A line's string field, for the host's own fixed JSON (no nesting).
@@ -237,8 +241,7 @@ finish() {
   # also take the freed session lock as an end without `exited`.
   local mark
   mark=$(events_size)
-  # shellcheck disable=SC2016
-  timeout 10 sh -c 'printf "%s\n" "$1" >"$2"' _ "exited $appid" "$fifo" 7>&- || say 'cannot send exited'
+  to_host "exited $appid" 10 || say 'cannot send exited'
   for _ in $(seq 1 20); do
     events_from "$mark" | grep -aqF "\"command\":\"exited\",\"appid\":$appid," && break
     sleep 0.5

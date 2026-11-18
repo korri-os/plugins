@@ -6,6 +6,8 @@ the host). Nothing here reaches Steam, a display or the network.
 """
 import json
 import os
+import re
+import shutil
 from pathlib import Path
 import shlex
 import struct
@@ -120,6 +122,21 @@ class LaunchEntryTests(unittest.TestCase):
         self.assertEqual(self.pick(app, "linux").returncode, 0)
 
 
+# What packages/engine.nix puts on the session program's PATH: coreutils,
+# gnugrep, gnused, jq, python3, util-linux (flock); systemd-notify is faked.
+SESSION_TOOLS = ["cat", "dirname", "head", "mkdir", "seq", "sleep", "stat", "tail",
+                 "timeout", "tr", "grep", "sed", "jq", "python3", "flock"]
+
+
+class SessionScriptTests(unittest.TestCase):
+    def test_the_session_program_never_runs_a_bare_sh(self):
+        for script in ("session.sh", "host-run.sh"):
+            for number, line in enumerate((HERE / script).read_text().splitlines(), 1):
+                code = line.split("#", 1)[0]
+                self.assertIsNone(re.search(r"(^|[\s;|&(`'\"])sh(\s|$)", code),
+                                  f"{script}:{number}: {line.strip()}")
+
+
 class EngineSessionTests(unittest.TestCase):
     def run_session(self, behavior="normal", entry=None):
         temporary = tempfile.TemporaryDirectory()
@@ -164,11 +181,20 @@ class EngineSessionTests(unittest.TestCase):
         (root / "session.sh").write_text(script)
         host = subprocess.Popen([sys.executable, "-c", HOST, str(channel), behavior])
         self.addCleanup(host.kill)
-        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        # The game unit's PATH has exactly the package's runtime inputs and no
+        # sh (device proof: "timeout: failed to run command 'sh'"). Give the
+        # session only the commands those inputs provide.
+        tools = root / "tools"
+        tools.mkdir()
+        for name in SESSION_TOOLS:
+            found = shutil.which(name)
+            self.assertIsNotNone(found, name)
+            (tools / name).symlink_to(found)
+        env = {**os.environ, "PATH": f"{bin_dir}:{tools}",
                "STEAM_ENGINE_HOME": str(engine), "KORRI_STEAM_ENGINE_CHANNEL": str(channel),
                "KORRI_PROTON_CACHYOS": str(proton), "NOTIFY_SOCKET": str(root / "notify")}
         env.pop("DISPLAY", None)
-        result = subprocess.run(["bash", str(root / "session.sh"), "401710"], env=env,
+        result = subprocess.run([shutil.which("bash"), str(root / "session.sh"), "401710"], env=env,
                                 capture_output=True, text=True, timeout=60, check=False)
         self.root, self.channel = root, channel
         return result
