@@ -4,6 +4,7 @@
 {
   lib,
   hasViewer,
+  hasSteamHostCross,
   libretroPackages,
   sunshineChecks,
   sunshinePackages,
@@ -53,6 +54,10 @@ let
     "korri-fantasy-runner-admission"
   ];
   gamescope = [ "korri-gamescope-plugin" ];
+  # The engine host's rustfmt, unit tests, clippy and its engine_map_missing
+  # start with the public map. The same checks with the private map run on aka
+  # (the private map is in no repository).
+  steamHost = [ "korri-steam-engine-host" ];
   bitsybox = [ "korri-bitsybox-plugin" ];
   moonlight = [
     "korri-moonlight-vaapi"
@@ -121,11 +126,14 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
   korri-plugin-steam =
     fex
     ++ proton
+    ++ steamHost
     ++ [
       "korri-steam-package"
       "korri-steam-source"
       "korri-steam-declaration"
     ];
+  # The Steam plugin's engine host on its own (ADR 0083), as the plugin ships it.
+  korri-steam-host = steamHost;
   korri-plugin-starter-pack =
     fake08
     ++ solarus
@@ -170,4 +178,8 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
 // lib.optionalAttrs hasViewer {
   korri-plugin-viewer = viewer;
   korri-viewer = viewer;
+}
+# The aarch64 cross-build of the engine host, exported on x86_64 only.
+// lib.optionalAttrs hasSteamHostCross {
+  korri-steam-host-aarch64 = steamHost;
 }

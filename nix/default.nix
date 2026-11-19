@@ -450,6 +450,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     publicationChecks = import ./publication-checks.nix {
       inherit (pkgs) lib;
       inherit hasViewer;
+      hasSteamHostCross = pkgs.stdenv.hostPlatform.isx86_64;
       libretroPackages = libretro.packages;
       sunshineChecks = sunshine.checks;
       sunshinePackages = sunshine.packages;
