@@ -49,6 +49,7 @@
 //! The host exports `kill`, so the engine's game-process check sees the game
 //! unit's pids (PrivatePIDs). The host ends with `_exit` after its last output.
 mod appinfo;
+mod platform;
 mod qr;
 mod saves;
 
@@ -225,6 +226,11 @@ type AppSyncState = unsafe extern "C" fn(Object, u32) -> u32;
 type SynchronizeApp = unsafe extern "C" fn(Object, u32, u32, u64) -> bool;
 type AppQuery = unsafe extern "C" fn(Object, u32) -> bool;
 type AppCall = unsafe extern "C" fn(Object, u32);
+// IClientCompat (IPC proxy). SpecifyCompatTool(appid, tool, config, priority)
+// sets the app's compatibility tool and, as in Steam's own client, the
+// engine's platform override; GetCompatToolName(appid) reads it back.
+type SpecifyCompat = unsafe extern "C" fn(Object, u32, *const c_char, *const c_char, i32);
+type CompatToolName = unsafe extern "C" fn(Object, u32) -> *const c_char;
 type ResolveConflict = unsafe extern "C" fn(Object, u32, bool) -> bool;
 type ConflictTimestamps = unsafe extern "C" fn(Object, u32, *mut u32, *mut u32) -> bool;
 // IClientAppManager (IPC proxy), install-evidence.txt.
@@ -786,6 +792,7 @@ fn next_resolve_step(state: u32, progress: Progress) -> SyncStep {
 /// Launch: download remote changes before the game starts, as Valve's client
 /// does with "AC Launch,down,". Local changes and conflicts keep the local files;
 /// the AutoCloud launch pass still runs so the exit pass can find changed files.
+const MAX_LAUNCH_DOWNLOADS: u8 = 2;
 fn next_launch_step(state: u32, progress: Progress) -> SyncStep {
     if let Some(result) = progress.launch_pass {
         return SyncStep::Finish(match state {
@@ -794,6 +801,11 @@ fn next_launch_step(state: u32, progress: Progress) -> SyncStep {
         });
     }
     if progress.downloads > 0 {
+        // The first job can end with the remote changes still listed (device
+        // runs: in progress, then state 4 again); ask once more.
+        if matches!(state, 4 | 6) && progress.downloads < MAX_LAUNCH_DOWNLOADS {
+            return SyncStep::DownloadForLaunch;
+        }
         return SyncStep::Finish(match state {
             // 5: the remote files arrived; local changes wait for the exit upload.
             2 | 5 => "downloaded",
@@ -1686,6 +1698,27 @@ impl AppManager {
         unsafe { call(self.object) }
     }
 }
+/// Where an install job is before the engine's own progress decides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstallPhase {
+    /// InstallApp was called (or the job is an uninstall): follow the state.
+    Running,
+    /// The compatibility tool was just set; let the engine's job apply the
+    /// platform override before the install decision.
+    Holding { until: Instant },
+    /// InstallApp said "Missing configuration" (9): the app's configuration
+    /// had not arrived yet. Try again at `at`.
+    Retry { at: Instant, tries: u8 },
+    /// The installed build is for another platform: UninstallApp was called;
+    /// install again once the app is uninstalled.
+    Reinstall,
+}
+/// InstallApp's "Missing configuration" (the engine's table at 0x2ad1710).
+const APP_UPDATE_MISSING_CONFIGURATION: u32 = 9;
+const INSTALL_RETRY_WAIT: Duration = Duration::from_secs(3);
+const INSTALL_RETRIES: u8 = 5;
+/// After SpecifyCompatTool, before the install decision.
+const COMPAT_SETTLE: Duration = Duration::from_secs(3);
 struct AppJob {
     command: AppCommand,
     started: Instant,
@@ -1693,6 +1726,7 @@ struct AppJob {
     reported: Option<(u32, bool, Option<UpdateInfo>)>,
     reported_at: Instant,
     stalled_since: Option<Instant>,
+    phase: InstallPhase,
 }
 struct Apps {
     manager: AppManager,
@@ -1700,6 +1734,162 @@ struct Apps {
     timeout: Duration,
     /// Engine offline logon: no content server can be reached.
     offline: bool,
+    /// The Steam root, for the installed build's platform.
+    steam: PathBuf,
+    /// The runner plays Windows builds through Proton (a compat tool is set).
+    windows: bool,
+}
+/// The compatibility tool the runner plays Windows builds with: the pinned
+/// Proton's tool name, from the start wrapper (`KORRI_STEAM_COMPAT_TOOL`).
+const COMPAT_TOOL_VARIABLE: &str = "KORRI_STEAM_COMPAT_TOOL";
+/// The priority Steam's own client gives a person's choice; the client
+/// runner's mapping uses the same (session/vdf-settings.py).
+const COMPAT_PRIORITY: i32 = 250;
+fn compat_tool_name(value: Option<&str>) -> Option<CString> {
+    let value = value?;
+    (!value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b)))
+    .then(|| CString::new(value).ok())
+    .flatten()
+}
+struct Compat {
+    object: Object,
+    tool: Option<CString>,
+    /// Apps this host process set the tool for.
+    applied: BTreeSet<u32>,
+}
+impl Compat {
+    fn current(&self, appid: u32) -> Option<String> {
+        // SAFETY: the object's vptr and slots were checked against the map.
+        let call: CompatToolName = unsafe { slot(self.object, GET_COMPAT_TOOL_NAME.0) };
+        let name = unsafe { call(self.object, appid) };
+        (!name.is_null()).then(|| {
+            unsafe { CStr::from_ptr(name) }
+                .to_string_lossy()
+                .into_owned()
+        })
+    }
+    /// Sets the runner's tool for `appid` once per host process and reports
+    /// the engine's read-back. True when the tool was not already set.
+    fn apply(&mut self, out: &mut File, appid: u32) -> Result<bool, String> {
+        let Some(tool) = &self.tool else {
+            return Ok(false);
+        };
+        if !self.applied.insert(appid) {
+            return Ok(false);
+        }
+        let wanted = tool.to_string_lossy().into_owned();
+        let before = self.current(appid);
+        let changed = before.as_deref() != Some(wanted.as_str());
+        if changed {
+            let call: SpecifyCompat = unsafe { slot(self.object, SPECIFY_COMPAT_TOOL.0) };
+            unsafe {
+                call(
+                    self.object,
+                    appid,
+                    tool.as_ptr(),
+                    c"".as_ptr(),
+                    COMPAT_PRIORITY,
+                )
+            };
+        }
+        let after = self.current(appid).unwrap_or_default();
+        json(
+            out,
+            &format!(
+                r#"{{"event":"compat_tool","appid":{appid},"tool":{},"changed":{changed}}}"#,
+                json_string(&after)
+            ),
+        )?;
+        Ok(changed)
+    }
+}
+/// What the first install step decided.
+enum Begin {
+    Continue,
+    Finish(&'static str, Option<u32>),
+}
+/// The next step after an InstallApp call.
+fn install_result_step(result: u32, tries: u8, now: Instant) -> Result<InstallPhase, &'static str> {
+    match result {
+        APP_UPDATE_OK => Ok(InstallPhase::Running),
+        APP_UPDATE_MISSING_CONFIGURATION if tries < INSTALL_RETRIES => Ok(InstallPhase::Retry {
+            at: now + INSTALL_RETRY_WAIT,
+            tries: tries + 1,
+        }),
+        _ => Err("install_refused"),
+    }
+}
+fn app_call_event(out: &mut File, call: &str, appid: u32, result: u32) -> Result<(), String> {
+    json(
+        out,
+        &format!(
+            r#"{{"event":"app_call","call":"{call}","appid":{appid},"library_folder":{},"result":{result},"result_name":"{}"}}"#,
+            if call == "InstallApp" {
+                DEFAULT_LIBRARY_FOLDER.to_string()
+            } else {
+                "null".into()
+            },
+            update_error_name(result)
+        ),
+    )
+}
+/// The install decision: the app's state, the installed build's platform,
+/// then InstallApp (or UninstallApp first for a wrong-platform build).
+fn begin_install(
+    manager: &AppManager,
+    steam: &Path,
+    windows: bool,
+    out: &mut File,
+    job: &mut AppJob,
+    now: Instant,
+) -> Result<Begin, String> {
+    let appid = job.command.appid();
+    let state = manager.state(appid);
+    let up_to_date = manager.up_to_date(appid);
+    json(
+        out,
+        &format!(
+            r#"{{"event":"app_state","appid":{appid},"state":{state},"names":{},"up_to_date":{up_to_date},"downloading_enabled":{},"queue":{}}}"#,
+            state_names(state),
+            manager.downloading_enabled(),
+            manager.queue_length()
+        ),
+    )?;
+    let installed = state & STATE_FULLY_INSTALLED != 0;
+    if windows
+        && installed
+        && platform::installed_build(steam, appid) == platform::Build::OtherThanWindows
+    {
+        // A build installed natively (before the compat tool was set, or by
+        // another client). The runner never starts it: install the Windows one.
+        json(
+            out,
+            &format!(r#"{{"event":"platform_reinstall","appid":{appid},"installed":"linux"}}"#),
+        )?;
+        let result = manager.uninstall(appid);
+        app_call_event(out, "UninstallApp", appid, result)?;
+        if result != APP_UPDATE_OK {
+            return Ok(Begin::Finish("install_refused", Some(state)));
+        }
+        job.phase = InstallPhase::Reinstall;
+        return Ok(Begin::Continue);
+    }
+    if app_step(job.command, state, up_to_date, None) == AppStep::Finish("installed") {
+        return Ok(Begin::Finish("already_installed", Some(state)));
+    }
+    let result = manager.install(appid);
+    app_call_event(out, "InstallApp", appid, result)?;
+    match install_result_step(result, 0, now) {
+        Ok(phase) => {
+            job.phase = phase;
+            Ok(Begin::Continue)
+        }
+        Err(finish) => Ok(Begin::Finish(finish, Some(state))),
+    }
 }
 impl Apps {
     fn finish(
@@ -1719,7 +1909,9 @@ impl Apps {
             ),
         )
     }
-    fn start(&mut self, out: &mut File, command: AppCommand) -> Result<(), String> {
+    /// `hold`: the compatibility tool was just changed for this app; wait
+    /// COMPAT_SETTLE before the install decision.
+    fn start(&mut self, out: &mut File, command: AppCommand, hold: bool) -> Result<(), String> {
         let appid = command.appid();
         let now = Instant::now();
         if let Some(old) = self.jobs.remove(&appid) {
@@ -1732,58 +1924,41 @@ impl Apps {
                 command.name()
             ),
         )?;
-        let job = AppJob {
+        let mut job = AppJob {
             command,
             started: now,
             next_poll: now,
             reported: None,
             reported_at: now,
             stalled_since: None,
+            phase: InstallPhase::Running,
         };
         if self.offline {
             return Self::finish(out, &job, "offline", None);
         }
-        let state = self.manager.state(appid);
-        let up_to_date = self.manager.up_to_date(appid);
-        json(
-            out,
-            &format!(
-                r#"{{"event":"app_state","appid":{appid},"state":{state},"names":{},"up_to_date":{up_to_date},"downloading_enabled":{},"queue":{}}}"#,
-                state_names(state),
-                self.manager.downloading_enabled(),
-                self.manager.queue_length()
-            ),
-        )?;
-        let (call, result) = match command {
+        match command {
+            AppCommand::Install(_) if hold => {
+                job.phase = InstallPhase::Holding {
+                    until: now + COMPAT_SETTLE,
+                };
+            }
             AppCommand::Install(_) => {
-                if app_step(command, state, up_to_date, None) == AppStep::Finish("installed") {
-                    return Self::finish(out, &job, "already_installed", Some(state));
+                match begin_install(&self.manager, &self.steam, self.windows, out, &mut job, now)? {
+                    Begin::Continue => {}
+                    Begin::Finish(result, state) => return Self::finish(out, &job, result, state),
                 }
-                ("InstallApp", self.manager.install(appid))
             }
-            AppCommand::Uninstall(_) => ("UninstallApp", self.manager.uninstall(appid)),
-        };
-        json(
-            out,
-            &format!(
-                r#"{{"event":"app_call","call":"{call}","appid":{appid},"library_folder":{},"result":{result}}}"#,
-                if call == "InstallApp" {
-                    DEFAULT_LIBRARY_FOLDER.to_string()
-                } else {
-                    "null".into()
+            AppCommand::Uninstall(_) => {
+                let state = self.manager.state(appid);
+                let result = self.manager.uninstall(appid);
+                app_call_event(out, "UninstallApp", appid, result)?;
+                match result {
+                    APP_UPDATE_OK => {}
+                    APP_UPDATE_NOT_INSTALLED => {
+                        return Self::finish(out, &job, "not_installed", Some(state))
+                    }
+                    _ => return Self::finish(out, &job, "uninstall_refused", Some(state)),
                 }
-            ),
-        )?;
-        match (command, result) {
-            (_, APP_UPDATE_OK) => {}
-            (AppCommand::Uninstall(_), APP_UPDATE_NOT_INSTALLED) => {
-                return Self::finish(out, &job, "not_installed", Some(state));
-            }
-            (AppCommand::Install(_), _) => {
-                return Self::finish(out, &job, "install_refused", Some(state));
-            }
-            (AppCommand::Uninstall(_), _) => {
-                return Self::finish(out, &job, "uninstall_refused", Some(state));
             }
         }
         self.jobs.insert(appid, job);
@@ -1797,6 +1972,49 @@ impl Apps {
                 continue;
             }
             job.next_poll = now + APP_POLL_INTERVAL;
+            match job.phase {
+                InstallPhase::Running => {}
+                InstallPhase::Holding { until } if now < until => continue,
+                InstallPhase::Holding { .. } => {
+                    job.phase = InstallPhase::Running;
+                    match begin_install(&self.manager, &self.steam, self.windows, out, job, now)? {
+                        Begin::Continue => {}
+                        Begin::Finish(result, state) => {
+                            Self::finish(out, job, result, state)?;
+                            done.push(appid);
+                        }
+                    }
+                    continue;
+                }
+                InstallPhase::Retry { at, .. } if now < at => continue,
+                InstallPhase::Retry { tries, .. } => {
+                    let result = self.manager.install(appid);
+                    app_call_event(out, "InstallApp", appid, result)?;
+                    match install_result_step(result, tries, now) {
+                        Ok(phase) => job.phase = phase,
+                        Err(finish) => {
+                            Self::finish(out, job, finish, None)?;
+                            done.push(appid);
+                        }
+                    }
+                    continue;
+                }
+                InstallPhase::Reinstall => {
+                    let state = self.manager.state(appid);
+                    if state & STATE_UNINSTALLED != 0 && state & STATE_BUSY == 0 {
+                        let result = self.manager.install(appid);
+                        app_call_event(out, "InstallApp", appid, result)?;
+                        match install_result_step(result, 0, now) {
+                            Ok(phase) => job.phase = phase,
+                            Err(finish) => {
+                                Self::finish(out, job, finish, Some(state))?;
+                                done.push(appid);
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
             let state = self.manager.state(appid);
             let up_to_date = self.manager.up_to_date(appid);
             let info = self.manager.update_info(appid);
@@ -1839,6 +2057,9 @@ impl Apps {
                 continue;
             }
             let stalled_for = job.stalled_since.map(|since| now.duration_since(since));
+            if job.phase != InstallPhase::Running {
+                continue;
+            }
             if let AppStep::Finish(result) = app_step(job.command, state, up_to_date, stalled_for) {
                 Self::finish(out, job, result, Some(state))?;
                 done.push(appid);
@@ -2411,6 +2632,7 @@ fn run(out: &mut File) -> Result<(), String> {
                 ENGINE_GET_REMOTE_STORAGE,
                 ENGINE_GET_APP_MANAGER,
                 ENGINE_SET_COMMAND_LINE,
+                ENGINE_GET_COMPAT,
             ],
         )?;
         let command: CommandLine = slot(engine, ENGINE_SET_COMMAND_LINE.0);
@@ -2512,6 +2734,32 @@ fn run(out: &mut File) -> Result<(), String> {
                 GET_NUM_APPS_IN_DOWNLOAD_QUEUE,
             ],
         )?;
+        let get_compat: GetUser = slot(engine, ENGINE_GET_COMPAT.0);
+        let compat_object = get_compat(engine, session.handle, session.pipe);
+        if compat_object.is_null() || *compat_object.cast::<usize>() != base + COMPAT_PROXY_VTABLE {
+            return Err("GetIClientCompat did not return the engine map's proxy".into());
+        }
+        check_slots(
+            compat_object,
+            base,
+            &[
+                COMPAT_LAYER_ENABLED,
+                SPECIFY_COMPAT_TOOL,
+                COMPAT_TOOL_ENABLED,
+                GET_COMPAT_TOOL_NAME,
+            ],
+        )?;
+        let mut compat = Compat {
+            object: compat_object,
+            tool: compat_tool_name(env::var(COMPAT_TOOL_VARIABLE).ok().as_deref()),
+            applied: BTreeSet::new(),
+        };
+        if compat.tool.is_none() {
+            json(
+                out,
+                r#"{"event":"compat_tool_missing","variable":"KORRI_STEAM_COMPAT_TOOL"}"#,
+            )?;
+        }
         let mut app_jobs = Apps {
             manager: AppManager {
                 object: app_manager,
@@ -2519,6 +2767,8 @@ fn run(out: &mut File) -> Result<(), String> {
             jobs: BTreeMap::new(),
             timeout: install_timeout,
             offline: false,
+            steam: steam.clone(),
+            windows: compat.tool.is_some(),
         };
         let callback_ptr = dlsym(lib, c"Steam_BGetCallback".as_ptr());
         let free_ptr = dlsym(lib, c"Steam_FreeLastCallback".as_ptr());
@@ -2546,6 +2796,9 @@ fn run(out: &mut File) -> Result<(), String> {
         let mut app_pending: Vec<AppCommand> = Vec::new();
         let mut list_pending = false;
         let mut list_wait: Option<ListWait> = None;
+        let mut licence_gate: Option<ListWait> = None;
+        let mut licences_ready = false;
+        let mut next_licence_poll = Instant::now();
         let mut next_list_poll = Instant::now();
         let frame: NoArgs = slot(engine, ENGINE_RUN_FRAME.0);
         let state: StateQuery = slot(user, USER_LOGON_STATE.0);
@@ -3039,11 +3292,39 @@ fn run(out: &mut File) -> Result<(), String> {
                     }
                 }
                 for command in pending.drain(..) {
+                    // The cloud's path roots follow the platform override.
+                    if matches!(command, CloudCommand::Launched(_) | CloudCommand::Sync(_)) {
+                        compat.apply(out, command.appid())?;
+                    }
                     cloud.start(out, command)?;
                 }
                 cloud.tick(out)?;
-                for command in app_pending.drain(..) {
-                    app_jobs.start(out, command)?;
+                // Install and uninstall wait for the account's licences:
+                // InstallApp right after the logon said "Missing configuration".
+                if !licences_ready && now >= next_licence_poll {
+                    next_licence_poll = now + LICENCE_POLL;
+                    let count = if phase == LogonPhase::Online {
+                        subscribed(true).len()
+                    } else {
+                        1
+                    };
+                    let gate = licence_gate.get_or_insert_with(|| ListWait::new(now));
+                    if phase != LogonPhase::Online || licences_settled(gate, now, count) {
+                        licences_ready = true;
+                        json(
+                            out,
+                            &format!(r#"{{"event":"licences_ready","count":{count}}}"#),
+                        )?;
+                    }
+                }
+                if licences_ready {
+                    for command in app_pending.drain(..) {
+                        let hold = match command {
+                            AppCommand::Install(appid) => compat.apply(out, appid)?,
+                            AppCommand::Uninstall(_) => false,
+                        };
+                        app_jobs.start(out, command, hold)?;
+                    }
                 }
                 app_jobs.tick(out)?;
             }
@@ -3718,8 +3999,20 @@ mod tests {
     #[test]
     fn launch_job_reports_what_the_download_left() {
         use JobKind::Launch;
-        let downloaded = Progress {
+        let once = Progress {
             downloads: 1,
+            ..done(1, 0)
+        };
+        assert_eq!(
+            next_step(Launch, 4, false, once),
+            SyncStep::DownloadForLaunch
+        );
+        assert_eq!(
+            next_step(Launch, 6, false, once),
+            SyncStep::DownloadForLaunch
+        );
+        let downloaded = Progress {
+            downloads: MAX_LAUNCH_DOWNLOADS,
             ..done(1, 0)
         };
         for (state, result) in [
@@ -4533,5 +4826,41 @@ mod tests {
         std::fs::write(dir.join("appcache/appinfo.vdf"), file).unwrap();
         assert_eq!(apps_without_appinfo(&[10, 20, 30], &dir), 2);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn the_compat_tool_name_is_a_plain_tool_name() {
+        assert_eq!(
+            compat_tool_name(Some("proton-cachyos-11.0-20260601-slr-arm64")).as_deref(),
+            Some(c"proton-cachyos-11.0-20260601-slr-arm64")
+        );
+        for bad in ["", "a b", "x\"y", "../proton", "a;b"] {
+            assert_eq!(compat_tool_name(Some(bad)), None, "{bad}");
+        }
+        assert_eq!(compat_tool_name(None), None);
+    }
+    #[test]
+    fn install_retries_missing_configuration_then_gives_up() {
+        let now = Instant::now();
+        assert_eq!(
+            install_result_step(APP_UPDATE_OK, 0, now),
+            Ok(InstallPhase::Running)
+        );
+        assert_eq!(
+            install_result_step(APP_UPDATE_MISSING_CONFIGURATION, 0, now),
+            Ok(InstallPhase::Retry {
+                at: now + INSTALL_RETRY_WAIT,
+                tries: 1
+            })
+        );
+        assert_eq!(
+            install_result_step(APP_UPDATE_MISSING_CONFIGURATION, INSTALL_RETRIES, now),
+            Err("install_refused")
+        );
+        // Invalid platform (29) is not retried.
+        assert_eq!(install_result_step(29, 0, now), Err("install_refused"));
+        assert_eq!(
+            update_error_name(APP_UPDATE_MISSING_CONFIGURATION),
+            "Missing configuration"
+        );
     }
 }

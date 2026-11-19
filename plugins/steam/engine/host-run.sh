@@ -59,6 +59,9 @@ if [[ "$daemon_uid" != "$(id -u)" ]]; then
   find "$steam/steamapps" -maxdepth 1 -name 'appmanifest_*.acf' -exec setfacl -m "u:$daemon_uid:r" {} +
 fi
 
+# The tool the host sets per app through the engine (IClientCompat), which
+# also sets the engine's platform override: Windows builds, through Proton.
+export KORRI_STEAM_COMPAT_TOOL=@protonToolName@
 # The engine must never see a game's identity, display or session bus.
 unset SteamAppId SteamGameId SteamOverlayGameId DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
 cd "$steam"

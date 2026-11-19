@@ -48,6 +48,7 @@ const ENGINE: &[(&str, &str)] = &[
         "ENGINE_SET_COMMAND_LINE",
         "slot IClientEngine SetClientCommandLine",
     ),
+    ("ENGINE_GET_COMPAT", "slot IClientEngine GetIClientCompat"),
 ];
 /// IClientUser methods: (constant, method). Proxy table IClientUserMap; the
 /// CUser table (IClientUser.CUser) is optional: without it the host accepts
@@ -100,6 +101,15 @@ const APP_MANAGER: &[(&str, &str)] = &[
         "GET_NUM_APPS_IN_DOWNLOAD_QUEUE",
         "GetNumAppsInDownloadQueue",
     ),
+];
+
+/// IClientCompat (IPC proxy): the per-app compatibility tool and with it the
+/// engine's platform override, as Steam's own client sets it.
+const COMPAT: &[(&str, &str)] = &[
+    ("COMPAT_LAYER_ENABLED", "BIsCompatLayerEnabled"),
+    ("SPECIFY_COMPAT_TOOL", "SpecifyCompatTool"),
+    ("COMPAT_TOOL_ENABLED", "BIsCompatibilityToolEnabled"),
+    ("GET_COMPAT_TOOL_NAME", "GetCompatToolName"),
 ];
 
 fn main() {
@@ -281,6 +291,13 @@ fn generate(text: &str) -> Result<String, String> {
     )
     .unwrap();
     table(&mut rs, "IClientAppManagerMap", APP_MANAGER, "")?;
+    writeln!(
+        rs,
+        "pub const COMPAT_PROXY_VTABLE: usize = {:#x};",
+        vtable("IClientCompatMap")?
+    )
+    .unwrap();
+    table(&mut rs, "IClientCompatMap", COMPAT, "")?;
     // The host exports `kill` for the engine's kill@plt; the map must show that call.
     match map.get("import kill").map(Vec::as_slice) {
         Some(["plt", _]) => {}
@@ -316,6 +333,7 @@ fn missing() -> String {
         .chain(USER)
         .chain(REMOTE_STORAGE)
         .chain(APP_MANAGER)
+        .chain(COMPAT)
     {
         writeln!(rs, "pub const {c}: (usize, usize) = (0, 0);").unwrap();
     }
@@ -323,6 +341,7 @@ fn missing() -> String {
         "USER_PROXY_VTABLE",
         "REMOTE_STORAGE_PROXY_VTABLE",
         "APP_MANAGER_PROXY_VTABLE",
+        "COMPAT_PROXY_VTABLE",
     ] {
         writeln!(rs, "pub const {v}: usize = 0;").unwrap();
     }
