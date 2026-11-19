@@ -1,0 +1,10 @@
+StorePath: /nix/store/60av9jpp43pla3jdzlcwfm1k25s1waaf-korri-steam-host
+URL: https://github.com/korri-os/plugins/releases/download/build-fecbea69dc50-steam-engine-2/1rnrh3rdxm2bkxpdxndf84mqm2yny280wrmf6hzahxmmjig1xils.nar.xz
+Compression: xz
+FileHash: sha256:1rnrh3rdxm2bkxpdxndf84mqm2yny280wrmf6hzahxmmjig1xils
+FileSize: 2740
+NarHash: sha256:0l5s8z1hnhnqyylnk2w9d6g53vp836mapi85amgh87bvi3ndbfmd
+NarSize: 6400
+References: 2xb8db93b84rw7yyv9yc80vh1njwbqk5-steam-vdf-settings 3g4cpzjazywyd0bkgygqx8d4jh31rnw8-acl-2.4.0-bin 3jplw390ifmb9rc4kfv9vvxdfi33mrnq-findutils-4.11.0 czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 i7d1is6ha5q8ag7zdg70j0z9i7k25maz-util-linux-2.42.4-bin m0sx55nqsalvfnvwqgipz8r0nb8802x2-korri-steam-engine-fhs m2ar7c5ylhgg8vp7dfdx9bhjfvki5xdg-coreutils-9.12 qn42bsv8r5q72c2wyk4f8zk8sd75csrf-korri-steam-host-0.1.0
+Deriver: x6320g7dndj3cwzds77zc01yqxm112bl-korri-steam-host.drv
+Sig: korri-plugins-1:k3EWo/zpxVorzf4uDniuQOPR8665LfaU2FP6PbyD1f38y9g99faiuELxN4tj7SP4FQB/BQ1cDyQP6CJYbR+4AQ==

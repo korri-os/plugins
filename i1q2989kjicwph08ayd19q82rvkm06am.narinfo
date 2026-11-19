@@ -1,0 +1,10 @@
+StorePath: /nix/store/i1q2989kjicwph08ayd19q82rvkm06am-korri-steam-arm64-fhs-init
+URL: https://github.com/korri-os/plugins/releases/download/build-fecbea69dc50-steam-engine-2/0hbkkgg8czjp6lwd16xb02yhz6mqvg1vgqpg1pk829bzd039xrj5.nar.xz
+Compression: xz
+FileHash: sha256:0hbkkgg8czjp6lwd16xb02yhz6mqvg1vgqpg1pk829bzd039xrj5
+FileSize: 284
+NarHash: sha256:0aax6bxzr6i2lbqvlgjkcwhvb8acdf33zrpxwvv8c93c140pvgar
+NarSize: 328
+References: ac11dh39wgl7jj770naxq2kgvkkpkwpk-steam-arm64-helpers-1 czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20
+Deriver: cdc489dq6r92gv33fxqslya28rq1lxka-korri-steam-arm64-fhs-init.drv
+Sig: korri-plugins-1:wqKuyBKX4PK2uxTayIG6Z2AjGkt01JoCNOIPLXc4LNkT3ikZ598usqOiyPODlZJ/UbXCgDySwMalzFga2P39Dg==

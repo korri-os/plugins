@@ -1,0 +1,10 @@
+StorePath: /nix/store/1nm351ddcdfb9zfpb562k2638m2lmdw5-steam-session-steps.sh
+URL: https://github.com/korri-os/plugins/releases/download/build-fecbea69dc50-steam-engine-2/1bx277h3s26svl26vv8p1xvbpn8mrdc1brkcwnni2dk59587z8g1.nar.xz
+Compression: xz
+FileHash: sha256:1bx277h3s26svl26vv8p1xvbpn8mrdc1brkcwnni2dk59587z8g1
+FileSize: 288
+NarHash: sha256:17k3974yqq151gqpw243pbzbsasnmsjh81149rzbazglfhm1sxsq
+NarSize: 384
+References: 
+Deriver: ra4czzgv8g8q7mp70xa14cm0d2b6dfh9-steam-session-steps.sh.drv
+Sig: korri-plugins-1:Vl6rauhygGHCii5nMjmH7wpnK73NQjwsg9I45VV7ZBzcrh7y2Jxgr3cpzgBLlbN+OrS8iz3NT/IuxkxSVkSwCA==

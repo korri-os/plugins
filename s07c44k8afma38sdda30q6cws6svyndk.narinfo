@@ -1,0 +1,10 @@
+StorePath: /nix/store/s07c44k8afma38sdda30q6cws6svyndk-x-placeholder.py
+URL: https://github.com/korri-os/plugins/releases/download/build-fecbea69dc50-steam-engine-2/0da2ym87dlcgc73cc6mjp2vpsvjypb899fmmj545ckh9r3ycbj2l.nar.xz
+Compression: xz
+FileHash: sha256:0da2ym87dlcgc73cc6mjp2vpsvjypb899fmmj545ckh9r3ycbj2l
+FileSize: 1424
+NarHash: sha256:038ap549m3ln50qg09p0b8fnwa21ng2s6nghqj8bsap50z0hkyn8
+NarSize: 3256
+References: 
+Sig: korri-plugins-1:IUyhfo9va/yPsEVXRRFIOKi8CMKYXdjUnfm8clG3xuG30tfIKOLactJhHU81+Vi5ke+jPueE7Nh3OLRjsaMkBQ==
+CA: fixed:r:sha256:038ap549m3ln50qg09p0b8fnwa21ng2s6nghqj8bsap50z0hkyn8

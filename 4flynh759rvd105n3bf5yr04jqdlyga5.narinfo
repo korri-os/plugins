@@ -1,0 +1,10 @@
+StorePath: /nix/store/4flynh759rvd105n3bf5yr04jqdlyga5-vdf-settings.py
+URL: https://github.com/korri-os/plugins/releases/download/build-fecbea69dc50-steam-engine-2/0kwi0kk1g6mqsrzl7fwm3s0h9z7b7vryqxlcfzcnp59242pkdarg.nar.xz
+Compression: xz
+FileHash: sha256:0kwi0kk1g6mqsrzl7fwm3s0h9z7b7vryqxlcfzcnp59242pkdarg
+FileSize: 3852
+NarHash: sha256:0klldvdfbwrv4q669z4dm1dp6fx2h2z104p49v2rf6jhr1ccyb1g
+NarSize: 10840
+References: 
+Deriver: 59rhrcw6vgkjyrm0z7zh00hm62hxlwqr-vdf-settings.py.drv
+Sig: korri-plugins-1:3tA1ID8HpOVqSFYHrVPbWO8rg+Laxo5ZMEWZwIpbFuLuFRitAgvi7f2Xxj4FpazGKXpmY3tBVFJZqjDKTM/KAg==

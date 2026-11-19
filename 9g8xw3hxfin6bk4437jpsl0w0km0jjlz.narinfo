@@ -1,0 +1,10 @@
+StorePath: /nix/store/9g8xw3hxfin6bk4437jpsl0w0km0jjlz-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-fecbea69dc50-steam-engine-2/1c916i6qkimv144qjljq3vg2qc6r9h1n6z464408rjwa64y6lm0a.nar.xz
+Compression: xz
+FileHash: sha256:1c916i6qkimv144qjljq3vg2qc6r9h1n6z464408rjwa64y6lm0a
+FileSize: 3988
+NarHash: sha256:1574wz0bbspjx5d5mkl2ffgkvz1l8cd7n5wzlkpp8k758ndxzzph
+NarSize: 10808
+References: 21hrac7fjfydxabpp1srm1flx4i72pi6-steam-session jd75iy8dgn504xbwyafainp3bpmgpzsb-korri-steam-host l65q3piladpj75nd935ng9072rdmdm17-steam-engine-session qzqi8qb8z9461c0k30hjk7q3566wkgh4-korri-plugin xj192clw012kpnyr369sbi50sx0v8s4s-korri-plugin
+Deriver: ad87vd247q7x1db7h8cnc3nmjpirimnl-korri-plugin.drv
+Sig: korri-plugins-1:CpfOCQuYnIb8llnI+XWMlkD/v0MFlQSrhUMRd7CYZKqKQ9iWw06A3cRjuDvmce8z5Iw2S+q2lrqlpQeQ+kn9DQ==
