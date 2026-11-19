@@ -368,7 +368,7 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
         let saves = tmp.join("saves");
         fs::create_dir_all(&saves).unwrap();
-        fs::set_permissions(&saves, fs::Permissions::from_mode(0o3770)).unwrap();
+        fs::set_permissions(&saves, fs::Permissions::from_mode(0o770)).unwrap();
         let file = tmp.join("save.bin");
         fs::write(&file, b"s").unwrap();
         let collected = Collected {
@@ -378,7 +378,7 @@ mod tests {
         };
         write_archive(&saves.join("7-launch-1.tar"), &collected).unwrap();
         let mode = fs::metadata(&saves).unwrap().permissions().mode() & 0o7777;
-        assert_eq!(mode, 0o3770);
+        assert_eq!(mode, 0o770);
         assert!(saves.join("7-launch-1.tar").is_file());
         assert_eq!(fs::read_dir(&saves).unwrap().count(), 1);
         fs::remove_dir_all(tmp).unwrap();
