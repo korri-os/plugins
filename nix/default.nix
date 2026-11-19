@@ -587,21 +587,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           inherit pkgs protonToolName;
           evaluator = korri.packages.${system}.korri-plugin-host;
         };
-        # TEMPORARY: korri e39102089's contract (ReleaseDiscoveryInput.pluginId),
-        # until the `korri` input moves to a main commit that holds it.
-        # Land step, in the same commit as that `korri` input bump:
-        #   1. replace the `contract = import ./plugin-contract.nix { ... };`
-        #      below with `contract = pluginContract;`
-        #   2. delete the folder plugins/steam/packages/contract (all of it).
-        #   3. run korri-steam-declaration.
         korri-steam-declaration = import ../plugins/steam/packages/declaration-check.nix {
           inherit pkgs;
-          contract = import ./plugin-contract.nix {
-            inherit pkgs;
-            contract = ../plugins/steam/packages/contract/korrid.ts;
-            surface = ../plugins/steam/packages/contract/surface.ts;
-            settings = ../plugins/steam/packages/contract/settings.ts;
-          };
+          contract = pluginContract;
         };
         korri-steam-source = import ../plugins/steam/packages/check.nix { inherit pkgs; };
         # ADR 0083: the engine host's tests with the public empty map. The

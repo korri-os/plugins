@@ -74,20 +74,21 @@
         "inputplumber-nixpkgs": "inputplumber-nixpkgs",
         "nixpkgs": "nixpkgs",
         "proseql": "proseql",
-        "rust-overlay": "rust-overlay"
+        "rust-overlay": "rust-overlay",
+        "tabs6-nixpkgs": "tabs6-nixpkgs"
       },
       "locked": {
-        "lastModified": 1795053751,
-        "narHash": "sha256-jLeh2fI5iGEKsXSOJfejP768BxqWASIrl/H5O6PaYv4=",
+        "lastModified": 1795106750,
+        "narHash": "sha256-1Ija60w3nN2sFWZQUxOMgxqxt0dFVvxBpt8C1Dpyn5k=",
         "owner": "korri-os",
         "repo": "korri",
-        "rev": "6b895b909b830ba56546e6da877bde20de0dde1d",
+        "rev": "a1b4149e813418e6589c9fe19a3af9118894a1e7",
         "type": "github"
       },
       "original": {
         "owner": "korri-os",
         "repo": "korri",
-        "rev": "6b895b909b830ba56546e6da877bde20de0dde1d",
+        "rev": "a1b4149e813418e6589c9fe19a3af9118894a1e7",
         "type": "github"
       }
     },
@@ -242,6 +243,22 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "tabs6-nixpkgs": {
+      "locked": {
+        "lastModified": 1794537146,
+        "narHash": "sha256-Wpz/7x/YWnDIBu7yj6ixe8j6fIMsidd9Y+o1PqPF3iM=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d5cc6833999746cffdfe0598f7bc801a57b887a9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d5cc6833999746cffdfe0598f7bc801a57b887a9",
         "type": "github"
       }
     }
