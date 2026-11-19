@@ -588,8 +588,12 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           evaluator = korri.packages.${system}.korri-plugin-host;
         };
         # TEMPORARY: korri e39102089's contract (ReleaseDiscoveryInput.pluginId),
-        # until the `korri` input moves to a main commit that holds it. Then use
-        # pluginContract here again and delete plugins/steam/packages/contract.
+        # until the `korri` input moves to a main commit that holds it.
+        # Land step, in the same commit as that `korri` input bump:
+        #   1. replace the `contract = import ./plugin-contract.nix { ... };`
+        #      below with `contract = pluginContract;`
+        #   2. delete the folder plugins/steam/packages/contract (all of it).
+        #   3. run korri-steam-declaration.
         korri-steam-declaration = import ../plugins/steam/packages/declaration-check.nix {
           inherit pkgs;
           contract = import ./plugin-contract.nix {
