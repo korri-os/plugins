@@ -42,7 +42,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     # nixpkgs revision.
     heldPkgs = packageSet nixpkgs-held;
     heldMkPlugin = korri.lib.${system}.mkPlugin { pkgs = heldPkgs; };
-    sunshine = import ../services/sunshine { inherit pkgs system korri; };
+    sunshine = import ../services/sunshine { inherit pkgs system; };
     moonlightPackage = pkgs.callPackage ../services/moonlight/package.nix { };
     moonlightDefinition = import ../plugins/moonlight/plugin.nix { inherit pkgs moonlightPackage; };
     moonlightPlugin = mkPlugin {

@@ -1,7 +1,6 @@
-{ pkgs, korri }:
+{ pkgs }:
 let
   approved = import ./approved-patches.nix;
-  client = "${korri}/clients/android/app/src/main/jni/moonlight-core/moonlight-common-c/src";
   source = pkgs.applyPatches {
     name = "sunshine-runtime-resolution-check-source";
     src = pkgs.sunshine.src;
@@ -9,21 +8,20 @@ let
     patches = map (record: record.path) approved.patches;
   };
 in
+# The channel half of patch 0044 (and 0046's local resize): admission,
+# deferred capture, deadlines and shutdown, against the patched source. Its
+# wire half linked Korri's Artemis client (`SunshineRuntimeSettings.c`),
+# which Korri removed with Artemis (README.md, "Live resolution control").
 pkgs.stdenv.mkDerivation {
   name = "sunshine-runtime-resolution-check";
   dontUnpack = true;
   buildPhase = ''
     $CXX -std=c++23 -O2 -Wall -Wextra -Werror -pthread -I${source}/src \
       ${./test-runtime-resolution-channel.cpp} -o channel-check
-    $CC -std=c11 -O2 -Wall -Wextra -Werror -I${client} \
-      -c ${client}/SunshineRuntimeSettings.c -o client.o
-    $CXX -std=c++23 -O2 -Wall -Wextra -Werror -I${source}/src -I${client} \
-      ${./test-runtime-resolution-wire.cpp} client.o -o wire-check
   '';
   doCheck = true;
   checkPhase = ''
     ./channel-check
-    ./wire-check
   '';
   installPhase = "touch $out";
 }

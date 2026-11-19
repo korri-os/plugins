@@ -1,4 +1,4 @@
-{ pkgs, system, korri }:
+{ pkgs, system }:
 let
   sunshinePackage = pkgs.callPackage ./package.nix {
     sunshine = pkgs.sunshine;
@@ -58,7 +58,7 @@ in
   };
   checks = {
     sunshine-korri-capture = import ./capture-check.nix { inherit pkgs; };
-    sunshine-runtime-resolution = import ./runtime-resolution-check.nix { inherit pkgs korri; };
+    sunshine-runtime-resolution = import ./runtime-resolution-check.nix { inherit pkgs; };
     sunshine-offline-retirement = sunshineOfflineRetirement;
     sunshine-korri-package = pkgs.runCommand "sunshine-korri-package-check" { } ''
       test -f ${sunshinePackage}/bin/sunshine

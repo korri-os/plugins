@@ -100,9 +100,9 @@ wrapper (`egl::ctx_t`) releases the current context when it is destroyed, and
 the destroyed device's textures and framebuffers are deleted in whatever
 context is current. Before this was handled, the picture froze on the first
 frame of each new encoder: the encoder kept encoding one surface (Korri issue
-#476, emulator proof in `clients/android/evidence/476`). The patch makes each
-VAAPI device take its own context back before it converts a frame and before
-it is destroyed. The Vulkan encoder uses no EGL context.
+#476, emulator proof in `clients/android/evidence/476` at Korri's tag
+`artemis-final`). The patch makes each VAAPI device take its own context
+back before it converts a frame and before it is destroyed. The Vulkan encoder uses no EGL context.
 
 The NVENC VRAM device (`gl_cuda_vram_t` in `src/platform/linux/cuda.cpp`)
 has the same pattern: its own `egl::ctx_t`, made current by `egl::make_ctx`,
@@ -165,8 +165,13 @@ deferral and teardown). Evidence: Korri `clients/android-app/proof/android-app-4
 Remove the patch when korrid no longer asks for a stream size, or when an
 upstream Sunshine offers an equivalent local control.
 
-The wire check links the actual Android C client. The channel check covers
-admission, deferred capture, deadlines and shutdown. The full capture check
+The channel check (`sunshine-runtime-resolution`) covers admission,
+deferred capture, deadlines and shutdown, and reads the host's answers on
+the wire. Its wire half, which linked Korri's Artemis copy of the client
+(`clients/android/…/SunshineRuntimeSettings.c` at the tag `artemis-final`)
+and checked the request's encoding, decoding and refusals between the two
+sides, is gone: Korri removed Artemis, its only client of patch `0044`'s
+request, so nothing checks the decoding of a client's request now. The full capture check
 applies the base and ARM patch stacks together. Patch `0033` places its rotation
 probe before the resulting encode loop. Device frame continuity still needs a
 hardware check before this candidate is treated as verified for deployment.
