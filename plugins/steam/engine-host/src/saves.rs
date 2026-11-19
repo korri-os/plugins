@@ -359,4 +359,28 @@ mod tests {
         assert!(!has_cloud(Some(&recursive)));
         fs::remove_dir_all(&tmp).unwrap();
     }
+
+    /// korrid makes <channel>/saves and gives the host rwx through an ACL.
+    /// The host writes into it and never changes the folder itself.
+    #[test]
+    fn an_existing_saves_folder_is_used_as_it_is() {
+        let tmp = std::env::temp_dir().join(format!("korri-saves-dir-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let saves = tmp.join("saves");
+        fs::create_dir_all(&saves).unwrap();
+        fs::set_permissions(&saves, fs::Permissions::from_mode(0o3770)).unwrap();
+        let file = tmp.join("save.bin");
+        fs::write(&file, b"s").unwrap();
+        let collected = Collected {
+            files: BTreeMap::from([("remote/save.bin".to_string(), file)]),
+            bytes: 1,
+            unresolved: 0,
+        };
+        write_archive(&saves.join("7-launch-1.tar"), &collected).unwrap();
+        let mode = fs::metadata(&saves).unwrap().permissions().mode() & 0o7777;
+        assert_eq!(mode, 0o3770);
+        assert!(saves.join("7-launch-1.tar").is_file());
+        assert_eq!(fs::read_dir(&saves).unwrap().count(), 1);
+        fs::remove_dir_all(tmp).unwrap();
+    }
 }
