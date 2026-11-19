@@ -61,10 +61,12 @@ The viewer streams with nightjar-core, opens a Rust X11 window, and draws
 pictures with bars through its Rust EGL presenter (a picture that fills the
 window still goes through `vaPutSurface`, and the SDL fallback uses neither
 Rust picture part): each measured equal to the C it replaced (korri-os/korri
-ADR 0062, #391 steps E and F). `-networkcore c`, `-eglpresenter c` and
-`-x11window c` keep the C. This plugin passes none of these options, so
-korrid's launches take the defaults. With nightjar-core the binary is
-GPL-3.0-only.
+ADR 0062, #391 steps E and F). It also plays the sound through its Rust
+audio output, which became the default on the owner's call of 2026-11-18,
+ahead of a quiet measurement (ADR 0062's amendment). `-networkcore c`,
+`-audiooutput c`, `-eglpresenter c` and `-x11window c` keep the C. This
+plugin passes none of these options, so korrid's launches take the
+defaults. With nightjar-core the binary is GPL-3.0-only.
 
 ### Client identity
 

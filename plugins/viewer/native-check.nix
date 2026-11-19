@@ -52,7 +52,7 @@ pkgs.runCommand "korri-viewer-native-check"
     # own feature set: the crates of nightjar-core and the Rust parts, and
     # nanors' licence, which nightjar-core's Reed-Solomon code ports.
     notices=${plugin.packages.viewer}/share/licenses/korri-viewer/NOTICES.txt
-    grep -Fx 'RUST CRATES IN THE BINARY (x86_64-unknown-linux-gnu, features nightjar,rust-egl-presenter,rust-x11-window)' "$notices"
+    grep -Fx 'RUST CRATES IN THE BINARY (x86_64-unknown-linux-gnu, features nightjar,rust-audio-output,rust-egl-presenter,rust-x11-window)' "$notices"
     grep -Fx 'nanors' "$notices"
     grep -F 'Copyright (c) 2021 Joseph Calderon' "$notices"
     grep -Fx '  nightjar-core 0.1.0' "$notices"
@@ -76,12 +76,13 @@ pkgs.runCommand "korri-viewer-native-check"
     done
     grep -q '^korri-viewer-source/moonlight-common-c/enet/' sources
     grep -q '^korri-viewer-source/vendor/openssl-[0-9]' sources
-    # The binary streams with nightjar-core and draws with the Rust EGL
-    # presenter and X11 window (Korri's ADR 0062 switch); the source says
-    # how to build those features.
+    # The binary streams with nightjar-core, draws with the Rust EGL
+    # presenter and X11 window (Korri's ADR 0062 switch) and plays through
+    # the Rust audio output (the owner's call); the source says how to build
+    # those features.
     tar -xJOf ${plugin.packages.source}/share/korri-viewer/korri-viewer-source.tar.xz \
       korri-viewer-source/BUILDING.txt > building
-    grep -F -- '--features nightjar,rust-egl-presenter,rust-x11-window' building
+    grep -F -- '--features nightjar,rust-audio-output,rust-egl-presenter,rust-x11-window' building
     # Moonlight's settings, answering for this runner. Moonlight's plugin
     # sits beside it so the test compares the two.
     mkdir -p settings-check/viewer settings-check/moonlight
