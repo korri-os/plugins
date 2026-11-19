@@ -1,0 +1,10 @@
+StorePath: /nix/store/jfbrvbyaknsp1qw3k2fpfs564a609hk4-korri-viewer-corresponding-source-0.1.0
+URL: https://github.com/korri-os/plugins/releases/download/build-a7448c0a8ea2-viewer-rust-audio/1pbwp6sr3mnbbq890z8g9xbv9pfn39vk6k4ijbivgd7472ck1r1v.nar.xz
+Compression: xz
+FileHash: sha256:1pbwp6sr3mnbbq890z8g9xbv9pfn39vk6k4ijbivgd7472ck1r1v
+FileSize: 31916260
+NarHash: sha256:1d68szlh4gfif2b6rqz9f133r5c06aj6cijmlwx46qlyyr1ncp7r
+NarSize: 31914616
+References: 
+Deriver: fyarggrj1xiv2jgy1fnx3wm2150j8hda-korri-viewer-corresponding-source-0.1.0.drv
+Sig: korri-plugins-1:hph9wmEagfJPFHQgHwICX4SBqr6wlqz6RAfD99Q51D/MnfesRIJEGvzrUvu+2NP3TcO67Bpdw6EO/MR9kejdBw==
