@@ -90,9 +90,26 @@ def appinfo(apps):
     return out
 
 
-def launch_config(*entries):
-    return {"common": {"name": "Game", "type": "Game"},
-            "config": {"installdir": "Game", "launch": {str(i): e for i, e in enumerate(entries)}}}
+def launch_config(*entries, depots=None):
+    app = {"common": {"name": "Game", "type": "Game"},
+           "config": {"installdir": "Game", "launch": {str(i): e for i, e in enumerate(entries)}}}
+    if depots:
+        app["depots"] = {str(d): {"config": {"oslist": os}} if os else {} for d, os in depots.items()}
+    return app
+
+
+# VVVVVV's shape: shared 70301, Windows 70302, Linux 70303; both launch entries.
+BOTH = dict(
+    entries=({"executable": "bin\\game.exe", "arguments": "-x", "config": {"oslist": "windows"}},
+             {"executable": "game.sh", "config": {"oslist": "linux"}}),
+    depots={70301: None, 70302: "windows", 70303: "linux"},
+)
+
+
+def manifest_text(depots=()):
+    inner = "".join(f'\t\t"{d}"\n\t\t{{\n\t\t\t"manifest"\t\t"1"\n\t\t}}\n' for d in depots)
+    return ('"AppState"\n{\n\t"appid"\t\t"401710"\n\t"installdir"\t\t"Game"\n'
+            f'\t"InstalledDepots"\n\t{{\n{inner}\t}}\n}}\n')
 
 
 class LaunchEntryTests(unittest.TestCase):
@@ -116,6 +133,20 @@ class LaunchEntryTests(unittest.TestCase):
         self.assertEqual(shlex.split(fields["EXE"]), ["bin/game.exe"])
         self.assertIn("ARGV=(-a 'b c')", result.stdout)
 
+    def test_platforms_follow_the_installed_depots(self):
+        app = launch_config(*BOTH["entries"], depots=BOTH["depots"])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "appinfo.vdf"
+            path.write_bytes(appinfo({401710: app}))
+            manifest = Path(tmp) / "appmanifest.acf"
+            for depots, order in (((70301, 70303), "linux"), ((70301, 70302), "windows linux"),
+                                  ((70301,), "windows linux"), ((), "windows linux")):
+                manifest.write_text(manifest_text(depots))
+                result = subprocess.run(
+                    [sys.executable, str(HERE / "launch-entry.py"), str(path), "401710",
+                     "--platforms", str(manifest)], capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout.strip(), order, depots)
+
     def test_no_entry_for_the_os_fails(self):
         app = launch_config({"executable": "game.sh", "config": {"oslist": "linux"}})
         self.assertNotEqual(self.pick(app).returncode, 0)
@@ -138,7 +169,7 @@ class SessionScriptTests(unittest.TestCase):
 
 
 class EngineSessionTests(unittest.TestCase):
-    def run_session(self, behavior="normal", entry=None):
+    def run_session(self, behavior="normal", entry=None, both=False, installed=(), files=("bin/game.exe",)):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -150,10 +181,17 @@ class EngineSessionTests(unittest.TestCase):
         (steam / "appcache").mkdir(parents=True)
         (steam / "steamapps/common/Game/bin").mkdir(parents=True)
         (engine / "home").mkdir()
-        (steam / "steamapps/appmanifest_401710.acf").write_text(
-            '"AppState"\n{\n\t"appid"\t\t"401710"\n\t"installdir"\t\t"Game"\n}\n')
-        (steam / "appcache/appinfo.vdf").write_bytes(appinfo({401710: launch_config(
-            entry or {"executable": "bin\\game.exe", "arguments": "-x", "config": {"oslist": "windows"}})}))
+        (steam / "steamapps/appmanifest_401710.acf").write_text(manifest_text(installed))
+        app = (launch_config(*BOTH["entries"], depots=BOTH["depots"]) if both else launch_config(
+            entry or {"executable": "bin\\game.exe", "arguments": "-x", "config": {"oslist": "windows"}}))
+        (steam / "appcache/appinfo.vdf").write_bytes(appinfo({401710: app}))
+        game_dir = steam / "steamapps/common/Game"
+        for name in files:
+            (game_dir / name).write_text(
+                f"#!{sys.executable}\nimport json, os, sys\n"
+                f"open({str(Path(temporary.name) / 'game.json')!r}, 'w').write(json.dumps("
+                "{'argv': sys.argv, 'native': True}))\n")
+            (game_dir / name).chmod(0o755)
         bin_dir = root / "bin"
         bin_dir.mkdir()
         notify = bin_dir / "systemd-notify"
@@ -245,6 +283,20 @@ class EngineSessionTests(unittest.TestCase):
     def test_a_missing_launch_entry_is_reported_through_the_engine_host(self):
         result = self.run_session(entry={"executable": "game.exe", "config": {"oslist": "macos"}})
         self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
+
+    def test_a_linux_build_runs_its_linux_entry_natively(self):
+        result = self.run_session(both=True, installed=(70301, 70303), files=("game.sh",))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        game = json.loads((self.root / "game.json").read_text())
+        self.assertTrue(game["native"])
+        self.assertTrue(game["argv"][0].endswith("/Game/game.sh"))
+
+    def test_a_missing_executable_is_never_started(self):
+        # The Windows build is the installed one, but its .exe is not on disk.
+        result = self.run_session(both=True, installed=(70301, 70302), files=())
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertFalse((self.root / "game.json").exists())
         self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
 
     def test_a_cloud_conflict_starts_no_game(self):

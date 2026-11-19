@@ -163,12 +163,24 @@ fi
 # 5. The game, from Steam's own launch entry in appinfo.vdf.
 reach_step game
 installdir=$(sed -n 's/^[[:space:]]*"installdir"[[:space:]]*"\(.*\)"$/\1/p' "$steam/steamapps/appmanifest_$appid.acf" | head -n 1)
-os=windows
-if ! entry=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --os windows 2>/dev/null); then
-  os=linux
-  entry=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --os linux) ||
-    refuse no_launch_entry 126 'Steam engine: Steam has no launch entry for this game' "no launch entry for $appid"
-fi
+# The launch entry of the build that is installed: the installed depots'
+# platform first (a Linux depot runs natively, a Windows one through Proton),
+# and only an entry whose executable is on disk. Never start a missing file.
+manifest="$steam/steamapps/appmanifest_$appid.acf"
+order=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --platforms "$manifest" 2>/dev/null) ||
+  order="windows linux"
+os="" entry=""
+for candidate in $order; do
+  found=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --os "$candidate" 2>/dev/null) || continue
+  EXE="" INSTALLDIR=""
+  eval "$found"
+  if [[ -n "$EXE" && -f "$steam/steamapps/common/${installdir:-$INSTALLDIR}/$EXE" ]]; then
+    os=$candidate entry=$found
+    break
+  fi
+done
+[[ -n "$entry" ]] ||
+  refuse no_launch_entry 126 'Steam engine: Steam has no launch entry for this game' "no launch entry for the installed build of $appid (tried: $order)"
 EXE="" WORKDIR="" INSTALLDIR="" ARGV=()
 eval "$entry"
 install="$steam/steamapps/common/${installdir:-$INSTALLDIR}"
