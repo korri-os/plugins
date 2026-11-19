@@ -138,6 +138,11 @@ on GitHub, and a moving catalog is not an immutable image pin.
 
 ## Signing key
 
+The build jobs also read the `STEAM_ENGINE_MAP_TGZ_B64` Actions secret: the
+private Steam engine map that `@korri:steam`'s engine host is compiled from.
+Without it the Steam host builds with the empty public map. See
+`plugins/steam/README.md`, "The private engine map in publication".
+
 Reuse the existing `korri-plugins-1` key in the `NIX_CACHE_SIGNING_KEY` Actions
 secret for both forms. Create no new key for this cut. Keep it out
 of Git, the Nix store and workflow artifacts. Configure the public key as an

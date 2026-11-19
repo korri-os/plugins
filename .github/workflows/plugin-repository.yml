@@ -93,6 +93,17 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git rev-parse "refs/tags/$NAR_TAG^{commit}")" = "$EXPECTED_SOURCE_SHA"
           python3 nix/ci-cache-config-test.py
+      # Korri ADR 0083: the published @korri:steam carries the private engine
+      # map compiled into its engine host. The map comes from this secret only
+      # (base64 of `tar czf` of the map folder, see plugins/steam/README.md); a
+      # run without it (fork, pull request) builds with the empty public map.
+      # Neither the secret nor the map is printed.
+      - name: Test the private Steam engine map step
+        run: python3 .github/workflows/test-steam-engine-map.py
+      - name: Install the private Steam engine map
+        env:
+          STEAM_ENGINE_MAP_TGZ_B64: ${{ secrets.STEAM_ENGINE_MAP_TGZ_B64 }}
+        run: python3 .github/workflows/steam-engine-map.py setup
       - name: Check plugin paths and scoped input invalidation
         env:
           SYSTEM: ${{ matrix.system }}
@@ -139,6 +150,8 @@ jobs:
             >/dev/null
           mapfile -t selected_outputs < "$RUNNER_TEMP/publication-packages.txt"
           ./cache-tool/bin/korri-cache build --ci-source-auth --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
+      - name: Refuse the private engine map in the upload closure
+        run: python3 .github/workflows/steam-engine-map.py check-closure "$RUNNER_TEMP/paths.txt"
       - name: Prepare signed plugin repository and the unchanged Nix cache
         env:
           SIGNING_KEY: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
@@ -183,6 +196,10 @@ jobs:
           path: ${{ runner.temp }}/prepared/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Remove the private Steam engine map
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/steam-engine-map" "$RUNNER_TEMP/steam-engine-nix"
 
       - name: Remove source credentials
         if: always()

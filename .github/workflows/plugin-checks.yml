@@ -41,6 +41,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: sudo --preserve-env=GITHUB_TOKEN,GITHUB_ENV,NIX_CONFIG python3 .github/workflows/source-auth.py setup --nix "$(command -v nix)"
+      - name: Test the private Steam engine map step
+        run: python3 .github/workflows/test-steam-engine-map.py
       - name: Verify publication scope
         run: python3 nix/publication-checks-test.py
       - name: Full regression checks without competing check builds

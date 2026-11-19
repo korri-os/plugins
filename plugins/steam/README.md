@@ -154,6 +154,44 @@ lock, sends `install`, then `launched`, starts no game on a Steam Cloud
 `conflict` (`STATUS=plugin-launch: steam-cloud-conflict`), plays the game
 through Proton with the x-placeholder window, and sends `exited`.
 
+### The private engine map in publication
+
+The published `@korri:steam` carries the pinned engine's map compiled into
+its engine host (ADR 0083: the map "ships only with the prebuilt engine
+host"). The map file is in no repository and in no published closure.
+
+- **Secret.** `STEAM_ENGINE_MAP_TGZ_B64`, a repository Actions secret of
+  korri-os/plugins: base64 of `tar czf` of the map folder, whose one file is
+  `engine.map` (the layout of `engine-host/map`).
+- **Use.** The build jobs of `plugin-repository.yml` and
+  `publish-core-main-cache.yml` run `.github/workflows/steam-engine-map.py
+  setup` before any build. It unpacks the map to `$RUNNER_TEMP/steam-engine-map`
+  (0700, the file 0600), outside the checkout, and puts a `nix` shim first on
+  PATH that adds `--override-input steam-engine-map path:<folder>` to every nix
+  command on this flake. Without the secret (forks, pull requests) nothing
+  changes and the host builds with the empty public map, so it reports
+  `engine_map_missing`. Nothing prints the secret or the map. Nix's
+  "not writing modified lock file" warning names the folder and the map's
+  narHash, not its content.
+- **Check.** After the build, `steam-engine-map.py check-closure` fails the job
+  if the map's store path is in the runtime closure of the paths it uploads
+  (`korri-cache export` copies exactly that closure). The compiled host binary
+  holds the map's addresses by design.
+- **Update when the engine pin moves.** On aka, make the map for the new
+  client version with the private pipeline
+  (`/var/lib/korri-private/steam-engine/make-map <version> <steamclient sha256>`),
+  change the artifact pin in `plugin.ts`, then replace the secret from the
+  new folder, piped so no file or output holds the value:
+
+  ```sh
+  ssh root@aka 'tar -C /var/lib/korri-private/steam-engine/<version> -czf - engine.map | base64 -w0' \
+    | gh secret set STEAM_ENGINE_MAP_TGZ_B64 -R korri-os/plugins
+  ```
+
+  A host built from a map that does not match the pinned engine refuses to
+  start (`engine_mismatch`), so the secret and the pin move in the same
+  publication.
+
 Checks: `korri-steam-engine-host` (rustfmt, unit tests, clippy and the
 `engine_map_missing` start with the empty map), `korri-steam-source` (the
 session program's tests), `korri-steam-declaration` and `korri-steam-package`.
