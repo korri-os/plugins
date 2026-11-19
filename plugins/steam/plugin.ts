@@ -9,22 +9,22 @@ export const name = "steam"
 export const title = "Steam"
 export const description = "Runs Steam content through the native session program."
 
-// Ids in this file are local (ADR 0045): korrid prefixes them with this
-// plugin's own id P, whatever its publisher namespace. The discovery provider
-// is P/installed-apps, the runners P/steam and P/engine, the engine package
-// P/engine-package, and the Steam provider is P itself.
+// This plugin's id. Declarations use full ids, as the published @korri:fex
+// and @korri:proton do. A sideloaded test build under another publisher
+// rewrites this one string in its scratch copy; the repository keeps @korri.
+const PLUGIN_ID = "@korri:steam"
+
 export const discovery = [
-  { id: "installed-apps", title: "Steam installed apps" },
+  { id: `${PLUGIN_ID}/installed-apps`, title: "Steam installed apps" },
 ]
 
 export const systems = {
   steam: { title: "Steam" },
 }
 
-// Korri ADR 0083: this plugin is also the Steam provider. korrid derives its
-// id from the plugin's own id, serves its search and listing from
-// korri-steam-host's `list-apps` for the current person, and runs Get and
-// Remove download as host jobs. Nothing is declared for it here.
+// Korri ADR 0083: this plugin is also the Steam provider, under its own id.
+// korrid serves its search and listing from korri-steam-host's `list-apps`
+// for the current person, and runs Get and Remove download as host jobs.
 
 // Korri ADR 0083: Valve's engine package, by its fixed name on Valve's update
 // servers and its `sha2vz`, for the pinned client 1792618285 (steamdeck_stable
@@ -40,6 +40,7 @@ const ENGINE_PACKAGE =
   "bins_sdk_linuxarm64_linuxarm64.zip.vz.1424aaa33c34c7aa1b6f356fcda3678c210a62d6_10044409"
 export const artifacts = {
   "engine-package": {
+    id: `${PLUGIN_ID}/engine-package`,
     title: "Steam engine (Valve)",
     platforms: {
       "aarch64-linux": {
@@ -85,8 +86,7 @@ export const runners = {
       { key: "sync", label: "Syncing saves" },
       { key: "game", label: "Starting the game" },
     ],
-    // Required plugins' artifacts by full id; this plugin's own by its key.
-    artifacts: ["@korri:fex/rootfs", "@korri:proton/cachyos", ENGINE_PACKAGE_KEY],
+    artifacts: ["@korri:fex/rootfs", "@korri:proton/cachyos", `${PLUGIN_ID}/${ENGINE_PACKAGE_KEY}`],
   },
 }
 
@@ -101,55 +101,18 @@ function requiredPath(paths: Record<string, string>, key: string): string {
   return path
 }
 
-/** The plugin id P of a runner id P/<key>, as korrid passes it. */
-function pluginIdOf(runnerId: string): string {
-  const slash = runnerId.lastIndexOf("/")
-  if (slash <= 0) throw new Error("Steam requires its runner id")
-  return runnerId.slice(0, slash)
-}
-
-function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
-  if (input.runnerId === `${pluginIdOf(input.runnerId)}/engine`) return prepareEngineLaunch(input)
-  if (!input.ref) {
-    throw new Error("Steam requires a provider ref")
-  }
-  const overrides = input.overrides
-  if (overrides?.config !== undefined) {
-    throw new Error("Steam takes no raw config override")
-  }
-  if (
-    overrides?.settings !== undefined &&
-    Object.keys(overrides.settings).length > 0
-  ) {
-    throw new Error("Steam runner does not implement typed settings yet")
-  }
-  const steamHome = `${input.accountRoot}/steam`
-  // The exact required @korri:fex and @korri:proton builds: their files and
-  // ready artifacts, as korrid passes them under `<pluginId>/<key>`.
-  const env: Record<string, string> = {
-    STEAM_HOME: steamHome,
-    KORRI_PROTON_CACHYOS: requiredPath(input.artifacts, "@korri:proton/cachyos"),
-  }
-  // korrid passes the FEX rootfs only on a device whose platform has it. The
-  // ARM64 session program refuses to start without it; the x86_64 one needs
-  // no FEX.
-  if (input.artifacts["@korri:fex/rootfs"]) {
-    env.KORRI_FEX_CONFIG = requiredPath(input.files, "@korri:fex/config")
-    env.KORRI_FEX_ROOTFS = input.artifacts["@korri:fex/rootfs"]
-  }
-  return {
-    command: input.program,
-    args: [input.ref],
-    env,
-    directories: [steamHome],
-    envUnset: [],
-  }
-}
-
-// The engine runner's game unit. korrid adds KORRI_STEAM_ENGINE_CHANNEL (the
-// launch channel it shares with korri-steam-host); this declaration gives the
-// person's engine folder and the ready Proton and FEX directories.
-function prepareEngineLaunch(input: PluginLaunchInput): PluginLaunchOutput {
+/**
+ * Both runners: the selected app id, the person's Steam folder for this
+ * runner (`homeVariable` = `home` under the account root), and the ready
+ * Proton and FEX directories of the exact required builds, as korrid passes
+ * them under `<pluginId>/<key>`. korrid adds KORRI_STEAM_ENGINE_CHANNEL for
+ * the engine runner's game unit.
+ */
+function steamLaunch(
+  input: PluginLaunchInput,
+  homeVariable: string,
+  home: string,
+): PluginLaunchOutput {
   if (!input.ref || !/^[1-9][0-9]*$/.test(input.ref)) {
     throw new Error("Steam requires a provider ref")
   }
@@ -160,24 +123,28 @@ function prepareEngineLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   if (overrides?.settings !== undefined && Object.keys(overrides.settings).length > 0) {
     throw new Error("Steam runner does not implement typed settings yet")
   }
-  // korrid passes this plugin's own artifacts under their local keys.
-  requiredPath(input.artifacts, ENGINE_PACKAGE_KEY)
-  const engineHome = `${input.accountRoot}/${ENGINE_FOLDER}`
+  const folder = `${input.accountRoot}/${home}`
   const env: Record<string, string> = {
-    STEAM_ENGINE_HOME: engineHome,
+    [homeVariable]: folder,
     KORRI_PROTON_CACHYOS: requiredPath(input.artifacts, "@korri:proton/cachyos"),
   }
+  // korrid passes the FEX rootfs only on a device whose platform has it. The
+  // ARM64 session program refuses to start without it; the x86_64 one needs
+  // no FEX.
   if (input.artifacts["@korri:fex/rootfs"]) {
     env.KORRI_FEX_CONFIG = requiredPath(input.files, "@korri:fex/config")
     env.KORRI_FEX_ROOTFS = input.artifacts["@korri:fex/rootfs"]
   }
-  return {
-    command: input.program,
-    args: [input.ref],
-    env,
-    directories: [engineHome],
-    envUnset: [],
+  return { command: input.program, args: [input.ref], env, directories: [folder], envUnset: [] }
+}
+
+function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
+  if (input.runnerId !== `${PLUGIN_ID}/engine`) {
+    return steamLaunch(input, "STEAM_HOME", "steam")
   }
+  // korrid passes this plugin's own artifacts under their local keys.
+  requiredPath(input.artifacts, ENGINE_PACKAGE_KEY)
+  return steamLaunch(input, "STEAM_ENGINE_HOME", ENGINE_FOLDER)
 }
 
 // Ported from legacy product/plugins/steam/src/discovery.ts and
@@ -244,13 +211,11 @@ function parseVdf(content: string): VdfObject {
 
 // korrid passes the plugin's own id in the discovery input (ADR 0045: no
 // namespace in plugin source).
+// Only the manifest files are read, so the handler works with the discovery
+// input of every korrid contract (with or without its later fields).
 function discoverInstalledApps(
-  input: ReleaseDiscoveryInput,
+  input: Pick<ReleaseDiscoveryInput, "files">,
 ): ProviderRefReleaseObservation[] {
-  const pluginId = input.pluginId
-  if (typeof pluginId !== "string" || !/^@[^/:\s]+:[^/:\s]+$/.test(pluginId)) {
-    throw new Error("Steam discovery requires the plugin id")
-  }
   const observations: ProviderRefReleaseObservation[] = []
   for (const file of input.files) {
     const match = /^steamapps\/appmanifest_(\d+)\.acf$/.exec(file.relativePath)
@@ -276,9 +241,9 @@ function discoverInstalledApps(
         kind: "provider-ref-release",
         confidence: "high",
         source: { relativePath: file.relativePath },
-        target: { provider: pluginId, ref: appid },
+        target: { provider: PLUGIN_ID, ref: appid },
         release: { id: "steam", title, system: "steam" },
-        launch: { use: `${pluginId}/steam` },
+        launch: { use: `${PLUGIN_ID}/steam` },
       })
     } catch {
       // A partial manifest is not an installed game.

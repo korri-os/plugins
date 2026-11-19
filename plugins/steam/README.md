@@ -112,11 +112,12 @@ Sign-in, when needed, remains a manual step in Steam.
 
 ## Engine runner (`engine`, Core ADR 0083)
 
-Every id in `plugin.ts` is local (Core ADR 0045). korrid prefixes it with
-the plugin's own id P, so the plugin works under any publisher namespace:
-runners `P/steam` and `P/engine`, artifact `P/engine-package`, discovery
-`P/installed-apps`, and the provider `P`. The handlers build the ids they
-return from `runnerId` and the discovery input's `pluginId`.
+`plugin.ts` declares full ids, as the published `@korri:fex` and
+`@korri:proton` do: runners `@korri:steam/steam` and `@korri:steam/engine`,
+artifact `@korri:steam/engine-package`, discovery
+`@korri:steam/installed-apps`. They are built from one constant, `PLUGIN_ID`.
+A sideloaded test build under another publisher rewrites that one line in
+its own scratch copy; the repository keeps `@korri`.
 
 A second, opt-in runner that plays Steam games through Valve's engine
 (`steamclient.so`) with no Steam client and no Steam UI. The client runner
@@ -125,8 +126,8 @@ above stays the default. ARM64 only.
 | Part | Where |
 |---|---|
 | Runner, steps `update`, `sync`, `game` | `plugin.ts` `runners.engine` |
-| Engine package `engine-package` (Valve's `bins_sdk_linuxarm64_linuxarm64` for client 1792618285, by name and `sha2vz`; no `unpack`) | `plugin.ts` `artifacts` |
-| The Steam provider: the plugin's own id (korrid derives it and serves search and listing from `list-apps`) | korrid |
+| Engine package `@korri:steam/engine-package` (Valve's `bins_sdk_linuxarm64_linuxarm64` for client 1792618285, by name and `sha2vz`; no `unpack`) | `plugin.ts` `artifacts` |
+| The Steam provider `@korri:steam`, the plugin's own id (korrid serves search and listing from `list-apps`) | korrid |
 | `korri-steam-host` (Rust, from an engine map) | `engine-host/`, `packages/engine-host.nix` |
 | Its start wrapper: the person's engine folder, then the host in the Steam FHS | `engine/host-run.sh` |
 | `steam-engine-session <appid>`: the game unit's program | `engine/session.sh`, `engine/launch-entry.py`, `engine/x-placeholder.py` |

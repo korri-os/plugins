@@ -2,20 +2,17 @@ import { describe, expect, test } from "bun:test"
 import * as plugin from "./plugin"
 import { artifacts, discovery, handlers, runners } from "./plugin"
 
-// The plugin works under any publisher namespace (ADR 0045): CI publishes it
-// as one id, a sideloaded test build as another. Nothing below may depend on
-// which. These ids are fixtures of the tests, not of the plugin.
-const PLUGIN_IDS = ["@test:steam", "@simonwjackson:steam"]
+// Declarations use full ids, as the published @korri:fex and @korri:proton.
+const ID = "@korri:steam"
 
 const manifest = (fields = "") =>
   `"AppState" { "appid" "401710" "StateFlags" "4" "name" "Flinthook" ${fields} }`
-const discover = (text: string, pluginId = PLUGIN_IDS[0]) => handlers["discovery.discover"]({
-  pluginId,
+const discover = (text: string) => handlers["discovery.discover"]({
   files: [{ relativePath: "steamapps/appmanifest_401710.acf", text }],
 })
 
-const launchInput = (pluginId = PLUGIN_IDS[0]) => ({
-  runnerId: `${pluginId}/steam`,
+const launchInput = () => ({
+  runnerId: `${ID}/steam`,
   program: "/nix/store/steam/bin/steam-session",
   ref: "401710",
   accountRoot: "/var/lib/korri/accounts/a",
@@ -75,24 +72,16 @@ describe("Steam launch declaration", () => {
 })
 
 describe("Steam installed manifest declaration", () => {
-  test("declares a local discovery id and names the installed game from VDF in its own namespace", () => {
-    expect(discovery).toEqual([{ id: "installed-apps", title: "Steam installed apps" }])
-    for (const pluginId of PLUGIN_IDS) {
-      expect(discover(manifest(), pluginId)).toEqual([{
-        kind: "provider-ref-release",
-        confidence: "high",
-        source: { relativePath: "steamapps/appmanifest_401710.acf" },
-        target: { provider: pluginId, ref: "401710" },
-        release: { id: "steam", title: "Flinthook", system: "steam" },
-        launch: { use: `${pluginId}/steam` },
-      }])
-    }
-  })
-
-  test("refuses discovery without its plugin id", () => {
-    for (const pluginId of ["", "steam", "@test:steam/x"]) {
-      expect(() => discover(manifest(), pluginId)).toThrow("requires the plugin id")
-    }
+  test("declares its closed provider by full id and names the installed game from VDF", () => {
+    expect(discovery).toEqual([{ id: "@korri:steam/installed-apps", title: "Steam installed apps" }])
+    expect(discover(manifest())).toEqual([{
+      kind: "provider-ref-release",
+      confidence: "high",
+      source: { relativePath: "steamapps/appmanifest_401710.acf" },
+      target: { provider: "@korri:steam", ref: "401710" },
+      release: { id: "steam", title: "Flinthook", system: "steam" },
+      launch: { use: "@korri:steam/steam" },
+    }])
   })
 
   test("skips partial, corrupt, mismatched and unnamed manifests", () => {
@@ -103,7 +92,7 @@ describe("Steam installed manifest declaration", () => {
       manifest().replace('"Flinthook"', '"   "'),
       '"AppState" {',
     ]) expect(discover(text)).toEqual([])
-    expect(handlers["discovery.discover"]({pluginId: PLUGIN_IDS[0], files: []})).toEqual([])
+    expect(handlers["discovery.discover"]({files: []})).toEqual([])
   })
 
   test("excludes explicit non-game types but accepts missing type and nested VDF", () => {
@@ -116,12 +105,12 @@ describe("Steam installed manifest declaration", () => {
 })
 
 // korrid passes the plugin's own artifacts under their local keys.
-const engineInput = (pluginId = PLUGIN_IDS[0]) => ({
-  ...launchInput(pluginId),
-  runnerId: `${pluginId}/engine`,
+const engineInput = () => ({
+  ...launchInput(),
+  runnerId: `${ID}/engine`,
   program: "/nix/store/steam/bin/steam-engine-session",
   artifacts: {
-    ...launchInput(pluginId).artifacts,
+    ...launchInput().artifacts,
     "engine-package": "/var/lib/korri/cache/steam/engine-package/1792618285",
   },
 })
@@ -134,13 +123,13 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
     expect(runners.engine.steps.map(step => step.key)).toEqual(["update", "sync", "game"])
     expect(runners.engine.steps[0].label).toBe("Updating")
     expect(runners.engine.artifacts).toEqual([
-      "@korri:fex/rootfs", "@korri:proton/cachyos", "engine-package",
+      "@korri:fex/rootfs", "@korri:proton/cachyos", "@korri:steam/engine-package",
     ])
   })
 
   test("pins Valve's engine package by name, sha2vz and size, with no unpack program", () => {
     const engine = artifacts["engine-package"]
-    expect("id" in engine).toBe(false)
+    expect(engine.id).toBe("@korri:steam/engine-package")
     expect("unpack" in engine).toBe(false)
     const build = engine.platforms["aarch64-linux"]
     expect(build.version).toBe("1792618285")
@@ -152,24 +141,13 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
     expect(Object.keys(engine.platforms)).toEqual(["aarch64-linux"])
   })
 
-  test("declares no provider record: korrid derives the provider from the plugin id", () => {
-    expect("providers" in plugin).toBe(false)
-  })
-
-  test("names no publisher namespace of its own anywhere in its declarations", () => {
+  test("names only its own id and its required plugins' ids, so a test build rewrites one string", () => {
     const declared = JSON.stringify({ ...plugin, handlers: undefined })
-    const foreign = declared.match(/@[A-Za-z0-9_-]+:[A-Za-z0-9_-]+/g) ?? []
-    // Only the required plugins of another publisher are named by full id.
-    expect(new Set(foreign)).toEqual(new Set(["@korri:fex", "@korri:proton"]))
+    const ids = declared.match(/@[A-Za-z0-9_-]+:[A-Za-z0-9_-]+/g) ?? []
+    expect(new Set(ids)).toEqual(new Set(["@korri:steam", "@korri:fex", "@korri:proton"]))
   })
 
-  test("hands the session the person's engine folder, Proton and FEX, in any namespace", () => {
-    for (const pluginId of PLUGIN_IDS) {
-      const input = engineInput(pluginId)
-      expect(handlers["launch.prepare"](input).command).toBe(input.program)
-      const client = launchInput(pluginId)
-      expect(handlers["launch.prepare"](client).command).toBe(client.program)
-    }
+  test("hands the session the person's engine folder, Proton and FEX", () => {
     const input = engineInput()
     expect(handlers["launch.prepare"](input)).toEqual({
       command: input.program,
@@ -190,5 +168,6 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
     delete (noEngine.artifacts as Record<string, string>)["engine-package"]
     expect(() => handlers["launch.prepare"](noEngine)).toThrow("Steam requires engine-package")
     expect(() => handlers["launch.prepare"]({ ...engineInput(), ref: "401710;x" })).toThrow("provider ref")
+    expect(() => handlers["launch.prepare"]({ ...launchInput(), ref: "" })).toThrow("provider ref")
   })
 })
