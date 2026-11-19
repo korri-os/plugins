@@ -21,7 +21,7 @@ HERE = Path(__file__).parent
 STEAM = HERE.parent
 
 HOST = r'''
-import json, os, sys, time
+import fcntl, json, os, sys, time
 channel = sys.argv[1]
 behavior = sys.argv[2]
 events = os.path.join(channel, "events.jsonl")
@@ -31,6 +31,19 @@ def emit(**event):
 if behavior == "mismatch":
     emit(event="engine_mismatch", expected="aa", found="bb")
     sys.exit(1)
+if behavior == "host-failed":
+    # The start wrapper's refusal (host-run.sh fail), then nothing.
+    emit(event="launch_refused", reason="host_failed",
+         message="Steam engine: the engine host could not start")
+    sys.exit(1)
+# The real host holds its host lock for its whole life.
+lock = open(os.path.join(channel, "host.lock"), "a")
+fcntl.flock(lock, fcntl.LOCK_EX)
+if behavior == "crash":
+    # Signed in, then gone without a word, as a crash in steamclient.so.
+    emit(event="mode", mode="session")
+    time.sleep(1)
+    os._exit(139)
 emit(event="logon_state", state=4, logged_on=True, connected=True, offline=False)
 while True:
     with open(os.path.join(channel, "commands")) as fifo:
@@ -156,7 +169,7 @@ class LaunchEntryTests(unittest.TestCase):
 # What packages/engine.nix puts on the session program's PATH: coreutils,
 # gnugrep, gnused, jq, python3, util-linux (flock); systemd-notify is faked.
 SESSION_TOOLS = ["cat", "dirname", "head", "mkdir", "seq", "sleep", "stat", "tail",
-                 "timeout", "tr", "grep", "sed", "jq", "python3", "flock"]
+                 "timeout", "tr", "true", "grep", "sed", "jq", "python3", "flock"]
 
 
 class SessionScriptTests(unittest.TestCase):
@@ -166,6 +179,27 @@ class SessionScriptTests(unittest.TestCase):
                 code = line.split("#", 1)[0]
                 self.assertIsNone(re.search(r"(^|[\s;|&(`'\"])sh(\s|$)", code),
                                   f"{script}:{number}: {line.strip()}")
+
+
+class HostWrapperTests(unittest.TestCase):
+    """host-run.sh refuses a bad start with an event in the channel's log."""
+
+    def run_wrapper(self, *args, home="/nonexistent/home"):
+        return subprocess.run([shutil.which("bash"), str(HERE / "host-run.sh"), *args],
+                              env={**os.environ, "HOME": home}, capture_output=True, text=True)
+
+    def test_every_refusal_writes_one_host_failed_event_to_stdout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = Path(tmp) / "linuxarm64/steamclient.so"
+            engine.parent.mkdir()
+            engine.write_bytes(b"x")
+            for args, home in (((), "/x/home"), (("/no/steamclient.so",), "/x/home"),
+                               ((str(engine),), "/not-a-home")):
+                result = self.run_wrapper(*args, home=home)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(json.loads(result.stdout), {
+                    "event": "launch_refused", "reason": "host_failed",
+                    "message": "Steam engine: the engine host could not start"})
 
 
 class EngineSessionTests(unittest.TestCase):
@@ -298,6 +332,21 @@ class EngineSessionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 126, result.stderr)
         self.assertFalse((self.root / "game.json").exists())
         self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
+
+    def test_a_refused_host_start_ends_the_session_with_its_reason(self):
+        result = self.run_session("host-failed")
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertIn("--status=plugin-launch: Steam engine: the engine host could not start", self.statuses())
+        self.assertFalse((self.channel / "received").exists())
+
+    def test_a_host_that_dies_silently_ends_the_session(self):
+        # No logon_state ever comes; the free host lock is the only sign.
+        started = time.monotonic()
+        result = self.run_session("crash")
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertIn("--status=plugin-launch: Steam engine: the engine host stopped", self.statuses())
+        self.assertIn("host lock free", result.stderr)
+        self.assertLess(time.monotonic() - started, 30)
 
     def test_a_cloud_conflict_starts_no_game(self):
         result = self.run_session("conflict")

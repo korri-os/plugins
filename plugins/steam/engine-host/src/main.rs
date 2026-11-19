@@ -341,7 +341,16 @@ fn json_string(value: &str) -> String {
     out.push('"');
     out
 }
+/// Set once an engine state (`engine_*`) was reported: korrid and the
+/// session program take that as the reason, so the host adds no other.
+static ENGINE_STATE_REPORTED: AtomicBool = AtomicBool::new(false);
+/// The line the host writes when it ends with an error and reported no
+/// engine state: the same shape as the start wrapper's (host-run.sh).
+const HOST_FAILED_EVENT: &str = r#"{"event":"launch_refused","reason":"host_failed","message":"Steam engine: the engine host stopped"}"#;
 fn json(out: &mut File, line: &str) -> Result<(), String> {
+    if line.starts_with(r#"{"event":"engine_"#) {
+        ENGINE_STATE_REPORTED.store(true, Ordering::Relaxed);
+    }
     writeln!(out, "{line}")
         .and_then(|_| out.flush())
         .map_err(|_| "JSON output failed".into())
@@ -3524,11 +3533,18 @@ fn make_fifo(path: &Path) -> Result<(), String> {
 
 fn main() {
     let mut errors = owned_fd(2).expect("cannot duplicate stderr");
+    // A second copy of stdout: run() points fd 1 at /dev/null for the engine.
+    let mut report = owned_fd(1).ok();
     let result = owned_fd(1).and_then(|mut out| run(&mut out));
     let status = match result {
         Ok(()) => 0,
         Err(error) => {
             let _ = writeln!(errors, "korri-steam-host: {error}");
+            if !ENGINE_STATE_REPORTED.load(Ordering::Relaxed) {
+                if let Some(report) = report.as_mut() {
+                    let _ = json(report, HOST_FAILED_EVENT);
+                }
+            }
             1
         }
     };
@@ -4862,5 +4878,22 @@ mod tests {
             update_error_name(APP_UPDATE_MISSING_CONFIGURATION),
             "Missing configuration"
         );
+    }
+    #[test]
+    fn an_engine_state_is_the_reason_and_no_host_failed_follows_it() {
+        let path = std::env::temp_dir().join(format!("korri-reported-{}", std::process::id()));
+        let mut out = File::create(&path).unwrap();
+        ENGINE_STATE_REPORTED.store(false, Ordering::Relaxed);
+        json(&mut out, r#"{"event":"phase","phase":"dlopen"}"#).unwrap();
+        assert!(!ENGINE_STATE_REPORTED.load(Ordering::Relaxed));
+        json(
+            &mut out,
+            r#"{"event":"engine_mismatch","expected":"a","found":"b"}"#,
+        )
+        .unwrap();
+        assert!(ENGINE_STATE_REPORTED.load(Ordering::Relaxed));
+        ENGINE_STATE_REPORTED.store(false, Ordering::Relaxed);
+        assert!(HOST_FAILED_EVENT.contains(r#""reason":"host_failed""#));
+        std::fs::remove_file(path).unwrap();
     }
 }

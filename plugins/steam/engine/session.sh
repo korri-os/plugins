@@ -91,15 +91,31 @@ send() {
 }
 # A line's string field, for the host's own fixed JSON (no nesting).
 field() { jq -r --arg key "$1" '.[$key] // empty' <<<"$2" 2>/dev/null || true; }
+# The host's end before the game: its engine states, a refusal of the start
+# wrapper or of the host (`launch_refused host_failed`), its stop, or, once it
+# has written any event, its host lock free again (a crash, for example in
+# steamclient.so, writes nothing). Returns 1 while the host runs.
 host_gone() {
-  local line
-  line=$(events_from 0 | grep -aE '"event":"(engine_map_missing|engine_mismatch|engine_refused)"|"phase":"stopped"' | tail -n 1)
-  case "$line" in
-    '') return 1 ;;
-    *engine_map_missing*|*engine_mismatch*) fail 126 'Steam engine: this engine build is not available on this device' "$line" ;;
-    *engine_refused*) fail 126 'Steam engine: Steam refused the pinned engine' "$line" ;;
-    *) fail 126 'Steam engine: the engine host stopped' "$line" ;;
-  esac
+  local all line
+  all=$(events_from 0)
+  if line=$(grep -aE '"event":"(engine_map_missing|engine_mismatch)"' <<<"$all" | tail -n 1) && [[ -n "$line" ]]; then
+    fail 126 'Steam engine: this engine build is not available on this device' "$line"
+  fi
+  if line=$(grep -aF '"event":"engine_refused"' <<<"$all" | tail -n 1) && [[ -n "$line" ]]; then
+    fail 126 'Steam engine: Steam refused the pinned engine' "$line"
+  fi
+  if line=$(grep -aF '"reason":"host_failed"' <<<"$all" | tail -n 1) && [[ -n "$line" ]]; then
+    local message
+    message=$(field message "$line")
+    fail 126 "${message:-Steam engine: the engine host stopped}" "$line"
+  fi
+  if grep -aqF '"phase":"stopped"' <<<"$all"; then
+    fail 126 'Steam engine: the engine host stopped' 'host phase stopped'
+  fi
+  if [[ -n "$all" ]] && flock -n "$channel/host.lock" true 7>&-; then
+    fail 126 'Steam engine: the engine host stopped' 'host lock free: the host is gone'
+  fi
+  return 1
 }
 
 # 2. A signed-in (or offline) engine. Without a saved login korrid shows the

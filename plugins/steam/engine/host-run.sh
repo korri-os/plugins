@@ -16,7 +16,16 @@ set -Eeuo pipefail
 umask 077
 
 say() { printf 'korri-steam-host: %s\n' "$*" >&2; }
-fail() { say "$1"; exit "${2:-1}"; }
+# Every refusal here also goes to stdout, which korrid appends to the
+# channel's events.jsonl: the session program and korrid read it there, as
+# they read the host's own events. The text is fixed; the reason stays on stderr.
+fail() {
+  trap - ERR
+  say "$1"
+  printf '%s\n' '{"event":"launch_refused","reason":"host_failed","message":"Steam engine: the engine host could not start"}'
+  exit "${2:-1}"
+}
+trap 'fail "start step failed at line $LINENO" 1' ERR
 
 [[ "$#" -ge 1 ]] || fail 'usage: korri-steam-host --commands FIFO --host-lock FILE [--session-lock FILE] DIR/steamclient.so' 2
 engine=${!#}
@@ -51,11 +60,26 @@ find "$root" -xdev -type d -perm -2000 -user "$(id -u)" -exec chmod g-s {} + 2>/
 # korrid discovers installed games from steamapps/appmanifest_*.acf and owns
 # the account root above this folder. Grant it listing of the path to
 # steamapps and reading of the manifests, nothing more.
+#
+# The engine writes a new manifest while this host runs (an install), and
+# korrid scans when the job ends, so steamapps itself keeps a default entry
+# that makes new files directly in it readable. A default entry is also
+# inherited by every new subfolder, and the engine puts game files, Wine
+# prefixes (with saves) and shader caches in subfolders. So the subfolders
+# the engine uses are made here with no default entry, and any entry
+# inherited earlier is removed from them. A subfolder the engine makes that is
+# not in this list would still inherit read for korrid.
 daemon_uid=$(stat -c %u "$(dirname "$root")")
 if [[ "$daemon_uid" != "$(id -u)" ]]; then
   setfacl -m "u:$daemon_uid:x" "$root"
   setfacl -m "u:$daemon_uid:rx" "$steam"
   setfacl -m "u:$daemon_uid:rx" -m "d:u:$daemon_uid:r" "$steam/steamapps"
+  for sub in common downloading compatdata shadercache temp workshop sourcemods; do
+    mkdir -p "$steam/steamapps/$sub"
+    if getfacl -p "$steam/steamapps/$sub" 2>/dev/null | grep -q "^\(default:\)\?user:$daemon_uid:"; then
+      setfacl -R -k -x "u:$daemon_uid" "$steam/steamapps/$sub" 2>/dev/null || true
+    fi
+  done
   find "$steam/steamapps" -maxdepth 1 -name 'appmanifest_*.acf' -exec setfacl -m "u:$daemon_uid:r" {} +
 fi
 
@@ -65,4 +89,7 @@ export KORRI_STEAM_COMPAT_TOOL=@protonToolName@
 # The engine must never see a game's identity, display or session bus.
 unset SteamAppId SteamGameId SteamOverlayGameId DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
 cd "$steam"
+[[ -x @fhs@/bin/korri-steam-engine-fhs && -x @host@/bin/korri-steam-host ]] ||
+  fail 'the Steam FHS or the host program is missing' 1
+trap - ERR
 exec @fhs@/bin/korri-steam-engine-fhs @host@/bin/korri-steam-host "$@"
