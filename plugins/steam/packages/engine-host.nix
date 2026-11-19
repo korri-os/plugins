@@ -16,13 +16,22 @@ let
       ../engine-host/map
     ];
   };
+  # The map on its own, named by its content. The `steam-engine-map` input's
+  # default is a relative path, so its outPath is a subfolder of the whole
+  # publisher source: interpolating it directly made every publisher file a
+  # build input of the host (the plugin churn check's helper case).
+  map = builtins.path {
+    name = "korri-steam-engine-map";
+    path = engineMap;
+    filter = path: _: baseNameOf path == "engine.map";
+  };
 in
 pkgs.rustPlatform.buildRustPackage {
   pname = "korri-steam-host";
   version = "0.1.0";
   src = source;
   cargoLock.lockFile = ../engine-host/Cargo.lock;
-  env.KORRI_STEAM_ENGINE_MAP = "${engineMap}/engine.map";
+  env.KORRI_STEAM_ENGINE_MAP = "${map}/engine.map";
   # The unit tests run in packages/engine-check.nix on the build host, with
   # both maps; a cross build cannot run them.
   doCheck = false;

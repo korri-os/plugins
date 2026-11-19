@@ -118,6 +118,9 @@ def _quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 
 
+MAP_COPY_NAME = "korri-steam-engine-map"
+
+
 def map_store_path():
     """The store path Nix gives the overridden map input."""
     out = subprocess.check_output(["nix", "flake", "archive", "--dry-run", "--json", "."],
@@ -134,7 +137,9 @@ def check_closure(paths_file: str, environ=os.environ):
     if not paths:
         return
     closure = subprocess.check_output(["nix", "path-info", "--recursive", *paths], text=True)
-    if map_path in closure.split():
+    # The host build copies the map to its own store path (MAP_COPY_NAME,
+    # plugins/steam/packages/engine-host.nix); refuse that copy too.
+    if any(path == map_path or path.endswith("-" + MAP_COPY_NAME) for path in closure.split()):
         fail("the private engine map's store path is in the upload closure")
     print(f"steam-engine-map: the map's store path is not in the closure of {len(paths)} paths")
 

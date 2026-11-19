@@ -107,6 +107,7 @@ class SteamEngineMapTests(unittest.TestCase):
         fake = self.root / "bin"
         fake.mkdir()
         for closure, expected in (("/nix/store/aaa-korri-plugin\n/nix/store/map-source\n", 1),
+                                  ("/nix/store/aaa-korri-plugin\n/nix/store/bbb-korri-steam-engine-map\n", 1),
                                   ("/nix/store/aaa-korri-plugin\n", 0)):
             (fake / "nix").write_text(
                 "#!/bin/sh\n"

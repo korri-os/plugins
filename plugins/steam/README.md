@@ -174,8 +174,11 @@ host"). The map file is in no repository and in no published closure.
   "not writing modified lock file" warning names the folder and the map's
   narHash, not its content.
 - **Check.** After the build, `steam-engine-map.py check-closure` fails the job
-  if the map's store path is in the runtime closure of the paths it uploads
-  (`korri-cache export` copies exactly that closure). The compiled host binary
+  if the map's store path, or the host build's copy of it
+  (`…-korri-steam-engine-map`), is in the runtime closure of the paths it
+  uploads (`korri-cache export` copies exactly that closure). The host build
+  reads the map from that content-named copy, so a change to another file of
+  this repository does not rebuild the host. The compiled host binary
   holds the map's addresses by design.
 - **Update when the engine pin moves.** On aka, make the map for the new
   client version with the private pipeline
