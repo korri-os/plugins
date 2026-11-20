@@ -1,0 +1,27 @@
+[
+  {
+    "name": "covers",
+    "result": [
+      { "id": 1, "image_id": "co1wyy", "width": 1170, "height": 1559, "alpha_channel": false, "animated": false },
+      { "id": 2, "image_id": "co1x7g", "width": 800, "height": 1148, "alpha_channel": false, "animated": false }
+    ]
+  },
+  {
+    "name": "artworks",
+    "result": [
+      { "id": 3, "image_id": "ar5l8", "width": 1920, "height": 1080, "alpha_channel": false, "animated": false },
+      { "id": 4, "image_id": "arwide0001", "width": 3840, "height": 1240, "alpha_channel": false, "animated": false },
+      { "id": 5, "image_id": "ar1bpe", "width": 1600, "height": 190, "alpha_channel": false, "animated": false },
+      { "id": 6, "image_id": "aranim0001", "width": 1920, "height": 1080, "alpha_channel": false, "animated": true },
+      { "id": 7, "image_id": "artiny0001", "width": 200, "height": 120, "alpha_channel": false, "animated": false }
+    ]
+  },
+  {
+    "name": "logos",
+    "result": [
+      { "id": 8, "image_id": "lgopaque01", "width": 1200, "height": 400, "alpha_channel": false, "animated": false },
+      { "id": 9, "image_id": "lgalpha001", "width": 3611, "height": 1877, "alpha_channel": true, "animated": false },
+      { "id": 10, "image_id": "lgalpha002", "width": 600, "height": 300, "alpha_channel": true, "animated": false }
+    ]
+  }
+]

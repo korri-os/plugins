@@ -183,6 +183,9 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     # Core ADR 0032: artwork, not acquisition, but built the same way: source
     # only, with declared hosts. `credentialHost` is Core ADR 0034.
     steamgriddbPlugin = acquisitionPlugin "steamgriddb";
+    # Velvet layered art, slice 5: artwork from IGDB. `credentialTokenUrl` is
+    # the Core ADR 0034 IGDB amendment.
+    igdbPlugin = acquisitionPlugin "igdb";
     acquisitionCheck =
       name: package: hosts:
       import ./acquisition-plugin-check.nix {
@@ -380,6 +383,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-android-app = androidAppPlugin;
       korri-plugin-retrobrews = retrobrewsPlugin;
       korri-plugin-steamgriddb = steamgriddbPlugin;
+      korri-plugin-igdb = igdbPlugin;
       korri-plugin-starter-pack = starterPack;
       starter-pack-cartridges = starterPackDefinition.packages.cartridges;
       korri-cemu-bench = cemuBench;
@@ -630,6 +634,15 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           shared = acquisitionCheck "steamgriddb" steamgriddbPlugin [
             "www.steamgriddb.com"
             "cdn2.steamgriddb.com"
+          ];
+        };
+        korri-igdb-plugin = import ../plugins/igdb/check.nix {
+          inherit pkgs;
+          package = igdbPlugin;
+          shared = acquisitionCheck "igdb" igdbPlugin [
+            "api.igdb.com"
+            "id.twitch.tv"
+            "images.igdb.com"
           ];
         };
         korri-gamescope-plugin = import ./gamescope-check.nix {

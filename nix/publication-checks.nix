@@ -170,6 +170,7 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
   "homebrewhub"
   "retrobrews"
   "steamgriddb"
+  "igdb"
 ]) (package: [ "korri-${lib.removePrefix "korri-plugin-" package}-plugin" ])
 // lib.optionalAttrs (sunshinePackages ? sunshine-korri-v4l2m2m) {
   sunshine-korri-v4l2m2m = sunshine;

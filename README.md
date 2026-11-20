@@ -48,6 +48,7 @@ does not update device images or grant permission approval. See
 | `korri-steam-host` | The Steam plugin's `engine` runner's engine host, built from the `steam-engine-map` input (the public map is empty) | `plugins/steam/engine-host/` |
 | `korri-steam-host-aarch64` (x86_64 only) | The same host, cross-built for aarch64 | `plugins/steam/engine-host/` |
 | `korri-plugin-steamgriddb` | `@korri:steamgriddb` (artwork candidates; declared hosts `www.steamgriddb.com` and `cdn2.steamgriddb.com`; ships no API key) | `plugins/steamgriddb/` |
+| `korri-plugin-igdb` | `@korri:igdb` (artwork candidates; declared hosts `api.igdb.com`, `id.twitch.tv` and `images.igdb.com`; ships no Twitch client ID or secret; not published, korri#558) | `plugins/igdb/` |
 | `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
 | `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |
