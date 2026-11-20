@@ -1,0 +1,10 @@
+StorePath: /nix/store/xi9ya3p1ahbz8gspp7gfsh5zz71b15ab-launch-entry.py
+URL: https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/0ygx363hfwqhvhm5dkkxmxsffhxhp6iajrxppca0j08wpfdyyj1d.nar.xz
+Compression: xz
+FileHash: sha256:0ygx363hfwqhvhm5dkkxmxsffhxhp6iajrxppca0j08wpfdyyj1d
+FileSize: 3064
+NarHash: sha256:13lzk11msswr7z4094ikwq8s5w9x35hc4lidd2h4jz47kjxnki0j
+NarSize: 8488
+References: 
+Sig: korri-plugins-1:ANI+hMPb37txPUf32HKkdf/IWVRADOXoszM//TSgBTD3iBDVhxAS5KVEv/FpdqsguPDrY6KN/uhoSicbYJgWAA==
+CA: fixed:r:sha256:13lzk11msswr7z4094ikwq8s5w9x35hc4lidd2h4jz47kjxnki0j

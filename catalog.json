@@ -1,74 +1,74 @@
 {
   "latest": {
-    "@korri:fex": "build-ae6ddab88126-steam-engine-5",
-    "@korri:proton": "build-ae6ddab88126-steam-engine-5",
-    "@korri:steam": "build-ae6ddab88126-steam-engine-5"
+    "@korri:fex": "build-dab3e5ee8a32-steam-engine-6",
+    "@korri:proton": "build-dab3e5ee8a32-steam-engine-6",
+    "@korri:steam": "build-dab3e5ee8a32-steam-engine-6"
   },
   "records": [
     {
       "archive_sha256": "0a1505806d6f163740f4bea761d30d903a8f9e3cda40b05641616214ab6514e6",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-ae6ddab88126-steam-engine-5/korri-plugin-f4b88e9a79c2dcaf9b136829590bcc72b5fe1bf1bd62836d3218927400df738d-build-ae6ddab88126-steam-engine-5-aarch64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-f4b88e9a79c2dcaf9b136829590bcc72b5fe1bf1bd62836d3218927400df738d-build-dab3e5ee8a32-steam-engine-6-aarch64-linux.tar",
       "description": "FEX x86 emulation runtime: its configuration and the pinned x86 rootfs.",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:fex",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-ae6ddab88126-steam-engine-5",
+      "release_version": "build-dab3e5ee8a32-steam-engine-6",
       "store_path": "/nix/store/pm36g2qq94zwb8vfsz0k6sdss4x1rz1b-korri-plugin",
       "title": "FEX"
     },
     {
       "archive_sha256": "102ba4aa01923d5154488845542b5f7660ead882876b4e4718c7e55dd8c72c38",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-ae6ddab88126-steam-engine-5/korri-plugin-f4b88e9a79c2dcaf9b136829590bcc72b5fe1bf1bd62836d3218927400df738d-build-ae6ddab88126-steam-engine-5-x86_64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-f4b88e9a79c2dcaf9b136829590bcc72b5fe1bf1bd62836d3218927400df738d-build-dab3e5ee8a32-steam-engine-6-x86_64-linux.tar",
       "description": "FEX x86 emulation runtime: its configuration and the pinned x86 rootfs.",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:fex",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-ae6ddab88126-steam-engine-5",
+      "release_version": "build-dab3e5ee8a32-steam-engine-6",
       "store_path": "/nix/store/xj192clw012kpnyr369sbi50sx0v8s4s-korri-plugin",
       "title": "FEX"
     },
     {
       "archive_sha256": "74f644076acd02944d76eacef7110a836d5ade275467680c79430e367a23b77e",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-ae6ddab88126-steam-engine-5/korri-plugin-bf8a2e7ae8b462321f88a44a74ed79b6b5e2edaedaf2c69beb5db1833dc59d94-build-ae6ddab88126-steam-engine-5-aarch64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-bf8a2e7ae8b462321f88a44a74ed79b6b5e2edaedaf2c69beb5db1833dc59d94-build-dab3e5ee8a32-steam-engine-6-aarch64-linux.tar",
       "description": "Proton compatibility tools: the pinned Proton-CachyOS build for this device.",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:proton",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-ae6ddab88126-steam-engine-5",
+      "release_version": "build-dab3e5ee8a32-steam-engine-6",
       "store_path": "/nix/store/6ijvfj8pldi4ar790xxhbcvj4l6abddy-korri-plugin",
       "title": "Proton"
     },
     {
       "archive_sha256": "f8949bdf644dd5bdb3986041e39d3f1aa75972dd0ff0217e0c42345e534bd74d",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-ae6ddab88126-steam-engine-5/korri-plugin-bf8a2e7ae8b462321f88a44a74ed79b6b5e2edaedaf2c69beb5db1833dc59d94-build-ae6ddab88126-steam-engine-5-x86_64-linux.tar",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-bf8a2e7ae8b462321f88a44a74ed79b6b5e2edaedaf2c69beb5db1833dc59d94-build-dab3e5ee8a32-steam-engine-6-x86_64-linux.tar",
       "description": "Proton compatibility tools: the pinned Proton-CachyOS build for this device.",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:proton",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-ae6ddab88126-steam-engine-5",
+      "release_version": "build-dab3e5ee8a32-steam-engine-6",
       "store_path": "/nix/store/qzqi8qb8z9461c0k30hjk7q3566wkgh4-korri-plugin",
       "title": "Proton"
     },
     {
-      "archive_sha256": "6c0e4f4cd8d4523c6ee93bbc08493b0bb2b61fe7990f13d228bfe0ed6d5dcad2",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-ae6ddab88126-steam-engine-5/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-ae6ddab88126-steam-engine-5-aarch64-linux.tar",
+      "archive_sha256": "035ce653244089d8ef400dc4bc13e63280ca7e9cf91fb40106faea9fbfeb787f",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-dab3e5ee8a32-steam-engine-6-aarch64-linux.tar",
       "description": "Runs Steam content through the native session program.",
       "platform": "aarch64-linux",
       "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-ae6ddab88126-steam-engine-5",
-      "store_path": "/nix/store/pknnv54prg5v8jqizi5nb288k320hpzh-korri-plugin",
+      "release_version": "build-dab3e5ee8a32-steam-engine-6",
+      "store_path": "/nix/store/9nhv44nqr4sxj9l2dg3cy9wslrsncgi7-korri-plugin",
       "title": "Steam"
     },
     {
-      "archive_sha256": "d00bf58c5039be6caa0f90b1759c4ca0640833c0e80a0197bef117b127f3ab85",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-ae6ddab88126-steam-engine-5/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-ae6ddab88126-steam-engine-5-x86_64-linux.tar",
+      "archive_sha256": "8cc470e347ac448dda63e1a0a0b0fba8f092bfe80e9e530595841c6d5c47e8b5",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-dab3e5ee8a32-steam-engine-6-x86_64-linux.tar",
       "description": "Runs Steam content through the native session program.",
       "platform": "x86_64-linux",
       "plugin_id": "@korri:steam",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-ae6ddab88126-steam-engine-5",
-      "store_path": "/nix/store/y7d1a9iib5s7f63mj3zdbgz72dfjg01p-korri-plugin",
+      "release_version": "build-dab3e5ee8a32-steam-engine-6",
+      "store_path": "/nix/store/y3wb3612ydcr7fvd1wc9k5gnh2i3rghd-korri-plugin",
       "title": "Steam"
     }
   ]
