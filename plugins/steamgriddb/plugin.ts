@@ -12,27 +12,25 @@
 import type {
   GameAssetCandidate,
   GameAssetCandidates,
-  GameAssetRole,
   PluginGameAssetCandidatesInput,
   PluginHttpRequest,
   PluginHttpRequests,
   PluginHttpResponse,
 } from "../../contracts/generated/korrid"
 
-// The wire enum is type-only: the sandbox cannot import generated Rust code.
-// So a role is written as the enum's string value, and the output is
-// `PluginGameAssetCandidatesOutput` with that role.
-type Role = `${GameAssetRole}`
-type Candidate = Omit<GameAssetCandidate, "role"> & { role: Role }
-type CandidatesOutput =
-  | PluginHttpRequests
-  | (Omit<GameAssetCandidates, "candidates"> & { candidates: Candidate[] })
+// Core ADR 0091: a candidate names a broad kind (`logo`, `picture`, `icon`)
+// and its measured size; the surface picks pictures by shape.
+type Candidate = GameAssetCandidate
+type Kind = Candidate["kind"]
+// The four SteamGridDB lists this plugin asks for, by the shape each holds.
+type ListName = "tile" | "poster" | "hero" | "logo"
+type CandidatesOutput = PluginHttpRequests | GameAssetCandidates
 type GameSystem = NonNullable<PluginGameAssetCandidatesInput["system"]>
 
 export const name = "steamgriddb"
 export const title = "SteamGridDB"
 export const description =
-  "Finds a tile, poster, hero and logo for each game on SteamGridDB, with your own API key."
+  "Finds pictures (tiles, posters, heroes) and logos for each game on SteamGridDB, with your own API key."
 
 const API_BASE_URL = "https://www.steamgriddb.com/api/v2"
 const JSON_HEADERS = { accept: "application/json" } as const
@@ -70,14 +68,15 @@ const TILE_STYLES: ReadonlySet<string> = new Set([
 ])
 
 interface ArtList {
-  readonly role: Role
+  readonly name: ListName
+  readonly kind: Kind
   readonly endpoint: "grids" | "heroes" | "logos"
   readonly query: Readonly<Record<string, string>>
   readonly styleRank: ReadonlyMap<string, number>
   readonly keepsStyle: (style: string | undefined) => boolean
-  // The asset's size group, lower first. korrid takes the first candidate, so
-  // the first group holds the size a 1920x1080 screen needs. Every other
-  // asset still follows: a game that has only those keeps its art.
+  // The asset's size group, lower first. korrid keeps the first four of a
+  // kind, so the first group holds the size a 1920x1080 screen needs. Every
+  // other asset still follows: a game that has only those keeps its art.
   readonly sizeGroup: (asset: ArtAsset) => number
 }
 
@@ -87,7 +86,8 @@ const anySize = () => 0
 // In request order: turn 2's responses arrive in this order.
 const ART_LISTS: readonly ArtList[] = [
   {
-    role: "tile",
+    name: "tile",
+    kind: "picture",
     endpoint: "grids",
     // main `grids_for_game`.
     query: { dimensions: "512x512", styles: "alternate,blurred,material,no_logo" },
@@ -96,7 +96,8 @@ const ART_LISTS: readonly ArtList[] = [
     sizeGroup: anySize,
   },
   {
-    role: "poster",
+    name: "poster",
+    kind: "picture",
     endpoint: "grids",
     query: { dimensions: "600x900" },
     styleRank: GRID_STYLE_RANK,
@@ -105,7 +106,8 @@ const ART_LISTS: readonly ArtList[] = [
     sizeGroup: noLargerThan(600, 900),
   },
   {
-    role: "hero",
+    name: "hero",
+    kind: "picture",
     endpoint: "heroes",
     query: {},
     styleRank: GRID_STYLE_RANK,
@@ -115,7 +117,8 @@ const ART_LISTS: readonly ArtList[] = [
     sizeGroup: noLargerThan(1920),
   },
   {
-    role: "logo",
+    name: "logo",
+    kind: "logo",
     endpoint: "logos",
     query: { mimes: "image/png" },
     styleRank: LOGO_STYLE_RANK,
@@ -184,12 +187,30 @@ function artTurns(gameId: number, artLists: readonly PluginHttpResponse[]): Cand
       `SteamGridDB art lists: expected ${ART_LISTS.length} responses, got ${artLists.length}`,
     )
   }
+  const lists = ART_LISTS.map((list, index) =>
+    listCandidates(list, artAssets(artLists[index], list.name)),
+  )
   return {
-    candidates: ART_LISTS.flatMap((list, index) =>
-      roleCandidates(list, artAssets(artLists[index], list.role)),
-    ),
+    candidates: [
+      ...interleave(PICTURE_ORDER.map(name => lists[ART_LISTS.findIndex(list => list.name === name)])),
+      ...lists[ART_LISTS.findIndex(list => list.name === "logo")],
+    ],
     externalIds: { [AUTHORITY]: [String(gameId)] },
   }
+}
+
+// korrid keeps the first four candidates of each kind (Core ADR 0091). Heroes,
+// posters and tiles are all pictures, so they take turns: the best hero, the
+// best poster, the best tile, then the second of each. The first four then
+// hold every shape the game has, with the wide hero first.
+const PICTURE_ORDER: readonly ListName[] = ["hero", "poster", "tile"]
+
+function interleave(lists: readonly Candidate[][]): Candidate[] {
+  const out: Candidate[] = []
+  for (let index = 0; lists.some(list => index < list.length); index++) {
+    for (const list of lists) if (index < list.length) out.push(list[index])
+  }
+  return out
 }
 
 // The first stored SteamGridDB id that is a game id. korrid stores what this
@@ -319,10 +340,10 @@ function isSafe(asset: Record<string, unknown>): boolean {
   return !tags.some(tag => typeof tag === "string" && UNSAFE.includes(tag.toLowerCase()))
 }
 
-function artAssets(response: PluginHttpResponse, role: Role): ArtAsset[] {
-  return dataList(response, `${role} list`).flatMap(entry => {
+function artAssets(response: PluginHttpResponse, name: ListName): ArtAsset[] {
+  return dataList(response, `${name} list`).flatMap(entry => {
     if (!isRecord(entry) || !isId(entry.id) || typeof entry.url !== "string" || entry.url === "") {
-      throw new Error(`SteamGridDB ${role} list returned an unexpected asset`)
+      throw new Error(`SteamGridDB ${name} list returned an unexpected asset`)
     }
     if (!isSafe(entry)) return []
     return [
@@ -361,9 +382,9 @@ function logoSizeGroup(asset: ArtAsset): number {
   return asset.width <= LOGO_MAX_WIDTH ? 0 : 1
 }
 
-// The role's size group first, then style preference, then English, then the
+// The list's size group first, then style preference, then English, then the
 // API's own order. Not `score`: it was 0 on all 444 assets observed.
-function roleCandidates(list: ArtList, assets: readonly ArtAsset[]): Candidate[] {
+function listCandidates(list: ArtList, assets: readonly ArtAsset[]): Candidate[] {
   return assets
     .filter(asset => list.keepsStyle(asset.style))
     .map((asset, apiOrder) => ({
@@ -381,7 +402,7 @@ function roleCandidates(list: ArtList, assets: readonly ArtAsset[]): Candidate[]
         a.apiOrder - b.apiOrder,
     )
     .map(({ asset }) => ({
-      role: list.role,
+      kind: list.kind,
       ...(isPixelCount(asset.width) ? { width: asset.width } : {}),
       ...(isPixelCount(asset.height) ? { height: asset.height } : {}),
       source: { id: String(asset.id), url: asset.url },

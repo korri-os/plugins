@@ -44,7 +44,7 @@ must not:
 What this plugin does against those terms:
 
 - Each person uses their own key, for the games on their own device.
-- korrid stores one image for each role of a game on that device. Korri never
+- korrid stores at most four images of each kind for a game on that device. Korri never
   redistributes an image, and no image is in this repository or this package.
 - korrid looks artwork up in the background after it finds new games. That
   is still automated use as the terms are written.
@@ -61,13 +61,15 @@ All requests are `GET` to `https://www.steamgriddb.com/api/v2`, with
 requests; Core ADR 0016 allows four calls and eight requests a turn. A game
 with a stored SteamGridDB id skips turn 1: two calls and four requests.
 
-| Turn | Request | Role |
-|---|---|---|
-| 1 | `search/autocomplete/<title>` | |
-| 2 | `grids/game/<id>?dimensions=512x512&styles=alternate,blurred,material,no_logo` | `tile` |
-| 2 | `grids/game/<id>?dimensions=600x900` | `poster` |
-| 2 | `heroes/game/<id>` | `hero` |
-| 2 | `logos/game/<id>?mimes=image/png` | `logo` |
+| Turn | Request | List | Kind |
+|---|---|---|---|
+| 1 | `search/autocomplete/<title>` | | |
+| 2 | `grids/game/<id>?dimensions=512x512&styles=alternate,blurred,material,no_logo` | tile | `picture` |
+| 2 | `grids/game/<id>?dimensions=600x900` | poster | `picture` |
+| 2 | `heroes/game/<id>` | hero | `picture` |
+| 2 | `logos/game/<id>?mimes=image/png` | logo | `logo` |
+
+The plugin fetches no icons, so it returns no `icon`.
 
 Every turn 2 request also has `types=static`, `nsfw=false`, `humor=false`
 and `epilepsy=false`. SteamGridDB's API description
@@ -120,10 +122,18 @@ The result of a match names the game's id, `externalIds: { steamgriddb:
 
 ## Filter and order
 
-The result is `{ candidates }`. Each candidate is
-`{ role, width?, height?, source: { id, url } }`: `width` and `height` are
-the asset's, `source.id` is the asset id as a string, and `source.url` is the
-asset's `url`, unchanged. korrid takes the first candidate of each role.
+The result is `{ candidates, externalIds }`. Each candidate is
+`{ kind, width?, height?, source: { id, url } }` (Core ADR 0091): `kind` is
+`picture` for a grid or a hero and `logo` for a logo; `width` and `height`
+are the asset's measured size as the API gives it, `source.id` is the asset
+id as a string, and `source.url` is the asset's `url`, unchanged. korrid
+keeps the first four candidates of each kind and checks the size against
+the bytes.
+
+- **Picture order:** the three picture lists take turns: the best hero, the
+  best poster, the best tile, then the second of each, and so on. So the
+  four pictures korrid keeps hold every shape the game has, with the wide
+  hero first. Logos follow, in their own order.
 
 - **Dropped:** the requests ask SteamGridDB to filter `nsfw`, `humor` and
   `epilepsy` out. The plugin also drops an asset whose `nsfw`, `humor` or
@@ -133,12 +143,12 @@ asset's `url`, unchanged. korrid takes the first candidate of each role.
   `alternate`, `blurred`, `material`, `white` or `black`, or it has none.
   This is ported as it is. It means a `no_logo` tile, which the request asks
   for, is not used.
-- **Order within a role:** the preferred size, then style, then `language`
+- **Order within a list:** the preferred size, then style, then `language`
   `en` first, then the API's own order. `score` is not used: it was 0 on all
   444 assets observed.
 - **Preferred size:** the plugin prefers art of the size a 1920x1080 screen
-  needs, and it prefers a logo between 480 and 1024 px wide. korrid takes the
-  first candidate. Every other asset still follows, so a game that has only
+  needs, and it prefers a logo between 480 and 1024 px wide. korrid keeps the
+  first four of a kind. Every other asset still follows, so a game that has only
   those keeps its art.
   - **Hero:** no wider than 1920 px first, then wider or of unknown size. The
     shell keeps 24 MiB of decoded pixels for a surface. A 3840x1240 hero is
@@ -158,8 +168,8 @@ SteamGridDB states no style preference. This order is the one the Velvet
 mockup's art was picked with on 2026-11-11 (`pick` in the mockup's
 `scripts/fetch-sgdb.sh`).
 
-A list that is empty, such as the heroes of Anguna, gives no candidate for
-that role. A response that is not 2xx JSON with a `data` list fails the whole
+A list that is empty, such as the heroes of Anguna, gives no candidate from
+that list. A response that is not 2xx JSON with a `data` list fails the whole
 lookup, also when the other three lists are good. korrid then asks again
 after the next rescan, instead of keeping a game with part of its art.
 

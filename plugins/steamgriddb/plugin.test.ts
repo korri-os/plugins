@@ -41,15 +41,30 @@ const ok = (text: string, url = "https://www.steamgriddb.com/api/v2/") => ({
 const status = (code: number, text = "") => ({ ...ok(text), status: code, ok: false })
 
 type Candidate = {
-  role: string
+  kind: string
   width?: number
   height?: number
   source: { id?: string; url: string }
 }
 type Request = { url: string; query?: Record<string, unknown>; headers?: Record<string, string> }
 
-const call = (title: string, responses: unknown[] = []) =>
-  plugin.handlers["game-assets.candidates"]({ title, responses } as never)
+// Which of turn 2's lists each asset id of one answer came from. Tile, poster
+// and hero are all `picture`, so a test that names a list looks it up here.
+type ListName = "tile" | "poster" | "hero" | "logo"
+const LIST_NAMES: readonly ListName[] = ["tile", "poster", "hero", "logo"]
+const listOf = new WeakMap<object, Map<string, ListName>>()
+const call = (title: string, responses: unknown[] = []) => {
+  const output = plugin.handlers["game-assets.candidates"]({ title, responses } as never)
+  if (responses.length === 5 && typeof output === "object" && output !== null) {
+    const names = new Map<string, ListName>()
+    responses.slice(1).forEach((response, index) => {
+      const body = JSON.parse((response as { text: string }).text) as { data?: { id: unknown }[] }
+      for (const asset of body.data ?? []) names.set(String(asset.id), LIST_NAMES[index])
+    })
+    listOf.set(output, names)
+  }
+  return output
+}
 const requestsOf = (output: unknown) => {
   expect(output).toHaveProperty("_tag", "HttpRequests")
   return (output as { requests: Request[] }).requests
@@ -60,10 +75,12 @@ const candidatesOf = (output: unknown) => {
   return (output as { candidates: Candidate[] }).candidates
 }
 const matched = (id: number) => ({ steamgriddb: [String(id)] })
-const idsOf = (output: unknown, role: string) =>
+// The ids of one list's candidates, in the answer's order.
+const idsOf = (output: unknown, list: ListName) =>
   candidatesOf(output)
-    .filter(candidate => candidate.role === role)
+    .filter(candidate => listOf.get(output as object)?.get(candidate.source.id ?? "") === list)
     .map(candidate => candidate.source.id)
+const kindsOf = (output: unknown) => candidatesOf(output).map(candidate => candidate.kind)
 
 // Turn 2's responses, in request order: tile, poster, hero, logo. No tile
 // list was recorded for Pokémon Emerald: the observed empty list (Anguna's
@@ -278,7 +295,7 @@ describe("turn 2: the four art lists", () => {
 })
 
 describe("candidates", () => {
-  test("lists every role with the asset's id, size and url: Super Metroid", () => {
+  test("lists every list as a kind with the asset's id, size and url: Super Metroid", () => {
     const source = (id: string, path: string) => ({
       id,
       url: `https://cdn2.steamgriddb.com/${path}`,
@@ -293,26 +310,26 @@ describe("candidates", () => {
       ]),
     ).toStrictEqual({
       candidates: [
-        // tile: the live list, in the API's order.
-        { role: "tile", width: 512, height: 512, source: source("800051", "grid/2581b4f20b66604537f96b64e27429e5.png") },
-        { role: "tile", width: 512, height: 512, source: source("727609", "grid/a2f3322f801d9fa81b0fd34a02d1e202.png") },
-        // poster: alternate, then white_logo and no_logo.
-        { role: "poster", width: 600, height: 900, source: source("37974", "grid/167248f62dbaf61aff4b7d1be9439282.jpg") },
-        { role: "poster", width: 600, height: 900, source: source("179187", "grid/0228b076e81154aa189310ca02eeb89a.png") },
-        { role: "poster", width: 600, height: 900, source: source("346133", "grid/c0d28afd12cbaf1d2483cf470f3e8567.png") },
-        { role: "poster", width: 600, height: 900, source: source("521614", "grid/d0c8e3a859c7a99aa64fc5b3164f6300.png") },
-        // hero: no wider than 1920 px first.
+        // Pictures take turns: hero, poster, tile. Within its list, a hero
+        // no wider than 1920 px comes first; a poster's alternate before
+        // white_logo and no_logo; tiles keep the live list's API order.
         superMetroidHero("59734", 1920, 620),
+        { kind: "picture", width: 600, height: 900, source: source("37974", "grid/167248f62dbaf61aff4b7d1be9439282.jpg") },
+        { kind: "picture", width: 512, height: 512, source: source("800051", "grid/2581b4f20b66604537f96b64e27429e5.png") },
         superMetroidHero("158930", 1600, 650),
+        { kind: "picture", width: 600, height: 900, source: source("179187", "grid/0228b076e81154aa189310ca02eeb89a.png") },
+        { kind: "picture", width: 512, height: 512, source: source("727609", "grid/a2f3322f801d9fa81b0fd34a02d1e202.png") },
         superMetroidHero("181998", 1920, 620),
+        { kind: "picture", width: 600, height: 900, source: source("346133", "grid/c0d28afd12cbaf1d2483cf470f3e8567.png") },
         superMetroidHero("77659", 3840, 1240),
+        { kind: "picture", width: 600, height: 900, source: source("521614", "grid/d0c8e3a859c7a99aa64fc5b3164f6300.png") },
         superMetroidHero("17374", 3840, 1240),
         // logo: 480 to 1024 px wide first (official, custom), then wider
         // (official, white).
-        { role: "logo", width: 785, height: 338, source: source("42959", "logo/60eefdd92947076e89f98d7f4ddec6c9.png") },
-        { role: "logo", width: 638, height: 344, source: source("161228", "logo/46cfe0a5e65d476f9e426b6d09dec97d.png") },
-        { role: "logo", width: 1526, height: 651, source: source("11253", "logo/ddfa8a1fa86914072eb6e3e55c253856.png") },
-        { role: "logo", width: 1842, height: 744, source: source("81263", "logo/7a3bd1a79a7b85595b21c34410147dd4.png") },
+        { kind: "logo", width: 785, height: 338, source: source("42959", "logo/60eefdd92947076e89f98d7f4ddec6c9.png") },
+        { kind: "logo", width: 638, height: 344, source: source("161228", "logo/46cfe0a5e65d476f9e426b6d09dec97d.png") },
+        { kind: "logo", width: 1526, height: 651, source: source("11253", "logo/ddfa8a1fa86914072eb6e3e55c253856.png") },
+        { kind: "logo", width: 1842, height: 744, source: source("81263", "logo/7a3bd1a79a7b85595b21c34410147dd4.png") },
       ],
       externalIds: matched(38157),
     })
@@ -321,10 +338,13 @@ describe("candidates", () => {
   test("lists poster, hero and logo in order of preference: Pokémon Emerald", () => {
     expect(call(POKEMON, pokemonArt())).toStrictEqual({
       candidates: [
-        // poster: alternate in English, alternate in other languages,
-        // material, then white_logo and no_logo in the API's order.
+        // Pictures take turns: hero, poster (no tile list was recorded).
+        // Heroes: no wider than 1920 px first (alternate, then material),
+        // then the wider one. Posters: alternate in English, alternate in
+        // other languages, material, then white_logo and no_logo.
+        hero("2748", 1920, 620),
         {
-          role: "poster",
+          kind: "picture",
           width: 600,
           height: 900,
           source: {
@@ -332,19 +352,16 @@ describe("candidates", () => {
             url: "https://cdn2.steamgriddb.com/grid/052938e7b425df3acdd9dc4be44404ef.png",
           },
         },
+        hero("15907", 1920, 620),
         poster("370856"),
+        hero("142599", 1920, 620),
         poster("772444"),
+        hero("145705", 3840, 1240),
         poster("772442"),
         poster("772440"),
         poster("341136"),
         poster("274559"),
         poster("858678"),
-        // hero: no wider than 1920 px first (alternate, then material), then
-        // the wider one.
-        hero("2748", 1920, 620),
-        hero("15907", 1920, 620),
-        hero("142599", 1920, 620),
-        hero("145705", 3840, 1240),
         // logo: 480 to 1024 px wide first (official with English first, then
         // white), then the wider ones in the same order, then the narrow one.
         logo("122408", 830, 355),
@@ -444,7 +461,7 @@ describe("candidates", () => {
       superMetroidHero("17374", 3840, 1240), // alternate
     ])
     expect(candidatesOf(output)[0]).toStrictEqual({
-      role: "hero",
+      kind: "picture",
       width: 1920,
       height: 620,
       source: {
@@ -471,7 +488,7 @@ describe("candidates", () => {
   test("picks a logo 480 to 1024 px wide over a 3611x1877 one: Pokémon Emerald", () => {
     // Observed: the API lists the 3611x1877 logo first.
     const logos = candidatesOf(call(POKEMON, pokemonArt())).filter(
-      candidate => candidate.role === "logo",
+      candidate => candidate.kind === "logo",
     )
     expect((JSON.parse(pokemonLogos) as { data: Asset[] }).data[0]).toMatchObject({
       id: 6894,
@@ -479,7 +496,7 @@ describe("candidates", () => {
       height: 1877,
     })
     expect(logos[0]).toStrictEqual({
-      role: "logo",
+      kind: "logo",
       width: 830,
       height: 355,
       source: {
@@ -505,7 +522,7 @@ describe("candidates", () => {
     ])
     expect(candidatesOf(output)).toStrictEqual([
       {
-        role: "logo",
+        kind: "logo",
         width: 2364,
         height: 704,
         source: {
@@ -514,7 +531,7 @@ describe("candidates", () => {
         },
       },
       {
-        role: "logo",
+        kind: "logo",
         width: 1155,
         height: 361,
         source: {
@@ -523,7 +540,7 @@ describe("candidates", () => {
         },
       },
       {
-        role: "logo",
+        kind: "logo",
         width: 463,
         height: 144,
         source: {
@@ -543,7 +560,7 @@ describe("candidates", () => {
       ok(angunaHeroes),
       ok(angunaLogos),
     ])
-    expect(candidatesOf(output).map(({ role, width, source }) => [role, width, source.id])).toEqual([
+    expect(candidatesOf(output).map(({ kind, width, source }) => [kind, width, source.id])).toEqual([
       ["logo", 1936, "151230"],
       ["logo", 3067, "151225"],
     ])
@@ -614,7 +631,7 @@ describe("candidates", () => {
     ])
   })
 
-  test("drops an asset flagged nsfw, humor or epilepsy, in every role", () => {
+  test("drops an asset flagged nsfw, humor or epilepsy, in every list", () => {
     const first = { tile: 800051, poster: 169090, hero: 2748, logo: 122408 }
     const lists = {
       tile: superMetroidTiles,
@@ -678,7 +695,7 @@ describe("candidates", () => {
     expect(output).toStrictEqual({
       candidates: [
         {
-          role: "poster",
+          kind: "picture",
           width: 600,
           height: 900,
           source: {
@@ -687,7 +704,7 @@ describe("candidates", () => {
           },
         },
         {
-          role: "poster",
+          kind: "picture",
           width: 600,
           height: 900,
           source: {
@@ -696,7 +713,7 @@ describe("candidates", () => {
           },
         },
         {
-          role: "logo",
+          kind: "logo",
           width: 1936,
           height: 1243,
           source: {
@@ -705,7 +722,7 @@ describe("candidates", () => {
           },
         },
         {
-          role: "logo",
+          kind: "logo",
           width: 3067,
           height: 1893,
           source: {
@@ -727,12 +744,12 @@ describe("candidates", () => {
     ])
     const url = (JSON.parse(pokemonLogos) as { data: Asset[] }).data[0].url
     expect(
-      candidatesOf(call(POKEMON, pokemonArt({ logo }))).filter(candidate => candidate.role === "logo"),
+      candidatesOf(call(POKEMON, pokemonArt({ logo }))).filter(candidate => candidate.kind === "logo"),
     ).toStrictEqual([
       // The one logo known to be 480 to 1024 px wide comes first.
-      { role: "logo", width: 640, source: { id: "3", url } },
-      { role: "logo", source: { id: "1", url } },
-      { role: "logo", source: { id: "2", url } },
+      { kind: "logo", width: 640, source: { id: "3", url } },
+      { kind: "logo", source: { id: "1", url } },
+      { kind: "logo", source: { id: "2", url } },
     ] as Candidate[])
   })
 
@@ -740,6 +757,36 @@ describe("candidates", () => {
     for (const candidate of candidatesOf(call(POKEMON, pokemonArt()))) {
       expect(candidate.source.url.startsWith("https://cdn2.steamgriddb.com/")).toBe(true)
     }
+  })
+})
+
+describe("kinds (Core ADR 0091)", () => {
+  test("grids and heroes are pictures, logos are logos, and no icon is sent", () => {
+    const output = call(POKEMON, pokemonArt({ tile: superMetroidTiles }))
+    const kinds = kindsOf(output)
+    expect(new Set(kinds)).toEqual(new Set(["picture", "logo"]))
+    for (const list of ["tile", "poster", "hero"] as const) {
+      for (const id of idsOf(output, list)) {
+        expect(candidatesOf(output).find(candidate => candidate.source.id === id)?.kind).toBe("picture")
+      }
+    }
+    // Pictures first, then logos; no candidate has a role.
+    expect(kinds.indexOf("logo")).toBe(kinds.lastIndexOf("picture") + 1)
+    for (const candidate of candidatesOf(output)) expect(candidate).not.toHaveProperty("role")
+  })
+
+  test("the first four pictures hold the best hero, poster and tile", () => {
+    const output = call(POKEMON, pokemonArt({ tile: superMetroidTiles }))
+    const firstFour = candidatesOf(output)
+      .filter(candidate => candidate.kind === "picture")
+      .slice(0, 4)
+      .map(candidate => candidate.source.id)
+    expect(firstFour).toEqual([
+      idsOf(output, "hero")[0],
+      idsOf(output, "poster")[0],
+      idsOf(output, "tile")[0],
+      idsOf(output, "hero")[1],
+    ])
   })
 })
 
@@ -789,19 +836,19 @@ function assetUrl(list: string, id: string): string {
 }
 
 function poster(id: string): Candidate {
-  return { role: "poster", width: 600, height: 900, source: { id, url: assetUrl(pokemonPosters, id) } }
+  return { kind: "picture", width: 600, height: 900, source: { id, url: assetUrl(pokemonPosters, id) } }
 }
 
 function hero(id: string, width: number, height: number): Candidate {
-  return { role: "hero", width, height, source: { id, url: assetUrl(pokemonHeroes, id) } }
+  return { kind: "picture", width, height, source: { id, url: assetUrl(pokemonHeroes, id) } }
 }
 
 function superMetroidHero(id: string, width: number, height: number): Candidate {
-  return { role: "hero", width, height, source: { id, url: assetUrl(superMetroidHeroes, id) } }
+  return { kind: "picture", width, height, source: { id, url: assetUrl(superMetroidHeroes, id) } }
 }
 
 function logo(id: string, width: number, height: number): Candidate {
-  return { role: "logo", width, height, source: { id, url: assetUrl(pokemonLogos, id) } }
+  return { kind: "logo", width, height, source: { id, url: assetUrl(pokemonLogos, id) } }
 }
 
 // Core ADR 0090 and the match eval of 2026-11-20 (strategy f).
