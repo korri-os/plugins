@@ -13,6 +13,9 @@ export const systems = {
     title: "Solarus",
     // Upstream's quest archive suffix. Do not claim every general ZIP file.
     content: { extensions: ["solarus"] },
+    // Public ids (Core ADR 0090), checked 2026-11-20 on wikidata.org and
+    // screenscraper.fr. The other authorities have no checked id.
+    externalIds: { wikidata: ["Q60965320"], screenscraper: ["223"] },
   },
 }
 

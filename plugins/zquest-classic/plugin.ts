@@ -14,6 +14,10 @@ export const systems = {
     title: "Zelda Classic Quest",
     // Native unpacked quest files only; packed quest archives are not claimed.
     content: { extensions: ["qst"] },
+    // Public ids (Core ADR 0090), checked 2026-11-20 on wikidata.org: the
+    // ZQuest Classic engine that runs the quests. The other authorities
+    // have no checked id.
+    externalIds: { wikidata: ["Q122171496"] },
   },
 }
 export const runners = {

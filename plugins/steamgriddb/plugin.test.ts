@@ -54,10 +54,12 @@ const requestsOf = (output: unknown) => {
   expect(output).toHaveProperty("_tag", "HttpRequests")
   return (output as { requests: Request[] }).requests
 }
+// A match also names the matched game's SteamGridDB id (Core ADR 0090).
 const candidatesOf = (output: unknown) => {
-  expect(Object.keys(output as object)).toEqual(["candidates"])
+  expect(["candidates", "candidates,externalIds"]).toContain(Object.keys(output as object).join())
   return (output as { candidates: Candidate[] }).candidates
 }
+const matched = (id: number) => ({ steamgriddb: [String(id)] })
 const idsOf = (output: unknown, role: string) =>
   candidatesOf(output)
     .filter(candidate => candidate.role === role)
@@ -178,12 +180,26 @@ describe("the exact, verified name match", () => {
     })
   })
 
-  test("yields no candidates when only an accent differs", () => {
+  test("folds accents and treats a trailing Version as optional (Core ADR 0090)", () => {
     // Observed: "Pokemon Emerald" answers ten "Pokémon Emerald …" names.
-    expect(call("Pokemon Emerald Version", [ok(pokemonSearch)])).toStrictEqual({ candidates: [] })
-    expect(call("Pokemon Emerald", [ok(pokemonSearch)])).toStrictEqual({ candidates: [] })
-    // An accented letter is a letter, not a word break.
+    expect(call("Pokemon Emerald Version", [ok(pokemonSearch)])).toStrictEqual(artRequests(34971))
+    expect(call("Pokemon Emerald", [ok(pokemonSearch)])).toStrictEqual(artRequests(34971))
+    expect(call("pokémon - emerald", [ok(pokemonSearch)])).toStrictEqual(artRequests(34971))
+    // An accented letter folds to its letter, never to a word break.
     expect(call("Pok mon Emerald Version", [ok(pokemonSearch)])).toStrictEqual({ candidates: [] })
+    // Only a trailing Version is optional, and never the whole name.
+    expect(call("Pokemon Version Emerald", [ok(pokemonSearch)])).toStrictEqual({ candidates: [] })
+  })
+
+  test("breaks words at an apostrophe, as main's normalized_match_name does", () => {
+    // Observed in the eval: "Mega Man Rock N Roll" is "Mega Man: Rock'n'Roll".
+    const rock = editedSearch(emptySearch, () => [
+      { id: 9, name: "Mega Man: Rock'n'Roll", verified: true },
+    ])
+    expect(call("Mega Man Rock N Roll", [ok(rock)])).toStrictEqual(artRequests(9))
+    const yoshi = editedSearch(emptySearch, () => [{ id: 8, name: "Yoshi’s Island", verified: true }])
+    expect(call("Yoshi's Island", [ok(yoshi)])).toStrictEqual(artRequests(8))
+    expect(call("Yoshis Island", [ok(yoshi)])).toStrictEqual({ candidates: [] })
   })
 
   test("yields no candidates when the search finds nothing", () => {
@@ -298,6 +314,7 @@ describe("candidates", () => {
         { role: "logo", width: 1526, height: 651, source: source("11253", "logo/ddfa8a1fa86914072eb6e3e55c253856.png") },
         { role: "logo", width: 1842, height: 744, source: source("81263", "logo/7a3bd1a79a7b85595b21c34410147dd4.png") },
       ],
+      externalIds: matched(38157),
     })
   })
 
@@ -340,6 +357,7 @@ describe("candidates", () => {
         logo("163962", 1596, 958),
         logo("80111", 231, 84),
       ],
+      externalIds: matched(34971),
     })
   })
 
@@ -644,7 +662,7 @@ describe("candidates", () => {
           logo: flagged(pokemonLogos),
         }),
       ),
-    ).toStrictEqual({ candidates: [] })
+    ).toStrictEqual({ candidates: [], externalIds: matched(34971) })
   })
 
   test("lists a game with no hero without one: Anguna", () => {
@@ -696,6 +714,7 @@ describe("candidates", () => {
           },
         },
       ],
+      externalIds: matched(5490981),
     })
     expect(idsOf(output, "hero")).toEqual([])
   })
@@ -784,3 +803,95 @@ function superMetroidHero(id: string, width: number, height: number): Candidate 
 function logo(id: string, width: number, height: number): Candidate {
   return { role: "logo", width, height, source: { id, url: assetUrl(pokemonLogos, id) } }
 }
+
+// Core ADR 0090 and the match eval of 2026-11-20 (strategy f).
+const SNES = {
+  id: "snes",
+  title: "Super Nintendo",
+  externalIds: { wikidata: ["Q183259"], igdb: ["19", "58"] },
+}
+const STEAM = { id: "steam", title: "Steam", externalIds: {} }
+const callWith = (title: string, input: Record<string, unknown>, responses: unknown[] = []) =>
+  plugin.handlers["game-assets.candidates"]({ title, responses, externalIds: {}, ...input } as never)
+type StoreGame = { id: number; name: string; verified: boolean; types: string[] }
+const searchOf = (games: StoreGame[]) => editedSearch(emptySearch, () => games as never)
+
+describe("id first", () => {
+  test("a stored SteamGridDB id skips the search and asks for its art lists", () => {
+    const stored = { externalIds: { steamgriddb: ["38157"], igdb: ["1"] } }
+    expect(callWith("Anything at all", stored)).toStrictEqual(artRequests(38157))
+    // Even a title that could match nothing is looked up by its id.
+    expect(callWith("???", stored)).toStrictEqual(artRequests(38157))
+    const output = callWith("Super Metroid", stored, [
+      ok(superMetroidTiles),
+      ok(superMetroidPosters),
+      ok(superMetroidHeroes),
+      ok(superMetroidLogos),
+    ])
+    expect(candidatesOf(output).length).toBe(15)
+    expect((output as { externalIds: unknown }).externalIds).toStrictEqual(matched(38157))
+  })
+
+  test("a value that is not a game id is not used, and the search runs", () => {
+    for (const steamgriddb of [[], [""], ["abc"], ["-1"], [7]]) {
+      const [request] = requestsOf(callWith("Super Metroid", { externalIds: { steamgriddb } }))
+      expect(request.url).toContain("/search/autocomplete/")
+    }
+  })
+
+  test("a new match returns its id for korrid to store", () => {
+    const output = callWith("Super Metroid", { system: SNES }, [
+      ok(superMetroidSearch),
+      ok(superMetroidTiles),
+      ok(superMetroidPosters),
+      ok(superMetroidHeroes),
+      ok(superMetroidLogos),
+    ])
+    expect((output as { externalIds: unknown }).externalIds).toStrictEqual(matched(38157))
+  })
+})
+
+describe("the store-type guard and the tie-break", () => {
+  const celeste = searchOf([
+    { id: 13136, name: "Celeste", verified: true, types: ["steam", "egs"] },
+    { id: 5253956, name: "Celeste", verified: true, types: [] },
+  ])
+
+  test("a console system drops a game listed only under PC stores", () => {
+    // Observed in the eval: PICO-8 Celeste matched the Steam game.
+    const pico8 = { id: "pico8", externalIds: { wikidata: ["Q28456260"] } }
+    expect(callWith("Celeste", { system: pico8 }, [ok(celeste)])).toStrictEqual(artRequests(5253956))
+    const onlyPc = searchOf([{ id: 13136, name: "Celeste", verified: true, types: ["steam"] }])
+    expect(callWith("Celeste", { system: pico8 }, [ok(onlyPc)])).toStrictEqual({ candidates: [] })
+    // A system with no declared ids is still a console unless it is a PC system.
+    const eggshell = { id: "eggshell", externalIds: {} }
+    expect(callWith("Celeste", { system: eggshell }, [ok(onlyPc)])).toStrictEqual({ candidates: [] })
+  })
+
+  test("a game listed under a console store or no store passes the guard", () => {
+    // Observed: Super Metroid is listed under eshop.
+    expect(callWith("Super Metroid", { system: SNES }, [ok(superMetroidSearch)])).toStrictEqual(
+      artRequests(38157),
+    )
+  })
+
+  test("a PC system and a game with no system are not guarded", () => {
+    const onlyPc = searchOf([{ id: 13136, name: "Celeste", verified: true, types: ["steam"] }])
+    expect(callWith("Celeste", { system: STEAM }, [ok(onlyPc)])).toStrictEqual(artRequests(13136))
+    expect(callWith("Celeste", {}, [ok(onlyPc)])).toStrictEqual(artRequests(13136))
+  })
+
+  test("a tie is broken by system, and a tie that remains is no match", () => {
+    // A PC system keeps the one game listed under a PC store.
+    expect(callWith("Celeste", { system: STEAM }, [ok(celeste)])).toStrictEqual(artRequests(13136))
+    // With no system nothing separates them; korrid passes no release year.
+    expect(callWith("Celeste", {}, [ok(celeste)])).toStrictEqual({ candidates: [] })
+    const twoConsole = searchOf([
+      { id: 1, name: "Ocarina of Time", verified: true, types: [] },
+      { id: 2, name: "Ocarina of Time", verified: true, types: [] },
+    ])
+    expect(callWith("Ocarina of Time", { system: SNES }, [ok(twoConsole)])).toStrictEqual({
+      candidates: [],
+    })
+  })
+})

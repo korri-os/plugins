@@ -15,6 +15,27 @@ install every core, and removing it does not disturb the others.
 | `nix/libretro-typecheck.nix` | Typechecks supported generated plugins and the helper; runs `content-check.ts` |
 | `default.nix` | Maps the catalogue to `korri-plugin-<name>` packages |
 
+## Public ids
+
+Each system of ibuki's cores in `systems.nix` carries `externalIds`, its
+public ids by authority (Core ADR 0090). A list holds every id an authority
+gives what Korri treats as one system: IGDB splits the SNES (`19`) from the
+Super Famicom (`58`). Every id was checked on 2026-11-20 against the source
+below; an authority with no checked id is left out.
+
+| Key | Value | Checked against |
+|---|---|---|
+| `wikidata` | item id | `wikidata.org` entity data |
+| `igdb` | platform id | `igdb.com` platform pages (archive.org snapshots; the site refuses scripts), which list `[name, slug, id]` |
+| `mobygames` | platform slug, the id its site shows | `mobygames.com/platform/` (archive.org snapshot of 2025-01-01) |
+| `thegamesdb` | platform id | `thegamesdb.net/list_platforms.php` |
+| `screenscraper` | system id | `screenscraper.fr/systemeinfos.php` system list |
+| `retroachievements` | console id | RetroAchievements' `rcheevos` `include/rc_consoles.h` |
+| `no-intro` | full DAT system name | DAT-o-MATIC's DAT list (archive.org snapshot of 2023) |
+
+No-Intro has no DAT for disc systems (PlayStation, Dreamcast) and for
+arcade, so those systems have no `no-intro` key.
+
 ## Adding a core
 
 Add an entry to `cores.nix`:

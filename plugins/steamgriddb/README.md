@@ -58,7 +58,8 @@ keys that people use with it.
 
 All requests are `GET` to `https://www.steamgriddb.com/api/v2`, with
 `accept: application/json`. One lookup is three handler calls and five
-requests; Core ADR 0016 allows four calls and eight requests a turn.
+requests; Core ADR 0016 allows four calls and eight requests a turn. A game
+with a stored SteamGridDB id skips turn 1: two calls and four requests.
 
 | Turn | Request | Role |
 |---|---|---|
@@ -82,20 +83,40 @@ the search path, `/` and `?` in the title become spaces (main's
 
 ## Match
 
-The search answers with its ten nearest names even when none is the game.
-"Super Metroid Redesign" answers Super Metroid and nine other hacks. So the
-plugin accepts a game only as main's `exact_verified_match` does:
+Core ADR 0090 sets the rule. The search answers with its ten nearest names
+even when none is the game. "Super Metroid Redesign" answers Super Metroid
+and nine other hacks. So the plugin accepts a game only when its name
+equals the title, and it never uses a fuzzy match.
 
-1. Keep the names that equal the title after main's `normalized_match_name`:
-   lower case, every character that is not a letter or a digit becomes a
-   space, words joined by one space. "Wario-Land 4™" equals "wario land 4".
-   Accents stay: "Pokemon" is not "Pokémon".
-2. Of those, keep the games SteamGridDB marks `verified`.
-3. Exactly one game must remain.
+**Id first.** korrid passes the game's stored public ids. When they hold a
+`steamgriddb` id, the plugin asks for that game's art lists at once and
+sends no search. A value that is not a whole number is not used.
 
-No equal name, no verified game and more than one verified game all answer
-`{ candidates: [] }`, and turn 2 is not asked. A title with no letter or
-digit answers the same with no request.
+Otherwise the plugin searches the title, and:
+
+1. Keeps the names that equal the title after normalization: accents folded
+   (NFD, then the marks dropped), lower case, every character that is not
+   a letter or a digit a word break, as main's `normalized_match_name`, and
+   a trailing `version` word optional. "Pokemon Emerald" equals "Pokémon
+   Emerald Version"; "Mega Man Rock N Roll" equals "Mega Man: Rock'n'Roll".
+2. Applies the store-type guard: when the system is a console, a handheld or
+   a fantasy console, it drops a game that SteamGridDB lists only under PC
+   stores (`steam`, `egs`, `gog`, `origin`, `uplay`, `bnet`). A system
+   counts as one when it declares a public id of an authority other than
+   `steam`, or when its id is not a PC system (`steam`, `dos`, `scummvm`).
+   This is strategy (f) of the match eval of 2026-11-20: PICO-8 Celeste no
+   longer takes the Steam game's art. A game with no system is not guarded.
+3. Keeps the games SteamGridDB marks `verified`.
+4. Accepts exactly one game. A tie is broken by system: for a PC system,
+   the one game listed under a PC store wins. korrid passes no release year,
+   so a tie that remains is no match.
+
+No equal name, no verified game and a tie all answer `{ candidates: [] }`,
+and turn 2 is not asked. A title with no letter or digit answers the same
+with no request.
+
+The result of a match names the game's id, `externalIds: { steamgriddb:
+["<id>"] }`. korrid stores it with the game, so the next lookup goes by id.
 
 ## Filter and order
 
@@ -168,6 +189,9 @@ download, and `plugin.nix` needs the new host and a new approval.
   `tags`, which no observed response has.
 - No title is proposed, no retry waits, and no attempt is recorded. Core
   ADR 0032 sections 2 and 4 give those to korrid or drop them.
+- Core ADR 0090: a stored id replaces the search, names match with accents
+  folded and a trailing `version` optional, the store-type guard and the
+  tie-break by system apply, and a match returns its id.
 
 ## Fixtures
 

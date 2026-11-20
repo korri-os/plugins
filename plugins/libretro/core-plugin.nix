@@ -34,6 +34,7 @@ let
     id:
     "  ${json id}: { title: ${json systems.${id}.title}, "
     + "content: ${json systems.${id}.content}"
+    + lib.optionalString (systems.${id} ? externalIds) ", externalIds: ${json systems.${id}.externalIds}"
     + lib.optionalString (
       systems.${id} ? panes
     ) ", panes: ${json systems.${id}.panes}, arrangement: ${json systems.${id}.arrangement}"

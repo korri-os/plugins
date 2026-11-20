@@ -27,6 +27,7 @@ type Candidate = Omit<GameAssetCandidate, "role"> & { role: Role }
 type CandidatesOutput =
   | PluginHttpRequests
   | (Omit<GameAssetCandidates, "candidates"> & { candidates: Candidate[] })
+type GameSystem = NonNullable<PluginGameAssetCandidatesInput["system"]>
 
 export const name = "steamgriddb"
 export const title = "SteamGridDB"
@@ -148,24 +149,35 @@ function artListRequest(list: ArtList, gameId: number): PluginHttpRequest {
 
 // --- handler --------------------------------------------------------------
 
+// This plugin's authority key in a game's public ids (Core ADR 0090): the
+// SteamGridDB game id, as text.
+const AUTHORITY = "steamgriddb"
+
 function gameAssetCandidates(
   input: PluginGameAssetCandidatesInput,
 ): CandidatesOutput {
-  const gameTitle = typeof input.title === "string" ? input.title : ""
-  const wanted = normalizedMatchName(gameTitle)
-  // A title with no letter or digit can match no name.
-  if (wanted === "") return { candidates: [] }
-
   const responses = Array.isArray(input.responses) ? input.responses : []
+  // Id first (Core ADR 0090): a game that holds a SteamGridDB id from an
+  // earlier match is fetched by it, with no title search.
+  const stored = storedGameId(input.externalIds)
+  if (stored !== undefined) return artTurns(stored, responses)
+
+  const gameTitle = typeof input.title === "string" ? input.title : ""
+  // A title with no letter or digit can match no name.
+  if (matchName(gameTitle) === "") return { candidates: [] }
   if (responses.length === 0) return httpRequests([searchRequest(gameTitle)])
 
   const [search, ...artLists] = responses
-  const match = exactVerifiedMatch(wanted, searchGames(search))
+  const match = equalNameMatch(gameTitle, input.system, searchGames(search))
   // No match, unverified and ambiguous all mean "no artwork for this title".
   if (match._tag !== "Accepted") return { candidates: [] }
+  return artTurns(match.game.id, artLists)
+}
 
+// The art lists of one SteamGridDB game, and its id for korrid to store.
+function artTurns(gameId: number, artLists: readonly PluginHttpResponse[]): CandidatesOutput {
   if (artLists.length === 0) {
-    return httpRequests(ART_LISTS.map(list => artListRequest(list, match.game.id)))
+    return httpRequests(ART_LISTS.map(list => artListRequest(list, gameId)))
   }
   if (artLists.length !== ART_LISTS.length) {
     throw new Error(
@@ -176,19 +188,32 @@ function gameAssetCandidates(
     candidates: ART_LISTS.flatMap((list, index) =>
       roleCandidates(list, artAssets(artLists[index], list.role)),
     ),
+    externalIds: { [AUTHORITY]: [String(gameId)] },
   }
+}
+
+// The first stored SteamGridDB id that is a game id. korrid stores what this
+// plugin returned, so another value is not this plugin's.
+function storedGameId(ids: unknown): number | undefined {
+  if (!isRecord(ids) || !Array.isArray(ids[AUTHORITY])) return undefined
+  for (const value of ids[AUTHORITY]) {
+    if (typeof value === "string" && /^[0-9]{1,15}$/.test(value)) return Number(value)
+  }
+  return undefined
 }
 
 export const handlers = {
   "game-assets.candidates": gameAssetCandidates,
 }
 
-// --- search: one exact, verified name ---------------------------------------
+// --- search: one verified game with an equal name ---------------------------
 
 interface SearchGame {
   readonly id: number
   readonly name: string
   readonly verified: boolean
+  // The stores SteamGridDB lists the game under, such as `steam` or `gog`.
+  readonly types: readonly string[]
 }
 
 type MatchDecision =
@@ -197,30 +222,67 @@ type MatchDecision =
   | { readonly _tag: "Unverified" }
   | { readonly _tag: "Ambiguous" }
 
-// main `exact_verified_match`. The search answers with its ten nearest names
-// even when none is the game, so only an equal name counts.
-function exactVerifiedMatch(wanted: string, games: readonly SearchGame[]): MatchDecision {
-  const exact = games.filter(game => normalizedMatchName(game.name) === wanted)
-  if (exact.length === 0) return { _tag: "NoMatch" }
-  const verified = exact.filter(game => game.verified)
-  if (verified.length === 0) return { _tag: "Unverified" }
+// SteamGridDB's PC store types. A game listed only under these is a PC game.
+const PC_STORES: ReadonlySet<string> = new Set(["steam", "egs", "gog", "origin", "uplay", "bnet"])
+// Systems whose games are PC games. Every other system is a console, a
+// handheld or a fantasy console.
+const PC_SYSTEMS: ReadonlySet<string> = new Set(["steam", "dos", "scummvm"])
+
+// Core ADR 0090. The search answers with its ten nearest names even when none
+// is the game, so only an equal name counts: no fuzzy match.
+// 1. Names equal after `matchName`.
+// 2. The store-type guard: for a console, handheld or fantasy console, drop a
+//    game listed only under PC stores (match eval, strategy f).
+// 3. Only a verified game counts.
+// 4. A tie is broken by system: a PC system keeps the games listed under a
+//    PC store. korrid passes no release year, so a tie that remains is no
+//    match.
+function equalNameMatch(
+  title: string,
+  system: GameSystem | undefined,
+  games: readonly SearchGame[],
+): MatchDecision {
+  const wanted = matchName(title)
+  let equal = games.filter(game => matchName(game.name) === wanted)
+  if (equal.length === 0) return { _tag: "NoMatch" }
+  if (isConsoleLike(system)) equal = equal.filter(game => !onlyPcStores(game))
+  const verified = equal.filter(game => game.verified)
+  if (verified.length === 0) return equal.length === 0 ? { _tag: "NoMatch" } : { _tag: "Unverified" }
   if (verified.length === 1) return { _tag: "Accepted", game: verified[0] }
+  if (isRecord(system) && typeof system.id === "string" && PC_SYSTEMS.has(system.id)) {
+    const onPc = verified.filter(game => game.types.some(type => PC_STORES.has(type)))
+    if (onPc.length === 1) return { _tag: "Accepted", game: onPc[0] }
+  }
   return { _tag: "Ambiguous" }
 }
 
+// A system is a console, a handheld or a fantasy console when it declares a
+// public id of an authority other than Steam, or when it is not a PC system.
+function isConsoleLike(system: GameSystem | undefined): boolean {
+  if (!isRecord(system) || typeof system.id !== "string") return false
+  const authorities = isRecord(system.externalIds) ? Object.keys(system.externalIds) : []
+  return authorities.some(authority => authority !== "steam") || !PC_SYSTEMS.has(system.id)
+}
+
+function onlyPcStores(game: SearchGame): boolean {
+  return game.types.length > 0 && game.types.every(type => PC_STORES.has(type))
+}
+
+const MARK = /\p{M}/gu
 const LETTER_OR_DIGIT = /[\p{Alphabetic}\p{N}]/u
 
-// main `discovery::title::normalized_match_name`: lower-case each character,
-// turn every character that is not a letter or a digit into a space, and join
-// the words with one space. Accents stay: "Pokemon" is not "Pokémon".
-function normalizedMatchName(value: string): string {
+// Core ADR 0090's normalization. Fold accents (NFD, then drop the marks) and
+// case, drop punctuation, and treat a trailing `version` word as optional:
+// "Pokémon: Emerald Version" and "pokemon emerald" are one name. Every
+// character that is not a letter or a digit separates words, as main's
+// `normalized_match_name` does: "Rock'n'Roll" is "rock n roll".
+function matchName(value: string): string {
+  const folded = value.normalize("NFD").replace(MARK, "").toLowerCase()
   let spaced = ""
-  for (const character of value) {
-    for (const lower of character.toLowerCase()) {
-      spaced += LETTER_OR_DIGIT.test(lower) ? lower : " "
-    }
-  }
-  return spaced.split(" ").filter(Boolean).join(" ")
+  for (const character of folded) spaced += LETTER_OR_DIGIT.test(character) ? character : " "
+  const words = spaced.split(" ").filter(Boolean)
+  if (words.length > 1 && words[words.length - 1] === "version") words.pop()
+  return words.join(" ")
 }
 
 function searchGames(response: PluginHttpResponse): SearchGame[] {
@@ -229,7 +291,10 @@ function searchGames(response: PluginHttpResponse): SearchGame[] {
       throw new Error("SteamGridDB search returned an unexpected game")
     }
     // main: `verified` is false when absent.
-    return { id: entry.id, name: entry.name, verified: entry.verified === true }
+    const types = Array.isArray(entry.types)
+      ? entry.types.filter((type): type is string => typeof type === "string")
+      : []
+    return { id: entry.id, name: entry.name, verified: entry.verified === true, types }
   })
 }
 
