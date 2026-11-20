@@ -180,6 +180,16 @@ host"). The map file is in no repository and in no published closure.
   reads the map from that content-named copy, so a change to another file of
   this repository does not rebuild the host. The compiled host binary
   holds the map's addresses by design.
+- **Host check.** `steam-engine-map.py check-host <system>` then fails the job
+  if the upload closure holds a `korri-steam-host` other than the one the shim
+  evaluates from the private map, and names the empty public map's host when
+  it finds it. Without the private map, any engine host in the closure fails
+  the job. The shim covers only a `nix` that it precedes on PATH; a tool that
+  puts its own nix first bypasses it. `korri-cache` therefore runs the
+  caller's nix and uses its own only when there is none. Before this, the
+  release `build-fecbea69dc50-steam-engine-2` shipped the public-map host:
+  `korri-cache build` evaluated without the override, and the closure check
+  passed because a public-map host holds no map path.
 - **Update when the engine pin moves.** On aka, make the map for the new
   client version with the private pipeline
   (`/var/lib/korri-private/steam-engine/make-map <version> <steamclient sha256>`),

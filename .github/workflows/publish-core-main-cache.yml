@@ -156,6 +156,12 @@ jobs:
           ./cache-tool/bin/korri-cache build --ci-source-auth --system "$SYSTEM" --paths-file "$RUNNER_TEMP/paths.txt" "${selected_outputs[@]}"
       - name: Refuse the private engine map in the upload closure
         run: python3 .github/workflows/steam-engine-map.py check-closure "$RUNNER_TEMP/paths.txt"
+      # korri-cache build once ran its own nix, not the map's shim, and
+      # published a host built from the empty public map. Check the result.
+      - name: Refuse a Steam engine host built from the public map
+        env:
+          SYSTEM: ${{ matrix.system }}
+        run: python3 .github/workflows/steam-engine-map.py check-host "$SYSTEM" "$RUNNER_TEMP/paths.txt"
       - name: Sign and prepare the Nix cache without content-address conversion
         env:
           SIGNING_KEY: ${{ secrets.NIX_CACHE_SIGNING_KEY }}

@@ -319,15 +319,19 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       '';
     };
     cemuBench = import ../plugins/cemu/bench { pkgs = heldPkgs; };
+    # korri-cache runs the caller's nix when there is one, and this nix only
+    # when there is none. A publication job puts the Steam engine map's nix
+    # shim first on PATH (.github/workflows/steam-engine-map.py); a nix ahead
+    # of it made `korri-cache build` evaluate the public map (Core ADR 0083).
     cacheTool = pkgs.writeShellApplication {
       name = "korri-cache";
       runtimeInputs = [
         pkgs.python3
-        pkgs.nix
         pkgs.gh
         pkgs.git
       ];
       text = ''
+        export PATH="$PATH:${pkgs.lib.makeBinPath [ pkgs.nix ]}"
         exec python3 ${./github-cache.py} "$@"
       '';
     };

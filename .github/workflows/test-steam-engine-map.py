@@ -74,6 +74,7 @@ class SteamEngineMapTests(unittest.TestCase):
             self.assertNotIn("deadbeef", output)
             self.assertNotIn("sha256", output)
         self.assertIn(f"STEAM_ENGINE_MAP_DIR={folder}", self.env_file.read_text())
+        self.assertIn(f"STEAM_ENGINE_REAL_NIX={self.real}", self.env_file.read_text())
         shim = Path(self.path_file.read_text().strip()) / "nix"
         run = lambda *args: subprocess.run([str(shim), *args], capture_output=True,
                                            text=True, check=True).stdout.splitlines()
@@ -121,6 +122,49 @@ class SteamEngineMapTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(SCRIPT), "check-closure", str(paths)],
                                     env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, expected, result.stderr)
+
+    def test_the_host_check_accepts_only_the_private_map_host(self):
+        private = "/nix/store/" + "p" * 32 + "-korri-steam-host-0.1.0"
+        public = "/nix/store/" + "e" * 32 + "-korri-steam-host-0.1.0"
+        other = "/nix/store/" + "o" * 32 + "-korri-steam-host-0.1.0"
+        wrapper = "/nix/store/" + "w" * 32 + "-korri-steam-host"
+        plugin = "/nix/store/" + "a" * 32 + "-korri-plugin"
+        paths = self.root / "paths.txt"
+        paths.write_text(plugin + "\n")
+
+        def stand_in(folder, out_path, closure):
+            folder.mkdir(exist_ok=True)
+            (folder / "nix").write_text(
+                "#!/bin/sh\n"
+                "case \"$1 $3\" in\n"
+                "  *.korri-steam-host.name) echo korri-steam-host-0.1.0 ;;\n"
+                f"  *.korri-steam-host.outPath) echo {out_path} ;;\n"
+                f"  path-info*) printf '%s\\n' {' '.join(closure)} ;;\n"
+                "  *) exit 9 ;;\n"
+                "esac\n")
+            (folder / "nix").chmod(0o755)
+
+        real = self.root / "real"
+        for closure, map_dir, code, said in (
+                ([plugin, wrapper, private], True, 0, "is the private map's"),
+                ([plugin, wrapper, public], True, 1, "the empty public map's"),
+                ([plugin, wrapper, private, other], True, 1, "an unknown"),
+                ([plugin, wrapper, public], False, 1, "empty public map"),
+                ([plugin], True, 0, "no Steam engine host"),
+                ([plugin], False, 0, "no Steam engine host")):
+            shim = self.root / "shim"
+            stand_in(shim, private, closure)
+            stand_in(real, public, closure)
+            env = {**os.environ, "PATH": f"{shim}:{os.environ['PATH']}",
+                   "STEAM_ENGINE_REAL_NIX": str(real / "nix")}
+            env.pop("STEAM_ENGINE_MAP_DIR", None)
+            if map_dir:
+                env["STEAM_ENGINE_MAP_DIR"] = str(self.root / "steam-engine-map")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "check-host", "aarch64-linux", str(paths)],
+                env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, code, (closure, map_dir, result.stderr))
+            self.assertIn(said, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

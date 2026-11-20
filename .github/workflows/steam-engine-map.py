@@ -17,6 +17,12 @@ engine.map, as in plugins/steam/engine-host/map).
       Fail if the map's store path is in the runtime closure of the paths the
       job uploads. The compiled host holds the map's addresses by design; the
       map file itself must never be uploaded.
+  steam-engine-map.py check-host SYSTEM PATHS_FILE
+      Fail if the closure of the paths the job uploads holds a Steam engine
+      host (packages.SYSTEM.korri-steam-host) other than the one the shim
+      builds from the private map: a host from the empty public map, or any
+      host when the job has no private map. A tool that runs its own nix
+      bypasses the shim; this check sees the result, not the route.
 
 Nothing here prints the secret, the map or any line of it.
 """
@@ -111,6 +117,7 @@ def setup(environ=os.environ):
         stream.write(f"{shim_bin}\n")
     with open(environ["GITHUB_ENV"], "a") as stream:
         stream.write(f"STEAM_ENGINE_MAP_DIR={folder}\n")
+        stream.write(f"STEAM_ENGINE_REAL_NIX={real}\n")
     print("steam-engine-map: private map installed; nix commands on this flake use it")
 
 
@@ -144,13 +151,51 @@ def check_closure(paths_file: str, environ=os.environ):
     print(f"steam-engine-map: the map's store path is not in the closure of {len(paths)} paths")
 
 
+HOST = "korri-steam-host"
+
+
+def host_attribute(nix, system, attribute):
+    return subprocess.check_output(
+        [nix, "eval", "--raw", f".#packages.{system}.{HOST}.{attribute}"], text=True).strip()
+
+
+def check_host(system, paths_file, environ=os.environ):
+    paths = [p for p in Path(paths_file).read_text().split() if p]
+    if not paths:
+        return
+    # `nix` is the shim when the job has the private map.
+    name = host_attribute("nix", system, "name")
+    closure = subprocess.check_output(["nix", "path-info", "--recursive", *paths], text=True)
+    # A store path's name follows its 32-character hash and a dash.
+    hosts = {path for path in closure.split() if Path(path).name[33:] == name}
+    if not hosts:
+        print(f"steam-engine-map: no Steam engine host in the closure of {len(paths)} paths")
+        return
+    if not environ.get("STEAM_ENGINE_MAP_DIR"):
+        fail(f"the upload closure holds {HOST} built from the empty public map "
+             f"({' '.join(sorted(hosts))}); publish @korri:steam only with {SECRET}")
+    private = host_attribute("nix", system, "outPath")
+    public = host_attribute(environ["STEAM_ENGINE_REAL_NIX"], system, "outPath")
+    if private == public:
+        fail(f"the private map and the public map give the same {HOST}")
+    wrong = sorted(hosts - {private})
+    if wrong:
+        kinds = ["the empty public map's" if path == public else "an unknown" for path in wrong]
+        fail(f"the upload closure holds {HOST} {' '.join(wrong)} "
+             f"({', '.join(kinds)}), not the private map's {private}")
+    print(f"steam-engine-map: the upload closure's {HOST} is the private map's {private}")
+
+
 def main(argv):
     if argv[1:] == ["setup"]:
         setup()
     elif len(argv) == 3 and argv[1] == "check-closure":
         check_closure(argv[2])
+    elif len(argv) == 4 and argv[1] == "check-host":
+        check_host(argv[2], argv[3])
     else:
-        fail("usage: steam-engine-map.py setup | check-closure PATHS_FILE")
+        fail("usage: steam-engine-map.py setup | check-closure PATHS_FILE"
+             " | check-host SYSTEM PATHS_FILE")
 
 
 if __name__ == "__main__":
