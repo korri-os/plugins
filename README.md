@@ -239,19 +239,51 @@ requests notification readiness, cleanup, `CAP_NET_ADMIN`, `CAP_NET_RAW`, and
 drop-in. These capabilities permit substantial host-network changes; approval
 is not a promise of isolation from the host network.
 
-Enablement starts the daemon but does not join a tailnet. Set `TAILSCALE_CLI` to
-the named `files.tailscale` path in the package's manifest and `SOCKET` to the
-reported runtime directory plus `/tailscaled.sock`. Run an explicit login:
+Enablement starts the daemon but does not join a tailnet. A Korri device signs
+in from its own screen (Core ADR 0089): the plugin declares one account in
+`plugin.ts`, and the plugin host runs its account host,
+`files.korri-tailscale-account`, beside `tailscaled`, as tailscaled's own user,
+for each korrid connection. The account host drives the plugin's own CLI
+against `$RUNTIME_DIRECTORY/tailscaled.sock`:
+
+| korrid writes | The account host runs | It answers |
+|---|---|---|
+| `status` | `tailscale status --json` | `signed_in{account_name}` (the login name) while Running, Starting or Stopped; `signed_out{reason:"expired"}` when the node key ran out; `signed_out` otherwise; `signin_failed{reason:"daemon_unreachable"}` when the daemon does not answer |
+| `signin-qr` | `tailscale up --json --reset --accept-dns=false --timeout=890s` | `qr_code{challenge_url}` with the first login link, `qr_refreshed{challenge_url}` with each new one, then `signed_in{account_name}`, or `signin_failed{reason}` |
+| `signout` | `tailscale logout` | `signed_out` |
+
+korrid draws the QR code from the link. With the one admitted credential,
+`LoadCredential=authkey:tailscale-authkey` on `tailscaled` (Core ADR 0034),
+the account host passes `--auth-key=file:$CREDENTIALS_DIRECTORY/authkey` and
+shows no link. Korri supplies no value; without one, systemd delivers nothing
+and the link is shown. The account host ends at the end of its input.
+
+On a host without Korri's surface, an operator can still log in by hand: set
+`TAILSCALE_CLI` to the named `files.tailscale` path in the package's manifest
+and `SOCKET` to the reported runtime directory plus `/tailscaled.sock`, then:
 
 ```sh
 sudo "$TAILSCALE_CLI" --socket="$SOCKET" up --accept-dns=false
 ```
 
-Open the login URL that Tailscale prints and approve the device separately.
-There is no `LoadCredential`, auth key, auto-login hook, or secret in this
-package. Host DNS integration is not implemented. State survives disablement
-and ordinary removal; `remove --purge` deletes it. Restoring an older package
-does not restore older application data.
+Host DNS integration is not implemented. State survives disablement and
+ordinary removal; `remove --purge` deletes it. Restoring an older package does
+not restore older application data.
+
+### Logo
+
+`plugins/tailscale/tailscale-icon.svg` is Tailscale's nine-dot icon,
+`Tailscale Logo/svg/Blk/Tailscale_icon_blk_rgb.svg`, unchanged, from the media
+kit that <https://tailscale.com/press> links ("Download our media kit",
+`https://cdn.sanity.io/files/w77i7m8x/production/a426ba5f63316745e108a18a6dbbfed6970752fd.zip`,
+SHA-256 `42a53fa131597d3d0c82fb8d8accf13e83c83810b8c1ec86bc55bd9c622a5af6`,
+fetched 2026-11-20; the file's SHA-256 is
+`f809040e6675344eafa6945ebcdbba83d1d9503ea12281c0db3f6c6952bada63`).
+Tailscale is a registered trademark of Tailscale Inc. The kit grants no
+copyright license; the mark identifies Tailscale's own sign-in and follows the
+kit's Brand Toolkit (April 2025): the dark icon on a light background, the dot
+opacities kept, no single-colour form, no complex background, at least 48×48
+pixels where the layout allows.
 
 ## Optional SSH
 

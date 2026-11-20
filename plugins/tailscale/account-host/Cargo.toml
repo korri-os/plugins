@@ -1,0 +1,18 @@
+[package]
+name = "korri-tailscale-account"
+version = "0.1.0"
+edition = "2021"
+description = "Reports the Tailscale plugin's sign-in to Korri through the account host protocol (Core ADR 0089)."
+publish = false
+
+[[bin]]
+name = "korri-tailscale-account"
+path = "src/main.rs"
+
+[dependencies]
+# Parses `tailscale status --json` and `tailscale up --json`, and writes events.
+serde_json = "1"
+
+[profile.release]
+strip = true
+panic = "abort"
