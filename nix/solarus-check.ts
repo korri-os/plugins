@@ -26,7 +26,11 @@ assert.deepEqual(manifest.ports, {})
 accessSync(manifest.files.solarus, constants.X_OK)
 assert.equal(name, "solarus")
 assert.deepEqual(systems, {
-  solarus: { title: "Solarus", content: { extensions: ["solarus"] } },
+  solarus: {
+    title: "Solarus",
+    content: { extensions: ["solarus"] },
+    externalIds: { wikidata: ["Q60965320"], screenscraper: ["223"] },
+  },
 })
 assert.deepEqual(runners, {
   solarus: { program: "solarus", systems: ["solarus"] },

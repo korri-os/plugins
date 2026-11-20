@@ -30,6 +30,7 @@ assert.deepEqual(systems, {
   "zelda-classic": {
     title: "Zelda Classic Quest",
     content: { extensions: ["qst"] },
+    externalIds: { wikidata: ["Q122171496"] },
   },
 })
 assert.deepEqual(runners, {
