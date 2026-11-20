@@ -202,6 +202,59 @@ class HostWrapperTests(unittest.TestCase):
                     "message": "Steam engine: the engine host could not start"})
 
 
+    def test_the_host_starts_with_the_folder_compat_tools_registered(self):
+        # korri#531: the engine looks for compatibilitytools.d beside the real
+        # path of steamclient.so (korrid's cache), so the wrapper names the
+        # folder's own one in STEAM_EXTRA_COMPAT_TOOLS_PATHS.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package = root / "cache/engine-package/linuxarm64/steamclient.so"
+            package.parent.mkdir(parents=True)
+            package.write_bytes(b"x")
+            proton = root / "proton"
+            proton.mkdir()
+            home = root / "person/steam-engine/home"
+            home.mkdir(parents=True)
+            fhs = root / "fhs/bin/korri-steam-engine-fhs"
+            fhs.parent.mkdir(parents=True)
+            fhs.write_text(f"#!{shutil.which('bash')}\nexec \"$@\"\n")
+            fhs.chmod(0o755)
+            seen = root / "seen.json"
+            host = root / "host/bin/korri-steam-host"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                f"#!{sys.executable}\nimport json, os, sys\n"
+                f"open({str(seen)!r}, 'w').write(json.dumps({{'argv': sys.argv[1:], 'cwd': os.getcwd(), "
+                "'tools': os.environ.get('STEAM_EXTRA_COMPAT_TOOLS_PATHS'), "
+                "'tool': os.environ.get('KORRI_STEAM_COMPAT_TOOL')}))\n")
+            host.chmod(0o755)
+            settings = root / "settings/bin/steam-vdf-settings"
+            settings.parent.mkdir(parents=True)
+            settings.write_text(f"#!{shutil.which('bash')}\nexit 0\n")
+            settings.chmod(0o755)
+            wrapper = root / "host-run.sh"
+            text = (HERE / "host-run.sh").read_text()
+            for name, value in (("fhs", fhs.parent.parent), ("host", host.parent.parent),
+                                ("settings", settings.parent.parent),
+                                ("protonToolName", "proton-test-arm64")):
+                text = text.replace(f"@{name}@", str(value))
+            wrapper.write_text(text)
+            result = subprocess.run(
+                [shutil.which("bash"), str(wrapper), "--commands", str(root / "commands"), str(package)],
+                env={**os.environ, "HOME": str(home), "KORRI_PROTON_CACHYOS": str(proton)},
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            steam = root / "person/steam-engine/steam"
+            self.assertEqual(json.loads(seen.read_text()), {
+                "argv": ["--commands", str(root / "commands"), str(package)],
+                "cwd": str(steam),
+                "tools": str(steam / "compatibilitytools.d"),
+                "tool": "proton-test-arm64",
+            })
+            # The folder's tool directory holds the link to korrid's Proton.
+            self.assertEqual(os.readlink(steam / "compatibilitytools.d/proton-test-arm64"), str(proton))
+
+
 class EngineSessionTests(unittest.TestCase):
     def run_session(self, behavior="normal", entry=None, both=False, installed=(), files=("bin/game.exe",)):
         temporary = tempfile.TemporaryDirectory()

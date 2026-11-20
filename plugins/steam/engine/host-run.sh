@@ -86,6 +86,14 @@ fi
 # The tool the host sets per app through the engine (IClientCompat), which
 # also sets the engine's platform override: Windows builds, through Proton.
 export KORRI_STEAM_COMPAT_TOOL=@protonToolName@
+# The engine registers only the tools it finds. It looks for
+# compatibilitytools.d beside the steamclient.so it was loaded from, the
+# engine package in korrid's cache (the host's last argument), not in this
+# folder. Without this variable it never registers the tool: the per-app
+# mapping names an unknown tool and reads back empty, and the engine installs
+# Linux builds or refuses Windows-only games with 29 "Invalid platform"
+# (korri#531; device proof on the RP Mini V2, 2026-11-20).
+export STEAM_EXTRA_COMPAT_TOOLS_PATHS="$steam/compatibilitytools.d"
 # The engine must never see a game's identity, display or session bus.
 unset SteamAppId SteamGameId SteamOverlayGameId DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS
 cd "$steam"

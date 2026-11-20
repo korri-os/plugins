@@ -144,7 +144,11 @@ The person's folder is `<account root>/steam-engine`: `steam/` is the Steam
 root the engine writes (its own `config/config.vdf` and `local.vdf`), `home/`
 is HOME, and `home/.steam/{steam,sdkarm64}` are links. The wrapper links the
 engine file and korrid's Proton into it and merges only the compat-tool
-mapping into the engine's config. It grants the account root's owner reading
+mapping into the engine's config. It names `steam/compatibilitytools.d` in
+`STEAM_EXTRA_COMPAT_TOOLS_PATHS`. The engine looks for that folder beside the
+`steamclient.so` it was loaded from, in korrid's cache. Without the variable it
+never registers the pinned Proton, so the mapping reads back empty and Windows
+builds do not install (korri#531). It grants the account root's owner reading
 of `steam/steamapps/appmanifest_*.acf`, as the client runner does.
 
 The launch channel `$KORRI_STEAM_ENGINE_CHANNEL` holds `commands` (the host's
