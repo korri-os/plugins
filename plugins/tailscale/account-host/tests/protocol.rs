@@ -185,11 +185,12 @@ fn signin_qr_shows_each_login_link_then_signs_in_and_signout_ends_it() {
     );
     assert!(
         host.args()
-            .contains("up --json --reset --accept-dns=false --timeout=890s"),
+            .contains("up --json --accept-dns=false --timeout=890s"),
         "{}",
         host.args()
     );
     assert!(!host.args().contains("--auth-key"));
+    assert!(!host.args().contains("--reset"));
     host.send("status");
     assert_eq!(
         host.next(),

@@ -17,6 +17,7 @@ pkgs.runCommand "korri-tailscale-package-check" { nativeBuildInputs = [ pkgs.jq 
   account=$(jq -r '.files["korri-tailscale-account"]' "$manifest")
   test -x "$account"
   # plugin.ts declares the one account by its file keys (Core ADR 0089).
+  grep -Fx 'export const account = {' ${tailscale}/plugin.ts
   grep -F 'program: "korri-tailscale-account"' ${tailscale}/plugin.ts
   # No Tailscale mark ships (README.md, "Logo").
   ! grep -q 'logo:' ${tailscale}/plugin.ts

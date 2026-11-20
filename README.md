@@ -240,7 +240,7 @@ drop-in. These capabilities permit substantial host-network changes; approval
 is not a promise of isolation from the host network.
 
 Enablement starts the daemon but does not join a tailnet. A Korri device signs
-in from its own screen (Core ADR 0089): the plugin declares one account in
+in from its own screen (Core ADR 0089): the plugin declares its `account` in
 `plugin.ts`, and the plugin host runs its account host,
 `files.korri-tailscale-account`, beside `tailscaled`, as tailscaled's own user,
 for each korrid connection. The account host drives the plugin's own CLI
@@ -249,10 +249,12 @@ against `$RUNTIME_DIRECTORY/tailscaled.sock`:
 | korrid writes | The account host runs | It answers |
 |---|---|---|
 | `status` | `tailscale status --json` | `signed_in{account_name}` (the login name) while Running, Starting or Stopped; `signed_out{reason:"expired"}` when the node key ran out; `signed_out` otherwise; `signin_failed{reason:"daemon_unreachable"}` when the daemon does not answer |
-| `signin-qr` | `tailscale up --json --reset --accept-dns=false --timeout=890s` | `qr_code{challenge_url}` with the first login link, `qr_refreshed{challenge_url}` with each new one, then `signed_in{account_name}`, or `signin_failed{reason}` |
+| `signin-qr` | `tailscale up --json --accept-dns=false --timeout=890s` | `qr_code{challenge_url}` with the first login link, `qr_refreshed{challenge_url}` with each new one, then `signed_in{account_name}`, or `signin_failed{reason}` |
 | `signout` | `tailscale logout` | `signed_out` |
 
-korrid draws the QR code from the link. With the one admitted credential,
+korrid draws the QR code from the link. `up` gets no `--reset`: the account
+host always passes the same non-default flag (`--accept-dns=false`), so a new
+sign-in after the node key expires needs no reset of the stored settings. With the one admitted credential,
 `LoadCredential=authkey:tailscale-authkey` on `tailscaled` (Core ADR 0034),
 the account host passes `--auth-key=file:$CREDENTIALS_DIRECTORY/authkey` and
 shows no link. Korri supplies no value; without one, systemd delivers nothing

@@ -232,7 +232,6 @@ fn sign_in(
     command.arg(format!("--socket={}", socket.display())).args([
         "up",
         "--json",
-        "--reset",
         "--accept-dns=false",
         UP_TIMEOUT,
     ]);
