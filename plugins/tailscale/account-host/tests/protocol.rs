@@ -101,7 +101,8 @@ fn start(prepare: impl FnOnce(&Path, &mut Command)) -> Host {
     std::thread::spawn(move || {
         for line in BufReader::new(output).lines() {
             let line = line.unwrap();
-            send.send(serde_json::from_str(&line).expect(&line)).unwrap();
+            send.send(serde_json::from_str(&line).expect(&line))
+                .unwrap();
         }
     });
     Host {
@@ -154,8 +155,15 @@ fn status_says_who_is_signed_in_and_an_expired_key_needs_sign_in() {
     std::fs::write(host.state.with_extension("expired"), "").unwrap();
     host.send("status");
     assert_eq!(host.next(), event("signed_out", "reason", "expired"));
-    let socket = format!("--socket={}", host.runtime.join("tailscaled.sock").display());
-    assert!(host.args().lines().all(|line| line.starts_with(&socket)), "{}", host.args());
+    let socket = format!(
+        "--socket={}",
+        host.runtime.join("tailscaled.sock").display()
+    );
+    assert!(
+        host.args().lines().all(|line| line.starts_with(&socket)),
+        "{}",
+        host.args()
+    );
     host.close();
 }
 
@@ -163,20 +171,30 @@ fn status_says_who_is_signed_in_and_an_expired_key_needs_sign_in() {
 fn signin_qr_shows_each_login_link_then_signs_in_and_signout_ends_it() {
     let mut host = start(|_, _| {});
     host.send("signin-qr");
-    assert_eq!(host.next(), event("qr_code", "challenge_url", "https://login.example/a/1"));
+    assert_eq!(
+        host.next(),
+        event("qr_code", "challenge_url", "https://login.example/a/1")
+    );
     assert_eq!(
         host.next(),
         event("qr_refreshed", "challenge_url", "https://login.example/a/2")
     );
-    assert_eq!(host.next(), event("signed_in", "account_name", "p@example.com"));
+    assert_eq!(
+        host.next(),
+        event("signed_in", "account_name", "p@example.com")
+    );
     assert!(
-        host.args().contains("up --json --reset --accept-dns=false --timeout=890s"),
+        host.args()
+            .contains("up --json --reset --accept-dns=false --timeout=890s"),
         "{}",
         host.args()
     );
     assert!(!host.args().contains("--auth-key"));
     host.send("status");
-    assert_eq!(host.next(), event("signed_in", "account_name", "p@example.com"));
+    assert_eq!(
+        host.next(),
+        event("signed_in", "account_name", "p@example.com")
+    );
     host.send("signout");
     assert_eq!(host.next(), serde_json::json!({"event": "signed_out"}));
     host.close();
@@ -191,7 +209,10 @@ fn the_admitted_credential_signs_in_with_no_link() {
         command.env("CREDENTIALS_DIRECTORY", credentials);
     });
     host.send("signin-qr");
-    assert_eq!(host.next(), event("signed_in", "account_name", "p@example.com"));
+    assert_eq!(
+        host.next(),
+        event("signed_in", "account_name", "p@example.com")
+    );
     assert!(host.args().contains("--auth-key=file:"), "{}", host.args());
     assert!(host.args().contains("/credentials/authkey"));
     host.close();
@@ -213,7 +234,10 @@ fn without_its_runtime_folder_it_says_so_and_ends() {
     let host = start(|_, command| {
         command.env_remove("RUNTIME_DIRECTORY");
     });
-    assert_eq!(host.next(), event("signin_failed", "reason", "no_runtime_directory"));
+    assert_eq!(
+        host.next(),
+        event("signin_failed", "reason", "no_runtime_directory")
+    );
     host.close();
 }
 
@@ -223,7 +247,10 @@ fn a_daemon_that_does_not_answer_is_a_failure() {
         command.env("KORRI_TAILSCALE_CLI", "/nonexistent/tailscale");
     });
     host.send("status");
-    assert_eq!(host.next(), event("signin_failed", "reason", "daemon_unreachable"));
+    assert_eq!(
+        host.next(),
+        event("signin_failed", "reason", "daemon_unreachable")
+    );
     host.send("signin-qr");
     assert_eq!(host.next(), event("signin_failed", "reason", "cli_missing"));
     host.close();

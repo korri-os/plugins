@@ -15,7 +15,7 @@
 use serde_json::{json, Value};
 use std::{
     io::{BufRead, Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::mpsc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -69,7 +69,9 @@ enum Message {
 #[derive(Debug, PartialEq)]
 enum Account {
     SignedIn(String),
-    SignedOut { expired: bool },
+    SignedOut {
+        expired: bool,
+    },
     /// Signed in, but an administrator must approve the device.
     NeedsApproval,
 }
@@ -151,7 +153,7 @@ fn now() -> i64 {
 
 /// `tailscale --socket=S <args>`, its output and whether it succeeded,
 /// bounded by `limit`.
-fn run(socket: &PathBuf, args: &[&str], limit: Duration) -> Option<(bool, Vec<u8>)> {
+fn run(socket: &Path, args: &[&str], limit: Duration) -> Option<(bool, Vec<u8>)> {
     let mut child = Command::new(cli())
         .arg(format!("--socket={}", socket.display()))
         .args(args)
@@ -181,7 +183,7 @@ fn run(socket: &PathBuf, args: &[&str], limit: Duration) -> Option<(bool, Vec<u8
     Some((status.success(), reader.join().ok()?))
 }
 
-fn read_account(socket: &PathBuf) -> Option<Account> {
+fn read_account(socket: &Path) -> Option<Account> {
     // `status` exits non-zero while logged out; its JSON still says why.
     let (_, out) = run(socket, &["status", "--json"], Duration::from_secs(20))?;
     let status: Value = serde_json::from_slice(&out).ok()?;
@@ -195,20 +197,18 @@ fn report(account: Account) {
             emit(json!({"event": "signed_out", "reason": "expired"}))
         }
         Account::SignedOut { expired: false } => emit(json!({"event": "signed_out"})),
-        Account::NeedsApproval => {
-            emit(json!({"event": "signed_out", "reason": "needs_approval"}))
-        }
+        Account::NeedsApproval => emit(json!({"event": "signed_out", "reason": "needs_approval"})),
     }
 }
 
-fn status(socket: &PathBuf) {
+fn status(socket: &Path) {
     match read_account(socket) {
         Some(account) => report(account),
         None => failed("daemon_unreachable"),
     }
 }
 
-fn sign_out(socket: &PathBuf) {
+fn sign_out(socket: &Path) {
     let _ = run(socket, &["logout"], Duration::from_secs(30));
     match read_account(socket) {
         Some(Account::SignedIn(_)) => failed("logout_failed"),
@@ -222,12 +222,20 @@ const UP_TIMEOUT: &str = "--timeout=890s";
 
 /// `up --json`: each new login link is a code; Running is the sign-in.
 /// Returns false when the input ended, which ends the program.
-fn sign_in(socket: &PathBuf, messages: &mpsc::Receiver<Message>, send: &mpsc::Sender<Message>) -> bool {
+fn sign_in(
+    socket: &Path,
+    messages: &mpsc::Receiver<Message>,
+    send: &mpsc::Sender<Message>,
+) -> bool {
     let key = auth_key();
     let mut command = Command::new(cli());
-    command
-        .arg(format!("--socket={}", socket.display()))
-        .args(["up", "--json", "--reset", "--accept-dns=false", UP_TIMEOUT]);
+    command.arg(format!("--socket={}", socket.display())).args([
+        "up",
+        "--json",
+        "--reset",
+        "--accept-dns=false",
+        UP_TIMEOUT,
+    ]);
     if let Some(key) = &key {
         command.arg(format!("--auth-key=file:{}", key.display()));
     }
@@ -265,7 +273,11 @@ fn sign_in(socket: &PathBuf, messages: &mpsc::Receiver<Message>, send: &mpsc::Se
     let child = std::sync::Arc::new(std::sync::Mutex::new(child));
     let watched = std::sync::Arc::clone(&child);
     std::thread::spawn(move || loop {
-        let done = watched.lock().map(|mut c| c.try_wait()).ok().and_then(Result::ok);
+        let done = watched
+            .lock()
+            .map(|mut c| c.try_wait())
+            .ok()
+            .and_then(Result::ok);
         if let Some(status) = done.flatten() {
             let _ = waiter.send(Message::UpEnded(status.success()));
             return;
@@ -282,8 +294,15 @@ fn sign_in(socket: &PathBuf, messages: &mpsc::Receiver<Message>, send: &mpsc::Se
     loop {
         match messages.recv() {
             Ok(Message::Up(block)) => {
-                if let Some(url) = block["AuthURL"].as_str().filter(|u| u.starts_with("https://")) {
-                    let event = if shown.is_none() { "qr_code" } else { "qr_refreshed" };
+                if let Some(url) = block["AuthURL"]
+                    .as_str()
+                    .filter(|u| u.starts_with("https://"))
+                {
+                    let event = if shown.is_none() {
+                        "qr_code"
+                    } else {
+                        "qr_refreshed"
+                    };
                     if shown.as_deref() != Some(url) {
                         emit(json!({"event": event, "challenge_url": url}));
                         shown = Some(url.to_owned());
@@ -363,7 +382,10 @@ mod tests {
     fn rfc3339_times_are_unix_seconds() {
         assert_eq!(unix_seconds("1970-01-01T00:00:00Z"), Some(0));
         assert_eq!(unix_seconds("2026-11-20T10:00:00Z"), Some(1_795_168_800));
-        assert_eq!(unix_seconds("2026-11-20T11:00:00.123456789+01:00"), Some(1_795_168_800));
+        assert_eq!(
+            unix_seconds("2026-11-20T11:00:00.123456789+01:00"),
+            Some(1_795_168_800)
+        );
         assert_eq!(unix_seconds("2000-02-29T00:00:00-00:30"), Some(951_784_200));
         assert_eq!(unix_seconds("not a time"), None);
     }
@@ -394,15 +416,30 @@ mod tests {
         );
         // The node key ran out: needs sign-in again.
         assert_eq!(
-            account(&status("NeedsLogin", json!({"UserID": 42, "KeyExpiry": "2026-11-01T00:00:00Z"})), now),
+            account(
+                &status(
+                    "NeedsLogin",
+                    json!({"UserID": 42, "KeyExpiry": "2026-11-01T00:00:00Z"})
+                ),
+                now
+            ),
             Account::SignedOut { expired: true }
         );
         assert_eq!(
-            account(&status("NeedsLogin", json!({"UserID": 42, "Expired": true})), now),
+            account(
+                &status("NeedsLogin", json!({"UserID": 42, "Expired": true})),
+                now
+            ),
             Account::SignedOut { expired: true }
         );
         assert_eq!(
-            account(&status("NeedsLogin", json!({"UserID": 42, "KeyExpiry": "2027-01-01T00:00:00Z"})), now),
+            account(
+                &status(
+                    "NeedsLogin",
+                    json!({"UserID": 42, "KeyExpiry": "2027-01-01T00:00:00Z"})
+                ),
+                now
+            ),
             Account::SignedOut { expired: false }
         );
         let mut health = status("NeedsLogin", json!({"UserID": 42}));
