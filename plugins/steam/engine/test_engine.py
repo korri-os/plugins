@@ -202,47 +202,55 @@ class HostWrapperTests(unittest.TestCase):
                     "message": "Steam engine: the engine host could not start"})
 
 
+    def start_host(self, root, path=None):
+        """Run host-run.sh with stand-ins for the FHS, the host and the settings
+        program, as korrid starts it for <root>/person/steam-engine."""
+        package = root / "cache/engine-package/linuxarm64/steamclient.so"
+        package.parent.mkdir(parents=True)
+        package.write_bytes(b"x")
+        proton = root / "proton"
+        proton.mkdir()
+        home = root / "person/steam-engine/home"
+        home.mkdir(parents=True, exist_ok=True)
+        fhs = root / "fhs/bin/korri-steam-engine-fhs"
+        fhs.parent.mkdir(parents=True)
+        fhs.write_text(f"#!{shutil.which('bash')}\nexec \"$@\"\n")
+        fhs.chmod(0o755)
+        seen = root / "seen.json"
+        host = root / "host/bin/korri-steam-host"
+        host.parent.mkdir(parents=True)
+        host.write_text(
+            f"#!{sys.executable}\nimport json, os, sys\n"
+            f"open({str(seen)!r}, 'w').write(json.dumps({{'argv': sys.argv[1:], 'cwd': os.getcwd(), "
+            "'tools': os.environ.get('STEAM_EXTRA_COMPAT_TOOLS_PATHS'), "
+            "'tool': os.environ.get('KORRI_STEAM_COMPAT_TOOL')}))\n")
+        host.chmod(0o755)
+        settings = root / "settings/bin/steam-vdf-settings"
+        settings.parent.mkdir(parents=True)
+        settings.write_text(f"#!{shutil.which('bash')}\nexit 0\n")
+        settings.chmod(0o755)
+        wrapper = root / "host-run.sh"
+        text = (HERE / "host-run.sh").read_text()
+        for name, value in (("fhs", fhs.parent.parent), ("host", host.parent.parent),
+                            ("settings", settings.parent.parent),
+                            ("protonToolName", "proton-test-arm64")):
+            text = text.replace(f"@{name}@", str(value))
+        wrapper.write_text(text)
+        environment = {**os.environ, "HOME": str(home), "KORRI_PROTON_CACHYOS": str(proton)}
+        if path is not None:
+            environment["PATH"] = path
+        result = subprocess.run(
+            [shutil.which("bash"), str(wrapper), "--commands", str(root / "commands"), str(package)],
+            env=environment, capture_output=True, text=True)
+        return result, package, proton, seen
+
     def test_the_host_starts_with_the_folder_compat_tools_registered(self):
         # korri#531: the engine looks for compatibilitytools.d beside the real
         # path of steamclient.so (korrid's cache), so the wrapper names the
         # folder's own one in STEAM_EXTRA_COMPAT_TOOLS_PATHS.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            package = root / "cache/engine-package/linuxarm64/steamclient.so"
-            package.parent.mkdir(parents=True)
-            package.write_bytes(b"x")
-            proton = root / "proton"
-            proton.mkdir()
-            home = root / "person/steam-engine/home"
-            home.mkdir(parents=True)
-            fhs = root / "fhs/bin/korri-steam-engine-fhs"
-            fhs.parent.mkdir(parents=True)
-            fhs.write_text(f"#!{shutil.which('bash')}\nexec \"$@\"\n")
-            fhs.chmod(0o755)
-            seen = root / "seen.json"
-            host = root / "host/bin/korri-steam-host"
-            host.parent.mkdir(parents=True)
-            host.write_text(
-                f"#!{sys.executable}\nimport json, os, sys\n"
-                f"open({str(seen)!r}, 'w').write(json.dumps({{'argv': sys.argv[1:], 'cwd': os.getcwd(), "
-                "'tools': os.environ.get('STEAM_EXTRA_COMPAT_TOOLS_PATHS'), "
-                "'tool': os.environ.get('KORRI_STEAM_COMPAT_TOOL')}))\n")
-            host.chmod(0o755)
-            settings = root / "settings/bin/steam-vdf-settings"
-            settings.parent.mkdir(parents=True)
-            settings.write_text(f"#!{shutil.which('bash')}\nexit 0\n")
-            settings.chmod(0o755)
-            wrapper = root / "host-run.sh"
-            text = (HERE / "host-run.sh").read_text()
-            for name, value in (("fhs", fhs.parent.parent), ("host", host.parent.parent),
-                                ("settings", settings.parent.parent),
-                                ("protonToolName", "proton-test-arm64")):
-                text = text.replace(f"@{name}@", str(value))
-            wrapper.write_text(text)
-            result = subprocess.run(
-                [shutil.which("bash"), str(wrapper), "--commands", str(root / "commands"), str(package)],
-                env={**os.environ, "HOME": str(home), "KORRI_PROTON_CACHYOS": str(proton)},
-                capture_output=True, text=True)
+            result, package, proton, seen = self.start_host(root)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             steam = root / "person/steam-engine/steam"
             self.assertEqual(json.loads(seen.read_text()), {
@@ -253,6 +261,97 @@ class HostWrapperTests(unittest.TestCase):
             })
             # The folder's tool directory holds the link to korrid's Proton.
             self.assertEqual(os.readlink(steam / "compatibilitytools.d/proton-test-arm64"), str(proton))
+
+    def test_every_bare_command_of_the_wrapper_is_on_its_path(self):
+        # The ACL test below needs ACLs, which the Nix build sandbox lacks;
+        # this one reads the script and runs everywhere.
+        builtins = {"cd", "exec", "exit", "export", "printf", "set", "trap", "true", "umask", "unset",
+                    "for", "if", "in", "done", "fi", "say", "fail"}
+        found = set()
+        for line in (HERE / "host-run.sh").read_text().splitlines():
+            code = re.sub(r"'[^']*'", "''", re.sub(r"(^|\s)#.*", "", line))
+            for segment in re.split(r"\$\(|\|\||&&|[;|`(!]|\b(?:then|do|else|if|while)\b", code):
+                words = segment.split()
+                while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+                    words = words[1:]
+                if words and re.fullmatch(r"[a-z][a-z0-9_-]*", words[0]):
+                    found.add(words[0])
+        self.assertEqual(found - builtins - set(HOST_TOOLS), set())
+        self.assertIn("setfacl", found)
+
+    def test_with_only_its_runtime_inputs_the_wrapper_strips_korrid_from_engine_subfolders(self):
+        # Device proof (RP Mini V2, 2026-11-20): "grep: command not found" on
+        # every start, and compatdata, shadercache, common and the rest kept
+        # user:korrid:r-- and default:user:korrid:r--.
+        own = os.getuid()
+        daemon = next((uid for uid in (0, 65534) if uid != own and _named(uid)), None)
+        if daemon is None:
+            self.skipTest("no named user other than this one")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            steamapps = root / "person/steam-engine/steam/steamapps"
+            inherited = [steamapps / "compatdata/401710/pfx", steamapps / "common/Game",
+                         steamapps / "shadercache/401710"]
+            for folder in inherited:
+                folder.mkdir(parents=True)
+            (steamapps / "common/Game/save.dat").write_text("x")
+            (steamapps / "appmanifest_401710.acf").write_text(manifest_text())
+            entry = f"u:{daemon}:r"
+            setup = subprocess.run(["setfacl", "-R", "-m", entry, "-m", f"d:{entry}", str(steamapps)],
+                                   capture_output=True, text=True)
+            if setup.returncode != 0:
+                self.skipTest(f"no ACLs on this file system: {setup.stderr.strip()}")
+            # korrid owns the account folder (person/). The test cannot chown it, so
+            # stat reports the daemon uid for that folder and nothing else.
+            tools = root / "tools"
+            tools.mkdir()
+            real_stat = shutil.which("stat")
+            for name in HOST_TOOLS:
+                found = shutil.which(name)
+                self.assertIsNotNone(found, name)
+                if name != "stat":
+                    (tools / name).symlink_to(found)
+            (tools / "stat").write_text(
+                f"#!{shutil.which('bash')}\n"
+                f"if [[ \"$*\" == '-c %u {root / 'person'}' ]]; then echo {daemon}; exit 0; fi\n"
+                f"exec {real_stat} \"$@\"\n")
+            (tools / "stat").chmod(0o755)
+            result, _, _, seen = self.start_host(root, path=str(tools))
+            self.assertNotIn("command not found", result.stderr)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertTrue(seen.exists())
+
+            def entries(path):
+                text = subprocess.run(["getfacl", "-n", "-p", str(path)], capture_output=True,
+                                      text=True, check=True).stdout
+                return [line for line in text.splitlines() if f"user:{daemon}:" in line]
+
+            for sub in ("common", "downloading", "compatdata", "shadercache", "temp", "workshop",
+                        "sourcemods"):
+                self.assertEqual(entries(steamapps / sub), [], sub)
+            for path in [*inherited, steamapps / "common/Game/save.dat"]:
+                self.assertEqual(entries(path), [], path)
+            # korrid keeps traverse on the engine folder, listing on steam and
+            # steamapps, and read on the manifests.
+            engine = root / "person/steam-engine"
+            self.assertEqual(entries(engine), [f"user:{daemon}:--x"])
+            self.assertEqual(entries(engine / "steam"), [f"user:{daemon}:r-x"])
+            self.assertEqual(entries(steamapps), [f"user:{daemon}:r-x", f"default:user:{daemon}:r--"])
+            self.assertEqual(entries(steamapps / "appmanifest_401710.acf"), [f"user:{daemon}:r--"])
+
+
+# What packages/engine.nix puts on the start wrapper's PATH: acl, coreutils,
+# findutils, util-linux (flock). Every bare command in host-run.sh.
+HOST_TOOLS = ["chmod", "dirname", "id", "ln", "mkdir", "stat", "find", "flock", "getfacl", "setfacl"]
+
+
+def _named(uid):
+    import pwd
+    try:
+        pwd.getpwuid(uid)
+        return True
+    except KeyError:
+        return False
 
 
 class EngineSessionTests(unittest.TestCase):

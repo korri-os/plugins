@@ -76,7 +76,10 @@ if [[ "$daemon_uid" != "$(id -u)" ]]; then
   setfacl -m "u:$daemon_uid:rx" -m "d:u:$daemon_uid:r" "$steam/steamapps"
   for sub in common downloading compatdata shadercache temp workshop sourcemods; do
     mkdir -p "$steam/steamapps/$sub"
-    if getfacl -p "$steam/steamapps/$sub" 2>/dev/null | grep -q "^\(default:\)\?user:$daemon_uid:"; then
+    # Numeric (-n): getfacl prints user names by default, never the uid.
+    # Bash matches the entries itself; the wrapper's PATH has no grep.
+    acl=$'\n'$(getfacl -n -p "$steam/steamapps/$sub" 2>/dev/null) || acl=''
+    if [[ "$acl" == *$'\n'"user:$daemon_uid:"* || "$acl" == *$'\n'"default:user:$daemon_uid:"* ]]; then
       setfacl -R -k -x "u:$daemon_uid" "$steam/steamapps/$sub" 2>/dev/null || true
     fi
   done
