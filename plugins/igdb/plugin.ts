@@ -10,25 +10,17 @@
 // api.igdb.com only.
 
 import type {
+  GameAssetCandidate,
+  GameAssetCandidates,
   PluginGameAssetCandidatesInput,
+  PluginGameAssetCandidatesOutput,
   PluginHttpRequest,
   PluginHttpRequests,
   PluginHttpResponse,
 } from "../../contracts/generated/korrid"
 
-// The candidate shape of the Velvet contract, slice 3: one `kind` instead of
-// `role`. It is written here, not imported, because the generated contract
-// that carries `kind` lands with the `media` worker's korrid change.
-type Kind = "logo" | "picture" | "icon"
-interface Candidate {
-  kind: Kind
-  width?: number
-  height?: number
-  source: { id?: string; url: string }
-}
-type CandidatesOutput =
-  | PluginHttpRequests
-  | { candidates: Candidate[]; externalIds?: Record<string, string[]> }
+type Candidate = GameAssetCandidate
+type Kind = GameAssetCandidate["kind"]
 type GameSystem = NonNullable<PluginGameAssetCandidatesInput["system"]>
 
 export const name = "igdb"
@@ -96,7 +88,7 @@ function artRequest(gameId: number): PluginHttpRequest {
 
 // --- handler ----------------------------------------------------------------
 
-function gameAssetCandidates(input: PluginGameAssetCandidatesInput): CandidatesOutput {
+function gameAssetCandidates(input: PluginGameAssetCandidatesInput): PluginGameAssetCandidatesOutput {
   const responses = Array.isArray(input.responses) ? input.responses : []
   // Id first (Core ADR 0090): a stored IGDB game id skips the search.
   const stored = storedId(input.externalIds)
@@ -116,16 +108,17 @@ function gameAssetCandidates(input: PluginGameAssetCandidatesInput): CandidatesO
   return artTurn(match, art)
 }
 
-function artTurn(gameId: number, art: readonly PluginHttpResponse[]): CandidatesOutput {
+function artTurn(gameId: number, art: readonly PluginHttpResponse[]): PluginGameAssetCandidatesOutput {
   if (art.length === 0) return httpRequests([artRequest(gameId)])
   if (art.length !== 1) throw new Error(`IGDB art: expected 1 response, got ${art.length}`)
   const lists = artLists(art[0])
-  return {
+  const result: GameAssetCandidates = {
     candidates: [...pictureCandidates(lists.covers, lists.artworks), ...logoCandidates(lists.logos)],
     // IGDB exposes no Wikidata id (its external game sources and website
     // types name none), so the match names only its own id.
     externalIds: { [AUTHORITY]: [String(gameId)] },
   }
+  return result
 }
 
 export const handlers = {

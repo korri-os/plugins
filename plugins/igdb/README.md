@@ -95,7 +95,10 @@ counterpart and are not applied.
 
 The result is `{ candidates, externalIds }`. Each candidate is
 `{ kind, width, height, source: { id, url } }` (Velvet contract, slice 3:
-`kind` replaces `role`). `source.id` is the IGDB `image_id`.
+`kind` replaces `role`). `source.id` is the IGDB `image_id`. The types
+come from Core's generated contract (`GameAssetCandidate`,
+`GameAssetCandidates`), so `tsc --strict` refuses a kind korrid does not
+admit.
 
 | Kind | From | Format | Kept |
 |---|---|---|---|
@@ -210,7 +213,8 @@ bun test plugins/igdb/plugin.test.ts
 ```
 
 The package and its Nix check need a Core that knows `credentialTokenUrl`
-and the raw text body (Core ADR 0034 and ADR 0016, IGDB amendments). The
+and the raw text body (Core ADR 0034 and ADR 0016, IGDB amendments), and
+the candidate `kind` (Core ADR 0091). The
 pinned Core does not have them yet: until it does, build with
 `--override-input korri <a Core checkout that has them>`.
 
