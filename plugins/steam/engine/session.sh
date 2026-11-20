@@ -182,15 +182,28 @@ installdir=$(sed -n 's/^[[:space:]]*"installdir"[[:space:]]*"\(.*\)"$/\1/p' "$st
 # The launch entry of the build that is installed: the installed depots'
 # platform first (a Linux depot runs natively, a Windows one through Proton),
 # and only an entry whose executable is on disk. Never start a missing file.
+# A Windows entry's paths match the files case-insensitively, as on Windows
+# (appinfo names vvvvvv.exe, the depot ships VVVVVV.exe); a Linux entry's
+# match exactly. Either resolves only inside the install folder.
 manifest="$steam/steamapps/appmanifest_$appid.acf"
 order=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --platforms "$manifest" 2>/dev/null) ||
   order="windows linux"
-os="" entry=""
+# $1: the folder; $2: the path in it; $3: file or dir; $4: the entry's OS.
+resolve() {
+  local fold=()
+  [[ "$4" == windows ]] && fold=(--fold)
+  python3 @launchEntry@ --resolve "$1" "$2" "$3" "${fold[@]}" 2>/dev/null
+}
+os="" entry="" install="" exe=""
 for candidate in $order; do
   found=$(python3 @launchEntry@ "$steam/appcache/appinfo.vdf" "$appid" --os "$candidate" 2>/dev/null) || continue
   EXE="" INSTALLDIR=""
   eval "$found"
-  if [[ -n "$EXE" && -f "$steam/steamapps/common/${installdir:-$INSTALLDIR}/$EXE" ]]; then
+  # Steam names the folder from the manifest's installdir; it is one folder in common.
+  folder=${installdir:-$INSTALLDIR}
+  [[ -n "$EXE" && -n "$folder" && "$folder" != */* ]] || continue
+  install=$(resolve "$steam/steamapps/common" "$folder" dir linux) || continue
+  if exe=$(resolve "$install" "$EXE" file "$candidate"); then
     os=$candidate entry=$found
     break
   fi
@@ -199,8 +212,6 @@ done
   refuse no_launch_entry 126 'Steam engine: Steam has no launch entry for this game' "no launch entry for the installed build of $appid (tried: $order)"
 EXE="" WORKDIR="" INSTALLDIR="" ARGV=()
 eval "$entry"
-install="$steam/steamapps/common/${installdir:-$INSTALLDIR}"
-[[ -n "$EXE" && -d "$install" ]] || refuse game_files_missing 126 'Steam engine: the game files are missing' "no $install"
 
 account=""
 [[ -f "$home/.korri-steam-account" ]] && account=$(head -c 64 "$home/.korri-steam-account")
@@ -246,13 +257,18 @@ if [[ -n "${DISPLAY:-}" ]]; then
   placeholder=$!
 fi
 
-if [[ -n "$WORKDIR" ]]; then cwd="$install/$WORKDIR"; else cwd=$(dirname "$install/$EXE"); fi
-cd "$cwd" || refuse game_files_missing 126 'Steam engine: the game files are missing' "cannot enter $cwd"
-say "AppID $appid: $os entry, $EXE"
-if [[ "$os" == windows ]]; then
-  "$fhs" python3 "$KORRI_PROTON_CACHYOS/proton" waitforexitandrun "$install/$EXE" "${ARGV[@]}" 7>&- &
+if [[ -n "$WORKDIR" ]]; then
+  cwd=$(resolve "$install" "$WORKDIR" dir "$os") ||
+    refuse game_files_missing 126 'Steam engine: the game files are missing' "no working folder $WORKDIR in $install"
 else
-  "$fhs" "$install/$EXE" "${ARGV[@]}" 7>&- &
+  cwd=$(dirname "$exe")
+fi
+cd "$cwd" || refuse game_files_missing 126 'Steam engine: the game files are missing' "cannot enter $cwd"
+say "AppID $appid: $os entry, $EXE as $exe"
+if [[ "$os" == windows ]]; then
+  "$fhs" python3 "$KORRI_PROTON_CACHYOS/proton" waitforexitandrun "$exe" "${ARGV[@]}" 7>&- &
+else
+  "$fhs" "$exe" "${ARGV[@]}" 7>&- &
 fi
 game=$!
 

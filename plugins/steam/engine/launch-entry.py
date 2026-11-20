@@ -14,7 +14,17 @@ Prints shell-safe KEY=VALUE lines: EXE, ARGS, WORKDIR, INSTALLDIR, ENTRY, CANDID
 Prints the platforms to try, in order, from the depots that are installed
 (the manifest's InstalledDepots against each depot's config/oslist): the
 installed build's platform first. Shared depots decide nothing.
+
+       launch-entry.py --resolve <root> <path> file|dir [--fold]
+Prints the real path of <path> (an entry's executable or working folder,
+"/" or "\" separated) inside the folder <root>. With --fold each component
+that does not match exactly matches one name in its folder case-insensitively,
+as Windows and Steam match: appinfo names vvvvvv.exe, the depot ships
+VVVVVV.exe. Without it every component matches exactly (a Linux entry).
+Refuses (exit 1) a missing or ambiguous component, a ".." component, a
+symbolic link that leads out of <root>, and a result of the wrong type.
 """
+import os
 import re
 import shlex
 import struct
@@ -119,7 +129,53 @@ def platforms(app, manifest_text):
     return ["windows", "linux"]
 
 
+def resolve(root, path, kind, fold):
+    """The real path of <path> inside <root>, or None. See the module text."""
+    base = os.path.realpath(root)
+    if not os.path.isdir(base):
+        return None
+
+    def inside(candidate):
+        return candidate == base or candidate.startswith(base + os.sep)
+
+    current = base
+    for part in path.replace("\\", "/").split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            return None
+        if not os.path.isdir(current):
+            return None
+        if os.path.lexists(os.path.join(current, part)):
+            name = part
+        elif fold:
+            wanted = part.casefold()
+            matches = [n for n in os.listdir(current) if n.casefold() == wanted]
+            if len(matches) != 1:
+                return None
+            name = matches[0]
+        else:
+            return None
+        current = os.path.realpath(os.path.join(current, name))
+        if not inside(current):
+            return None
+    if kind == "file" and not os.path.isfile(current):
+        return None
+    if kind == "dir" and not os.path.isdir(current):
+        return None
+    return current
+
+
 def main():
+    if len(sys.argv) in (5, 6) and sys.argv[1] == "--resolve" and sys.argv[4] in ("file", "dir"):
+        fold = sys.argv[5:] == ["--fold"]
+        if len(sys.argv) == 6 and not fold:
+            sys.exit(__doc__)
+        found = resolve(sys.argv[2], sys.argv[3], sys.argv[4], fold)
+        if found is None:
+            sys.exit(1)
+        print(found)
+        return
     if len(sys.argv) == 5 and sys.argv[3] == "--platforms":
         app = find_app(sys.argv[1], int(sys.argv[2])) or {}
         with open(sys.argv[4], encoding="utf-8", errors="replace") as manifest:

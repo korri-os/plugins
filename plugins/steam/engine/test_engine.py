@@ -355,7 +355,8 @@ def _named(uid):
 
 
 class EngineSessionTests(unittest.TestCase):
-    def run_session(self, behavior="normal", entry=None, both=False, installed=(), files=("bin/game.exe",)):
+    def run_session(self, behavior="normal", entry=None, both=False, installed=(), files=("bin/game.exe",),
+                    folders=(), prepare=None):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -372,12 +373,17 @@ class EngineSessionTests(unittest.TestCase):
             entry or {"executable": "bin\\game.exe", "arguments": "-x", "config": {"oslist": "windows"}}))
         (steam / "appcache/appinfo.vdf").write_bytes(appinfo({401710: app}))
         game_dir = steam / "steamapps/common/Game"
+        for name in folders:
+            (game_dir / name).mkdir(parents=True)
         for name in files:
+            (game_dir / name).parent.mkdir(parents=True, exist_ok=True)
             (game_dir / name).write_text(
                 f"#!{sys.executable}\nimport json, os, sys\n"
                 f"open({str(Path(temporary.name) / 'game.json')!r}, 'w').write(json.dumps("
                 "{'argv': sys.argv, 'native': True}))\n")
             (game_dir / name).chmod(0o755)
+        if prepare:
+            prepare(root, game_dir)
         bin_dir = root / "bin"
         bin_dir.mkdir()
         notify = bin_dir / "systemd-notify"
@@ -484,6 +490,85 @@ class EngineSessionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 126, result.stderr)
         self.assertFalse((self.root / "game.json").exists())
         self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
+
+    def windows_entry(self, executable, **fields):
+        return {"executable": executable, "config": {"oslist": "windows"}, **fields}
+
+    def started(self):
+        return json.loads((self.root / "game.json").read_text())
+
+    def game_dir(self):
+        return self.root / "person/steam-engine/steam/steamapps/common/Game"
+
+    def test_a_windows_entry_finds_its_executable_in_any_case(self):
+        # Device proof (RP Mini V2, 2026-11-20): appinfo names vvvvvv.exe and
+        # downwell.exe, the depots ship VVVVVV.exe and Downwell.exe.
+        result = self.run_session(entry=self.windows_entry("downwell.exe"), files=("Downwell.exe",))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["argv"][:2], ["waitforexitandrun", str(self.game_dir() / "Downwell.exe")])
+        self.assertEqual(self.started()["cwd"], str(self.game_dir()))
+
+    def test_a_windows_entry_finds_a_nested_path_and_working_folder_in_any_case(self):
+        result = self.run_session(
+            entry=self.windows_entry("TOOLS\\x64\\GAME.EXE", workingdir="tools\\DATA"),
+            files=("Tools/X64/Game.exe",), folders=("Tools/Data",))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["argv"][1], str(self.game_dir() / "Tools/X64/Game.exe"))
+        self.assertEqual(self.started()["cwd"], str(self.game_dir() / "Tools/Data"))
+
+    def test_a_windows_entry_prefers_the_exact_name(self):
+        result = self.run_session(entry=self.windows_entry("game.exe"), files=("Game.exe", "game.exe"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["argv"][1], str(self.game_dir() / "game.exe"))
+
+    def test_a_windows_entry_with_two_names_in_other_case_starts_nothing(self):
+        result = self.run_session(entry=self.windows_entry("game.exe"), files=("Game.exe", "GAME.EXE"))
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertFalse((self.root / "game.json").exists())
+
+    def test_a_linux_entry_matches_exactly(self):
+        app_entry = {"executable": "game.sh", "config": {"oslist": "linux"}}
+        result = self.run_session(entry=app_entry, files=("Game.sh",))
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertFalse((self.root / "game.json").exists())
+        self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
+
+    def test_a_missing_executable_in_any_case_is_never_started(self):
+        result = self.run_session(entry=self.windows_entry("downwell.exe"), files=("Downwel.exe",))
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertFalse((self.root / "game.json").exists())
+        self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
+
+    def test_an_entry_never_leads_out_of_the_install_folder(self):
+        def outside(root, game_dir):
+            other = game_dir.parent / "Other"
+            other.mkdir()
+            (other / "game.exe").write_text("x")
+            (other / "game.exe").chmod(0o755)
+            (root / "elsewhere").mkdir()
+            (root / "elsewhere/game.exe").write_text("x")
+            (game_dir / "link.exe").symlink_to(root / "elsewhere/game.exe")
+            (game_dir / "linked").symlink_to(root / "elsewhere")
+        for executable in ("..\\Other\\game.exe", "bin\\..\\..\\Other\\game.exe", "LINK.exe",
+                           "linked\\game.exe", "/../Other/game.exe"):
+            with self.subTest(executable=executable):
+                result = self.run_session(entry=self.windows_entry(executable), files=(), prepare=outside)
+                self.assertEqual(result.returncode, 126, result.stderr)
+                self.assertFalse((self.root / "game.json").exists())
+                self.assertTrue(self.wait_for("received", "refused").endswith("refused no_launch_entry\n"))
+
+    def test_a_working_folder_never_leads_out_of_the_install_folder(self):
+        result = self.run_session(entry=self.windows_entry("bin\\game.exe", workingdir="..\\..\\.."))
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertFalse((self.root / "game.json").exists())
+        self.assertIn("refused game_files_missing", self.wait_for("received", "refused"))
+
+    def test_a_symbolic_link_inside_the_install_folder_resolves_to_its_real_path(self):
+        def link(root, game_dir):
+            (game_dir / "Launcher.exe").symlink_to(game_dir / "bin/game.exe")
+        result = self.run_session(entry=self.windows_entry("launcher.exe"), prepare=link)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["argv"][1], str(self.game_dir() / "bin/game.exe"))
 
     def test_a_refused_host_start_ends_the_session_with_its_reason(self):
         result = self.run_session("host-failed")
