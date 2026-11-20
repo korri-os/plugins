@@ -272,18 +272,13 @@ not restore older application data.
 
 ### Logo
 
-`plugins/tailscale/tailscale-icon.svg` is Tailscale's nine-dot icon,
-`Tailscale Logo/svg/Blk/Tailscale_icon_blk_rgb.svg`, unchanged, from the media
-kit that <https://tailscale.com/press> links ("Download our media kit",
-`https://cdn.sanity.io/files/w77i7m8x/production/a426ba5f63316745e108a18a6dbbfed6970752fd.zip`,
-SHA-256 `42a53fa131597d3d0c82fb8d8accf13e83c83810b8c1ec86bc55bd9c622a5af6`,
-fetched 2026-11-20; the file's SHA-256 is
-`f809040e6675344eafa6945ebcdbba83d1d9503ea12281c0db3f6c6952bada63`).
-Tailscale is a registered trademark of Tailscale Inc. The kit grants no
-copyright license; the mark identifies Tailscale's own sign-in and follows the
-kit's Brand Toolkit (April 2025): the dark icon on a light background, the dot
-opacities kept, no single-colour form, no complex background, at least 48×48
-pixels where the layout allows.
+The plugin ships no logo, and its `accounts` entry names none, so Korri shows
+the sign-in without one (a surface may draw a monogram from the title). The
+only official Tailscale mark is in the media kit that
+<https://tailscale.com/press> links. That kit grants no copyright license, and
+`@korri` publishes only content licensed for redistribution (Core ADR 0042).
+Tailscale is a registered trademark of Tailscale Inc. A mark may return when
+Tailscale grants a license that permits redistribution.
 
 ## Optional SSH
 

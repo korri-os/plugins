@@ -10,9 +10,8 @@ in
   files = {
     tailscaled = "${pkgs.tailscale}/bin/tailscaled";
     tailscale = "${pkgs.tailscale}/bin/tailscale";
-    # Core ADR 0089: the account host and the mark plugin.ts names.
+    # Core ADR 0089: the account host plugin.ts names.
     korri-tailscale-account = "${account}/bin/korri-tailscale-account";
-    logo = "${account}/share/korri-tailscale/tailscale-icon.svg";
   };
   # Native service options match core's Tailscale fixture. The host supplies
   # private state/runtime directories and the final hardening drop-in.

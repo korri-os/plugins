@@ -1,6 +1,6 @@
 # The Tailscale plugin's account host (Core ADR 0089), built from its Rust
-# source, with the Tailscale mark the plugin shows beside its sign-in. The
-# plugin host runs it beside tailscaled for each korrid connection.
+# source. The plugin host runs it beside tailscaled for each korrid
+# connection.
 { pkgs }:
 let
   source = pkgs.lib.fileset.toSource {
@@ -21,10 +21,5 @@ pkgs.rustPlatform.buildRustPackage {
   # The plugin's own CLI; the program drives no other.
   env.KORRI_TAILSCALE_CLI = "${pkgs.tailscale}/bin/tailscale";
   strictDeps = true;
-  # tailscale-icon.svg is Tailscale's icon, unchanged, from Tailscale's media
-  # kit (see README.md, "Logo").
-  postInstall = ''
-    install -Dm0644 ${./tailscale-icon.svg} "$out/share/korri-tailscale/tailscale-icon.svg"
-  '';
   meta.mainProgram = "korri-tailscale-account";
 }

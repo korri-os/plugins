@@ -6,7 +6,7 @@ pkgs.runCommand "korri-tailscale-package-check" { nativeBuildInputs = [ pkgs.jq 
     .ports == {"allowedUDPPorts": [41641]} and
     (has("requires") | not) and
     (.services | keys) == ["tailscaled"] and
-    (.files | keys) == ["korri-tailscale-account", "logo", "tailscale", "tailscaled"]
+    (.files | keys) == ["korri-tailscale-account", "tailscale", "tailscaled"]
   ' "$manifest"
   cli=$(jq -r .files.tailscale "$manifest")
   daemon=$(jq -r .files.tailscaled "$manifest")
@@ -15,14 +15,11 @@ pkgs.runCommand "korri-tailscale-package-check" { nativeBuildInputs = [ pkgs.jq 
   test -x "$cli"
   test -x "$daemon"
   account=$(jq -r '.files["korri-tailscale-account"]' "$manifest")
-  logo=$(jq -r .files.logo "$manifest")
   test -x "$account"
-  # Tailscale's icon, unchanged from the media kit (README.md, "Logo").
-  test "$(sha256sum < "$logo")" = "$(sha256sum < ${../plugins/tailscale/tailscale-icon.svg})"
-  grep -q '<svg' "$logo"
   # plugin.ts declares the one account by its file keys (Core ADR 0089).
   grep -F 'program: "korri-tailscale-account"' ${tailscale}/plugin.ts
-  grep -F 'logo: "logo"' ${tailscale}/plugin.ts
+  # No Tailscale mark ships (README.md, "Logo").
+  ! grep -q 'logo:' ${tailscale}/plugin.ts
 
   unit=$(jq -r .services.tailscaled "$manifest")
   grep -Fx 'Type=notify' "$unit"
