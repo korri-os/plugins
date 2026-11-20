@@ -1,0 +1,10 @@
+StorePath: /nix/store/gbxhvn9wad6ri3wr3h86z6sv22jdkfq9-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-0bc0cee2e441-steam-engine-4/0jngfzr8mj6hvhj9k2zv4hm9wr4m83ix32clnacmgjqscpkjb3pj.nar.xz
+Compression: xz
+FileHash: sha256:0jngfzr8mj6hvhj9k2zv4hm9wr4m83ix32clnacmgjqscpkjb3pj
+FileSize: 3992
+NarHash: sha256:194i5j6nnhgb9lw9xh2w83f2x9imb91aqijn4lkij8kz0513p097
+NarSize: 10808
+References: 6ijvfj8pldi4ar790xxhbcvj4l6abddy-korri-plugin 8xbd0wqgsbjf4ldzaaplkxrjdd4jlqm6-korri-steam-host a7irwpgw1yamcpirmzmgah3xs21r32d4-steam-engine-session fnbkb64mjl8fhbwn96zz2pf2zm4j0l9d-steam-session pm36g2qq94zwb8vfsz0k6sdss4x1rz1b-korri-plugin
+Deriver: hpbndv9kvwmjq987k86ifvdrasm8cgcj-korri-plugin.drv
+Sig: korri-plugins-1:nPlaH3oh7TW3F0aNe1QXfAPUCAOrcvuDymIEOAKLFFkg//98J6AmwjU+dkymgZov/bvqCbrmtdF3d7dfaIe2DA==

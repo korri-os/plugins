@@ -1,0 +1,10 @@
+StorePath: /nix/store/mjmj4404irihp03q00bcd5qddzr5wbv4-korri-steam-host
+URL: https://github.com/korri-os/plugins/releases/download/build-0bc0cee2e441-steam-engine-4/00vdz31bxpl30bkgvwvwvsrdx8k6i1b3lbqlynin6jb96p5ym0xm.nar.xz
+Compression: xz
+FileHash: sha256:00vdz31bxpl30bkgvwvwvsrdx8k6i1b3lbqlynin6jb96p5ym0xm
+FileSize: 2944
+NarHash: sha256:1jsfmfbppgxdhq2bmcwhfghkcili4f9q4s7m5qfjs9p3cv7f6yqp
+NarSize: 6968
+References: 2lgg8jqyzjp60svh7kmp39kqwnig31p2-util-linux-2.42.4-bin 5s6rdmwddhgma4x541bcka4i4nr8svvg-korri-steam-host-0.1.0 99v13ig4382mngi6ggf0csqi7rfa04j5-findutils-4.11.0 cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12 hxvczp5n7af5svazbnm0r11bdinfsd4n-steam-vdf-settings nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20 rszbxwc5p9kgiyb4n2rz5b5dn58qlg4m-acl-2.4.0-bin xqxx11pl3jaarql6fc0mhkjl3w9g51ds-korri-steam-engine-fhs
+Deriver: 2pg6dzq2r75ssgk154v6b5nasxgnmw43-korri-steam-host.drv
+Sig: korri-plugins-1:xMFWYWcL6MN6fKnpUVgkr5QGTyC3KIenf7uJMXJZ1tyTk4god0ADVq2MZpmzr5SY3EoPPzdc31ONYJPlvccYAw==
