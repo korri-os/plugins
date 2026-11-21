@@ -38,6 +38,7 @@ fn packaged_melonds_panes_layouts_and_launch() {
         requires: Vec::new(),
         hosts: Vec::new(),
         credential_host: None,
+        credential_token_url: None,
     }])
     .expect("locked Core must admit the packaged source graph and typed panes/layouts");
     let system = registry.systems().values().next().unwrap();
