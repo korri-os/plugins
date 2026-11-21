@@ -154,21 +154,36 @@ case "$result" in
 esac
 
 # 4. The launch sync. A Steam Cloud conflict starts no game: korrid turns it
-# into a save split and sends `resolve` before the next launch.
+# into a save split and sends `resolve` before the next launch. When another
+# device's save has not finished uploading, the host reports `cloud_pending`
+# and waits: korrid asks the person and answers the host with `retry` or
+# `play-anyway` (owner decision, 2026-11-21). This program waits with no
+# limit while the question is open; korrid stops the unit on Cancel.
 reach_step sync
 mark=$(events_size)
 send "launched $appid"
 result=""
-deadline=$((SECONDS + 130))  # the host's own limit is 120 s
+# The host's own limit (KORRI_STEAM_LAUNCH_SYNC_SECONDS, 120 s) and a margin;
+# it starts again with each answer, as the host's does.
+limit=$(( ${KORRI_STEAM_LAUNCH_SYNC_SECONDS:-120} + 10 ))
+deadline=$((SECONDS + limit))
+answers=0
 while [[ -z "$result" ]]; do
+  asking="" answered=0
   while IFS= read -r line; do
     case "$line" in
       *'"event":"sync_finished","appid":'"$appid",'"kind":"launch"'*) result=$(field result "$line") ;;
+      *'"event":"cloud_pending","appid":'"$appid",*) asking=1 ;;
+      *'"event":"cloud_pending_answered","appid":'"$appid",*) asking="" answered=$((answered + 1)) ;;
     esac
   done < <(events_from "$mark")
   [[ -n "$result" ]] && break
+  if (( answered > answers )); then
+    answers=$answered
+    deadline=$((SECONDS + limit))
+  fi
   host_gone || true
-  (( SECONDS < deadline )) || { result=timeout; break; }
+  [[ -n "$asking" ]] || (( SECONDS < deadline )) || { result=timeout; break; }
   sleep 0.5
 done
 say "launch sync: $result"

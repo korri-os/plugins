@@ -14,6 +14,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 
@@ -65,6 +66,13 @@ while True:
                 time.sleep(0.3)
                 emit(event="app_job_finished", appid=appid, kind="install",
                      result="installed", state=4, seconds=1)
+            elif verb == "launched" and behavior == "pending":
+                emit(event="sync_started", appid=appid, kind="launch")
+                emit(event="cloud_pending", appid=appid,
+                     operations=[{"operation": "upload_pending", "machine": "Living room"}])
+            elif verb in ("retry", "play-anyway"):
+                emit(event="cloud_pending_answered", appid=appid, answer=verb)
+                emit(event="sync_finished", appid=appid, kind="launch", result="downloaded", state=2, seconds=1)
             elif verb == "launched":
                 emit(event="sync_started", appid=appid, kind="launch")
                 result = "conflict" if behavior == "conflict" else "synchronized"
@@ -451,7 +459,8 @@ def _named(uid):
 
 class EngineSessionTests(unittest.TestCase):
     def run_session(self, behavior="normal", entry=None, both=False, installed=(), files=("bin/game.exe",),
-                    folders=(), prepare=None, legacycompat=("steamclient.dll", "steamclient64.dll", "Steam.dll")):
+                    folders=(), prepare=None, legacycompat=("steamclient.dll", "steamclient64.dll", "Steam.dll"),
+                    env_extra=None, answer=None):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -526,6 +535,23 @@ class EngineSessionTests(unittest.TestCase):
                "KORRI_PROTON_CACHYOS": str(proton), "KORRI_STEAM_LEGACYCOMPAT": str(artifact),
                "NOTIFY_SOCKET": str(root / "notify")}
         env.pop("DISPLAY", None)
+        env.update(env_extra or {})
+        if answer is not None:
+            # korrid's answer, `delay` seconds after the question.
+            line, delay = answer
+
+            def reply():
+                events = channel / "events.jsonl"
+                deadline = time.monotonic() + 30
+                while time.monotonic() < deadline:
+                    if events.exists() and '"cloud_pending"' in events.read_text():
+                        break
+                    time.sleep(0.05)
+                time.sleep(delay)
+                with open(channel / "commands", "w") as fifo:
+                    fifo.write(line + "\n")
+
+            threading.Thread(target=reply, daemon=True).start()
         result = subprocess.run([shutil.which("bash"), str(root / "session.sh"), "401710"], env=env,
                                 capture_output=True, text=True, timeout=60, check=False)
         self.root, self.channel = root, channel
@@ -718,6 +744,20 @@ class EngineSessionTests(unittest.TestCase):
         self.assertIn("--status=plugin-launch: steam-cloud-conflict", self.statuses())
         self.assertFalse((self.root / "game.json").exists())
         self.assertEqual((self.channel / "received").read_text(), "install 401710\nlaunched 401710\n")
+
+    def test_a_pending_upload_on_another_device_holds_the_launch_until_the_answer(self):
+        # The launch limit is 1 s (+10 s margin); the answer comes 3 s after it ran out.
+        started = time.monotonic()
+        result = self.run_session("pending", env_extra={"KORRI_STEAM_LAUNCH_SYNC_SECONDS": "1"},
+                                  answer=("play-anyway 401710", 14))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertGreater(time.monotonic() - started, 14)
+        self.assertIn("launch sync: downloaded", result.stderr)
+        self.assertEqual((self.channel / "received").read_text(),
+                         "install 401710\nlaunched 401710\nplay-anyway 401710\nexited 401710\n")
+        self.assertTrue((self.root / "game.json").exists())
+        self.assertEqual(self.statuses(), ["--status=korri-step: update", "--status=korri-step: sync",
+                                           "--status=korri-step: game"])
 
     def test_an_engine_that_is_not_the_pinned_build_refuses_the_launch(self):
         result = self.run_session("mismatch")

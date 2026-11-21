@@ -176,6 +176,26 @@ machine name (`IClientUser::SetUserMachineName`, a map entry since korri#595),
 which Steam shows for this device's cloud operations. Without the variable the
 host sets no machine name.
 
+### Another device's save is still uploading (Core ADR 0083, 2026-11-21)
+
+The launch sync is always one `AC Launch,down,` job, also with nothing to
+download: its launch intent is how Steam says that another device has a
+session open or a save not uploaded yet. Steam then refuses the download. The
+engine keeps those operations only in an object the host cannot read, so the
+host reads the two lines the job writes to `steam/logs/cloud_log.txt`
+(`src/pending.rs`): only bytes written after the call, at most 1 MiB, also
+across a rotation to `cloud_log.previous.txt`. A report it cannot read, or a
+log it cannot open, counts as a pending operation of an unknown device.
+
+The host then reports
+`{"event":"cloud_pending","appid":N,"operations":[{"operation":"upload_pending","machine":"Living room"}]}`
+(`machine` only when Steam names one) and the launch waits, with no time limit,
+for korrid's answer: `retry <appid>` evaluates and asks Steam again,
+`play-anyway <appid>` downloads with the engine's `ignore pending` flag. The
+host confirms with `cloud_pending_answered`, and the launch limit starts again.
+The session program waits with no limit while the question is open; korrid
+stops the game unit when the person cancels.
+
 ### Steamworks games: `legacycompat` (korri#589)
 
 A Steamworks game's `steam_api` loads the `steamclient.dll` or

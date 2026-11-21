@@ -18,8 +18,15 @@
 //!
 //! Commands, one per line on the FIFO; one JSON event per line on stdout:
 //!   launched <appid>   save_export, then the launch sync: start the queue,
-//!                      evaluate, download remote changes together with the
-//!                      AutoCloud launch pass, else run that pass alone
+//!                      evaluate, then one "AC Launch,down," job (launch intent,
+//!                      remote changes, AutoCloud launch pass); a conflict runs
+//!                      that pass alone. When Steam reports another device's
+//!                      pending operation instead, `cloud_pending` and the
+//!                      launch waits for an answer (pending.rs)
+//!   retry <appid>      the answer: evaluate and ask Steam again
+//!   play-anyway <appid>
+//!                      the answer: download with `ignore pending`, Valve's
+//!                      "Play anyway"
 //!   exited <appid>     RunAutoCloudOnAppExit, start the queue, evaluate, upload,
 //!                      then save_export. With nothing to upload the job still
 //!                      ends with one upload call, whose end sends Steam the
@@ -54,6 +61,7 @@
 //! The host exports `kill`, so the engine's game-process check sees the game
 //! unit's pids (PrivatePIDs). The host ends with `_exit` after its last output.
 mod appinfo;
+mod pending;
 mod platform;
 mod qr;
 mod saves;
@@ -269,6 +277,10 @@ const SYNC_UPLOAD: u32 = 2;
 // SynchronizeApp flags bit 1 adds the "AC Launch" command bit. With "down" the
 // job runs as "AC Launch,down,", the job Valve's client logs at game start.
 const SYNC_FLAG_AUTOCLOUD_LAUNCH: u64 = 2;
+// Flag bit 0 sets `ignore pending` (0x80): the launch intent tells Steam to
+// ignore other devices' pending operations, Valve's "Play anyway"
+// (FINDINGS.md section 7; request field +0x2c at 0x611bd8..0x611bf4).
+const SYNC_FLAG_IGNORE_PENDING: u64 = 1;
 
 // IClientAppManager (install-evidence.txt): InstallApp(AppId_t, int32 libraryFolder,
 // bool) installs to the default folder for a negative folder and, with the bool
@@ -470,6 +482,25 @@ enum Command {
     ListApps,
     /// The session program refused the launch before the game started.
     Refused(Refusal),
+    /// The person's answer to a launch's pending remote operation.
+    Answer(u32, Answer),
+}
+
+/// What the person chose when another device's save had not finished
+/// uploading (owner decision, 2026-11-21): ask Steam again, or start with what
+/// Steam Cloud holds now, as Valve's client offers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Answer {
+    Retry,
+    PlayAnyway,
+}
+impl Answer {
+    fn name(self) -> &'static str {
+        match self {
+            Answer::Retry => "retry",
+            Answer::PlayAnyway => "play-anyway",
+        }
+    }
 }
 
 /// Why steam-engine-session refused a launch, from a closed list: the
@@ -576,6 +607,8 @@ fn parse_command(line: &str) -> Result<Option<Command>, CommandError> {
         "install" => |id| Command::App(AppCommand::Install(id)),
         "uninstall" => |id| Command::App(AppCommand::Uninstall(id)),
         "resolve" => |id| Command::Cloud(CloudCommand::Resolve(id, false)),
+        "retry" => |id| Command::Answer(id, Answer::Retry),
+        "play-anyway" => |id| Command::Answer(id, Answer::PlayAnyway),
         "shutdown" => return bare(Command::Shutdown),
         "signin-qr" => return bare(Command::SigninQr),
         "signout" => return bare(Command::Signout),
@@ -771,6 +804,8 @@ struct Progress {
     downloads: u8,
     /// Set when the AutoCloud launch pass was queued: the result to report after it.
     launch_pass: Option<&'static str>,
+    /// Launch: the state before the first download, which names the result.
+    before: Option<u32>,
 }
 /// One decision for one app. The host never resolves a conflict and never
 /// uploads at launch: a conflict ends the job and is reported for a person.
@@ -819,9 +854,13 @@ fn next_resolve_step(state: u32, progress: Progress) -> SyncStep {
         _ => SyncStep::Finish("unhandled_state"),
     }
 }
-/// Launch: download remote changes before the game starts, as Valve's client
-/// does with "AC Launch,down,". Local changes and conflicts keep the local files;
-/// the AutoCloud launch pass still runs so the exit pass can find changed files.
+/// Launch: one "AC Launch,down," job before the game starts, as Valve's client
+/// runs it. It downloads remote changes, runs the AutoCloud launch pass, and
+/// first sends Steam the launch intent, whose answer lists other devices'
+/// pending operations. So it runs also with nothing to download (2, 5): a
+/// save another device has not uploaded yet looks synchronized here. Local
+/// changes stay for the exit upload. A conflict keeps the local files and runs
+/// only the AutoCloud launch pass.
 const MAX_LAUNCH_DOWNLOADS: u8 = 2;
 fn next_launch_step(state: u32, progress: Progress) -> SyncStep {
     if let Some(result) = progress.launch_pass {
@@ -836,20 +875,21 @@ fn next_launch_step(state: u32, progress: Progress) -> SyncStep {
         if matches!(state, 4 | 6) && progress.downloads < MAX_LAUNCH_DOWNLOADS {
             return SyncStep::DownloadForLaunch;
         }
-        return SyncStep::Finish(match state {
+        return SyncStep::Finish(match (progress.before, state) {
+            // Nothing came down: the state the launch found names it.
+            (Some(2), 2) => "synchronized",
+            (Some(5), 5) => "local_changes",
             // 5: the remote files arrived; local changes wait for the exit upload.
-            2 | 5 => "downloaded",
-            7 => "conflict",
-            0 => "no_sync_state",
+            (_, 2 | 5) => "downloaded",
+            (_, 7) => "conflict",
+            (_, 0) => "no_sync_state",
             _ => "download_incomplete",
         });
     }
     match state {
         1 | 8 if progress.evaluations < MAX_EVALUATIONS => SyncStep::Evaluate,
         1 | 8 => SyncStep::Finish("evaluation_incomplete"),
-        4 | 6 => SyncStep::DownloadForLaunch,
-        2 => SyncStep::LaunchPass("synchronized"),
-        5 => SyncStep::LaunchPass("local_changes"),
+        2 | 4 | 5 | 6 => SyncStep::DownloadForLaunch,
         7 => SyncStep::LaunchPass("conflict"),
         0 => SyncStep::Finish("no_sync_state"),
         _ => SyncStep::Finish("unhandled_state"),
@@ -1163,6 +1203,14 @@ struct SyncJob {
     awaiting_start_until: Option<Instant>,
     progress: Progress,
     reported: Option<(u32, bool)>,
+    /// Launch: the cloud log's end when the last download was asked for. Read
+    /// once that job ended, for a pending remote operation.
+    log_mark: Option<pending::Mark>,
+    /// Launch: a pending operation was reported; nothing runs until the answer.
+    asking: bool,
+    /// Launch: the person chose "Play anyway"; the download ignores pending
+    /// operations and the log is not read again.
+    ignore_pending: bool,
 }
 struct RemoteStorage {
     object: Object,
@@ -1182,16 +1230,14 @@ impl RemoteStorage {
         let call: SynchronizeApp = unsafe { slot(self.object, SYNCHRONIZE_APP.0) };
         unsafe { call(self.object, appid, SYNC_UPLOAD, 0) }
     }
-    fn download_for_launch(&self, appid: u32) -> bool {
+    fn download_for_launch(&self, appid: u32, ignore_pending: bool) -> bool {
         let call: SynchronizeApp = unsafe { slot(self.object, SYNCHRONIZE_APP.0) };
-        unsafe {
-            call(
-                self.object,
-                appid,
-                SYNC_DOWNLOAD,
-                SYNC_FLAG_AUTOCLOUD_LAUNCH,
-            )
-        }
+        let flags = if ignore_pending {
+            SYNC_FLAG_AUTOCLOUD_LAUNCH | SYNC_FLAG_IGNORE_PENDING
+        } else {
+            SYNC_FLAG_AUTOCLOUD_LAUNCH
+        };
+        unsafe { call(self.object, appid, SYNC_DOWNLOAD, flags) }
     }
     /// (found, newest local "time", newest remote "remotetime") of conflicting files.
     fn conflict_timestamps(&self, appid: u32) -> (bool, u32, u32) {
@@ -1293,9 +1339,56 @@ impl SaveExports {
         }
     }
 }
+/// `{"event":"cloud_pending","appid":N,"operations":[{"operation":"upload_pending","machine":"zao"}]}`.
+/// An empty list (the log could not be read) is one operation of an unknown kind and device.
+fn pending_event(appid: u32, operations: &[pending::Operation]) -> String {
+    let unknown = [pending::Operation {
+        kind: None,
+        machine: None,
+    }];
+    let operations = if operations.is_empty() {
+        &unknown[..]
+    } else {
+        operations
+    };
+    let items: Vec<String> = operations
+        .iter()
+        .map(|operation| {
+            let machine = operation.machine.as_deref().map_or(String::new(), |name| {
+                format!(r#","machine":{}"#, json_string(name))
+            });
+            format!(
+                r#"{{"operation":"{}"{machine}}}"#,
+                pending::operation_name(operation.kind)
+            )
+        })
+        .collect();
+    format!(
+        r#"{{"event":"cloud_pending","appid":{appid},"operations":[{}]}}"#,
+        items.join(",")
+    )
+}
+fn apply_answer(job: &mut SyncJob, answer: Answer, now: Instant) {
+    job.asking = false;
+    job.started = now;
+    job.next_poll = now;
+    match answer {
+        Answer::Retry => {
+            job.progress = Progress::default();
+            job.ignore_pending = false;
+        }
+        Answer::PlayAnyway => {
+            job.progress.downloads = 0;
+            job.ignore_pending = true;
+        }
+    }
+}
 struct Cloud {
     storage: RemoteStorage,
     saves: SaveExports,
+    /// The engine's `logs/cloud_log.txt` and its rotated copy (pending.rs).
+    log: PathBuf,
+    previous_log: PathBuf,
     jobs: BTreeMap<u32, SyncJob>,
     launch_timeout: Duration,
     /// Engine offline logon: no cloud call can work (the sync job requires logon
@@ -1326,6 +1419,33 @@ impl Cloud {
             &format!(r#"{{"event":"cloud_call","call":"{call}","appid":{appid}}}"#),
         )
     }
+    /// The launch holds: korrid asks the person and answers with `retry` or
+    /// `play-anyway`. An operation with no known device has no `machine`.
+    fn ask(out: &mut File, appid: u32, operations: &[pending::Operation]) -> Result<(), String> {
+        json(out, &pending_event(appid, operations))
+    }
+    /// `retry` asks Steam again from the evaluation on; `play-anyway` downloads
+    /// with `ignore pending`. Each starts the launch limit again. An answer with
+    /// no question open changes nothing.
+    fn answer(&mut self, out: &mut File, appid: u32, answer: Answer) -> Result<(), String> {
+        let Some(job) = self.jobs.get_mut(&appid).filter(|job| job.asking) else {
+            return json(
+                out,
+                &format!(
+                    r#"{{"event":"cloud_answer_ignored","appid":{appid},"answer":"{}"}}"#,
+                    answer.name()
+                ),
+            );
+        };
+        apply_answer(job, answer, Instant::now());
+        json(
+            out,
+            &format!(
+                r#"{{"event":"cloud_pending_answered","appid":{appid},"answer":"{}"}}"#,
+                answer.name()
+            ),
+        )
+    }
     fn start(&mut self, out: &mut File, command: CloudCommand) -> Result<(), String> {
         let appid = command.appid();
         let now = Instant::now();
@@ -1353,6 +1473,9 @@ impl Cloud {
             awaiting_start_until: (kind != JobKind::Sync).then_some(now + START_GRACE),
             progress: Progress::default(),
             reported: None,
+            log_mark: None,
+            asking: false,
+            ignore_pending: false,
         };
         if self.offline {
             // No cloud call can run offline; the saves still change.
@@ -1408,6 +1531,11 @@ impl Cloud {
                 continue;
             }
             job.next_poll = now + POLL_INTERVAL;
+            // The launch waits for the person, with no limit: korrid ends the
+            // session when they cancel.
+            if job.asking {
+                continue;
+            }
             let in_progress = self.storage.in_progress(appid);
             let state = self.storage.state(appid);
             if job.reported != Some((state, in_progress)) {
@@ -1435,6 +1563,18 @@ impl Cloud {
                 Some(until) if now < until => continue,
                 _ => job.awaiting_start_until = None,
             }
+            // The launch download's job has ended: did Steam report another
+            // device's pending operation instead of downloading?
+            if let Some(mark) = job.log_mark.filter(|_| !busy) {
+                job.log_mark = None;
+                if let pending::Found::Pending(operations) =
+                    pending::probe(&self.log, &self.previous_log, mark, appid)
+                {
+                    Self::ask(out, appid, &operations)?;
+                    job.asking = true;
+                    continue;
+                }
+            }
             match next_step(job.kind, state, in_progress, job.progress) {
                 SyncStep::Wait => {}
                 SyncStep::Evaluate => {
@@ -1444,13 +1584,19 @@ impl Cloud {
                     Self::call_event(out, "EvaluateRemoteStorageSyncState", appid)?;
                 }
                 SyncStep::DownloadForLaunch => {
-                    let accepted = self.storage.download_for_launch(appid);
+                    if job.progress.downloads == 0 {
+                        job.progress.before = Some(state);
+                    }
+                    // Before the call: its job logs the launch intent's answer.
+                    job.log_mark = (!job.ignore_pending).then(|| pending::mark(&self.log));
+                    let ignore = job.ignore_pending;
+                    let accepted = self.storage.download_for_launch(appid, ignore);
                     job.progress.downloads += 1;
                     job.awaiting_start_until = Some(now + START_GRACE);
                     json(
                         out,
                         &format!(
-                            r#"{{"event":"cloud_call","call":"SynchronizeApp","appid":{appid},"direction":"download","autocloud_launch":true,"accepted":{accepted}}}"#
+                            r#"{{"event":"cloud_call","call":"SynchronizeApp","appid":{appid},"direction":"download","autocloud_launch":true,"ignore_pending":{ignore},"accepted":{accepted}}}"#
                         ),
                     )?;
                     if !accepted {
@@ -2754,6 +2900,8 @@ fn run(out: &mut File) -> Result<(), String> {
                 steam_id: 0,
                 sequence: 0,
             },
+            log: steam.join("logs/cloud_log.txt"),
+            previous_log: steam.join("logs/cloud_log.previous.txt"),
             jobs: BTreeMap::new(),
             launch_timeout,
             offline: false,
@@ -3244,6 +3392,16 @@ fn run(out: &mut File) -> Result<(), String> {
                         )?;
                         app_pending.push(command);
                     }
+                    Ok(Command::Answer(appid, answer)) => {
+                        json(
+                            out,
+                            &format!(
+                                r#"{{"event":"command","command":"{}","appid":{appid}}}"#,
+                                answer.name()
+                            ),
+                        )?;
+                        cloud.answer(out, appid, answer)?;
+                    }
                     Ok(Command::Cloud(command)) => {
                         json(
                             out,
@@ -3673,6 +3831,26 @@ mod tests {
         assert_eq!(parse_command(" shutdown \r\n"), Ok(Some(Command::Shutdown)));
     }
     #[test]
+    fn parse_command_accepts_the_answers_to_a_pending_operation() {
+        assert_eq!(
+            parse_command("retry 584400\n"),
+            Ok(Some(Command::Answer(584400, Answer::Retry)))
+        );
+        assert_eq!(
+            parse_command("play-anyway 584400"),
+            Ok(Some(Command::Answer(584400, Answer::PlayAnyway)))
+        );
+        assert_eq!(parse_command("retry"), Err(CommandError::MissingAppId));
+        assert_eq!(
+            parse_command("play-anyway 1 2"),
+            Err(CommandError::ExtraArguments)
+        );
+        assert_eq!(
+            parse_command("play anyway 1"),
+            Err(CommandError::UnknownCommand)
+        );
+    }
+    #[test]
     fn parse_command_accepts_install_and_uninstall() {
         use AppCommand::*;
         assert_eq!(
@@ -4032,7 +4210,7 @@ mod tests {
         }
     }
     #[test]
-    fn launch_job_evaluates_then_downloads_remote_changes_with_the_launch_pass() {
+    fn launch_job_evaluates_then_runs_one_launch_download_also_with_nothing_to_download() {
         use JobKind::Launch;
         assert_eq!(next_step(Launch, 2, false, done(0, 0)), SyncStep::Evaluate);
         assert_eq!(next_step(Launch, 8, false, done(1, 0)), SyncStep::Evaluate);
@@ -4040,19 +4218,29 @@ mod tests {
             next_step(Launch, 1, false, done(2, 0)),
             SyncStep::Finish("evaluation_incomplete")
         );
-        for state in [4, 6] {
+        // The launch intent goes with every launch download, so a save another
+        // device has not uploaded is found also when this one looks synchronized.
+        for state in [2, 4, 5, 6] {
             assert_eq!(
                 next_step(Launch, state, false, done(1, 0)),
                 SyncStep::DownloadForLaunch
             );
         }
-        assert_eq!((SYNC_DOWNLOAD, SYNC_FLAG_AUTOCLOUD_LAUNCH), (1, 2));
+        assert_eq!(
+            (
+                SYNC_DOWNLOAD,
+                SYNC_FLAG_AUTOCLOUD_LAUNCH,
+                SYNC_FLAG_IGNORE_PENDING
+            ),
+            (1, 2, 1)
+        );
     }
     #[test]
     fn launch_job_reports_what_the_download_left() {
         use JobKind::Launch;
         let once = Progress {
             downloads: 1,
+            before: Some(4),
             ..done(1, 0)
         };
         assert_eq!(
@@ -4063,43 +4251,47 @@ mod tests {
             next_step(Launch, 6, false, once),
             SyncStep::DownloadForLaunch
         );
-        let downloaded = Progress {
-            downloads: MAX_LAUNCH_DOWNLOADS,
-            ..done(1, 0)
-        };
-        for (state, result) in [
-            (2, "downloaded"),
-            (5, "downloaded"),
-            (7, "conflict"),
-            (4, "download_incomplete"),
-            (6, "download_incomplete"),
-            (0, "no_sync_state"),
+        for (before, state, result) in [
+            (4, 2, "downloaded"),
+            (6, 5, "downloaded"),
+            (2, 2, "synchronized"),
+            (5, 5, "local_changes"),
+            (2, 7, "conflict"),
+            (4, 4, "download_incomplete"),
+            (6, 6, "download_incomplete"),
+            (4, 0, "no_sync_state"),
         ] {
-            assert_eq!(
-                next_step(Launch, state, false, downloaded),
-                SyncStep::Finish(result)
-            );
-        }
-    }
-    #[test]
-    fn launch_job_keeps_local_files_and_runs_only_the_launch_pass() {
-        use JobKind::Launch;
-        for (state, result) in [(2, "synchronized"), (5, "local_changes"), (7, "conflict")] {
-            assert_eq!(
-                next_step(Launch, state, false, done(1, 0)),
-                SyncStep::LaunchPass(result)
-            );
-            let passed = Progress {
-                launch_pass: Some(result),
+            let downloaded = Progress {
+                downloads: MAX_LAUNCH_DOWNLOADS,
+                before: Some(before),
                 ..done(1, 0)
             };
             assert_eq!(
-                next_step(Launch, state, false, passed),
-                SyncStep::Finish(result)
+                next_step(Launch, state, false, downloaded),
+                SyncStep::Finish(result),
+                "{before} -> {state}"
             );
         }
+        // Nothing to download: one job is enough.
+        let synced = Progress {
+            downloads: 1,
+            before: Some(2),
+            ..done(1, 0)
+        };
+        assert_eq!(
+            next_step(Launch, 2, false, synced),
+            SyncStep::Finish("synchronized")
+        );
+    }
+    #[test]
+    fn a_launch_conflict_keeps_local_files_and_runs_only_the_launch_pass() {
+        use JobKind::Launch;
+        assert_eq!(
+            next_step(Launch, 7, false, done(1, 0)),
+            SyncStep::LaunchPass("conflict")
+        );
         let passed = Progress {
-            launch_pass: Some("synchronized"),
+            launch_pass: Some("conflict"),
             ..done(1, 0)
         };
         assert_eq!(
@@ -4112,6 +4304,72 @@ mod tests {
                 CloudCall::RunAutoCloudOnAppLaunch,
                 CloudCall::LoadLocalFileInfoCache
             ]
+        );
+    }
+    fn launch_job() -> SyncJob {
+        let now = Instant::now();
+        SyncJob {
+            kind: JobKind::Launch,
+            started: now,
+            next_poll: now,
+            awaiting_start_until: None,
+            progress: Progress {
+                downloads: 1,
+                before: Some(4),
+                ..done(1, 0)
+            },
+            reported: None,
+            log_mark: None,
+            asking: true,
+            ignore_pending: false,
+        }
+    }
+    /// Owner decision, 2026-11-21: the launch waits for the person's answer.
+    #[test]
+    fn retry_asks_steam_again_and_play_anyway_ignores_the_pending_operation() {
+        let later = Instant::now() + Duration::from_secs(300);
+        let mut job = launch_job();
+        apply_answer(&mut job, Answer::Retry, later);
+        assert!(!job.asking && !job.ignore_pending);
+        assert_eq!(job.started, later, "the launch limit starts again");
+        assert_eq!(job.progress, Progress::default());
+        assert_eq!(
+            next_step(JobKind::Launch, 4, false, job.progress),
+            SyncStep::Evaluate
+        );
+        let mut job = launch_job();
+        apply_answer(&mut job, Answer::PlayAnyway, later);
+        assert!(!job.asking && job.ignore_pending);
+        assert_eq!(job.started, later);
+        assert_eq!(
+            next_step(JobKind::Launch, 4, false, job.progress),
+            SyncStep::DownloadForLaunch
+        );
+        assert_eq!(job.progress.before, Some(4), "the result still names it");
+    }
+    #[test]
+    fn a_pending_operation_is_reported_with_its_kind_and_device_if_known() {
+        use pending::Operation;
+        assert_eq!(
+            pending_event(
+                584400,
+                &[
+                    Operation {
+                        kind: Some(3),
+                        machine: None
+                    },
+                    Operation {
+                        kind: Some(1),
+                        machine: Some("Bob's \"Deck\"".into())
+                    }
+                ]
+            ),
+            r#"{"event":"cloud_pending","appid":584400,"operations":[{"operation":"upload_pending"},{"operation":"app_session_active","machine":"Bob's \"Deck\""}]}"#
+        );
+        // Fail closed: nothing readable is one operation of an unknown device.
+        assert_eq!(
+            pending_event(7, &[]),
+            r#"{"event":"cloud_pending","appid":7,"operations":[{"operation":"unknown"}]}"#
         );
     }
     #[test]
