@@ -21,7 +21,9 @@
 //!                      evaluate, download remote changes together with the
 //!                      AutoCloud launch pass, else run that pass alone
 //!   exited <appid>     RunAutoCloudOnAppExit, start the queue, evaluate, upload,
-//!                      then save_export
+//!                      then save_export. With nothing to upload the job still
+//!                      ends with one upload call, whose end sends Steam the
+//!                      exit notice (korri#595)
 //!   sync <appid>       evaluate and upload
 //!   install <appid>    InstallApp (also the update of an installed app), progress
 //!   uninstall <appid>  UninstallApp
@@ -34,6 +36,9 @@
 //!   shutdown           stop now, without waiting for an exit sync
 //! Nothing runs in Steam Cloud when it is off for the account or the app. The
 //! host only reads that setting. It resolves a conflict only on `resolve`.
+//!
+//! KORRI_STEAM_DEVICE_NAME, the device's Korri title from korrid, is the QR
+//! sign-in's device name and, set before the logon, the engine's machine name.
 //!
 //! Logon: with a saved login (the account name file and the engine's own
 //! ConnectCache) the network logon gets KORRI_STEAM_LOGON_SECONDS (default 15).
@@ -215,6 +220,11 @@ type SetLoginToken = unsafe extern "C" fn(Object, *const c_char, *const c_char);
 // the proxy (1792618285: aa7ce0) sends max (4 bytes) and the bool (1 byte), reads
 // the total (4 bytes), then min(total, max) * 4 bytes into `list`.
 type SubscribedApps = unsafe extern "C" fn(Object, *mut u32, u32, bool) -> u32;
+// void IClientUser::SetUserMachineName(const char *name) (proxy ac79a0 in
+// 1792618285: one C string, no reply). It sets CUser+0x6670, which
+// GetUserMachineName (c4fa80) reads and the logon sends as the name Steam
+// shows for this device's cloud operations (korri#595).
+type SetMachineName = unsafe extern "C" fn(Object, *const c_char);
 type GetCallback = unsafe extern "C" fn(i32, *mut Callback) -> bool;
 // IClientUser slots 214 and 215 (offline-evidence.txt): both return an EResult.
 type CanLogonOffline = unsafe extern "C" fn(Object) -> i32;
@@ -739,6 +749,12 @@ enum SyncStep {
     Wait,
     Evaluate,
     Upload,
+    /// SynchronizeApp(upload) at the end of an exit sync with nothing to upload.
+    /// Every job with the `up` bit sends Steam `Cloud.SignalAppExitSyncDone` at
+    /// its end (guard 0x60fcf0, also with no file to upload), as Valve's client
+    /// ends every game's exit sync. Without it Steam keeps the session as an
+    /// `UploadPending` operation and refuses later launch downloads (korri#595).
+    ExitNotice,
     /// SynchronizeApp(download, AutoCloud launch): one "AC Launch,down," job.
     DownloadForLaunch,
     /// RunAutoCloudOnAppLaunch, then start the queue; the result to report after it.
@@ -776,6 +792,11 @@ fn next_step(kind: JobKind, state: u32, in_progress: bool, progress: Progress) -
         1 | 8 => SyncStep::Finish("evaluation_incomplete"),
         5 if progress.uploads < MAX_UPLOADS => SyncStep::Upload,
         5 => SyncStep::Finish("upload_incomplete"),
+        // Nothing to upload: still end the exit sync with an `up` job. In 4 the
+        // job has no local change to upload; the remote change stays for the
+        // next launch. 6 and 7 are left alone: an `up` job would upload local
+        // changes next to remote ones, or stop on the conflict.
+        2 | 4 if kind == JobKind::Exit && progress.uploads == 0 => SyncStep::ExitNotice,
         2 => SyncStep::Finish("synchronized"),
         4 => SyncStep::Finish("remote_changes_not_downloaded"),
         6 => SyncStep::Finish("local_and_remote_changes_not_synced"),
@@ -1446,14 +1467,15 @@ impl Cloud {
                     job.progress.launch_pass = Some(result);
                     job.awaiting_start_until = Some(now + START_GRACE);
                 }
-                SyncStep::Upload => {
+                step @ (SyncStep::Upload | SyncStep::ExitNotice) => {
                     let accepted = self.storage.upload(appid);
                     job.progress.uploads += 1;
                     job.awaiting_start_until = Some(now + START_GRACE);
                     json(
                         out,
                         &format!(
-                            r#"{{"event":"cloud_call","call":"SynchronizeApp","appid":{appid},"direction":"upload","accepted":{accepted}}}"#
+                            r#"{{"event":"cloud_call","call":"SynchronizeApp","appid":{appid},"direction":"upload","exit_notice":{},"accepted":{accepted}}}"#,
+                            step == SyncStep::ExitNotice
                         ),
                     )?;
                 }
@@ -2301,6 +2323,14 @@ const QR_TIMEOUT_VARIABLE: &str = "KORRI_STEAM_QR_SECONDS";
 const QR_TIMEOUT_MAX: u64 = 1800;
 /// The name the Steam mobile app shows for this device.
 const DEVICE_NAME_VARIABLE: &str = "KORRI_STEAM_DEVICE_NAME";
+/// The device's name for Steam (korrid gives the device's Korri title): the
+/// QR sign-in's device name and the engine's machine name. A name Steam could
+/// not show as one line is no name.
+fn device_name(value: Option<&str>) -> Option<String> {
+    let name = value?.trim();
+    (!name.is_empty() && name.len() <= 64 && !name.chars().any(char::is_control))
+        .then(|| name.to_owned())
+}
 const MAX_SUBSCRIBED_APPS: usize = 1 << 16;
 // After `signout`, LogOff gets this long to reach logon state 0.
 const SIGNOUT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -2531,10 +2561,8 @@ fn run(out: &mut File) -> Result<(), String> {
         INSTALL_TIMEOUT_MAX,
     )?;
     let qr_timeout = seconds_variable(QR_TIMEOUT_VARIABLE, DEFAULT_QR_TIMEOUT, QR_TIMEOUT_MAX)?;
-    let device_name = env::var(DEVICE_NAME_VARIABLE)
-        .ok()
-        .filter(|n| !n.trim().is_empty() && n.len() <= 64)
-        .unwrap_or_else(|| "Korri".into());
+    let machine_name = device_name(env::var(DEVICE_NAME_VARIABLE).ok().as_deref());
+    let device_name = machine_name.clone().unwrap_or_else(|| "Korri".into());
     let home = PathBuf::from(env::var_os("HOME").ok_or("HOME is required")?);
     if !home.is_absolute() {
         return Err("HOME must be absolute".into());
@@ -2682,6 +2710,14 @@ fn run(out: &mut File) -> Result<(), String> {
         };
         check_slots(user, base, expected)?;
         session.user = user;
+        // Before any logon, which sends it: without a name Steam lists this
+        // device's cloud operations "from machine ''" (korri#595).
+        if let Some(name) = &machine_name {
+            let name = cstring(name.as_bytes(), "device name")?;
+            let set_machine_name: SetMachineName = slot(user, USER_SET_MACHINE_NAME.0);
+            set_machine_name(user, name.as_ptr());
+            json(out, r#"{"event":"machine_name","set":true}"#)?;
+        }
         // The interface-set builder stores only the IPC proxy at the getter's field,
         // so accept only the proxy vtable; calls go through the engine's IPC thread.
         let get_storage: GetUser = slot(engine, ENGINE_GET_REMOTE_STORAGE.0);
@@ -4351,6 +4387,66 @@ mod tests {
             next_step(Exit, 2, false, done(1, 1)),
             SyncStep::Finish("synchronized")
         );
+    }
+    /// korri#595: Steam hears that the session ended only from an `up` job,
+    /// so an exit sync with nothing to upload still ends with one, once.
+    #[test]
+    fn every_exit_sync_ends_with_an_upload_job_that_sends_the_exit_notice() {
+        use JobKind::*;
+        for state in [2, 4] {
+            assert_eq!(
+                next_step(Exit, state, false, done(1, 0)),
+                SyncStep::ExitNotice
+            );
+        }
+        assert_eq!(
+            next_step(Exit, 2, false, done(1, 1)),
+            SyncStep::Finish("synchronized")
+        );
+        assert_eq!(
+            next_step(Exit, 4, false, done(1, 1)),
+            SyncStep::Finish("remote_changes_not_downloaded")
+        );
+        // Local changes upload as before; that job sends the notice itself.
+        assert_eq!(next_step(Exit, 5, false, done(1, 0)), SyncStep::Upload);
+        // Nothing is uploaded next to remote changes or over a conflict.
+        assert_eq!(
+            next_step(Exit, 6, false, done(1, 0)),
+            SyncStep::Finish("local_and_remote_changes_not_synced")
+        );
+        assert_eq!(
+            next_step(Exit, 7, false, done(1, 0)),
+            SyncStep::Finish("conflict_not_resolved")
+        );
+        // Only a game session ends with the notice; `sync` is no session.
+        assert_eq!(
+            next_step(Sync, 2, false, done(1, 0)),
+            SyncStep::Finish("synchronized")
+        );
+        assert_eq!(
+            next_step(Sync, 4, false, done(1, 0)),
+            SyncStep::Finish("remote_changes_not_downloaded")
+        );
+    }
+    #[test]
+    fn the_device_name_is_one_short_line_or_none() {
+        assert_eq!(
+            device_name(Some(" Living room ")).as_deref(),
+            Some("Living room")
+        );
+        assert_eq!(
+            device_name(Some("OnePlus 6 Korri")).as_deref(),
+            Some("OnePlus 6 Korri")
+        );
+        for bad in ["", "   ", "two\nlines", "tab\there"] {
+            assert_eq!(device_name(Some(bad)), None, "{bad:?}");
+        }
+        assert_eq!(device_name(Some(&"x".repeat(65))), None);
+        assert_eq!(
+            device_name(Some(&"x".repeat(64))).map(|n| n.len()),
+            Some(64)
+        );
+        assert_eq!(device_name(None), None);
     }
     #[test]
     fn app_manager_install_arguments() {

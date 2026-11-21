@@ -159,6 +159,23 @@ lock, sends `install`, then `launched`, starts no game on a Steam Cloud
 `conflict` (`STATUS=plugin-launch: steam-cloud-conflict`), plays the game
 through Proton with the x-placeholder window, and sends `exited`.
 
+### The end of a session and the device's name (korri#595)
+
+Steam hears that a game session ended only from `Cloud.SignalAppExitSyncDone`.
+The engine sends it at the end of every sync job that has the `up` bit, also
+when there is nothing to upload. So the exit sync always ends with one
+`SynchronizeApp` upload call, as Valve's client ends it: with nothing to upload
+(state 2, or 4 with only remote changes) the call is the exit notice
+(`cloud_call` with `"exit_notice":true`). States 6 and 7 still upload
+nothing. Without the notice Steam kept the session as an `UploadPending`
+operation "from machine ''" and refused the next launch's download.
+
+korrid passes the device's Korri title as `KORRI_STEAM_DEVICE_NAME`. The host
+uses it as the QR sign-in's device name and, before the logon, as the engine's
+machine name (`IClientUser::SetUserMachineName`, a map entry since korri#595),
+which Steam shows for this device's cloud operations. Without the variable the
+host sets no machine name.
+
 ### Steamworks games: `legacycompat` (korri#589)
 
 A Steamworks game's `steam_api` loads the `steamclient.dll` or

@@ -71,6 +71,9 @@ const USER: &[(&str, &str)] = &[
     ("USER_SET_LOGIN_TOKEN", "SetLoginToken"),
     // list-apps: uint32 GetSubscribedApps(AppId_t *list, uint32 max, bool includeFree).
     ("USER_GET_SUBSCRIBED_APPS", "GetSubscribedApps"),
+    // void SetUserMachineName(const char *): the name Steam shows for this
+    // device's cloud operations, sent with the logon (korri#595).
+    ("USER_SET_MACHINE_NAME", "SetUserMachineName"),
 ];
 const REMOTE_STORAGE: &[(&str, &str)] = &[
     ("IS_CLOUD_ENABLED_FOR_ACCOUNT", "IsCloudEnabledForAccount"),
