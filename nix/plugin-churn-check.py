@@ -313,16 +313,20 @@ def main():
                     # The custom FAKE-08 core has no GTK/SDL native dependency;
                     # only its frontend and settings use that fetch graph.
                     # libretro-core-info is data fetched without OpenSSH.
+                    # Steam's legacycompat unpack program is a Python script
+                    # in a shell wrapper; it has no toolchain-built input.
                     expected_declared = {key for key in baseline['declared_packages']
                                          if key.split(':')[0] in runtime_plugins
-                                         and not key.endswith((':autoconfig', ':fake08', ':core-info'))}
+                                         and not key.endswith((':autoconfig', ':fake08', ':core-info',
+                                                               ':steam-legacycompat-unpack'))}
                     # The fixture holds Sunshine's approved package itself.
                     # Gamescope's display-change shell hook uses bash, coreutils
                     # and X tools, not the OpenSSH-backed GTK/SDL fetch graph.
                     expected_declared |= {key for key in baseline['declared_packages']
                                           if key.split(':')[0] in fetch_graph_plugins
                                           and key not in {'korri-plugin-sunshine:sunshine',
-                                                          'korri-plugin-gamescope:display-change'}}
+                                                          'korri-plugin-gamescope:display-change',
+                                                          'korri-plugin-steam:steam-legacycompat-unpack'}}
                     expected_declared.add('korri-plugin-ssh:openssh')
                 if declared_changes != expected_declared:
                     raise AssertionError(
