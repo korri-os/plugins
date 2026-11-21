@@ -1,0 +1,10 @@
+StorePath: /nix/store/z5qrih6hdm62a658yvpljqrk5f9brzp4-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-eae4ae220f5d-tailscale-signin/11niich8n33s7424128azzmd4zv35dy45myjrgdq4dlnrinzwqh1.nar.xz
+Compression: xz
+FileHash: sha256:11niich8n33s7424128azzmd4zv35dy45myjrgdq4dlnrinzwqh1
+FileSize: 13912
+NarHash: sha256:1dlb9p4d77ckw9sq7kqf2wy7gmrrs5y40k81qv9b6yd95s69zpkm
+NarSize: 57416
+References: 0jn7zjq62zb2r6nql2vhnaf321mi5qgw-retroarch-bare-1.22.2 7fmg8lgg5wv5msb0hlqbh5v54jqd6c4j-libretro-core-info-1.22.2 95h079dqxg7hj5h20wcnrv4ydiiz3f2d-retroarch-source-checked-settings-1.22.2 k8r9mn046df0dsmzz9nhr9y5vr6mmgdd-libretro-gambatte-0-unstable-2026-08-21 r2jfkg289bjbpylmdw1w3ajrm1l7qi6l-korri-inputplumber-retroarch-autoconfig-1.22.0
+Deriver: 1callzkl7nb1g16l1x94dr0akm6qgsqi-korri-plugin.drv
+Sig: korri-plugins-1:79cQVDeN081gTplF85Kj6Zw0lGMVgMv08uejD2XvEiwF7s5EhpVcCeHll4iNdoMzVgiu5KC/x4Fi3243hoXQDQ==

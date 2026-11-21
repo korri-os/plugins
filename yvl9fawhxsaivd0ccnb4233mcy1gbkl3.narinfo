@@ -1,0 +1,10 @@
+StorePath: /nix/store/yvl9fawhxsaivd0ccnb4233mcy1gbkl3-unit-tailscaled.service
+URL: https://github.com/korri-os/plugins/releases/download/build-eae4ae220f5d-tailscale-signin/1231v63i9lm0play6nl2ka61acc4cjhxp9ym1ffxvy5ijdwzkam0.nar.xz
+Compression: xz
+FileHash: sha256:1231v63i9lm0play6nl2ka61acc4cjhxp9ym1ffxvy5ijdwzkam0
+FileSize: 440
+NarHash: sha256:0ba8qic2ig9m2n7m6zp7i3vlzn8pr6rzx3p9g95dfhkpscpq3i4h
+NarSize: 784
+References: 8cy6ll8fsx7ykn8jqv1phw4f3lcgjwv1-tailscale-1.104.1
+Deriver: mkdbb61ngld7dnzqy7pab8vhm1c7f1nv-unit-tailscaled.service.drv
+Sig: korri-plugins-1:PyygJj/db3bSeU8i8NlXsnBelq5ALxj81oIiQl0fusWFfq+nhtL56GQrCMercrtTLsb2M5frGHmq9cAFJWz0Dg==
