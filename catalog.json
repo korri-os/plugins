@@ -1,75 +1,18 @@
 {
   "latest": {
-    "@korri:fex": "build-dab3e5ee8a32-steam-engine-6",
-    "@korri:proton": "build-dab3e5ee8a32-steam-engine-6",
-    "@korri:steam": "build-dab3e5ee8a32-steam-engine-6"
+    "@korri:steamgriddb": "build-a2e9fbe57689-velvet-art"
   },
   "records": [
     {
-      "archive_sha256": "0a1505806d6f163740f4bea761d30d903a8f9e3cda40b05641616214ab6514e6",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-f4b88e9a79c2dcaf9b136829590bcc72b5fe1bf1bd62836d3218927400df738d-build-dab3e5ee8a32-steam-engine-6-aarch64-linux.tar",
-      "description": "FEX x86 emulation runtime: its configuration and the pinned x86 rootfs.",
-      "platform": "aarch64-linux",
-      "plugin_id": "@korri:fex",
+      "archive_sha256": "1a0283026c392bc03a390c85de094b76a1e8a9686a5f4d523ec081ae7dc8d116",
+      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-a2e9fbe57689-velvet-art/korri-plugin-24c67d64fdc58274309c13b40394cbf8b0eb4600daeef5e2c6bd80a03d3ea102-build-a2e9fbe57689-velvet-art-any.tar",
+      "description": "Finds pictures (tiles, posters, heroes) and logos for each game on SteamGridDB, with your own API key.",
+      "platform": "any",
+      "plugin_id": "@korri:steamgriddb",
       "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-dab3e5ee8a32-steam-engine-6",
-      "store_path": "/nix/store/pm36g2qq94zwb8vfsz0k6sdss4x1rz1b-korri-plugin",
-      "title": "FEX"
-    },
-    {
-      "archive_sha256": "102ba4aa01923d5154488845542b5f7660ead882876b4e4718c7e55dd8c72c38",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-f4b88e9a79c2dcaf9b136829590bcc72b5fe1bf1bd62836d3218927400df738d-build-dab3e5ee8a32-steam-engine-6-x86_64-linux.tar",
-      "description": "FEX x86 emulation runtime: its configuration and the pinned x86 rootfs.",
-      "platform": "x86_64-linux",
-      "plugin_id": "@korri:fex",
-      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-dab3e5ee8a32-steam-engine-6",
-      "store_path": "/nix/store/xj192clw012kpnyr369sbi50sx0v8s4s-korri-plugin",
-      "title": "FEX"
-    },
-    {
-      "archive_sha256": "74f644076acd02944d76eacef7110a836d5ade275467680c79430e367a23b77e",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-bf8a2e7ae8b462321f88a44a74ed79b6b5e2edaedaf2c69beb5db1833dc59d94-build-dab3e5ee8a32-steam-engine-6-aarch64-linux.tar",
-      "description": "Proton compatibility tools: the pinned Proton-CachyOS build for this device.",
-      "platform": "aarch64-linux",
-      "plugin_id": "@korri:proton",
-      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-dab3e5ee8a32-steam-engine-6",
-      "store_path": "/nix/store/6ijvfj8pldi4ar790xxhbcvj4l6abddy-korri-plugin",
-      "title": "Proton"
-    },
-    {
-      "archive_sha256": "f8949bdf644dd5bdb3986041e39d3f1aa75972dd0ff0217e0c42345e534bd74d",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-bf8a2e7ae8b462321f88a44a74ed79b6b5e2edaedaf2c69beb5db1833dc59d94-build-dab3e5ee8a32-steam-engine-6-x86_64-linux.tar",
-      "description": "Proton compatibility tools: the pinned Proton-CachyOS build for this device.",
-      "platform": "x86_64-linux",
-      "plugin_id": "@korri:proton",
-      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-dab3e5ee8a32-steam-engine-6",
-      "store_path": "/nix/store/qzqi8qb8z9461c0k30hjk7q3566wkgh4-korri-plugin",
-      "title": "Proton"
-    },
-    {
-      "archive_sha256": "035ce653244089d8ef400dc4bc13e63280ca7e9cf91fb40106faea9fbfeb787f",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-dab3e5ee8a32-steam-engine-6-aarch64-linux.tar",
-      "description": "Runs Steam content through the native session program.",
-      "platform": "aarch64-linux",
-      "plugin_id": "@korri:steam",
-      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-dab3e5ee8a32-steam-engine-6",
-      "store_path": "/nix/store/9nhv44nqr4sxj9l2dg3cy9wslrsncgi7-korri-plugin",
-      "title": "Steam"
-    },
-    {
-      "archive_sha256": "8cc470e347ac448dda63e1a0a0b0fba8f092bfe80e9e530595841c6d5c47e8b5",
-      "archive_url": "https://github.com/korri-os/plugins/releases/download/build-dab3e5ee8a32-steam-engine-6/korri-plugin-23115467c957d591834e001e3bf49396555fff118952ec4694bd79b3f7c4b29d-build-dab3e5ee8a32-steam-engine-6-x86_64-linux.tar",
-      "description": "Runs Steam content through the native session program.",
-      "platform": "x86_64-linux",
-      "plugin_id": "@korri:steam",
-      "publicKey": "korri-plugins-1:qlK5Mgb3dYhF76WC4jGhrvL+CHsU93De7GpBFtrXb98=",
-      "release_version": "build-dab3e5ee8a32-steam-engine-6",
-      "store_path": "/nix/store/y3wb3612ydcr7fvd1wc9k5gnh2i3rghd-korri-plugin",
-      "title": "Steam"
+      "release_version": "build-a2e9fbe57689-velvet-art",
+      "store_path": "/nix/store/4par9c55khyv81r78xrbwkh5amj0qcsx-korri-plugin",
+      "title": "SteamGridDB"
     }
   ]
 }

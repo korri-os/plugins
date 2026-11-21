@@ -1,0 +1,10 @@
+StorePath: /nix/store/d851w8llsnpf7y9fns6yn870iassf0ik-korri-plugin
+URL: https://github.com/korri-os/plugins/releases/download/build-a2e9fbe57689-velvet-art/13jgv8ya0ng4v2a8ykrd1kk4w137hhzyaj3g4rq78cj2jj7ddna0.nar.xz
+Compression: xz
+FileHash: sha256:13jgv8ya0ng4v2a8ykrd1kk4w137hhzyaj3g4rq78cj2jj7ddna0
+FileSize: 6136
+NarHash: sha256:0k3hrhzcvs99f582cwiinjy4rgkrwd32rcnvaf8fk69vcsd5dj99
+NarSize: 17832
+References: 
+Deriver: dri0a8p41y64clc9lh45bm5ncqbpavy0-korri-plugin.drv
+Sig: korri-plugins-1:pd4GFUL3p2VxQmVCI7kCYg+p+TGMUdwve11K7EUQngQgisV7mZSDAnict++Phpos4lNrxUz7l5o+kl7UtBHsCg==
