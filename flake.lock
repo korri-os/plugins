@@ -78,17 +78,17 @@
         "tabs6-nixpkgs": "tabs6-nixpkgs"
       },
       "locked": {
-        "lastModified": 1795225410,
-        "narHash": "sha256-ABplSWs0Uvpx4TU7YCfYWj304BNBiJ9Dknx5zGsPutA=",
+        "lastModified": 1795237155,
+        "narHash": "sha256-pGJR+K6PWUiQbBtxQ+vyJKE6FxZdE+MsDdp4gw+MAz8=",
         "owner": "korri-os",
         "repo": "korri",
-        "rev": "db8a3779aef1daa89b87d4b35c75dc1d68fecffc",
+        "rev": "7ad834303cef21a85d949969f22fdf788e571db6",
         "type": "github"
       },
       "original": {
         "owner": "korri-os",
         "repo": "korri",
-        "rev": "db8a3779aef1daa89b87d4b35c75dc1d68fecffc",
+        "rev": "7ad834303cef21a85d949969f22fdf788e571db6",
         "type": "github"
       }
     },
