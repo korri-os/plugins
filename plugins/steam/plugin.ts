@@ -179,8 +179,10 @@ function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   // korrid passes this plugin's own artifacts under their local keys.
   requiredPath(input.artifacts, ENGINE_PACKAGE_KEY)
   const launch = steamLaunch(input, "STEAM_ENGINE_HOME", ENGINE_FOLDER)
-  launch.env.KORRI_STEAM_LEGACYCOMPAT = requiredPath(input.artifacts, LEGACYCOMPAT_KEY)
-  return launch
+  return {
+    ...launch,
+    env: { ...launch.env, KORRI_STEAM_LEGACYCOMPAT: requiredPath(input.artifacts, LEGACYCOMPAT_KEY) },
+  }
 }
 
 // Ported from legacy product/plugins/steam/src/discovery.ts and
