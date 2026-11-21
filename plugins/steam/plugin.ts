@@ -38,6 +38,18 @@ export const systems = {
 const ENGINE_PACKAGE_KEY = "engine-package"
 const ENGINE_PACKAGE =
   "bins_sdk_linuxarm64_linuxarm64.zip.vz.1424aaa33c34c7aa1b6f356fcda3678c210a62d6_10044409"
+// korri#589: Valve's `legacycompat/` folder (steamclient.dll,
+// steamclient64.dll, Steam.dll, ...), which Proton copies into every prefix
+// from the Steam folder. A Steamworks game loads that steamclient(64).dll, and
+// Proton points its exports at lsteamclient and the engine's steamclient.so.
+// The engine package does not ship it; Valve's `bins_misc_linuxarm64` package
+// of the same manifest (`steam_client_steamdeck_stable_linuxarm64`, version
+// 1792618285) does, by name and `sha2vz`. Its legacycompat entries are links,
+// which korrid's own reader refuses, so the plugin's unpack program writes the
+// folder.
+const LEGACYCOMPAT_KEY = "legacycompat"
+const LEGACYCOMPAT_PACKAGE =
+  "bins_misc_linuxarm64.zip.vz.c1fe69f2ddbbfd3d89ae14f20185fcf878df5cc8_19812282"
 export const artifacts = {
   "engine-package": {
     id: `${PLUGIN_ID}/engine-package`,
@@ -54,6 +66,23 @@ export const artifacts = {
         ],
       },
     },
+  },
+  legacycompat: {
+    id: `${PLUGIN_ID}/${LEGACYCOMPAT_KEY}`,
+    title: "Steam Windows client files (Valve)",
+    platforms: {
+      "aarch64-linux": {
+        version: "1792618285",
+        files: [
+          {
+            url: `https://client-update.steamstatic.com/${LEGACYCOMPAT_PACKAGE}`,
+            sha256: "sha256:8888138451bc088adb1ce222a22d63214c1d3b249a06604c844634dfd9a004b3",
+            bytes: 19812282,
+          },
+        ],
+      },
+    },
+    unpack: "steam-legacycompat-unpack",
   },
 }
 
@@ -86,7 +115,12 @@ export const runners = {
       { key: "sync", label: "Syncing saves" },
       { key: "game", label: "Starting the game" },
     ],
-    artifacts: ["@korri:fex/rootfs", "@korri:proton/cachyos", `${PLUGIN_ID}/${ENGINE_PACKAGE_KEY}`],
+    artifacts: [
+      "@korri:fex/rootfs",
+      "@korri:proton/cachyos",
+      `${PLUGIN_ID}/${ENGINE_PACKAGE_KEY}`,
+      `${PLUGIN_ID}/${LEGACYCOMPAT_KEY}`,
+    ],
   },
 }
 
@@ -144,7 +178,9 @@ function prepareLaunch(input: PluginLaunchInput): PluginLaunchOutput {
   }
   // korrid passes this plugin's own artifacts under their local keys.
   requiredPath(input.artifacts, ENGINE_PACKAGE_KEY)
-  return steamLaunch(input, "STEAM_ENGINE_HOME", ENGINE_FOLDER)
+  const launch = steamLaunch(input, "STEAM_ENGINE_HOME", ENGINE_FOLDER)
+  launch.env.KORRI_STEAM_LEGACYCOMPAT = requiredPath(input.artifacts, LEGACYCOMPAT_KEY)
+  return launch
 }
 
 // Ported from legacy product/plugins/steam/src/discovery.ts and

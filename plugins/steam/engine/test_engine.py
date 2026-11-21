@@ -168,8 +168,103 @@ class LaunchEntryTests(unittest.TestCase):
 
 # What packages/engine.nix puts on the session program's PATH: coreutils,
 # gnugrep, gnused, jq, python3, util-linux (flock); systemd-notify is faked.
-SESSION_TOOLS = ["cat", "dirname", "head", "mkdir", "seq", "sleep", "stat", "tail",
+SESSION_TOOLS = ["cat", "dirname", "head", "ln", "mkdir", "seq", "sleep", "stat", "tail",
                  "timeout", "tr", "true", "grep", "sed", "jq", "python3", "flock"]
+
+
+def vz(zip_bytes):
+    """A Valve VZa package of zip_bytes (layout in legacycompat-unpack.py)."""
+    import lzma
+    import zlib
+    filters = [{"id": lzma.FILTER_LZMA1, "dict_size": 1 << 20, "lc": 3, "lp": 0, "pb": 2}]
+    stream = lzma.compress(zip_bytes, format=lzma.FORMAT_RAW, filters=filters)
+    props = bytes([3 + 0 * 9 + 2 * 45]) + struct.pack("<I", 1 << 20)
+    return (b"VZa" + struct.pack("<I", 0) + props + stream
+            + struct.pack("<II", zlib.crc32(zip_bytes) & 0xFFFFFFFF, len(zip_bytes)) + b"zv")
+
+
+def valve_zip(extra=(), links=None):
+    """bins_misc's shape: real DLLs at the root, legacycompat links named with a backslash."""
+    import io
+    import zipfile
+    out = io.BytesIO()
+    links = {"steamclient.dll": "../steamclient.dll", "steamclient64.dll": "../steamclient64.dll",
+             "GameOverlayRenderer64.dll": "../GameOverlayRenderer64.dll"} if links is None else links
+    with zipfile.ZipFile(out, "w") as archive:
+        archive.writestr("legacycompat/", b"")
+        for name in ("steamclient.dll", "steamclient64.dll", "GameOverlayRenderer64.dll",
+                     "ubuntu12_64/disk-free"):
+            archive.writestr(name, f"MZ {name}".encode())
+        archive.writestr("legacycompat/Steam.dll", b"MZ Steam.dll")
+        for name, target in links.items():
+            info = zipfile.ZipInfo("legacycompat\\" + name)
+            info.create_system = 3
+            info.external_attr = (0o120755 << 16)
+            archive.writestr(info, target.encode())
+        for name, data in extra:
+            archive.writestr(name, data)
+    return out.getvalue()
+
+
+class LegacycompatUnpackTests(unittest.TestCase):
+    """steam-legacycompat-unpack on Valve-shaped packages (korri#589)."""
+
+    def unpack(self, package):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        (root / "work").mkdir()
+        (root / "package.zip.vz").write_bytes(package)
+        result = subprocess.run([sys.executable, str(HERE / "legacycompat-unpack.py"), str(root / "work"),
+                                 str(root / "package.zip.vz")], capture_output=True, text=True)
+        return result, root / "work"
+
+    def test_writes_valves_legacycompat_folder_with_its_links_as_files(self):
+        result, work = self.unpack(vz(valve_zip()))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(sorted(p.name for p in work.iterdir()), ["legacycompat"])
+        folder = work / "legacycompat"
+        self.assertEqual(sorted(p.name for p in folder.iterdir()),
+                         ["GameOverlayRenderer64.dll", "Steam.dll", "steamclient.dll", "steamclient64.dll"])
+        for path in folder.iterdir():
+            self.assertFalse(path.is_symlink(), path)
+        self.assertEqual((folder / "steamclient64.dll").read_bytes(), b"MZ steamclient64.dll")
+        self.assertEqual((folder / "Steam.dll").read_bytes(), b"MZ Steam.dll")
+
+    def test_refuses_a_link_that_leads_anywhere_else(self):
+        for target in ("/etc/passwd", "../../steamclient.dll", "../ubuntu12_64/disk-free", "../missing.dll"):
+            with self.subTest(target=target):
+                result, work = self.unpack(vz(valve_zip(links={"steamclient.dll": target,
+                                                              "steamclient64.dll": "../steamclient64.dll"})))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertFalse((work / "legacycompat").exists())
+
+    def test_refuses_a_package_without_the_steamclient_dlls(self):
+        result, _ = self.unpack(vz(valve_zip(links={})))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("steamclient.dll", result.stderr)
+
+    def test_refuses_a_damaged_or_foreign_package(self):
+        good = vz(valve_zip())
+        for package in (good[:-20] + good[-10:], b"PK\x03\x04" + good[4:], good[:-6] + b"\xff\xff\xff\x7fzv"):
+            result, work = self.unpack(package)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertFalse((work / "legacycompat").exists())
+
+    def test_writes_nothing_outside_the_folder_and_refuses_unsafe_names(self):
+        # Entries deeper than legacycompat/<name> are not part of the folder.
+        for name in ("legacycompat/../x.dll", "legacycompat/sub/x.dll", "x/legacycompat/y.dll"):
+            with self.subTest(name=name):
+                result, work = self.unpack(vz(valve_zip(extra=((name, b"x"),))))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                written = sorted(str(p.relative_to(work)) for p in work.rglob("*"))
+                self.assertEqual([p for p in written if "x.dll" in p or "y.dll" in p or "sub" in p], [])
+        for name in ("legacycompat/.hidden", "legacycompat\\a:b.dll"):
+            with self.subTest(name=name):
+                result, work = self.unpack(vz(valve_zip(extra=((name, b"x"),))))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertFalse((work / "legacycompat").exists())
 
 
 class SessionScriptTests(unittest.TestCase):
@@ -356,7 +451,7 @@ def _named(uid):
 
 class EngineSessionTests(unittest.TestCase):
     def run_session(self, behavior="normal", entry=None, both=False, installed=(), files=("bin/game.exe",),
-                    folders=(), prepare=None):
+                    folders=(), prepare=None, legacycompat=("steamclient.dll", "steamclient64.dll", "Steam.dll")):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -395,9 +490,15 @@ class EngineSessionTests(unittest.TestCase):
         fhs.chmod(0o755)
         proton = root / "proton-tool"
         proton.mkdir()
+        # korrid's ready legacycompat artifact (korri#589).
+        artifact = root / "cache/legacycompat/1792618285"
+        (artifact / "legacycompat").mkdir(parents=True)
+        for name in legacycompat:
+            (artifact / "legacycompat" / name).write_text("MZ")
         (proton / "proton").write_text(
             "import json, os, sys, time\n"
             f"open({str(root / 'game.json')!r}, 'w').write(json.dumps({{'argv': sys.argv[1:], 'cwd': os.getcwd(), "
+            "'legacycompat': os.path.realpath(os.environ['STEAM_COMPAT_CLIENT_INSTALL_PATH'] + '/legacycompat'), "
             "'env': {k: os.environ.get(k) for k in ('SteamAppId', 'STEAM_COMPAT_DATA_PATH', 'Steam3Master', 'HOME', "
             "'STEAM_COMPAT_TOOL_PATHS', 'SDL_JOYSTICK_HIDAPI_STEAMXBOX')}}))\n"
             "time.sleep(0.5)\n")
@@ -422,7 +523,8 @@ class EngineSessionTests(unittest.TestCase):
             (tools / name).symlink_to(found)
         env = {**os.environ, "PATH": f"{bin_dir}:{tools}",
                "STEAM_ENGINE_HOME": str(engine), "KORRI_STEAM_ENGINE_CHANNEL": str(channel),
-               "KORRI_PROTON_CACHYOS": str(proton), "NOTIFY_SOCKET": str(root / "notify")}
+               "KORRI_PROTON_CACHYOS": str(proton), "KORRI_STEAM_LEGACYCOMPAT": str(artifact),
+               "NOTIFY_SOCKET": str(root / "notify")}
         env.pop("DISPLAY", None)
         result = subprocess.run([shutil.which("bash"), str(root / "session.sh"), "401710"], env=env,
                                 capture_output=True, text=True, timeout=60, check=False)
@@ -458,8 +560,33 @@ class EngineSessionTests(unittest.TestCase):
         self.assertEqual(game["env"]["Steam3Master"], "127.0.0.1:57343")
         self.assertEqual(game["env"]["HOME"], str(self.root / "person/steam-engine/home"))
         self.assertEqual(game["env"]["STEAM_COMPAT_DATA_PATH"], f"{steam}/steamapps/compatdata/401710")
+        # Proton finds Valve's legacycompat folder in the Steam folder (korri#589).
+        self.assertEqual(game["legacycompat"], str(self.root / "cache/legacycompat/1792618285/legacycompat"))
         # The lock file names this session's cgroup for the host's pid translation.
         self.assertTrue((self.channel / "session.lock").read_text().startswith("/"))
+
+    def test_a_stale_legacycompat_link_moves_to_the_ready_artifact(self):
+        def stale(root, game_dir):
+            (root / "person/steam-engine/steam/legacycompat").symlink_to(root / "old/legacycompat")
+        result = self.run_session(prepare=stale)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["legacycompat"],
+                         str(self.root / "cache/legacycompat/1792618285/legacycompat"))
+
+    def test_without_the_steamclient_dlls_no_game_starts(self):
+        result = self.run_session(legacycompat=("Steam.dll",))
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertIn("--status=plugin-launch: Steam engine: the Steam client files are missing", self.statuses())
+        self.assertFalse((self.root / "game.json").exists())
+
+    def test_a_legacycompat_folder_that_is_not_a_link_is_left_alone(self):
+        def folder(root, game_dir):
+            (root / "person/steam-engine/steam/legacycompat").mkdir()
+            (root / "person/steam-engine/steam/legacycompat/keep").write_text("x")
+        result = self.run_session(prepare=folder)
+        self.assertEqual(result.returncode, 126, result.stderr)
+        self.assertTrue((self.root / "person/steam-engine/steam/legacycompat/keep").exists())
+        self.assertFalse((self.root / "game.json").exists())
 
     def test_a_failed_install_is_reported_through_the_engine_host(self):
         result = self.run_session("install-fails")

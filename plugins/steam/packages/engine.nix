@@ -72,7 +72,7 @@ let
         echo 'usage: steam-engine-session <appid>' >&2
         exit 2
       fi
-      for name in STEAM_ENGINE_HOME KORRI_STEAM_ENGINE_CHANNEL KORRI_PROTON_CACHYOS; do
+      for name in STEAM_ENGINE_HOME KORRI_STEAM_ENGINE_CHANNEL KORRI_PROTON_CACHYOS KORRI_STEAM_LEGACYCOMPAT; do
         if [[ "''${!name:-}" != /* || ! -d "''${!name}" ]]; then
           echo "steam-engine-session: $name must be an existing absolute directory" >&2
           exit 2
@@ -86,12 +86,22 @@ let
       placeholder = "${../engine/x-placeholder.py}";
     };
   };
+  # The legacycompat artifact's unpack program (korri#589): korrid runs it on
+  # Valve's verified bins_misc package in its unpack sandbox.
+  legacycompatUnpack = pkgs.writeShellApplication {
+    name = "steam-legacycompat-unpack";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec python3 ${../engine/legacycompat-unpack.py} "$@"
+    '';
+  };
 in
 {
   inherit
     host
     hostRun
     session
+    legacycompatUnpack
     fhs
     steps
     ;

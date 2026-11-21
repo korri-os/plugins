@@ -247,6 +247,23 @@ export LIBVA_DRIVERS_PATH=/run/opengl-driver/lib/dri
 export GTK_IM_MODULE=xim
 mkdir -p "$STEAM_COMPAT_DATA_PATH" "$STEAM_COMPAT_SHADER_PATH"
 
+# Valve's legacycompat folder, from korrid's legacycompat artifact (korri#589).
+# Proton copies its steamclient.dll and steamclient64.dll from
+# $STEAM_COMPAT_CLIENT_INSTALL_PATH/legacycompat into the prefix, where the
+# game's steam_api loads them. Proton's ntdll points their exports at
+# lsteamclient, which loads $HOME/.steam/sdkarm64/steamclient.so, the engine.
+# Without the folder, steam_api finds no steamclient.dll and the game cannot
+# start the Steam API. Only a link of this program's is ever replaced.
+legacycompat="$KORRI_STEAM_LEGACYCOMPAT/legacycompat"
+[[ -f "$legacycompat/steamclient.dll" && -f "$legacycompat/steamclient64.dll" ]] ||
+  fail 126 'Steam engine: the Steam client files are missing' "no steamclient DLLs in $legacycompat"
+if [[ -L "$steam/legacycompat" || ! -e "$steam/legacycompat" ]]; then
+  ln -sfnT "$legacycompat" "$steam/legacycompat" ||
+    fail 126 'Steam engine: the Steam client files are missing' "cannot link $steam/legacycompat"
+else
+  fail 126 'Steam engine: the Steam client files are missing' "$steam/legacycompat is not a link"
+fi
+
 # A 1x1 X window that keeps gamescope's toplevel mapped for the whole session.
 # Without it gamescope 3.16.31 can ack a configure that sway dropped and abort
 # (xdg_wm_base error 4) when the first Wine windows map and vanish at once

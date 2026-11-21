@@ -127,6 +127,7 @@ above stays the default. ARM64 only.
 |---|---|
 | Runner, steps `update`, `sync`, `game` | `plugin.ts` `runners.engine` |
 | Engine package `@korri:steam/engine-package` (Valve's `bins_sdk_linuxarm64_linuxarm64` for client 1792618285, by name and `sha2vz`; no `unpack`) | `plugin.ts` `artifacts` |
+| Valve's `legacycompat/` folder `@korri:steam/legacycompat` (Valve's `bins_misc_linuxarm64` for client 1792618285, by name and `sha2vz`; unpack program `steam-legacycompat-unpack`) | `plugin.ts` `artifacts`, `engine/legacycompat-unpack.py` |
 | The Steam provider `@korri:steam`, the plugin's own id (korrid serves search and listing from `list-apps`) | korrid |
 | `korri-steam-host` (Rust, from an engine map) | `engine-host/`, `packages/engine-host.nix` |
 | Its start wrapper: the person's engine folder, then the host in the Steam FHS | `engine/host-run.sh` |
@@ -157,6 +158,36 @@ FIFO), `session.lock`, `host.lock`, `events.jsonl` (the host's stdout) and
 lock, sends `install`, then `launched`, starts no game on a Steam Cloud
 `conflict` (`STATUS=plugin-launch: steam-cloud-conflict`), plays the game
 through Proton with the x-placeholder window, and sends `exited`.
+
+### Steamworks games: `legacycompat` (korri#589)
+
+A Steamworks game's `steam_api` loads the `steamclient.dll` or
+`steamclient64.dll` that the registry names in
+`C:\Program Files (x86)\Steam`. Proton copies both from
+`$STEAM_COMPAT_CLIENT_INSTALL_PATH/legacycompat/` into the prefix. Proton's
+ntdll then loads `lsteamclient` and overwrites each export of that Valve DLL
+with a jump into lsteamclient. lsteamclient loads
+`$HOME/.steam/sdkarm64/steamclient.so`, the engine, which reaches the
+running host. An engine-only folder has no client and so no
+`legacycompat/`: without it the game reports that it cannot load
+`steamclient.dll`.
+
+Valve's `bins_misc_linuxarm64` package of the same manifest carries the
+folder. In that package `legacycompat\steamclient.dll`,
+`legacycompat\steamclient64.dll` and `legacycompat\GameOverlayRenderer64.dll`
+are symbolic links to files at the package root. korrid's own archive reader
+refuses links, so the artifact names the plugin's unpack program.
+`steam-legacycompat-unpack <work-dir> <package>` decodes the VZ package and
+writes only `<work-dir>/legacycompat/`, each link as a copy of its target. It
+refuses a link to any other place and a package without `steamclient.dll`,
+`steamclient64.dll` and `Steam.dll`. `steam-engine-session` links
+`steam/legacycompat` to the ready folder (`KORRI_STEAM_LEGACYCOMPAT`) before
+each launch. It replaces only a link, and refuses the launch if the folder is
+missing or `steam/legacycompat` is a real folder.
+
+The engine also makes `steamapps/common/Steam.dll`, a link to
+`legacycompat/Steam.dll` beside the engine package in korrid's cache. That
+link stays broken: the engine package is a separate artifact.
 
 ### The private engine map in publication
 

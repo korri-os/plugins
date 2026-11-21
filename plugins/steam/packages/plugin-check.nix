@@ -29,7 +29,11 @@ pkgs.runCommand "steam-plugin-package-check"
     for required, keys in ((fex, ['config', 'fex-unpack']), (proton, ['cachyos-unpack'])):
         files = json.loads((required / 'manifest.json').read_text())['files']
         assert sorted(files) == keys, files
-    assert sorted(manifest['files']) == ['korri-steam-host', 'steam-engine-session', 'steam-session'], manifest['files']
+    assert sorted(manifest['files']) == ['korri-steam-host', 'steam-engine-session', 'steam-legacycompat-unpack',
+                                        'steam-session'], manifest['files']
+    unpack = manifest['files']['steam-legacycompat-unpack']
+    result = subprocess.run([unpack], capture_output=True)
+    assert result.returncode == 1 and b'usage' in result.stderr, result.stderr
     # The engine runner's programs refuse a bad start before they touch anything.
     host = manifest['files']['korri-steam-host']
     result = subprocess.run([host], env={'HOME': '/nonexistent/home'}, capture_output=True)

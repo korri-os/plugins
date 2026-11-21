@@ -27,11 +27,14 @@ in
     steam-session = steam.session;
     korri-steam-host = engine.hostRun;
     steam-engine-session = engine.session;
+    steam-legacycompat-unpack = engine.legacycompatUnpack;
   };
   files = {
     "steam-session" = "${steam.session}/bin/steam-session";
     # korrid starts this as the engine runner's host (contract of korri#518).
     "korri-steam-host" = "${engine.hostRun}/bin/korri-steam-host";
     "steam-engine-session" = "${engine.session}/bin/steam-engine-session";
+    # korrid runs this on the legacycompat artifact (plugin.ts `unpack`).
+    "steam-legacycompat-unpack" = "${engine.legacycompatUnpack}/bin/steam-legacycompat-unpack";
   };
 }

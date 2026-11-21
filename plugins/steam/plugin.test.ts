@@ -112,6 +112,7 @@ const engineInput = () => ({
   artifacts: {
     ...launchInput().artifacts,
     "engine-package": "/var/lib/korri/cache/steam/engine-package/1792618285",
+    legacycompat: "/var/lib/korri/cache/steam/legacycompat/1792618285",
   },
 })
 
@@ -124,6 +125,7 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
     expect(runners.engine.steps[0].label).toBe("Updating")
     expect(runners.engine.artifacts).toEqual([
       "@korri:fex/rootfs", "@korri:proton/cachyos", "@korri:steam/engine-package",
+      "@korri:steam/legacycompat",
     ])
   })
 
@@ -141,13 +143,29 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
     expect(Object.keys(engine.platforms)).toEqual(["aarch64-linux"])
   })
 
+  test("pins Valve's legacycompat package of the same client version, with its unpack program", () => {
+    // korri#589: bins_misc_linuxarm64 of steam_client_steamdeck_stable_linuxarm64
+    // 1792618285 carries legacycompat/ (steamclient.dll, steamclient64.dll, Steam.dll).
+    const legacycompat = artifacts.legacycompat
+    expect(legacycompat.id).toBe("@korri:steam/legacycompat")
+    expect(legacycompat.unpack).toBe("steam-legacycompat-unpack")
+    expect(Object.keys(legacycompat.platforms)).toEqual(["aarch64-linux"])
+    const build = legacycompat.platforms["aarch64-linux"]
+    expect(build.version).toBe(artifacts["engine-package"].platforms["aarch64-linux"].version)
+    expect(build.files).toEqual([{
+      url: "https://client-update.steamstatic.com/bins_misc_linuxarm64.zip.vz.c1fe69f2ddbbfd3d89ae14f20185fcf878df5cc8_19812282",
+      sha256: "sha256:8888138451bc088adb1ce222a22d63214c1d3b249a06604c844634dfd9a004b3",
+      bytes: 19812282,
+    }])
+  })
+
   test("names only its own id and its required plugins' ids, so a test build rewrites one string", () => {
     const declared = JSON.stringify({ ...plugin, handlers: undefined })
     const ids = declared.match(/@[A-Za-z0-9_-]+:[A-Za-z0-9_-]+/g) ?? []
     expect(new Set(ids)).toEqual(new Set(["@korri:steam", "@korri:fex", "@korri:proton"]))
   })
 
-  test("hands the session the person's engine folder, Proton and FEX", () => {
+  test("hands the session the person's engine folder, Proton, FEX and legacycompat", () => {
     const input = engineInput()
     expect(handlers["launch.prepare"](input)).toEqual({
       command: input.program,
@@ -157,16 +175,20 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
         KORRI_PROTON_CACHYOS: "/var/lib/korri/cache/proton/cachyos/11.0-20260601-slr-arm64",
         KORRI_FEX_CONFIG: "/nix/store/fex/share/fex-emu",
         KORRI_FEX_ROOTFS: "/var/lib/korri/cache/fex/rootfs/archlinux-2026-01-08-mesa-26.1.2",
+        KORRI_STEAM_LEGACYCOMPAT: "/var/lib/korri/cache/steam/legacycompat/1792618285",
       },
       directories: ["/var/lib/korri/accounts/a/steam-engine"],
       envUnset: [],
     })
   })
 
-  test("refuses a launch without the engine package or with a ref that is not an appid", () => {
+  test("refuses a launch without the engine package, legacycompat or with a ref that is not an appid", () => {
     const noEngine = engineInput()
     delete (noEngine.artifacts as Record<string, string>)["engine-package"]
     expect(() => handlers["launch.prepare"](noEngine)).toThrow("Steam requires engine-package")
+    const noLegacycompat = engineInput()
+    delete (noLegacycompat.artifacts as Record<string, string>).legacycompat
+    expect(() => handlers["launch.prepare"](noLegacycompat)).toThrow("Steam requires legacycompat")
     expect(() => handlers["launch.prepare"]({ ...engineInput(), ref: "401710;x" })).toThrow("provider ref")
     expect(() => handlers["launch.prepare"]({ ...launchInput(), ref: "" })).toThrow("provider ref")
   })
