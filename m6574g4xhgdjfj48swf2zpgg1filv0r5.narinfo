@@ -1,0 +1,10 @@
+StorePath: /nix/store/m6574g4xhgdjfj48swf2zpgg1filv0r5-steam-session-run
+URL: https://github.com/korri-os/plugins/releases/download/build-0695df1fecda-steam-engine-9/18cy48qah2ghrg7ws117vr7ph27p509w73fj49w2c445gv7b341p.nar.xz
+Compression: xz
+FileHash: sha256:18cy48qah2ghrg7ws117vr7ph27p509w73fj49w2c445gv7b341p
+FileSize: 8536
+NarHash: sha256:0jwh8j2wd0inw05ylks36rzw6d6701z3mpcc1vcpvbpwkcjgbghn
+NarSize: 25208
+References: 2lgg8jqyzjp60svh7kmp39kqwnig31p2-util-linux-2.42.4-bin 4cxn28ri5r4z6z9wbp79g4w020d7g2r4-steam-1.0.0.87 99v13ig4382mngi6ggf0csqi7rfa04j5-findutils-4.11.0 c3f45pxlb81gzz4w1nym7lpznfypva7s-gnugrep-3.12 cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12 fmg6kh4sx6ljgwqnxccc5j7y1ps572j5-systemd-262 hxvczp5n7af5svazbnm0r11bdinfsd4n-steam-vdf-settings nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20 nzsflqrk0zdljly9jhx82l784hl5rmc4-diffutils-3.12 rszbxwc5p9kgiyb4n2rz5b5dn58qlg4m-acl-2.4.0-bin y1dj0w8v0n569annm599ssvszc3kpi2j-steam-session-steps.sh y733samykhd49crbck70qzsl315zq3hw-procps-4.0.7 yrkjgmq8fyyzwnylkm7cyqd5b5j8lqyw-steam-arm64-helpers-1 zwck8p6gis60l3pach2sj4g84xpfxxrz-steam-failure.sh
+Deriver: s8ddfsx76k9qrbr10ksddnakiimrnsfj-steam-session-run.drv
+Sig: korri-plugins-1:XNb0B6/dTbbOzdyiBsrgqDVA3qtoop14I/GlXrY2xvurpoLd46wRfvw5gvzFxSsGCegOuRIpQd5Eepcla30WDA==

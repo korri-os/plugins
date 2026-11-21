@@ -1,0 +1,10 @@
+StorePath: /nix/store/cyyc112sbasmfi25aidcv3v5c162z7hl-legacycompat-unpack.py
+URL: https://github.com/korri-os/plugins/releases/download/build-0695df1fecda-steam-engine-9/1d8kfn9hb28zcskfmrd0n0cjywb0l2vf63qqnyk848isg64diq6d.nar.xz
+Compression: xz
+FileHash: sha256:1d8kfn9hb28zcskfmrd0n0cjywb0l2vf63qqnyk848isg64diq6d
+FileSize: 2804
+NarHash: sha256:0z14kzwa2zji0lx9ywj6pn5kjd1k8p9q9djhhggds00s3rcjsa5k
+NarSize: 6896
+References: 
+Sig: korri-plugins-1:gHApUsR9A2FqnfS9uSMkiw2RKG3OzJ7cisZQ5fY7QYUB7K9oK9PglsHTw+fXomIxtoDA5nzmI2qm1fOcLBIXCw==
+CA: fixed:r:sha256:0z14kzwa2zji0lx9ywj6pn5kjd1k8p9q9djhhggds00s3rcjsa5k

@@ -1,0 +1,10 @@
+StorePath: /nix/store/yh35xsh89sz3lh4p8mfazx0qs1gwxp2s-steam-engine-session-steps.sh
+URL: https://github.com/korri-os/plugins/releases/download/build-0695df1fecda-steam-engine-9/04biyw6jwk0bhwnkycmiwnmsj587kpsrz149p8skzdkh05377617.nar.xz
+Compression: xz
+FileHash: sha256:04biyw6jwk0bhwnkycmiwnmsj587kpsrz149p8skzdkh05377617
+FileSize: 240
+NarHash: sha256:1dpdqs3rmlkix19mdq6vv7lk0n9i49q685ga9lwz04l0bvrqldrp
+NarSize: 272
+References: 
+Deriver: n6qcb8fl6hwr91khkf1c209hialmva0d-steam-engine-session-steps.sh.drv
+Sig: korri-plugins-1:NoRwimx98WKDKe8bG0dQ0PY9w23PjyjlK+emnDdoCTnZ2XFV4ZitAtMC7F/TR8KKbmttNj/e+wtIvjns/iVNCw==
