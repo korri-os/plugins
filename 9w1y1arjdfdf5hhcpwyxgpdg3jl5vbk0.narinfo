@@ -1,0 +1,10 @@
+StorePath: /nix/store/9w1y1arjdfdf5hhcpwyxgpdg3jl5vbk0-steam-session-run
+URL: https://github.com/korri-os/plugins/releases/download/build-3b890f04f72d-steam-engine-12/10sr9j5cw71g7fk8b8msfp8aazm5wnh49flsg32n48a2y90ndb4v.nar.xz
+Compression: xz
+FileHash: sha256:10sr9j5cw71g7fk8b8msfp8aazm5wnh49flsg32n48a2y90ndb4v
+FileSize: 8736
+NarHash: sha256:1mwdqkjzc2glbba9v5sc48xhg7yc95f4xy1vn4cbzbn9l32923pa
+NarSize: 25688
+References: 2lgg8jqyzjp60svh7kmp39kqwnig31p2-util-linux-2.42.4-bin 4cxn28ri5r4z6z9wbp79g4w020d7g2r4-steam-1.0.0.87 7zkvpvb8qmsvb4w80c47r8jycyyg5bhs-steam-session-steps.sh 99v13ig4382mngi6ggf0csqi7rfa04j5-findutils-4.11.0 9wc73n5izv0m7ppjbibi4hbr68rba1lj-gnused-4.10 c3f45pxlb81gzz4w1nym7lpznfypva7s-gnugrep-3.12 cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12 fmg6kh4sx6ljgwqnxccc5j7y1ps572j5-systemd-262 hxvczp5n7af5svazbnm0r11bdinfsd4n-steam-vdf-settings nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20 nzsflqrk0zdljly9jhx82l784hl5rmc4-diffutils-3.12 rszbxwc5p9kgiyb4n2rz5b5dn58qlg4m-acl-2.4.0-bin y733samykhd49crbck70qzsl315zq3hw-procps-4.0.7 yrkjgmq8fyyzwnylkm7cyqd5b5j8lqyw-steam-arm64-helpers-1 zwck8p6gis60l3pach2sj4g84xpfxxrz-steam-failure.sh
+Deriver: z4qy125akmp5rnh5d841qj8rnzgg03wq-steam-session-run.drv
+Sig: korri-plugins-1:jTleEAMRffXrkp4Wx4iaDOeSAL3QtirLGiu6EXvX7iNuV7rbPgxjRkOROwUptnNuOLFeNXBQUxS9uQbtqD2FBg==

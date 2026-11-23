@@ -1,0 +1,10 @@
+StorePath: /nix/store/pq4fzkkqalggyd95kykjr2zwrgzj83w9-steam-session
+URL: https://github.com/korri-os/plugins/releases/download/build-3b890f04f72d-steam-engine-12/0jasxz29rd5pmlv6dsz9njkgymh2wgk5x5fwjwwrbcri9iivfka3.nar.xz
+Compression: xz
+FileHash: sha256:0jasxz29rd5pmlv6dsz9njkgymh2wgk5x5fwjwwrbcri9iivfka3
+FileSize: 952
+NarHash: sha256:10rqk0li2fqp4mng34imk1sj1bvyjb3crwbyqcxpznp8h0wqgb0j
+NarSize: 1952
+References: czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 jpmxjcppk7d5zd70f9smr1nvjpkn06x0-steam-session-run m2ar7c5ylhgg8vp7dfdx9bhjfvki5xdg-coreutils-9.12 y41f5xwsyfzmwh624a5q5xdfaslcv8vf-dbus-1.16.2
+Deriver: zrjwgnm3igv0dq2na6bqb00gp8hhlq39-steam-session.drv
+Sig: korri-plugins-1:aSfPj3KHo80Z4Foohz7PF6kAzwQMYFIx92exia7xa1CLaQQ6vt6S9kLyrHnikqx8MEWvEr3VmWm1xgWR4wUfDA==
