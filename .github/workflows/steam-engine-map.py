@@ -3,8 +3,9 @@
 
 The published @korri:steam carries the engine map compiled into its engine
 host; the map itself is in no repository. It comes from the Actions secret
-STEAM_ENGINE_MAP_TGZ_B64: base64 of `tar czf` of the map folder (one file,
-engine.map, as in plugins/steam/engine-host/map).
+STEAM_ENGINE_MAP_TGZ_B64: base64 of `tar czf` of the map folder: one
+engine.map per system, `aarch64-linux/engine.map` and
+`x86_64-linux/engine.map`, as in plugins/steam/engine-host/map.
 
   steam-engine-map.py setup
       With the secret: unpack the map into $RUNNER_TEMP/steam-engine-map
@@ -38,6 +39,9 @@ import tarfile
 
 SECRET = "STEAM_ENGINE_MAP_TGZ_B64"
 INPUT = "steam-engine-map"
+# The archive's files: one map per system the engine host is published for.
+SYSTEMS = ("aarch64-linux", "x86_64-linux")
+MAPS = tuple(f"{system}/engine.map" for system in SYSTEMS)
 MAX_MAP = 1 << 20
 
 SHIM = """#!{bash}
@@ -73,26 +77,39 @@ def fail(message):
 
 
 def unpack(encoded: str, folder: Path):
-    """The secret's one file, engine.map, into `folder`; no other member."""
+    """The secret's files, <system>/engine.map for each system, into `folder`;
+    no other file. Folder entries of the two systems may be present."""
     try:
         raw = base64.b64decode(encoded.strip(), validate=True)
         archive = tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz")
+        members = {m.name.removeprefix("./").rstrip("/"): m for m in archive.getmembers()}
     except Exception:
         fail(f"{SECRET} is not base64 of a gzip tar")
-    members = [m for m in archive.getmembers() if m.name not in (".", "./")]
-    names = [m.name.removeprefix("./") for m in members]
-    if names != ["engine.map"] or not members[0].isfile() or members[0].size > MAX_MAP:
-        fail(f"{SECRET} must hold exactly one regular file, engine.map")
-    data = archive.extractfile(members[0]).read()
-    lines = [l.strip() for l in data.decode("utf-8", "replace").splitlines()]
-    if "format korri-steam-engine-map 1" not in lines or "status pass" not in lines:
-        fail(f"{SECRET} holds no remap map with status pass")
+    members.pop("", None)
+    members.pop(".", None)
+    for system in SYSTEMS:
+        if system in members and members[system].isdir():
+            del members[system]
+    wrong = sorted(members) != sorted(MAPS) or any(
+        not m.isfile() or m.size > MAX_MAP for m in members.values())
+    if wrong:
+        fail(f"{SECRET} must hold exactly the regular files {' and '.join(MAPS)}")
+    maps = {}
+    for name in MAPS:
+        data = archive.extractfile(members[name]).read()
+        lines = [l.strip() for l in data.decode("utf-8", "replace").splitlines()]
+        if "format korri-steam-engine-map 1" not in lines or "status pass" not in lines:
+            fail(f"{SECRET}: {name} is no remap map with status pass")
+        maps[name] = data
     folder.mkdir(mode=0o700)
     os.chmod(folder, 0o700)
-    target = folder / "engine.map"
-    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "wb") as stream:
-        stream.write(data)
+    for name, data in maps.items():
+        target = folder / name
+        target.parent.mkdir(mode=0o700)
+        os.chmod(target.parent, 0o700)
+        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
 
 
 def setup(environ=os.environ):

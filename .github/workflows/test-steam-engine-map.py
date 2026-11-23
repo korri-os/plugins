@@ -20,6 +20,9 @@ spec.loader.exec_module(tool)
 
 # A made-up map: the shape the build accepts, no real addresses.
 MAP = b"format korri-steam-engine-map 1\nengine sha256 00\nstatus pass\nslot X Y 1 deadbeef\n"
+MAP_X86 = b"format korri-steam-engine-map 1\nengine sha256 11\nstatus pass\nslot X Y 1 feedbeef\n"
+# The secret's layout: one map per system.
+MAPS = {"aarch64-linux/engine.map": MAP, "x86_64-linux/engine.map": MAP_X86}
 
 
 def secret(files):
@@ -27,6 +30,10 @@ def secret(files):
     with tarfile.open(fileobj=raw, mode="w:gz") as archive:
         for name, data in files.items():
             info = tarfile.TarInfo(name)
+            if data is None:
+                info.type = tarfile.DIRTYPE
+                archive.addfile(info)
+                continue
             info.size = len(data)
             archive.addfile(info, io.BytesIO(data))
     return base64.b64encode(raw.getvalue()).decode()
@@ -61,17 +68,24 @@ class SteamEngineMapTests(unittest.TestCase):
         self.assertFalse((self.root / "steam-engine-map").exists())
 
     def test_the_map_is_private_and_the_shim_overrides_only_this_flake(self):
-        value = secret({"engine.map": MAP})
+        # `tar czf` of the folder also holds the two folder entries.
+        value = secret({"./": None, "./aarch64-linux/": None, "./x86_64-linux/": None,
+                        **{"./" + name: data for name, data in MAPS.items()}})
         result = self.run_setup(value)
         self.assertEqual(result.returncode, 0, result.stderr)
         folder = self.root / "steam-engine-map"
         self.assertEqual(os.stat(folder).st_mode & 0o777, 0o700)
-        self.assertEqual(os.stat(folder / "engine.map").st_mode & 0o777, 0o600)
-        self.assertEqual((folder / "engine.map").read_bytes(), MAP)
+        self.assertEqual(sorted(str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_file()),
+                         sorted(MAPS))
+        for name, data in MAPS.items():
+            self.assertEqual(os.stat(folder / name).st_mode & 0o777, 0o600)
+            self.assertEqual(os.stat((folder / name).parent).st_mode & 0o777, 0o700)
+            self.assertEqual((folder / name).read_bytes(), data)
         # Neither the secret nor any map line reaches the job's output.
         for output in (result.stdout, result.stderr):
             self.assertNotIn(value, output)
             self.assertNotIn("deadbeef", output)
+            self.assertNotIn("feedbeef", output)
             self.assertNotIn("sha256", output)
         self.assertIn(f"STEAM_ENGINE_MAP_DIR={folder}", self.env_file.read_text())
         self.assertIn(f"STEAM_ENGINE_REAL_NIX={self.real}", self.env_file.read_text())
@@ -91,8 +105,13 @@ class SteamEngineMapTests(unittest.TestCase):
                          ["copy", "--to", "file:///c", "/nix/store/x-y"])
 
     def test_a_wrong_archive_is_refused_without_printing_it(self):
-        for files in ({"other": MAP}, {"engine.map": MAP, "extra": b"x"},
-                      {"engine.map": b"status refused\n"}):
+        for files in ({"other": MAP}, {**MAPS, "extra": b"x"},
+                      # the one-file layout from before the x86_64 map
+                      {"engine.map": MAP},
+                      # one system only
+                      {"aarch64-linux/engine.map": MAP},
+                      {**MAPS, "riscv64-linux/engine.map": MAP},
+                      {**MAPS, "x86_64-linux/engine.map": b"status refused\n"}):
             value = secret(files)
             result = self.run_setup(value)
             self.assertEqual(result.returncode, 1, files.keys())

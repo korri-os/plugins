@@ -1,6 +1,7 @@
 # korri-steam-host from its Rust source and one engine map (ADR 0083).
-# `engineMap` is a folder that holds engine.map: the public empty map, or the
-# private map of the pinned engine (flake input `steam-engine-map`).
+# `engineMap` is a folder that holds `<system>/engine.map` for each system: the
+# public empty maps, or the private maps of the pinned engine (flake input
+# `steam-engine-map`). The host is built from the map of the system it runs on.
 {
   pkgs,
   engineMap,
@@ -20,9 +21,12 @@ let
   # default is a relative path, so its outPath is a subfolder of the whole
   # publisher source: interpolating it directly made every publisher file a
   # build input of the host (the plugin churn check's helper case).
+  # One system's map only: a change to the other system's map does not
+  # rebuild this host.
+  mapRoot = if builtins.isAttrs engineMap then engineMap.outPath else engineMap;
   map = builtins.path {
     name = "korri-steam-engine-map";
-    path = engineMap;
+    path = mapRoot + "/${pkgs.stdenv.hostPlatform.system}";
     filter = path: _: baseNameOf path == "engine.map";
   };
 in

@@ -2,10 +2,11 @@
 # built from an engine map, its start wrapper, the session program, and the
 # Steam FHS they run games and the engine in.
 #
-# `engineMap` is the flake input `steam-engine-map`: a folder with engine.map.
-# The public default (plugins/steam/engine-host/map) is empty; a host built
-# from it reports engine_map_missing. A real build overrides the input on aka
-# with `--override-input steam-engine-map path:/var/lib/korri-private/steam-engine/<version>`.
+# `engineMap` is the flake input `steam-engine-map`: a folder with one
+# `<system>/engine.map` per system. The public default
+# (plugins/steam/engine-host/map) is empty; a host built from it reports
+# engine_map_missing. A real build overrides the input on aka with
+# `--override-input steam-engine-map path:/var/lib/korri-private/steam-engine/<version>`.
 {
   pkgs,
   engineMap,
@@ -15,6 +16,26 @@
 }:
 let
   lib = pkgs.lib;
+  # Valve's names for the engine package's folder and for the link Proton's
+  # lsteamclient reads, per platform. The x86_64 package also holds the
+  # 32-bit library.
+  valve =
+    if pkgs.stdenv.hostPlatform.isAarch64 then
+      {
+        engineFolder = "linuxarm64";
+        sdkLink = "sdkarm64";
+        otherEngineFolder = "";
+        otherSdkLink = "";
+        engineLibraryPath = "$steam/linuxarm64";
+      }
+    else
+      {
+        engineFolder = "linux64";
+        sdkLink = "sdk64";
+        otherEngineFolder = "linux32";
+        otherSdkLink = "sdk32";
+        engineLibraryPath = "$steam/linux64:$steam/linux32";
+      };
   host = import ./engine-host.nix { inherit pkgs engineMap; };
   steps = import ./session-steps.nix {
     inherit pkgs;
@@ -48,6 +69,12 @@ let
       host = "${host}";
       settings = "${settings}";
       inherit protonToolName;
+      inherit (valve)
+        engineFolder
+        sdkLink
+        otherEngineFolder
+        otherSdkLink
+        ;
     };
   };
   session = pkgs.writeShellApplication {
@@ -84,6 +111,7 @@ let
       steps = "${steps}";
       launchEntry = "${../engine/launch-entry.py}";
       placeholder = "${../engine/x-placeholder.py}";
+      inherit (valve) engineLibraryPath sdkLink;
     };
   };
   # The legacycompat artifact's unpack program (korri#589): korrid runs it on

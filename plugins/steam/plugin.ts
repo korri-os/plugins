@@ -27,41 +27,60 @@ export const systems = {
 // for the current person, and runs Get and Remove download as host jobs.
 
 // Korri ADR 0083: Valve's engine package, by its fixed name on Valve's update
-// servers and its `sha2vz`, for the pinned client 1792618285 (steamdeck_stable
-// linuxarm64; the package's linuxarm64/steamclient.so has sha256
-// 33ae8d62d122d1fb6a653598259beed34117d09ca4ce87a1d6e31a9af3eb170e). The name
-// ends in the file's size. korrid recognises the VZ format and unpacks it
-// itself; the runner uses only linuxarm64/steamclient.so. Grounding: the
-// spike's results/pin-age (engines.tsv, retention.tsv: HTTP 200, sha2vz
-// verified) and results/min-home/pkg-contents.txt.
+// servers and its `sha2vz`, for the pinned client 1792618285. The name ends in
+// the file's size. korrid recognises the VZ format and unpacks it itself.
+// - aarch64-linux: `bins_sdk_linuxarm64_linuxarm64` (manifest
+//   steam_client_steamdeck_stable_linuxarm64); the runner uses only
+//   linuxarm64/steamclient.so, sha256
+//   33ae8d62d122d1fb6a653598259beed34117d09ca4ce87a1d6e31a9af3eb170e.
+//   Grounding: the spike's results/pin-age (engines.tsv, retention.tsv: HTTP
+//   200, sha2vz verified) and results/min-home/pkg-contents.txt.
+// - x86_64-linux: `bins_sdk_ubuntu12` (manifest steam_client_ubuntu12 of the
+//   same version); the runner uses linux64/steamclient.so, sha256
+//   3e32119f473cb9c2615e1b282da8498b9986378e8b71537a4aed9f77e7b797e0, and
+//   links linux32/steamclient.so for 32-bit games.
+// The engine host is built from the private map of exactly that file and
+// refuses any other (`engine_mismatch`).
 /** This plugin's engine artifact, by its local key. */
 const ENGINE_PACKAGE_KEY = "engine-package"
-const ENGINE_PACKAGE =
-  "bins_sdk_linuxarm64_linuxarm64.zip.vz.1424aaa33c34c7aa1b6f356fcda3678c210a62d6_10044409"
+const ENGINE_VERSION = "1792618285"
+const VALVE = "https://client-update.steamstatic.com"
 // korri#589: Valve's `legacycompat/` folder (steamclient.dll,
 // steamclient64.dll, Steam.dll, ...), which Proton copies into every prefix
 // from the Steam folder. A Steamworks game loads that steamclient(64).dll, and
 // Proton points its exports at lsteamclient and the engine's steamclient.so.
-// The engine package does not ship it; Valve's `bins_misc_linuxarm64` package
-// of the same manifest (`steam_client_steamdeck_stable_linuxarm64`, version
-// 1792618285) does, by name and `sha2vz`. Its legacycompat entries are links,
-// which korrid's own reader refuses, so the plugin's unpack program writes the
-// folder.
+// The engine package does not ship it; Valve's `bins_misc_*` package of the
+// same manifest does, by name and `sha2vz`. Its legacycompat entries are
+// links, which korrid's own reader refuses, so the plugin's unpack program
+// writes the folder. Valve serves one file under both platforms' names
+// (`bins_misc_linuxarm64` and `bins_misc_ubuntu12`): same size, same sha2vz.
 const LEGACYCOMPAT_KEY = "legacycompat"
-const LEGACYCOMPAT_PACKAGE =
-  "bins_misc_linuxarm64.zip.vz.c1fe69f2ddbbfd3d89ae14f20185fcf878df5cc8_19812282"
+const LEGACYCOMPAT_FILE = {
+  sha256: "sha256:8888138451bc088adb1ce222a22d63214c1d3b249a06604c844634dfd9a004b3",
+  bytes: 19812282,
+}
 export const artifacts = {
   "engine-package": {
     id: `${PLUGIN_ID}/engine-package`,
     title: "Steam engine (Valve)",
     platforms: {
       "aarch64-linux": {
-        version: "1792618285",
+        version: ENGINE_VERSION,
         files: [
           {
-            url: `https://client-update.steamstatic.com/${ENGINE_PACKAGE}`,
+            url: `${VALVE}/bins_sdk_linuxarm64_linuxarm64.zip.vz.1424aaa33c34c7aa1b6f356fcda3678c210a62d6_10044409`,
             sha256: "sha256:e043d05b4e7bcc43e22cc2be3e8872ed1132e79e989cbbe181eb3a5d3f849df7",
             bytes: 10044409,
+          },
+        ],
+      },
+      "x86_64-linux": {
+        version: ENGINE_VERSION,
+        files: [
+          {
+            url: `${VALVE}/bins_sdk_ubuntu12.zip.vz.e9ae6bc8e0116bd6d8ec14af21362f9f7399ea5c_24063512`,
+            sha256: "sha256:f03c33ea25ab007550e91b39a682660ccc53426dde6764256b3fe07a5c6833f6",
+            bytes: 24063512,
           },
         ],
       },
@@ -72,12 +91,20 @@ export const artifacts = {
     title: "Steam Windows client files (Valve)",
     platforms: {
       "aarch64-linux": {
-        version: "1792618285",
+        version: ENGINE_VERSION,
         files: [
           {
-            url: `https://client-update.steamstatic.com/${LEGACYCOMPAT_PACKAGE}`,
-            sha256: "sha256:8888138451bc088adb1ce222a22d63214c1d3b249a06604c844634dfd9a004b3",
-            bytes: 19812282,
+            url: `${VALVE}/bins_misc_linuxarm64.zip.vz.c1fe69f2ddbbfd3d89ae14f20185fcf878df5cc8_19812282`,
+            ...LEGACYCOMPAT_FILE,
+          },
+        ],
+      },
+      "x86_64-linux": {
+        version: ENGINE_VERSION,
+        files: [
+          {
+            url: `${VALVE}/bins_misc_ubuntu12.zip.vz.c1fe69f2ddbbfd3d89ae14f20185fcf878df5cc8_19812282`,
+            ...LEGACYCOMPAT_FILE,
           },
         ],
       },
@@ -109,7 +136,7 @@ export const runners = {
   engine: {
     program: "steam-engine-session",
     systems: ["steam"],
-    platforms: ["aarch64-linux"],
+    platforms: ["aarch64-linux", "x86_64-linux"],
     steps: [
       { key: "update", label: "Updating" },
       { key: "sync", label: "Syncing saves" },

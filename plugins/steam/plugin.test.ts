@@ -117,10 +117,10 @@ const engineInput = () => ({
 })
 
 describe("Steam engine runner declaration (ADR 0083)", () => {
-  test("is a second, ARM64-only runner with its own steps and the engine package", () => {
+  test("is a second runner for both platforms with its own steps and the engine package", () => {
     expect(runners.engine.program).toBe("steam-engine-session")
     expect(runners.engine.systems).toEqual(["steam"])
-    expect(runners.engine.platforms).toEqual(["aarch64-linux"])
+    expect(runners.engine.platforms).toEqual(["aarch64-linux", "x86_64-linux"])
     expect(runners.engine.steps.map(step => step.key)).toEqual(["update", "sync", "game"])
     expect(runners.engine.steps[0].label).toBe("Updating")
     expect(runners.engine.artifacts).toEqual([
@@ -140,7 +140,16 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
       sha256: "sha256:e043d05b4e7bcc43e22cc2be3e8872ed1132e79e989cbbe181eb3a5d3f849df7",
       bytes: 10044409,
     }])
-    expect(Object.keys(engine.platforms)).toEqual(["aarch64-linux"])
+    // x86_64-linux: bins_sdk_ubuntu12 of steam_client_ubuntu12, the same client version.
+    expect(engine.platforms["x86_64-linux"]).toEqual({
+      version: "1792618285",
+      files: [{
+        url: "https://client-update.steamstatic.com/bins_sdk_ubuntu12.zip.vz.e9ae6bc8e0116bd6d8ec14af21362f9f7399ea5c_24063512",
+        sha256: "sha256:f03c33ea25ab007550e91b39a682660ccc53426dde6764256b3fe07a5c6833f6",
+        bytes: 24063512,
+      }],
+    })
+    expect(Object.keys(engine.platforms)).toEqual(["aarch64-linux", "x86_64-linux"])
   })
 
   test("pins Valve's legacycompat package of the same client version, with its unpack program", () => {
@@ -149,7 +158,16 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
     const legacycompat = artifacts.legacycompat
     expect(legacycompat.id).toBe("@korri:steam/legacycompat")
     expect(legacycompat.unpack).toBe("steam-legacycompat-unpack")
-    expect(Object.keys(legacycompat.platforms)).toEqual(["aarch64-linux"])
+    expect(Object.keys(legacycompat.platforms)).toEqual(["aarch64-linux", "x86_64-linux"])
+    // Valve serves the same file under the x86_64 manifest's name.
+    expect(legacycompat.platforms["x86_64-linux"]).toEqual({
+      version: "1792618285",
+      files: [{
+        url: "https://client-update.steamstatic.com/bins_misc_ubuntu12.zip.vz.c1fe69f2ddbbfd3d89ae14f20185fcf878df5cc8_19812282",
+        sha256: "sha256:8888138451bc088adb1ce222a22d63214c1d3b249a06604c844634dfd9a004b3",
+        bytes: 19812282,
+      }],
+    })
     const build = legacycompat.platforms["aarch64-linux"]
     expect(build.version).toBe(artifacts["engine-package"].platforms["aarch64-linux"].version)
     expect(build.files).toEqual([{

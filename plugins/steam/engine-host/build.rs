@@ -3,11 +3,12 @@
 //
 // Engine map (ADR 0083): every steamclient.so address the host checks or calls
 // comes from the map that the private remap pipeline writes on aka. The Nix
-// build passes it as KORRI_STEAM_ENGINE_MAP (flake input `steam-engine-map`);
-// a plain cargo build reads map/engine.map. This script turns it into
+// build passes it as KORRI_STEAM_ENGINE_MAP (flake input `steam-engine-map`,
+// the target system's map); a plain cargo build reads
+// map/<target arch>-linux/engine.map. This script turns it into
 // $OUT_DIR/engine_map.rs.
 //
-// The public map (map/engine.map) is empty: `status missing`. A host built from
+// The public maps (map/*/engine.map) are empty: `status missing`. A host built from
 // it has ENGINE_MAP_PRESENT = false, every address 0, and reports
 // `engine_map_missing` at start without loading the engine. Any other map must be
 // a remap map with `status pass` and every entry the host needs, or the build stops.
@@ -121,7 +122,9 @@ fn main() {
     let path = std::env::var_os("KORRI_STEAM_ENGINE_MAP")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("map/engine.map")
+            let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+            PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
+                .join(format!("map/{arch}-linux/engine.map"))
         });
     println!("cargo:rerun-if-changed={}", path.display());
     let text = std::fs::read_to_string(&path)

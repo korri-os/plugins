@@ -244,7 +244,8 @@ export SteamEnv=1 SteamClientLaunch=1
 # The engine's IPC endpoint (spike FINDINGS section 3: Steam3Master, default port).
 export Steam3Master=127.0.0.1:57343
 export MESA_SHADER_CACHE_DIR="$STEAM_COMPAT_SHADER_PATH"
-export LD_LIBRARY_PATH="$install:$steam/linuxarm64"
+# The engine library a native game's Steam API loads (Valve's folder per platform).
+export LD_LIBRARY_PATH="$install:@engineLibraryPath@"
 if [[ -n "${KORRI_FEX_ROOTFS:-}" ]]; then
   export FEX_ROOTFS="$KORRI_FEX_ROOTFS" FEX_APP_CONFIG_LOCATION="$KORRI_FEX_CONFIG/"
   export FEX_APP_DATA_LOCATION="$steam/fex-data/"
@@ -266,7 +267,7 @@ mkdir -p "$STEAM_COMPAT_DATA_PATH" "$STEAM_COMPAT_SHADER_PATH"
 # Proton copies its steamclient.dll and steamclient64.dll from
 # $STEAM_COMPAT_CLIENT_INSTALL_PATH/legacycompat into the prefix, where the
 # game's steam_api loads them. Proton's ntdll points their exports at
-# lsteamclient, which loads $HOME/.steam/sdkarm64/steamclient.so, the engine.
+# lsteamclient, which loads $HOME/.steam/@sdkLink@/steamclient.so, the engine.
 # Without the folder, steam_api finds no steamclient.dll and the game cannot
 # start the Steam API. Only a link of this program's is ever replaced.
 legacycompat="$KORRI_STEAM_LEGACYCOMPAT/legacycompat"

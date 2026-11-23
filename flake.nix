@@ -13,9 +13,10 @@
     #   of Cemu to the current pin needs separate dependency qualification.
     nixpkgs-held.url = "github:NixOS/nixpkgs/a6531044f6d0bef691ea18d4d4ce44d0daa6e816";
     flake-utils.url = "github:numtide/flake-utils";
-    # The engine map that korri-steam-host is built from (Core ADR 0083). The
-    # public map is empty on purpose; the pinned engine's map is private and is
-    # passed on aka with --override-input steam-engine-map path:<folder>.
+    # The engine maps that korri-steam-host is built from (Core ADR 0083), one
+    # `<system>/engine.map` per system. The public maps are empty on purpose;
+    # the pinned engines' maps are private and are passed on aka with
+    # --override-input steam-engine-map path:<folder>.
     steam-engine-map = {
       url = "path:./plugins/steam/engine-host/map";
       flake = false;

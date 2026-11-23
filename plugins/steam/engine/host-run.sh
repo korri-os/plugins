@@ -7,11 +7,15 @@
 #
 # Layout of <person>/steam-engine:
 #   steam/                        the Steam root the engine writes
-#   steam/linuxarm64/steamclient.so  link to the engine package's file
+#   steam/@engineFolder@/steamclient.so  link to the engine package's file
 #   steam/compatibilitytools.d/@protonToolName@  link to korrid's Proton
 #   home/                         HOME of the host and the game
 #   home/.steam/steam             link to steam/
-#   home/.steam/sdkarm64          link to steam/linuxarm64 (Proton's lsteamclient)
+#   home/.steam/@sdkLink@          link to steam/@engineFolder@ (Proton's lsteamclient)
+# The engine package's folder and the link's name are Valve's, per platform:
+# linuxarm64 and sdkarm64 on aarch64-linux, linux64 and sdk64 on x86_64-linux.
+# Valve's x86_64 package also holds the 32-bit library (linux32), which a
+# 32-bit game's Steam API loads through home/.steam/sdk32.
 set -Eeuo pipefail
 umask 077
 
@@ -42,10 +46,18 @@ mkdir -p "$root"
 exec 8>>"$root/.korri-engine.lock"
 flock -w 30 8 || fail "another engine host uses this Steam folder" 1
 
-mkdir -p "$steam/linuxarm64" "$steam/compatibilitytools.d" "$steam/steamapps" "$HOME/.steam"
-ln -sfn "$engine" "$steam/linuxarm64/steamclient.so"
+mkdir -p "$steam/@engineFolder@" "$steam/compatibilitytools.d" "$steam/steamapps" "$HOME/.steam"
+ln -sfn "$engine" "$steam/@engineFolder@/steamclient.so"
 ln -sfn "$steam" "$HOME/.steam/steam"
-ln -sfn "$steam/linuxarm64" "$HOME/.steam/sdkarm64"
+ln -sfn "$steam/@engineFolder@" "$HOME/.steam/@sdkLink@"
+# The package's other library, when this platform's package has one.
+other=@otherEngineFolder@
+other_engine="$(dirname "$(dirname "$engine")")/$other/steamclient.so"
+if [[ -n "$other" && -f "$other_engine" ]]; then
+  mkdir -p "$steam/$other"
+  ln -sfn "$other_engine" "$steam/$other/steamclient.so"
+  ln -sfn "$steam/$other" "$HOME/.steam/@otherSdkLink@"
+fi
 # Windows games install and run only with a compatibility tool registered
 # (InstallApp 29 "Invalid platform" without it, spike section 11).
 if [[ "${KORRI_PROTON_CACHYOS:-}" == /* && -d "$KORRI_PROTON_CACHYOS" ]]; then

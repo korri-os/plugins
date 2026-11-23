@@ -305,12 +305,21 @@ class HostWrapperTests(unittest.TestCase):
                     "message": "Steam engine: the engine host could not start"})
 
 
-    def start_host(self, root, path=None):
+    # Valve's names per platform, as packages/engine.nix substitutes them.
+    ARM = {"engineFolder": "linuxarm64", "sdkLink": "sdkarm64", "otherEngineFolder": "", "otherSdkLink": ""}
+    X86 = {"engineFolder": "linux64", "sdkLink": "sdk64", "otherEngineFolder": "linux32", "otherSdkLink": "sdk32"}
+
+    def start_host(self, root, path=None, valve=None, other_library=True):
         """Run host-run.sh with stand-ins for the FHS, the host and the settings
         program, as korrid starts it for <root>/person/steam-engine."""
-        package = root / "cache/engine-package/linuxarm64/steamclient.so"
+        valve = valve or self.ARM
+        package = root / "cache/engine-package" / valve["engineFolder"] / "steamclient.so"
         package.parent.mkdir(parents=True)
         package.write_bytes(b"x")
+        if valve["otherEngineFolder"] and other_library:
+            other = package.parent.parent / valve["otherEngineFolder"] / "steamclient.so"
+            other.parent.mkdir()
+            other.write_bytes(b"y")
         proton = root / "proton"
         proton.mkdir()
         home = root / "person/steam-engine/home"
@@ -336,7 +345,7 @@ class HostWrapperTests(unittest.TestCase):
         text = (HERE / "host-run.sh").read_text()
         for name, value in (("fhs", fhs.parent.parent), ("host", host.parent.parent),
                             ("settings", settings.parent.parent),
-                            ("protonToolName", "proton-test-arm64")):
+                            ("protonToolName", "proton-test-arm64"), *valve.items()):
             text = text.replace(f"@{name}@", str(value))
         wrapper.write_text(text)
         environment = {**os.environ, "HOME": str(home), "KORRI_PROTON_CACHYOS": str(proton)}
@@ -364,6 +373,38 @@ class HostWrapperTests(unittest.TestCase):
             })
             # The folder's tool directory holds the link to korrid's Proton.
             self.assertEqual(os.readlink(steam / "compatibilitytools.d/proton-test-arm64"), str(proton))
+
+    def test_the_folder_links_the_engine_under_valves_names_for_the_platform(self):
+        for valve, links in (
+            (self.ARM, {"steam/linuxarm64/steamclient.so": "linuxarm64/steamclient.so",
+                        "home/.steam/sdkarm64": None}),
+            (self.X86, {"steam/linux64/steamclient.so": "linux64/steamclient.so",
+                        "steam/linux32/steamclient.so": "linux32/steamclient.so",
+                        "home/.steam/sdk64": None, "home/.steam/sdk32": None}),
+        ):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                result, package, _, _ = self.start_host(root, valve=valve)
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+                engine = root / "person/steam-engine"
+                cache = package.parent.parent
+                for link, target in links.items():
+                    # A library links to korrid's cache; an sdk link to the folder's own engine folder.
+                    want = cache / target if target else engine / "steam" / {
+                        "sdkarm64": "linuxarm64", "sdk64": "linux64", "sdk32": "linux32"}[Path(link).name]
+                    self.assertEqual(os.readlink(engine / link), str(want), link)
+                made = sorted(p.name for p in (engine / "home/.steam").iterdir())
+                self.assertEqual(made, sorted(["steam", *(Path(l).name for l in links if l.startswith("home/"))]))
+
+    def test_no_other_library_is_linked_when_the_package_has_none(self):
+        # An x86_64 package without linux32 (not Valve's layout today) starts with the 64-bit links only.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result, _, _, _ = self.start_host(root, valve=self.X86, other_library=False)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            engine = root / "person/steam-engine"
+            self.assertFalse((engine / "steam/linux32").exists())
+            self.assertFalse((engine / "home/.steam/sdk32").exists())
 
     def test_every_bare_command_of_the_wrapper_is_on_its_path(self):
         # The ACL test below needs ACLs, which the Nix build sandbox lacks;
@@ -516,7 +557,8 @@ class EngineSessionTests(unittest.TestCase):
         script = (HERE / "session.sh").read_text()
         for name, value in {"fhs": str(root / "fhs"), "steps": str(root / "steps.sh"),
                             "launchEntry": str(HERE / "launch-entry.py"),
-                            "placeholder": str(HERE / "x-placeholder.py")}.items():
+                            "placeholder": str(HERE / "x-placeholder.py"),
+                            "engineLibraryPath": "$steam/linuxarm64", "sdkLink": "sdkarm64"}.items():
             script = script.replace(f"@{name}@", value)
         (root / "session.sh").write_text(script)
         host = subprocess.Popen([sys.executable, "-c", HOST, str(channel), behavior])

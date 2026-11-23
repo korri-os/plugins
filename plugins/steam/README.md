@@ -121,23 +121,26 @@ its own scratch copy; the repository keeps `@korri`.
 
 A second, opt-in runner that plays Steam games through Valve's engine
 (`steamclient.so`) with no Steam client and no Steam UI. The client runner
-above stays the default. ARM64 only.
+above stays the default. It runs on aarch64-linux and x86_64-linux; each
+platform has its own engine package from Valve and its own engine map.
 
 | Part | Where |
 |---|---|
 | Runner, steps `update`, `sync`, `game` | `plugin.ts` `runners.engine` |
-| Engine package `@korri:steam/engine-package` (Valve's `bins_sdk_linuxarm64_linuxarm64` for client 1792618285, by name and `sha2vz`; no `unpack`) | `plugin.ts` `artifacts` |
-| Valve's `legacycompat/` folder `@korri:steam/legacycompat` (Valve's `bins_misc_linuxarm64` for client 1792618285, by name and `sha2vz`; unpack program `steam-legacycompat-unpack`) | `plugin.ts` `artifacts`, `engine/legacycompat-unpack.py` |
+| Engine package `@korri:steam/engine-package` (for client 1792618285, by name and `sha2vz`; no `unpack`): Valve's `bins_sdk_linuxarm64_linuxarm64` on aarch64-linux, `bins_sdk_ubuntu12` on x86_64-linux | `plugin.ts` `artifacts` |
+| Valve's `legacycompat/` folder `@korri:steam/legacycompat` (Valve's `bins_misc_linuxarm64` or `bins_misc_ubuntu12` for client 1792618285, one file under two names, by name and `sha2vz`; unpack program `steam-legacycompat-unpack`) | `plugin.ts` `artifacts`, `engine/legacycompat-unpack.py` |
 | The Steam provider `@korri:steam`, the plugin's own id (korrid serves search and listing from `list-apps`) | korrid |
 | `korri-steam-host` (Rust, from an engine map) | `engine-host/`, `packages/engine-host.nix` |
 | Its start wrapper: the person's engine folder, then the host in the Steam FHS | `engine/host-run.sh` |
 | `steam-engine-session <appid>`: the game unit's program | `engine/session.sh`, `engine/launch-entry.py`, `engine/x-placeholder.py` |
 
-The engine map is the flake input `steam-engine-map`. The public map
-(`engine-host/map/engine.map`) is empty, and a host built from it reports
-`{"event":"engine_map_missing"}` and exits 1. The pinned engine's map is made
-privately on aka and is in no repository; a real build passes it with
-`--override-input steam-engine-map path:<folder>`. At start the host compares
+The engine map is the flake input `steam-engine-map`: a folder with one map
+per system, `aarch64-linux/engine.map` and `x86_64-linux/engine.map`. A host
+is built from the map of the system it runs on. The public maps
+(`engine-host/map/<system>/engine.map`) are empty, and a host built from one
+reports `{"event":"engine_map_missing"}` and exits 1. The pinned engines'
+maps are made privately on aka and are in no repository; a real build passes
+them with `--override-input steam-engine-map path:<folder>`. At start the host compares
 the engine file's sha256 with the map's and reports `engine_mismatch` on a
 difference, before it loads the engine.
 
@@ -204,13 +207,14 @@ A Steamworks game's `steam_api` loads the `steamclient.dll` or
 `$STEAM_COMPAT_CLIENT_INSTALL_PATH/legacycompat/` into the prefix. Proton's
 ntdll then loads `lsteamclient` and overwrites each export of that Valve DLL
 with a jump into lsteamclient. lsteamclient loads
-`$HOME/.steam/sdkarm64/steamclient.so`, the engine, which reaches the
-running host. An engine-only folder has no client and so no
+`$HOME/.steam/sdkarm64/steamclient.so` (aarch64-linux) or
+`$HOME/.steam/sdk64/steamclient.so` (x86_64-linux; `sdk32` for a 32-bit
+lsteamclient), the engine library, which reaches the running host. An engine-only folder has no client and so no
 `legacycompat/`: without it the game reports that it cannot load
 `steamclient.dll`.
 
 Valve's `bins_misc_linuxarm64` package of the same manifest carries the
-folder. In that package `legacycompat\steamclient.dll`,
+folder (on x86_64-linux the same file is named `bins_misc_ubuntu12`). In that package `legacycompat\steamclient.dll`,
 `legacycompat\steamclient64.dll` and `legacycompat\GameOverlayRenderer64.dll`
 are symbolic links to files at the package root. korrid's own archive reader
 refuses links, so the artifact names the plugin's unpack program.
@@ -233,8 +237,10 @@ its engine host (ADR 0083: the map "ships only with the prebuilt engine
 host"). The map file is in no repository and in no published closure.
 
 - **Secret.** `STEAM_ENGINE_MAP_TGZ_B64`, a repository Actions secret of
-  korri-os/plugins: base64 of `tar czf` of the map folder, whose one file is
-  `engine.map` (the layout of `engine-host/map`).
+  korri-os/plugins: base64 of `tar czf` of the map folder, whose files are
+  `aarch64-linux/engine.map` and `x86_64-linux/engine.map` (the layout of
+  `engine-host/map`). `setup` refuses an archive with any other file or
+  without one of the two.
 - **Use.** The build jobs of `plugin-repository.yml` and
   `publish-core-main-cache.yml` run `.github/workflows/steam-engine-map.py
   setup` before any build. It unpacks the map to `$RUNNER_TEMP/steam-engine-map`
@@ -262,16 +268,21 @@ host"). The map file is in no repository and in no published closure.
   release `build-fecbea69dc50-steam-engine-2` shipped the public-map host:
   `korri-cache build` evaluated without the override, and the closure check
   passed because a public-map host holds no map path.
-- **Update when the engine pin moves.** On aka, make the map for the new
-  client version with the private pipeline
-  (`/var/lib/korri-private/steam-engine/make-map <version> <steamclient sha256>`),
-  change the artifact pin in `plugin.ts`, then replace the secret from the
-  new folder, piped so no file or output holds the value:
+- **Update when the engine pin moves.** On aka, make each system's map for
+  the new client version with the private pipeline
+  (`/var/lib/korri-private/steam-engine/make-map <version> <system> <steamclient sha256>`,
+  once for `aarch64-linux` and once for `x86_64-linux`), change the artifact
+  pins in `plugin.ts`, then replace the secret from the new folder, piped so
+  no file or output holds the value:
 
   ```sh
-  ssh root@aka 'tar -C /var/lib/korri-private/steam-engine/<version> -czf - engine.map | base64 -w0' \
+  ssh root@aka 'tar -C /var/lib/korri-private/steam-engine/<version> -czf - aarch64-linux/engine.map x86_64-linux/engine.map | base64 -w0' \
     | gh secret set STEAM_ENGINE_MAP_TGZ_B64 -R korri-os/plugins
   ```
+
+  The x86_64 map is derived by the same program from the x86_64 library. Its
+  slot numbers must equal the aarch64 map's of the same client version;
+  `make-map` checks that.
 
   A host built from a map that does not match the pinned engine refuses to
   start (`engine_mismatch`), so the secret and the pin move in the same
@@ -280,4 +291,5 @@ host"). The map file is in no repository and in no published closure.
 Checks: `korri-steam-engine-host` (rustfmt, unit tests, clippy and the
 `engine_map_missing` start with the empty map), `korri-steam-source` (the
 session program's tests), `korri-steam-declaration` and `korri-steam-package`.
-The aarch64 cross-builds with both maps run on aka (`korri-steam-host-aarch64`).
+The aarch64 cross-builds with the public and the private maps run on aka
+(`korri-steam-host-aarch64`), as does the native x86_64 host with the private map.
