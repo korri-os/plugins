@@ -483,6 +483,14 @@ fi
 # Proton pin brings a new tool name and ready directory.
 mkdir -p "$STEAM_HOME/compatibilitytools.d"
 ln -sfn "$KORRI_PROTON_CACHYOS" "$STEAM_HOME/compatibilitytools.d/@protonToolName@"
+if [[ "$uses_fex" != 1 ]]; then
+  # x86_64: name the folder to the client as well (korri#604). On aka the
+  # client (1794536281) maps games to this tool but registers only Valve's
+  # runtimes, and then starts a Windows game's .exe directly. The engine
+  # needs the same variable for the same symptom (engine/host-run.sh,
+  # korri#531).
+  export STEAM_EXTRA_COMPAT_TOOLS_PATHS="$STEAM_HOME/compatibilitytools.d"
+fi
 say 'settings: merging Proton, Steam Input and first-launch seeds'
 @settings@/bin/steam-vdf-settings "$STEAM_HOME" "$appid"
 # Steam's own library list names this home by its absolute path (#498).
