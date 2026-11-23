@@ -50,6 +50,12 @@ let
     executableName = "korri-steam-engine-fhs";
     runScript = pkgs.writeShellScript "korri-steam-engine-run" ''exec "$@"'';
     extraMultiPkgs = p: [ p.sdl3 ];
+    # x86_64: Proton starts a 32-bit Windows game with its 32-bit loader
+    # (files/lib/wine/i386-unix), which loads the 32-bit lsteamclient.so and
+    # Valve's linux32/steamclient.so; a 32-bit Linux game is a 32-bit program
+    # too. All of them need the 32-bit libraries. On aarch64 the x86 libraries
+    # come from the FEX rootfs.
+    multiArch = pkgs.stdenv.hostPlatform.isx86_64;
   };
   replace =
     file: values:

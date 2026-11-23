@@ -8,9 +8,16 @@
   executableName ? "steam-arm64-fhs",
   runScript ? "${helpers}/bin/steam-guest-run",
   extraMultiPkgs ? (_: [ ]),
+  # Also the 32-bit build of every `multiPkgs` library (x86_64 only).
+  multiArch ? false,
 }:
 pkgs.buildFHSEnv {
-  inherit name executableName runScript;
+  inherit
+    name
+    executableName
+    runScript
+    multiArch
+    ;
   privateTmp = true;
   includeClosures = true;
 
