@@ -60,6 +60,7 @@ let
       diffutils
       findutils
       gnugrep
+      gnused
       procps
       systemd
       util-linux
