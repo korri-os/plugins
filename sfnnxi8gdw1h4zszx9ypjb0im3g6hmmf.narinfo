@@ -1,0 +1,10 @@
+StorePath: /nix/store/sfnnxi8gdw1h4zszx9ypjb0im3g6hmmf-korri-steam-engine-fhs
+URL: https://github.com/korri-os/plugins/releases/download/build-ba4b03e1de27-steam-engine-11/1yqnfab29fj4f2pr80y4szvjsi4184gnhk9f6svbiym4zzr9nlzz.nar.xz
+Compression: xz
+FileHash: sha256:1yqnfab29fj4f2pr80y4szvjsi4184gnhk9f6svbiym4zzr9nlzz
+FileSize: 236
+NarHash: sha256:1cci0yhg094ng7q8yi0b77p14azx07476nn166spxay2bbk8fjzk
+NarSize: 536
+References: aizd4prd66d69rq79a1vp6h98jcga0w3-korri-steam-engine-fhs-bwrap
+Deriver: s29vsdvsvgflzi4mg71sxgv6qiam3jpp-korri-steam-engine-fhs.drv
+Sig: korri-plugins-1:Hi/VT2UvwnaW3UnUyZYyEVc8NTunDN+wuJyM1M9FHYsTQunTXWerJwkxJfuADORcm4qkJIQs7FxqH6E2MF9NDQ==

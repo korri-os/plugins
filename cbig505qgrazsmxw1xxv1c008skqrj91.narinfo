@@ -1,0 +1,10 @@
+StorePath: /nix/store/cbig505qgrazsmxw1xxv1c008skqrj91-sdl3-3.4.18-lib
+URL: https://github.com/korri-os/plugins/releases/download/build-ba4b03e1de27-steam-engine-11/13ak2gb4ygrin62ysqb4ln7r3w7ry9v3d573f2vpn4jksywxm5h4.nar.xz
+Compression: xz
+FileHash: sha256:13ak2gb4ygrin62ysqb4ln7r3w7ry9v3d573f2vpn4jksywxm5h4
+FileSize: 1453700
+NarHash: sha256:14h21h26yh9gxkn9ph8569b52yznp93mcp8gw92ly0rkd2vgibqf
+NarSize: 4878768
+References: 1dgz8204sgl317rl6gacsla6m71w4xcn-libxcursor-1.2.3 1f7b6bjrh0kxkcxhwm17ykd9hmwqp4dn-alsa-lib-1.2.16.1 22y38h48bmnvxl3lvr17di02816pz15d-mesa-libgbm-26.1.3 3wlpc2yz22hf7jn80xm0d8mwmpj368zr-libglvnd-1.7.0 6ss773ladcqlxbsdhf7cr63i583ghzs0-libjack2-1.9.22 6sswhblrjffa9llbc3ch8mny3c3hpp3d-libxrender-0.9.12 6z2b101vyfa8bh2fv2m6iwxwf1q78mal-libpulseaudio-17.0 86masykrw3f12wj11mfsgdnl2wn0ylsp-libxscrnsaver-1.2.5 8mmbnc39m0acgabapnqd1k922b3a538a-libusb-1.0.30 9cbjbpw70ymbx5vv93s6zq63dajp4vqb-libxi-1.8.3 b498pcrja06ijkv3ak9byz6z2qpaz2bd-wayland-1.26.0 fa704g8jsf980s0wxsdciq1rcy9wfsff-libdecor-0.2.5 i7iyqjv5kx2s1lx6fwa5ksfydv7xmvcs-glibc-2.44-57 iq1a612libyfnbs6knfr9vb0hpd325yg-zenity-4.2.2 klf46x1mvqk941z6l5qxpjbmnxwwj8c7-vulkan-loader-1.4.363.0 l5sr2imzrk5hmjwzrwq6885abq4d09h6-pipewire-1.6.9 lx05g1x2xz3jdp2rn3mz9h6mxshv12rz-libxkbcommon-1.13.2 mh79nj19dr16hhjlyxm37vxfhkwihngr-libxrandr-1.5.5 my3d3j9kbv6hx8ll26psngp1pv5lgd37-libxext-1.3.7 pcjmqy42wk2xy0ilsficz5b9j9xnib3x-libdrm-2.4.134 sy30brn2w0jgjrkdfc3wj6amcjhcq9hz-libxtst-1.2.5 wrzy26x8y7dfn97xfnhhyhiif5rzq443-libx11-1.8.13 ylihnwy5cl249psdvlmpr9kymwvqrhx3-libxfixes-6.0.2
+Deriver: 4fs3qkhqqmycpzry8kam4jm8iz0ni3c8-sdl3-3.4.18.drv
+Sig: korri-plugins-1:kAZu6695C/nd1n3Q1LOQ8U7WbZo7CxJLQI3sdZudGyEsp6I6TrxXGKnjObuRArqhBlirsMlxT9Gohn7hLFaNDw==
