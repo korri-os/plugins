@@ -48,7 +48,7 @@ let
     name = "korri-steam-engine-fhs";
     executableName = "korri-steam-engine-fhs";
     runScript = pkgs.writeShellScript "korri-steam-engine-run" ''exec "$@"'';
-    extraMultiPkgs = p: [ p.sdl3 ];
+    extraMultiPkgs = p: [ p.sdl3 ] ++ import ./proton-media-libs.nix p;
     # x86_64: Proton starts a 32-bit Windows game with its 32-bit loader
     # (files/lib/wine/i386-unix), which loads the 32-bit lsteamclient.so and
     # Valve's linux32/steamclient.so; a 32-bit Linux game is a 32-bit program
