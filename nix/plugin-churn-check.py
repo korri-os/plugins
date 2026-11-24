@@ -101,7 +101,11 @@ def evaluate(publisher, korri, system, selection):
     packages = subprocess.run(
         command + [f'path:{publisher}#packages.{system}', '--apply', f'''p:
           let names = (import {json.dumps(str(selection))} {{
-            plugins = builtins.mapAttrs (name: _: name) p;
+            # Core selects catalog IDs; this publisher's existing Tailscale
+            # output predates the korri-plugin-* output naming convention.
+            plugins = (builtins.mapAttrs (name: _: name) p) // {{
+              korri-plugin-tailscale = "korri-tailscale";
+            }};
           }}).rpminiv2;
           in builtins.listToAttrs (map (name: {{
             inherit name; value = ({identity}) p.${{name}};
