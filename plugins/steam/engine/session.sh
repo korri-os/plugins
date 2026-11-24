@@ -245,7 +245,10 @@ export SteamEnv=1 SteamClientLaunch=1
 export Steam3Master=127.0.0.1:57343
 export MESA_SHADER_CACHE_DIR="$STEAM_COMPAT_SHADER_PATH"
 # The engine library a native game's Steam API loads (Valve's folder per platform).
-export LD_LIBRARY_PATH="$install:@engineLibraryPath@"
+# The last two folders hold the libraries Proton asks for by a file name the
+# FHS loader's cache does not have (packages/proton-media-libs.nix); the
+# loader skips the folder of the other word size.
+export LD_LIBRARY_PATH="$install:@engineLibraryPath@:/usr/lib/korri-proton-compat:/usr/lib32/korri-proton-compat"
 if [[ -n "${KORRI_FEX_ROOTFS:-}" ]]; then
   export FEX_ROOTFS="$KORRI_FEX_ROOTFS" FEX_APP_CONFIG_LOCATION="$KORRI_FEX_CONFIG/"
   export FEX_APP_DATA_LOCATION="$steam/fex-data/"

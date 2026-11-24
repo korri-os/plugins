@@ -3,7 +3,8 @@
 # Valve's Steam Linux Runtime, which provides them; the engine runner starts
 # Proton with no runtime container. Wine's media backend (winedmo.so) and
 # Proton's bundled FFmpeg and GStreamer plugins need:
-#   libbz2.so.1.0, libvdpau.so.1   as in nixpkgs
+#   libvdpau.so.1                  as in nixpkgs
+#   libbz2.so.1.0                  nixpkgs' bzip2 under Debian's file name
 #   libvpx.so.9                    libvpx 1.14; nixpkgs has 1.17 (libvpx.so.12)
 #   libtheoradec.so.1, libtheoraenc.so.1
 #                                  libtheora 1.1; nixpkgs has 1.2 (.so.2)
@@ -12,8 +13,17 @@
 # The older two are built from their own releases, never renamed copies: the
 # newer ABIs differ.
 p: [
-  # bzip2's default output holds its programs; the library is in `out`.
-  p.bzip2.out
+  # bzip2: Proton's files ask for the file name libbz2.so.1.0, as Debian
+  # names the library. nixpkgs' library has the soname libbz2.so.1, and the
+  # FHS loader finds libraries by soname through its cache, so that file name
+  # in /usr/lib did not help (seen on aka: "libbz2.so.1.0: cannot open shared
+  # object file" with the file there). The session program puts this folder
+  # on LD_LIBRARY_PATH, where the loader looks by file name. It holds this
+  # one library, so nothing else changes its search order.
+  (p.runCommand "korri-proton-compat-libs" { } ''
+    mkdir -p "$out/lib/korri-proton-compat"
+    ln -s ${p.bzip2.out}/lib/libbz2.so.1.0.8 "$out/lib/korri-proton-compat/libbz2.so.1.0"
+  '')
   p.libvdpau
   (p.libvpx.overrideAttrs (_: {
     version = "1.14.1";
