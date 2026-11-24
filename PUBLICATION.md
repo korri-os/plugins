@@ -1020,3 +1020,38 @@ precheck too, and retains full diagnostics if a check fails. All three native
 gates, assertions and deadlines stay unchanged. A subprocess-contract regression
 checks the job limit, diagnostics and gate selection, including checkout paths
 with spaces.
+
+## Moonlight Embedded removal preparation (2026-11-24)
+
+Core ADR 0099 removes `@korri:moonlight` and `moonlight-embedded-korri` now.
+Their declarations, recipe, 14 vendored patch files, native checks and publication gates
+are removed. The Rust viewer owns the unchanged settings source and its
+15-leaf regression tests. Protocol, pairing, Sunshine and certificate rules
+are unchanged. No old release or cache metadata is deleted.
+
+The `korri` input is pinned to removal commit
+`a27386cb0d2efcd7bf2e20dc909f30b19ae0fee0`, available on Core's preparation
+branch; the owner must land that exact commit before production cutover.
+The viewer treaty is `834af1f4a4f1f2beecf6a75bbe2d1ef69933a5c34d62ccca7b1cb1014c9c9cc9`,
+matching that korrid. ibuki's old installed viewer has the different treaty
+`e9178296902fad5842fdd2d5eac1d7111ba14851a2c0e1d98a87b07df3fd8565`.
+
+The proposed full catalog batch is the 35 plugin IDs in Core's pinned
+`build-e3343461a76e-engine-default-2` catalog, minus `@korri:moonlight`:
+34 outputs, retaining `@korri:viewer` on x86_64. This replaces the moving
+catalog without silently dropping unrelated product plugins. The exact UTF-8
+`packages` input below, with no newline, has SHA-256
+`9d337e39e594b6f6a42b67114cab5479e7bcf99319d1f5d8f0eb1b24f46c7bd6`.
+
+```sh
+PACKAGES='korri-plugin-beetle-ngp korri-plugin-beetle-pce-fast korri-plugin-beetle-wswan korri-plugin-fake08 korri-plugin-fbneo korri-plugin-fex korri-plugin-flycast korri-plugin-gambatte korri-plugin-gamescope korri-plugin-genesis-plus-gx korri-plugin-gw korri-plugin-handy korri-plugin-homebrewhub korri-plugin-melonds korri-plugin-mgba korri-plugin-mupen64plus korri-plugin-nestopia korri-plugin-pcsx-rearmed korri-plugin-pico8 korri-plugin-picodrive korri-plugin-prosystem korri-plugin-proton korri-plugin-retroarch korri-plugin-retrobrews korri-plugin-snes9x korri-plugin-solarus korri-plugin-ssh korri-plugin-starter-pack korri-plugin-steam korri-plugin-stella korri-plugin-sunshine korri-tailscale korri-plugin-viewer korri-plugin-zquest-classic'
+```
+
+Local preparation passes the moved viewer's 9 settings tests (94 assertions),
+strict TypeScript, publication-scope tests and both architectures' output
+selection checks. Neither architecture exports a Moonlight client. These are
+not a release dry run, publication, or proof of streaming on ibuki.
+Use the normal tested-SHA/tag and dry-run workflow above. Publication still
+needs owner approval, then Core's immutable catalog pin, then ibuki's deploy
+and a `korri` CLI stream from aka. Do not deploy the removal there with its
+old viewer.

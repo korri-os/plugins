@@ -59,13 +59,6 @@ let
   # (the private map is in no repository).
   steamHost = [ "korri-steam-engine-host" ];
   bitsybox = [ "korri-bitsybox-plugin" ];
-  moonlight = [
-    "korri-moonlight-vaapi"
-    "korri-moonlight-viewer-presence"
-    "korri-moonlight-x11-vaapi-size"
-    "korri-moonlight-server-pin"
-    "korri-moonlight-plugin-native"
-  ];
   # The plugin's own gates, Korri's checks of its binary, and the cold-host
   # proof that korrid selects, runs and refuses it (#435).
   viewer = [
@@ -98,8 +91,6 @@ lib.genAttrs (builtins.attrNames libretroPackages) (_: retroarch)
   korri-plugin-sunshine = sunshine;
   sunshine-korri = sunshine;
   sunshine-retire-all-clients = [ "sunshine-offline-retirement" ];
-  korri-plugin-moonlight = moonlight;
-  moonlight-embedded-korri = moonlight;
   korri-plugin-bitsybox = bitsybox;
   inherit
     bitsybox

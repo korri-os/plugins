@@ -3,9 +3,8 @@
 `@korri:viewer` is Korri's own stream viewer for Linux, as a removable,
 permission-approved plugin (korri-os/korri ADR 0061, issue #435). Its code is
 `clients/viewer` in the Korri repository, at the pinned `korri` input. This
-repository builds it with its own package set. korrid uses it in place of
-`@korri:moonlight` when it is installed and enabled. A device without it keeps
-Moonlight.
+repository builds it with its own package set. It is the only client since
+2026-11-24 (Core ADR 0099). A device without it cannot stream.
 
 Only the PC picture paths (X11 VA-API and the SDL software fallback) have a
 proof. Korri's aarch64 `v4l2request` path has none on a bench device yet
@@ -30,8 +29,7 @@ korrid compares `files.treaty` with its own copy of
 `contracts/generated/viewer.ts`, byte for byte. Equal bytes: korrid uses this
 viewer. Other bytes: korrid refuses the plugin and names both SHA-256 hashes.
 No `treaty` file: korrid refuses the plugin and names only its own hash.
-Either way Moonlight stays the viewer. Without Moonlight the refusal is the
-start's error.
+Any refusal is the start's error; no fallback client runs.
 
 Cost: the treaty file holds the wire types only. A change to the launch
 arguments, or to behaviour that keeps the wire types, is not caught before
@@ -71,11 +69,9 @@ defaults. With nightjar-core the binary is GPL-3.0-only.
 ### Client identity
 
 The setup unit creates `/home/korri/.config/moonlight`, mode 0700, owned by
-`korri`, exactly as `@korri:moonlight` does. The two plugins share it: korrid
-hides this one path from game units, its certificate provisioning is
-unchanged, and the viewer reads Moonlight's `client.pem` and `key.pem`. A
-device that installs both keeps one identity. Removal keeps the directory, as
-Moonlight's does.
+`korri`. It preserves the existing protocol identity. korrid hides this path
+from game units; certificate provisioning is unchanged. The viewer reads
+`client.pem` and `key.pem`. Plugin removal keeps the identity directory.
 
 `identity-bootstrap` is Moonlight's helper with one change: the viewer makes
 its identity on `pair`, before it reads the server pin, so the helper runs
@@ -85,13 +81,12 @@ the directory is checked like the other files.
 
 ## Settings
 
-The viewer keeps Moonlight's settings (#435): the same schema, defaults,
-diagnostics and arguments, under its own runner `@korri:viewer/viewer`. The
-plugin source has no copy of them. `nix/default.nix` builds `settings.ts`
-from `plugins/moonlight/settings.ts` with only the runner ID changed.
-`settings.test.mts` compares the two plugins' answers for the same values and
-displays. Settings stored for `@korri:moonlight` do not carry over (ADR 0061).
-See `plugins/moonlight/README.md` for the table.
+The viewer owns `settings.ts` and keeps the existing schema, revision,
+defaults, diagnostics and native arguments under `@korri:viewer/viewer`.
+`settings.test.mts` checks all 15 leaves, rendering, validation and display
+fallbacks. The source was moved intact from the removed plugin at
+`e3343461a76eff0aa0e8ef7b8a8761d3c359918a`, changing only the runner ID.
+Stored settings for the removed plugin do not carry over (Core ADR 0061).
 
 ## Checks (build machines only)
 

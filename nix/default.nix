@@ -44,29 +44,13 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     heldPkgs = packageSet nixpkgs-held;
     heldMkPlugin = korri.lib.${system}.mkPlugin { pkgs = heldPkgs; };
     sunshine = import ../services/sunshine { inherit pkgs system; };
-    moonlightPackage = pkgs.callPackage ../services/moonlight/package.nix { };
-    moonlightDefinition = import ../plugins/moonlight/plugin.nix { inherit pkgs moonlightPackage; };
-    moonlightPlugin = mkPlugin {
-      publisher.namespace = "@korri";
-      source = ../plugins/moonlight;
-      plugin = _: moonlightDefinition;
-    };
-    # @korri:viewer is built from the Korri input (ADR 0061). Only its PC
-    # picture paths have a proof; the aarch64 v4l2request path has none on a
-    # bench device yet (ADR 0063), so x86_64 alone exports it.
+    # ADR 0099: the Rust viewer is the only client. Its current published
+    # picture paths are x86_64; unsupported ARM devices lose streaming.
     viewer = import "${korri}/clients/viewer" { inherit pkgs; };
     viewerDefinition = import ../plugins/viewer/plugin.nix { inherit pkgs viewer; };
-    # One settings source for both viewers (#435): Moonlight's, answering for
-    # the viewer's runner. Its schema and arguments are not redesigned.
-    viewerSource = pkgs.runCommand "korri-viewer-plugin-source" { } ''
-      mkdir -p "$out"
-      cp ${../plugins/viewer/plugin.ts} "$out/plugin.ts"
-      substitute ${../plugins/moonlight/settings.ts} "$out/settings.ts" \
-        --replace-fail '"@korri:moonlight/moonlight"' '"@korri:viewer/viewer"'
-    '';
     viewerPlugin = mkPlugin {
       publisher.namespace = "@korri";
-      source = viewerSource;
+      source = ../plugins/viewer;
       plugin = _: viewerDefinition;
     };
     hasViewer = pkgs.stdenv.hostPlatform.isx86_64;
@@ -251,15 +235,14 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
         tailscalePackage
         sshPackage
         sunshinePlugin
-        moonlightPlugin
         hasViewer
         viewerPlugin
         ;
       # The same plugin with one byte of its treaty changed: korrid must
-      # refuse it and keep Moonlight.
+      # refuse it without a fallback client.
       viewerOtherContract = mkPlugin {
         publisher.namespace = "@korri";
-        source = viewerSource;
+        source = ../plugins/viewer;
         plugin =
           _:
           viewerDefinition
@@ -337,8 +320,6 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       korri-plugin-retroarch = retroarchPackage;
       korri-plugin-ssh = sshPackage;
       korri-plugin-sunshine = sunshinePlugin;
-      korri-plugin-moonlight = moonlightPlugin;
-      moonlight-embedded-korri = moonlightPackage;
       korri-plugin-bitsybox = bitsyboxPlugin;
       bitsybox = bitsyboxPackage;
       korri-plugin-pyxel = pyxel.plugin;
@@ -463,7 +444,6 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           plugin = viewerDefinition;
           package = viewerPlugin;
           hostPackage = korri.packages.${system}.korri-plugin-host;
-          moonlightSource = moonlightPlugin;
         };
         # Korri's checks of the binary, with the package set it ships with.
         korri-viewer-picture = viewer.pictureCheck;
@@ -501,24 +481,6 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
           };
         };
         korri-ssh-upstream = (import ../plugins/ssh/upstream.nix { inherit pkgs; }).report;
-        korri-moonlight-viewer-presence = import ../services/moonlight/viewer-presence-check.nix {
-          inherit pkgs moonlightPackage;
-        };
-        korri-moonlight-x11-vaapi-size = import ../services/moonlight/x11-vaapi-size-check.nix {
-          inherit pkgs moonlightPackage;
-        };
-        korri-moonlight-vaapi = import ../services/moonlight/vaapi-check.nix {
-          inherit pkgs moonlightPackage;
-        };
-        korri-moonlight-server-pin = import ../services/moonlight/server-pin-check.nix {
-          inherit pkgs moonlightPackage;
-        };
-        korri-moonlight-plugin-native = import ../plugins/moonlight/native-check.nix {
-          inherit pkgs;
-          plugin = moonlightDefinition;
-          package = moonlightPlugin;
-          hostPackage = korri.packages.${system}.korri-plugin-host;
-        };
         korri-sunshine-plugin-native = import ../plugins/sunshine/native-check.nix {
           inherit pkgs;
           plugin = sunshineDefinition;

@@ -43,6 +43,14 @@ class PublicationChecksTest(unittest.TestCase):
                     self.assertIsInstance(gates, list)
                     self.assertLessEqual(set(gates), set(checks))
 
+    def test_removed_moonlight_client_has_no_output_or_publication_gate(self):
+        for system, mapping in self.mappings.items():
+            with self.subTest(system=system):
+                self.assertNotIn("korri-plugin-moonlight", mapping)
+                self.assertNotIn("moonlight-embedded-korri", mapping)
+                checks = evaluate(f"ci.checks.{system}", "builtins.attrNames")
+                self.assertFalse(any("moonlight" in check for check in checks))
+
     def test_netplay_batch_does_not_pull_unrelated_native_runtimes(self):
         for mapping in self.mappings.values():
             checks = selection.select_checks(
@@ -180,7 +188,7 @@ class PublicationPlatformsTest(unittest.TestCase):
             ("korri-plugin-viewer", "x86_64-linux", "aarch64-linux"),
             ("sunshine-korri-v4l2m2m", "aarch64-linux", "x86_64-linux"),
         ):
-            batch = [package, "korri-plugin-moonlight"]
+            batch = [package, "korri-plugin-sunshine"]
             with self.subTest(package=package):
                 self.assertIn(package, self.mappings[present])
                 self.assertNotIn(package, self.mappings[absent])
@@ -190,7 +198,7 @@ class PublicationPlatformsTest(unittest.TestCase):
                 )
                 self.assertEqual(
                     selection.select_packages(self.mappings, self.platforms, batch, absent),
-                    ["korri-plugin-moonlight"],
+                    ["korri-plugin-sunshine"],
                 )
 
     def test_single_architecture_output_cannot_be_skipped_everywhere(self):
@@ -210,15 +218,15 @@ class PublicationPlatformsTest(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, str(ROOT / "nix/publication-checks.py"),
                  "--system", "aarch64-linux", "--packages-file", str(path),
-                 "korri-plugin-viewer", "korri-plugin-moonlight"],
+                 "korri-plugin-viewer", "korri-plugin-sunshine"],
                 cwd=ROOT, text=True, capture_output=True, check=True,
             )
-            self.assertEqual(path.read_text(), "korri-plugin-moonlight\n")
+            self.assertEqual(path.read_text(), "korri-plugin-sunshine\n")
             self.assertIn(
                 "Skipping korri-plugin-viewer on aarch64-linux: no aarch64-linux package output",
                 result.stderr,
             )
-            self.assertIn(".#ci.checks.aarch64-linux.korri-moonlight-plugin-native", result.stdout)
+            self.assertIn(".#ci.checks.aarch64-linux.korri-sunshine-plugin-native", result.stdout)
             self.assertNotIn("korri-viewer", result.stdout)
 
     def test_cli_refuses_an_architecture_with_no_selected_output(self):

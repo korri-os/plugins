@@ -1,5 +1,4 @@
-// The settings are Moonlight's, rendered for this runner: nix/default.nix
-// builds ./settings from plugins/moonlight/settings.ts (ADR 0061, #435).
+// Settings belong to the Rust viewer (ADRs 0061 and 0099 in Core).
 import { describeSettings, validateSettings, renderSettings } from "./settings"
 
 export const name = "viewer"

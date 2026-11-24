@@ -267,16 +267,12 @@ def main():
             # reaches it through zenity (GTK4) and sdl2-compat. Core 9ff6e1644
             # added Steam to that selection. Only steam-session's drv changes;
             # the derived Proton tool name does not reach OpenSSH.
-            # Moonlight's moonlight-embedded source is a fetchFromGitHub with
-            # fetchSubmodules, a git fetch whose build closure holds OpenSSH.
-            # Core bb6da05b5 preinstalled Moonlight on every device, which put
-            # it in this selection.
             # Sunshine's held base keeps its approved drv (see the fixture
             # overlay above), but the plugin's other build inputs reach the
             # same fetch graph, so only its drv changes.
             fetch_graph_plugins = {
                 'korri-plugin-gamescope', 'korri-plugin-solarus', 'korri-plugin-steam',
-                'korri-plugin-moonlight', 'korri-plugin-sunshine',
+                'korri-plugin-sunshine',
             } & set(baseline['packages'])
             cases = [
                 ('unrelated', publisher, unrelated, set(), set()),

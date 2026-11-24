@@ -7,7 +7,6 @@
   package,
   hostPackage,
   korri,
-  moonlightSource,
 }:
 pkgs.runCommand "korri-viewer-native-check"
   {
@@ -83,12 +82,10 @@ pkgs.runCommand "korri-viewer-native-check"
     tar -xJOf ${plugin.packages.source}/share/korri-viewer/korri-viewer-source.tar.xz \
       korri-viewer-source/BUILDING.txt > building
     grep -F -- '--features nightjar,rust-audio-output,rust-egl-presenter,rust-x11-window' building
-    # Moonlight's settings, answering for this runner. Moonlight's plugin
-    # sits beside it so the test compares the two.
-    mkdir -p settings-check/viewer settings-check/moonlight
+    # The viewer owns its settings and their native-argument regression tests.
+    mkdir -p settings-check/viewer
     cp ${package}/plugin.ts ${package}/settings.ts settings-check/viewer/
     cp ${./settings.test.mts} settings-check/viewer/settings.test.ts
-    cp ${moonlightSource}/plugin.ts ${moonlightSource}/settings.ts settings-check/moonlight/
     tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext \
       --moduleResolution Bundler settings-check/viewer/plugin.ts
     bun test ./settings-check/viewer/settings.test.ts

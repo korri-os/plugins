@@ -6,7 +6,6 @@
   tailscalePackage,
   sshPackage,
   sunshinePlugin,
-  moonlightPlugin,
   hasViewer,
   viewerPlugin,
   viewerOtherContract,
@@ -48,12 +47,11 @@ in
   }
   // pkgs.lib.optionalAttrs hasViewer {
     # #435: korrid starts, observes and stops @korri:viewer through its
-    # socket, falls back to Moonlight, and refuses another viewer contract.
+    # socket, and refuses a missing plugin or another viewer contract.
     korri-viewer-lifecycle = import "${korri}/services/korrid/viewer-vm-test.nix" {
       inherit
         pkgs
         hostPackage
-        moonlightPlugin
         viewerPlugin
         ;
       otherContractPlugin = viewerOtherContract;

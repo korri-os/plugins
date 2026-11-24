@@ -150,7 +150,7 @@ export function describeSettings(input: SettingsDescribeInput): {
   return { schema: schemaForRules(), revision }
 }
 
-const contributionId = "@korri:moonlight/moonlight"
+const contributionId = "@korri:viewer/viewer"
 const flag = (name: string) => (value: SettingValue) => [`-${name}`, String(value)]
 const switchFlag =
   (name: string, when = true) =>
