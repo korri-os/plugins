@@ -200,10 +200,13 @@ class PublicationPlatformsTest(unittest.TestCase):
                     ),
                     ["korri-plugin-viewer"],
                 )
-                self.assertIn(
-                    "korri-viewer-plugin-native",
-                    selection.select_checks(self.mappings[system], ["korri-plugin-viewer"]),
-                )
+                checks = selection.select_checks(self.mappings[system], ["korri-plugin-viewer"])
+                for gate in ("korri-viewer-plugin-native", "korri-viewer-picture", "korri-viewer-io"):
+                    self.assertIn(gate, checks)
+                if system == "x86_64-linux":
+                    self.assertIn("korri-viewer-lifecycle", checks)
+                else:
+                    self.assertNotIn("korri-viewer-lifecycle", checks)
 
     def test_single_architecture_output_cannot_be_skipped_everywhere(self):
         platforms = {

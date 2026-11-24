@@ -51,8 +51,17 @@ does not update device images or grant permission approval. See
 | `starter-pack-cartridges` | Standalone content payload | `plugins/starter-pack/` |
 | `korri-plugin-ssh` | `@korri:ssh` | `plugins/ssh/` |
 | `korri-plugin-sunshine` | `@korri:sunshine` | `plugins/sunshine/` and `services/sunshine/` |
-| `korri-plugin-viewer` | `@korri:viewer` (x86_64 only) | `plugins/viewer/` and the Korri input's `clients/viewer/` |
-| `korri-viewer` | Standalone Korri viewer, GPL-3.0-only (GPL-3.0-or-later code with nightjar-core) | The Korri input's `clients/viewer/` |
+| `korri-plugin-viewer` | `@korri:viewer` (x86_64 and aarch64; aarch64 rollout needs device proof) | `plugins/viewer/` and the Korri input's `clients/viewer/` |
+| `korri-viewer` | Standalone Korri viewer; x86_64 GPL-3.0-only (with nightjar-core), aarch64 GPL-3.0-or-later | The Korri input's `clients/viewer/` |
+
+The viewer's native admission, treaty, source, licence, settings, picture and
+I/O gates run on both architectures. Its `korri-viewer-lifecycle` VM publication
+gate runs only on x86_64: the hosted ARM runner has no `kvm` system feature
+(dry run 45484336168). The lifecycle code is the same Rust on both architectures.
+For aarch64, installed-viewer proof on tabs6 and op6 under Core ADR 0063 must
+stand in for that VM before rollout. `nix/publication-checks.nix` keeps the
+per-system condition explicit so a future ARM runner with KVM can enable it.
+Signature, publisher-binding and exact approval checks are unchanged.
 
 Sunshine is a build candidate. Do not publish it until the ARM build and
 plugin lifecycle gates pass. Its presence in a release does not establish

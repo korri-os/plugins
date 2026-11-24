@@ -3,6 +3,7 @@
 # native runtime/admission gates when that runtime is actually in the batch.
 {
   lib,
+  system,
   hasViewer,
   hasSteamHostCross,
   libretroPackages,
@@ -72,8 +73,12 @@ let
     "korri-viewer-plugin-native"
     "korri-viewer-picture"
     "korri-viewer-io"
-    "korri-viewer-lifecycle"
-  ];
+  ]
+  # The hosted ARM runner has no KVM (dry run 45484336168). Keep this
+  # architecture explicit: add aarch64-linux when its runner provides KVM.
+  # The same Rust lifecycle runs in the x86 VM; ARM also needs its device
+  # proof on tabs6/op6 before rollout (Core ADR 0063).
+  ++ lib.optional (system == "x86_64-linux") "korri-viewer-lifecycle";
   sunshine = builtins.attrNames sunshineChecks ++ [
     "korri-sunshine-plugin-native"
     "korri-sunshine-plugin-admission"
