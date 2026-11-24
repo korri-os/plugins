@@ -5,7 +5,8 @@ It declares no runner and no handler.
 
 ## Files
 
-A runner that lists this plugin's exact output in its `plugin.nix` `requires`
+A runner that names an artifact of this plugin, or lists this plugin's exact
+output in its `plugin.nix` `requires`,
 reads these files from its launch input under `@korri:fex/<key>`:
 
 | Key | File |

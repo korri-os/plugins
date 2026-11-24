@@ -24,8 +24,10 @@ pkgs.runCommand "steam-plugin-package-check"
     assert manifest['publisher'] == {'namespace': '@korri'}
     assert manifest['sources'] == ['plugin.ts']
     assert manifest['services'] == {}
-    # Exact outputs of the plugins whose files plugin.ts passes to the session.
-    assert manifest['requires'] == [str(fex), str(proton)], manifest['requires']
+    # Core ADR 0083: no exact FEX or Proton package is required. The runners
+    # name those plugins' artifacts, and korrid passes the files of the
+    # plugins that declare them.
+    assert manifest.get('requires', []) == [], manifest.get('requires')
     for required, keys in ((fex, ['config', 'fex-unpack']), (proton, ['cachyos-unpack'])):
         files = json.loads((required / 'manifest.json').read_text())['files']
         assert sorted(files) == keys, files

@@ -26,6 +26,27 @@ export STEAM_GAMES_ROOT="$STEAM_HOME"
 export STEAM_DOT="$HOME/.steam"
 steam_client=@steamClient@
 uses_fex=@usesFex@
+# Steam's name for the Proton that korrid passed: the one tool that the
+# artifact's own compatibilitytool.vdf declares (@korri:proton writes it). Read
+# at launch, so this plugin fixes no Proton version. Bash only: this program's
+# PATH need not hold grep or sed.
+proton_tool_name() {
+  local line seen=
+  [[ -f "$1/compatibilitytool.vdf" ]] || return 1
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ ^[[:space:]]*\"([^\"]+)\"[[:space:]]*$ ]]; then
+      seen+=x
+      # "compatibilitytools", "compat_tools", then the tool's name.
+      if [[ "$seen" == xxx ]]; then
+        line=${BASH_REMATCH[1]}
+        [[ "$line" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$ ]] || return 1
+        printf '%s' "$line"
+        return 0
+      fi
+    fi
+  done <"$1/compatibilitytool.vdf"
+  return 1
+}
 # Empty means Steam's public channel: the client keeps its own channel and
 # manifest, and the ARM64 manifest repair below does not apply.
 export STEAM_BETA=@steamBeta@
@@ -482,7 +503,11 @@ fi
 # Link on every launch: the seed runs only once per Steam home, and a new
 # Proton pin brings a new tool name and ready directory.
 mkdir -p "$STEAM_HOME/compatibilitytools.d"
-ln -sfn "$KORRI_PROTON_CACHYOS" "$STEAM_HOME/compatibilitytools.d/@protonToolName@"
+KORRI_STEAM_COMPAT_TOOL=$(proton_tool_name "$KORRI_PROTON_CACHYOS") ||
+  fail 126 'Steam failed: the Proton folder names no compatibility tool'
+# steam-vdf-settings maps games to this tool.
+export KORRI_STEAM_COMPAT_TOOL
+ln -sfn "$KORRI_PROTON_CACHYOS" "$STEAM_HOME/compatibilitytools.d/$KORRI_STEAM_COMPAT_TOOL"
 say 'settings: merging Proton, Steam Input and first-launch seeds'
 @settings@/bin/steam-vdf-settings "$STEAM_HOME" "$appid"
 # Steam's own library list names this home by its absolute path (#498).

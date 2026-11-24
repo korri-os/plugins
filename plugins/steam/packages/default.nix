@@ -1,4 +1,4 @@
-{ pkgs, protonToolName }:
+{ pkgs }:
 let
   native = import ./steam-korri { inherit pkgs settings; };
   steps = import ./session-steps.nix { inherit pkgs; };
@@ -43,10 +43,7 @@ let
       };
   requiredPaths =
     if arm then "KORRI_FEX_CONFIG KORRI_FEX_ROOTFS KORRI_PROTON_CACHYOS" else "KORRI_PROTON_CACHYOS";
-  settingsSource = pkgs.runCommand "vdf-settings.py" { } ''
-    substitute ${../session/vdf-settings.py} "$out" \
-      --replace-fail @protonToolName@ ${pkgs.lib.escapeShellArg protonToolName}
-  '';
+  settingsSource = ../session/vdf-settings.py;
   settings = pkgs.writeShellApplication {
     name = "steam-vdf-settings";
     runtimeInputs = [ pkgs.python3 ];
@@ -76,7 +73,6 @@ let
           "@desktopScaling@"
           "@helpers@"
           "@settings@"
-          "@protonToolName@"
         ]
         [
           "${steps}"
@@ -87,7 +83,6 @@ let
           platform.desktopScaling
           "${native.helpers}"
           "${settings}"
-          protonToolName
         ]
         (builtins.readFile ../session/steam-session.sh);
   };
@@ -140,7 +135,6 @@ native
     settingsSource
     session
     sessionRun
-    protonToolName
     x86Steam
     ;
   fex = pkgs.fex;

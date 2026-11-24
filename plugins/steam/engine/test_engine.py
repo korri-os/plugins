@@ -320,8 +320,12 @@ class HostWrapperTests(unittest.TestCase):
             other = package.parent.parent / valve["otherEngineFolder"] / "steamclient.so"
             other.parent.mkdir()
             other.write_bytes(b"y")
+        # korrid's Proton, with the tool name @korri:proton's unpack writes.
         proton = root / "proton"
         proton.mkdir()
+        (proton / "compatibilitytool.vdf").write_text(
+            '"compatibilitytools"\n{\n  "compat_tools"\n  {\n    "proton-test-arm64"\n'
+            '    {\n      "install_path" "."\n    }\n  }\n}\n')
         home = root / "person/steam-engine/home"
         home.mkdir(parents=True, exist_ok=True)
         fhs = root / "fhs/bin/korri-steam-engine-fhs"
@@ -345,7 +349,7 @@ class HostWrapperTests(unittest.TestCase):
         text = (HERE / "host-run.sh").read_text()
         for name, value in (("fhs", fhs.parent.parent), ("host", host.parent.parent),
                             ("settings", settings.parent.parent),
-                            ("protonToolName", "proton-test-arm64"), *valve.items()):
+                            *valve.items()):
             text = text.replace(f"@{name}@", str(value))
         wrapper.write_text(text)
         environment = {**os.environ, "HOME": str(home), "KORRI_PROTON_CACHYOS": str(proton)}
@@ -406,11 +410,39 @@ class HostWrapperTests(unittest.TestCase):
             self.assertFalse((engine / "steam/linux32").exists())
             self.assertFalse((engine / "home/.steam/sdk32").exists())
 
+    def test_the_tool_name_comes_from_the_proton_folder(self):
+        # Core ADR 0083: the wrapper fixes no Proton version.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result, _, proton, seen = self.start_host(root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            (proton / "compatibilitytool.vdf").write_text(
+                '"compatibilitytools"\n{\n  "compat_tools"\n  {\n    "proton-other-9"\n    {\n    }\n  }\n}\n')
+            wrapper = root / "host-run.sh"
+            home = root / "person/steam-engine/home"
+            package = root / "cache/engine-package/linuxarm64/steamclient.so"
+            run = lambda: subprocess.run(
+                [shutil.which("bash"), str(wrapper), "--commands", str(root / "commands"), str(package)],
+                env={**os.environ, "HOME": str(home), "KORRI_PROTON_CACHYOS": str(proton)},
+                capture_output=True, text=True)
+            result = run()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(seen.read_text())["tool"], "proton-other-9")
+            steam = root / "person/steam-engine/steam"
+            self.assertEqual(os.readlink(steam / "compatibilitytools.d/proton-other-9"), str(proton))
+            # A folder that names no tool, or an unsafe name, refuses the start.
+            for text in ("", '"compatibilitytools"\n{\n  "compat_tools"\n  {\n    "../x"\n  }\n}\n'):
+                (proton / "compatibilitytool.vdf").write_text(text)
+                result = run()
+                self.assertEqual(result.returncode, 1, text)
+                self.assertEqual(json.loads(result.stdout)["reason"], "host_failed")
+
     def test_every_bare_command_of_the_wrapper_is_on_its_path(self):
         # The ACL test below needs ACLs, which the Nix build sandbox lacks;
         # this one reads the script and runs everywhere.
         builtins = {"cd", "exec", "exit", "export", "printf", "set", "trap", "true", "umask", "unset",
-                    "for", "if", "in", "done", "fi", "say", "fail"}
+                    "for", "if", "in", "done", "fi", "say", "fail",
+                    "local", "read", "return", "proton_tool_name"}
         found = set()
         for line in (HERE / "host-run.sh").read_text().splitlines():
             code = re.sub(r"'[^']*'", "''", re.sub(r"(^|\s)#.*", "", line))

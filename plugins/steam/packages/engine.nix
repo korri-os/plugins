@@ -12,7 +12,6 @@
   engineMap,
   settings,
   helpers,
-  protonToolName,
 }:
 let
   lib = pkgs.lib;
@@ -74,7 +73,6 @@ let
       fhs = "${fhs}";
       host = "${host}";
       settings = "${settings}";
-      inherit protonToolName;
       inherit (valve)
         engineFolder
         sdkLink

@@ -14,7 +14,10 @@ import stat
 import sys
 import tempfile
 
-TOOL = "@protonToolName@"  # Substituted from @korri:proton by packages/default.nix.
+# Steam's name for the Proton that korrid passed. The session program reads it
+# from the artifact's compatibilitytool.vdf at launch; this plugin fixes no
+# Proton version.
+TOOL = os.environ.get("KORRI_STEAM_COMPAT_TOOL", "")
 ONCE = (
     "Intro", "NonVerifiedGame", "Gyro", "RemotePlayConfirm",
     "ExternalControllersAndSIAPI", "IntroToActionSets", "IntroToSteamInputGames",
@@ -223,8 +226,17 @@ def engine_compat_mapping(steam: Path) -> int:
     return 0
 
 
+def tool_known() -> bool:
+    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}", TOOL):
+        return True
+    print("steam-vdf-settings: KORRI_STEAM_COMPAT_TOOL names no compatibility tool", file=sys.stderr)
+    return False
+
+
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--engine":
+        if not tool_known():
+            return 126
         return engine_compat_mapping(Path(sys.argv[2]))
     if len(sys.argv) == 3 and sys.argv[1] == "--registry":
         return seed_registry(Path(sys.argv[2]))
@@ -235,6 +247,8 @@ def main():
               " | --engine <steam-root>",
               file=sys.stderr)
         return 2
+    if not tool_known():
+        return 126
     home, appid = Path(sys.argv[1]), sys.argv[2]
     mapping = {key: {"name": TOOL, "config": "", "priority": "250"} for key in ("0", appid)}
     # These are native Steam config.vdf keys, not Korri settings. Korri Seat

@@ -149,12 +149,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       plugin =
         _:
         import ../plugins/steam/plugin.nix {
-          inherit
-            pkgs
-            fexPlugin
-            protonPlugin
-            protonToolName
-            ;
+          inherit pkgs;
           engineMap = steam-engine-map;
         };
     };

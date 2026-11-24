@@ -36,7 +36,7 @@ class SteamBootstrapTests(unittest.TestCase):
             (self.bin / name).write_text(script)
             (self.bin / name).chmod(0o755)
         settings = self.bin / "steam-vdf-settings"
-        source = (HERE / "vdf-settings.py").read_text().replace("@protonToolName@", TOOL)
+        source = (HERE / "vdf-settings.py").read_text()
         settings.write_text(f"#!{sys.executable}\n" + source)
         settings.chmod(0o755)
         # Offline fetches fail explicitly, so tests cannot contact Valve.

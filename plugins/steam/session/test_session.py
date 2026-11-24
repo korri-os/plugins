@@ -92,11 +92,15 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
         self.proton = root / "cache/proton/cachyos/fixture-arm64"
         self.rootfs.mkdir(parents=True)
         self.proton.mkdir(parents=True)
+        # The tool name @korri:proton's unpack writes; the session reads it.
+        (self.proton / "compatibilitytool.vdf").write_text(
+            '"compatibilitytools"\n{\n  "compat_tools"\n  {\n    "%s"\n'
+            '    {\n      "install_path" "."\n    }\n  }\n}\n' % TOOL)
         client = root / "bin" / ("steam-arm64-fhs" if arm else "steam")
         program(client, (HERE / "fixtures/session-client.py").read_text())
         program(root / "bin/steam-arm64-seed", (HERE / "fixtures/seed.py").read_text())
         program(root / "bin/steam-vdf-settings",
-                (HERE / "vdf-settings.py").read_text().replace("@protonToolName@", TOOL))
+                (HERE / "vdf-settings.py").read_text())
         script = (HERE / "steam-session.sh").read_text()
         for placeholder in ("helpers", "settings"):
             script = script.replace(f"@{placeholder}@", str(root))
@@ -108,7 +112,6 @@ os.execv({shutil.which('cp')!r}, [{shutil.which('cp')!r}, *args])
             "desktopScaling": "1.5" if arm else "",
         }.items():
             script = script.replace(f"@{placeholder}@", value)
-        script = script.replace("@protonToolName@", TOOL)
         script = script.replace("@steps@", str(self.steps_file))
         script = script.replace("@failure@", str(HERE.resolve() / "steam-failure.sh"))
         # Exercise timeout branches without adding timing knobs to production.

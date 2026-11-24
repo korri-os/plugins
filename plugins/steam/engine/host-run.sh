@@ -8,7 +8,8 @@
 # Layout of <person>/steam-engine:
 #   steam/                        the Steam root the engine writes
 #   steam/@engineFolder@/steamclient.so  link to the engine package's file
-#   steam/compatibilitytools.d/@protonToolName@  link to korrid's Proton
+#   steam/compatibilitytools.d/<tool>  link to korrid's Proton, under the name
+#                                 its compatibilitytool.vdf declares
 #   home/                         HOME of the host and the game
 #   home/.steam/steam             link to steam/
 #   home/.steam/@sdkLink@          link to steam/@engineFolder@ (Proton's lsteamclient)
@@ -58,14 +59,40 @@ if [[ -n "$other" && -f "$other_engine" ]]; then
   ln -sfn "$other_engine" "$steam/$other/steamclient.so"
   ln -sfn "$steam/$other" "$HOME/.steam/@otherSdkLink@"
 fi
+# Steam's name for the Proton that korrid passed: the one tool that the
+# artifact's own compatibilitytool.vdf declares (@korri:proton writes it). Read
+# at launch, so this plugin fixes no Proton version. Bash only: this program's
+# PATH need not hold grep or sed.
+proton_tool_name() {
+  local line seen=
+  [[ -f "$1/compatibilitytool.vdf" ]] || return 1
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ ^[[:space:]]*\"([^\"]+)\"[[:space:]]*$ ]]; then
+      seen+=x
+      # "compatibilitytools", "compat_tools", then the tool's name.
+      if [[ "$seen" == xxx ]]; then
+        line=${BASH_REMATCH[1]}
+        [[ "$line" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$ ]] || return 1
+        printf '%s' "$line"
+        return 0
+      fi
+    fi
+  done <"$1/compatibilitytool.vdf"
+  return 1
+}
 # Windows games install and run only with a compatibility tool registered
-# (InstallApp 29 "Invalid platform" without it, spike section 11).
+# (InstallApp 29 "Invalid platform" without it, spike section 11). The tool
+# the host sets per app through the engine (IClientCompat) also sets the
+# engine's platform override: Windows builds, through Proton.
 if [[ "${KORRI_PROTON_CACHYOS:-}" == /* && -d "$KORRI_PROTON_CACHYOS" ]]; then
-  ln -sfn "$KORRI_PROTON_CACHYOS" "$steam/compatibilitytools.d/@protonToolName@"
+  tool=$(proton_tool_name "$KORRI_PROTON_CACHYOS") ||
+    fail 'the Proton folder names no compatibility tool' 1
+  ln -sfn "$KORRI_PROTON_CACHYOS" "$steam/compatibilitytools.d/$tool"
+  export KORRI_STEAM_COMPAT_TOOL=$tool
+  # The folder's own compat-tool mapping, merged into the config the engine
+  # writes; no other value of that file changes.
+  @settings@/bin/steam-vdf-settings --engine "$steam" || fail 'cannot write the compat-tool mapping' 1
 fi
-# The folder's own compat-tool mapping, merged into the config the engine
-# writes; no other value of that file changes.
-@settings@/bin/steam-vdf-settings --engine "$steam" || fail 'cannot write the compat-tool mapping' 1
 
 # The account root is setgid; directories made below it inherit the bit.
 find "$root" -xdev -type d -perm -2000 -user "$(id -u)" -exec chmod g-s {} + 2>/dev/null || true
@@ -98,9 +125,6 @@ if [[ "$daemon_uid" != "$(id -u)" ]]; then
   find "$steam/steamapps" -maxdepth 1 -name 'appmanifest_*.acf' -exec setfacl -m "u:$daemon_uid:r" {} +
 fi
 
-# The tool the host sets per app through the engine (IClientCompat), which
-# also sets the engine's platform override: Windows builds, through Proton.
-export KORRI_STEAM_COMPAT_TOOL=@protonToolName@
 # The engine registers only the tools it finds. It looks for
 # compatibilitytools.d beside the steamclient.so it was loaded from, the
 # engine package in korrid's cache (the host's last argument), not in this

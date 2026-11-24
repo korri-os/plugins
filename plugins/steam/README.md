@@ -53,9 +53,14 @@ therefore lose detail; it cannot expose arbitrary log content.
 
 ## Runtime
 
-`plugin.nix` requires the exact `@korri:fex` and `@korri:proton` outputs, and
-the runner lists their artifacts, `@korri:fex/rootfs` and
-`@korri:proton/cachyos`. korrid downloads, verifies and unpacks those before
+The runners list the artifacts `@korri:fex/rootfs` and
+`@korri:proton/cachyos`. `plugin.nix` requires no exact `@korri:fex` or
+`@korri:proton` output (Core ADR 0083): korrid resolves each artifact from
+the enabled plugin that declares it and passes that plugin's files, so each of
+the three plugins moves to a new release by itself. A runner is off, and says
+which artifact it lacks, while no enabled plugin declares one of them. Both
+session programs read Proton's tool name from the ready folder's
+`compatibilitytool.vdf` at launch. korrid downloads, verifies and unpacks those before
 it starts the runner (ADR 0012); see `plugins/fex/README.md` and
 `plugins/proton/README.md`. The FEX rootfs exists for `aarch64-linux` only, so
 an x86_64 device skips it (Core ADR 0052). `launch.prepare` refuses the launch

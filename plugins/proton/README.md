@@ -7,7 +7,8 @@ segment only.
 
 ## Files
 
-A runner that lists this plugin's exact output in its `plugin.nix` `requires`
+A runner that names an artifact of this plugin, or lists this plugin's exact
+output in its `plugin.nix` `requires`,
 reads this file from its launch input under `@korri:proton/<key>`:
 
 | Key | File |
@@ -41,9 +42,10 @@ See ADR 0012.
 cachyos artifact and derives `proton-cachyos-11.0-20260601-slr-arm64` or
 `proton-cachyos-11.0-20260601-slr-x86_64`. It accepts only the current form:
 one `"<system>": {` entry per supported system, each followed directly by its
-one `version:` line; any other form stops evaluation. Builders
-substitute the string into `compatibilitytool.vdf`, the Steam session and the
-VDF settings helper. Nix evaluation does not read build outputs. No compiled
+one `version:` line; any other form stops evaluation. The builder
+substitutes the string into `compatibilitytool.vdf`. The Steam plugin reads
+the name from that file at launch (Core ADR 0083); it is in none of Steam's
+programs. Nix evaluation does not read build outputs. No compiled
 declaration is shipped. The current tool name and existing per-game selections
 are unchanged.
 

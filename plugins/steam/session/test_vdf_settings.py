@@ -22,13 +22,23 @@ class SteamSettingsTests(unittest.TestCase):
         program = tempfile.TemporaryDirectory()
         self.addCleanup(program.cleanup)
         self.helper = Path(program.name) / "vdf-settings.py"
-        self.helper.write_text(HELPER.read_text().replace("@protonToolName@", TOOL))
+        self.helper.write_text(HELPER.read_text())
 
-    def run_helper(self, appid="401710"):
+    def run_helper(self, appid="401710", tool=TOOL):
         return subprocess.run(
             [os.environ.get("PYTHON", "python3"), str(self.helper), str(self.home), appid],
             text=True, capture_output=True, check=False,
+            env={**os.environ, "KORRI_STEAM_COMPAT_TOOL": tool},
         )
+
+    def test_without_a_tool_name_nothing_is_written(self):
+        # Core ADR 0083: the name comes from the Proton artifact at launch.
+        before = self.config.read_bytes()
+        for tool in ("", "bad name", "../x"):
+            result = self.run_helper(tool=tool)
+            self.assertEqual(result.returncode, 126, tool)
+            self.assertIn("KORRI_STEAM_COMPAT_TOOL", result.stderr)
+            self.assertEqual(self.config.read_bytes(), before)
 
     def test_preserves_existing_content_and_adds_compat_mapping(self):
         result = self.run_helper()
@@ -150,6 +160,7 @@ class SteamSettingsTests(unittest.TestCase):
         run = lambda: subprocess.run(
             [os.environ.get("PYTHON", "python3"), str(self.helper), "--engine", str(steam)],
             text=True, capture_output=True, check=False,
+            env={**os.environ, "KORRI_STEAM_COMPAT_TOOL": TOOL},
         )
         result = run()
         self.assertEqual(result.returncode, 0, result.stderr)

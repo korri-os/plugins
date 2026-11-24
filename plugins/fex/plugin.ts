@@ -1,6 +1,6 @@
 // FEX runtime files for runners that emulate x86 code. This plugin declares
 // no runner and no handler. Its native files are declared in plugin.nix; a
-// runner that requires this plugin reads them from its launch input under
+// runner that names its artifact reads them from its launch input under
 // `@korri:fex/<key>`. A runner that lists `@korri:fex/rootfs` in its
 // `artifacts` receives the ready rootfs directory in `input.artifacts`.
 export const name = "fex"

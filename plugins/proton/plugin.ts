@@ -11,7 +11,8 @@ export const description =
 // 0052). korrid downloads and verifies this device's build, then runs
 // `cachyos-unpack` on it. `bytes` is the server's Content-Length: arm64 read
 // on 2026-10-19, x86_64 read from GitHub's release API on 2026-11-08.
-// Build metadata derives Steam's tool name from each platform's version.
+// Build metadata derives Steam's tool name from each platform's version and
+// writes it into compatibilitytool.vdf, where the Steam plugin reads it.
 export const artifacts = {
   cachyos: {
     id: "@korri:proton/cachyos",
