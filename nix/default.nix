@@ -51,9 +51,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = ../plugins/moonlight;
       plugin = _: moonlightDefinition;
     };
-    # @korri:viewer is built from the Korri input (ADR 0061). Only its PC
-    # picture paths have a proof; the aarch64 v4l2request path has none on a
-    # bench device yet (ADR 0063), so x86_64 alone exports it.
+    # @korri:viewer is built from the Korri input (ADR 0061). Export the
+    # aarch64 plugin for the tabs6/op6 installed-viewer proof (#616).
+    # Exporting does not select it for an image: ADR 0063 still requires
+    # a passing device proof before a device replaces Moonlight.
     viewer = import "${korri}/clients/viewer" { inherit pkgs; };
     viewerDefinition = import ../plugins/viewer/plugin.nix { inherit pkgs viewer; };
     # One settings source for both viewers (#435): Moonlight's, answering for
@@ -69,7 +70,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = viewerSource;
       plugin = _: viewerDefinition;
     };
-    hasViewer = pkgs.stdenv.hostPlatform.isx86_64;
+    hasViewer = pkgs.stdenv.hostPlatform.isx86_64 || pkgs.stdenv.hostPlatform.isAarch64;
     sshPackage = mkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/ssh;

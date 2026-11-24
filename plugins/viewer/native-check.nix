@@ -9,6 +9,9 @@
   korri,
   moonlightSource,
 }:
+let
+  pc = pkgs.stdenv.hostPlatform.isx86_64;
+in
 pkgs.runCommand "korri-viewer-native-check"
   {
     nativeBuildInputs = [
@@ -45,17 +48,27 @@ pkgs.runCommand "korri-viewer-native-check"
     test ${toString (builtins.length (builtins.attrNames plugin.services))} -eq 1
     ${plugin.files.viewer} --help > help
     grep -F 'GPL-3.0-or-later' help
-    # With nightjar-core the binary is GPL-3.0-only (korri#391).
-    grep -F 'GPL-3.0-only' help
+    # Only the PC build includes nightjar-core (korri#391).
+    ${pkgs.lib.optionalString pc "grep -F 'GPL-3.0-only' help"}
     test -s ${plugin.packages.viewer}/share/licenses/korri-viewer/LICENSE
     # The notices of what the binary's recipe builds in (korri#521), for its
     # own feature set: the crates of nightjar-core and the Rust parts, and
     # nanors' licence, which nightjar-core's Reed-Solomon code ports.
     notices=${plugin.packages.viewer}/share/licenses/korri-viewer/NOTICES.txt
-    grep -Fx 'RUST CRATES IN THE BINARY (x86_64-unknown-linux-gnu, features nightjar,rust-audio-output,rust-egl-presenter,rust-x11-window)' "$notices"
-    grep -Fx 'nanors' "$notices"
-    grep -F 'Copyright (c) 2021 Joseph Calderon' "$notices"
-    grep -Fx '  nightjar-core 0.1.0' "$notices"
+    ${
+      if pc then
+        ''
+          grep -Fx 'RUST CRATES IN THE BINARY (x86_64-unknown-linux-gnu, features nightjar,rust-audio-output,rust-egl-presenter,rust-x11-window)' "$notices"
+          grep -Fx 'nanors' "$notices"
+          grep -F 'Copyright (c) 2021 Joseph Calderon' "$notices"
+          grep -Fx '  nightjar-core 0.1.0' "$notices"
+        ''
+      else
+        ''
+          grep -Fx 'RUST CRATES IN THE BINARY (aarch64-unknown-linux-gnu)' "$notices"
+          ! grep -Fx '  nightjar-core 0.1.0' "$notices"
+        ''
+    }
     # GPL-3 corresponding source, in the same closure as the binary.
     tar -tJf ${plugin.packages.source}/share/korri-viewer/korri-viewer-source.tar.xz > sources
     for expected in \
@@ -82,7 +95,18 @@ pkgs.runCommand "korri-viewer-native-check"
     # those features.
     tar -xJOf ${plugin.packages.source}/share/korri-viewer/korri-viewer-source.tar.xz \
       korri-viewer-source/BUILDING.txt > building
-    grep -F -- '--features nightjar,rust-audio-output,rust-egl-presenter,rust-x11-window' building
+    ${
+      if pc then
+        ''
+          grep -F -- '--features nightjar,rust-audio-output,rust-egl-presenter,rust-x11-window' building
+        ''
+      else
+        ''
+          grep -F -- '--offline in korri/clients/viewer' building
+          ! grep -F -- '--features nightjar' building
+          grep -Fx 'korri-viewer-source/korri/clients/viewer/ffmpeg/0001-v4l2-request.patch' sources
+        ''
+    }
     # Moonlight's settings, answering for this runner. Moonlight's plugin
     # sits beside it so the test compares the two.
     mkdir -p settings-check/viewer settings-check/moonlight
