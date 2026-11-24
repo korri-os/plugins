@@ -1,0 +1,10 @@
+StorePath: /nix/store/6xvz3dz2cc6xq040zhs87rixv90divi6-korri-steam-engine-fhs
+URL: https://github.com/korri-os/plugins/releases/download/build-e3343461a76e-steam-engine-15/1cz9zwnc39n7h2jd829m4jrp45879v1wky6diziys2likasvy445.nar.xz
+Compression: xz
+FileHash: sha256:1cz9zwnc39n7h2jd829m4jrp45879v1wky6diziys2likasvy445
+FileSize: 236
+NarHash: sha256:171yv03b010ffgpi419fnpynh19bmrrd74xw5bqr1pdh0hpginql
+NarSize: 536
+References: qskdzsvwzlwadzvz4wfg2x7p4jzh34f3-korri-steam-engine-fhs-bwrap
+Deriver: ymf4imkb9v5wl9jp3s48869s4cq2x0lm-korri-steam-engine-fhs.drv
+Sig: korri-plugins-1:WP6Q0i0n15DHoX9pj7NE8KzHxIPfAnGvmylPfnOdnAQolV7SFMY8pKm9A1XTRp+vEtDoaaoRPrtJ0dHYph+CBw==

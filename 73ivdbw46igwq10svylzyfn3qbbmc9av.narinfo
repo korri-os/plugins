@@ -1,0 +1,10 @@
+StorePath: /nix/store/73ivdbw46igwq10svylzyfn3qbbmc9av-korri-proton-compat-libs
+URL: https://github.com/korri-os/plugins/releases/download/build-e3343461a76e-steam-engine-15/02h7h4ygr3wq1qhjg24d4mvj89sw9580d9rdjd94i5cvxrsc9fqz.nar.xz
+Compression: xz
+FileHash: sha256:02h7h4ygr3wq1qhjg24d4mvj89sw9580d9rdjd94i5cvxrsc9fqz
+FileSize: 260
+NarHash: sha256:1fcnjijqvzwkqdkfchxy412kcbk5v73fi2y7vsw6qgvm7ii8mini
+NarSize: 720
+References: zx4ag3v11v9rl0iqvg6vzbpflzlg0dk2-bzip2-1.0.8
+Deriver: nci2rf3sq9gw4rr0h26jiwmc1d1fcf2b-korri-proton-compat-libs.drv
+Sig: korri-plugins-1:y8UU5N9TjTan0A3q5IGRBhaZAOPyUQIs8lwxKWH2uNwpKPpZqDpgWb7O/DFiDxzUp0D073oIFyVOjEQSRc32BQ==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/qskdzsvwzlwadzvz4wfg2x7p4jzh34f3-korri-steam-engine-fhs-bwrap
+URL: https://github.com/korri-os/plugins/releases/download/build-e3343461a76e-steam-engine-15/052bfh8cwxyk2k3qsv92m8qgahckbzha95bfv1y6ycfjz4bwc8nz.nar.xz
+Compression: xz
+FileHash: sha256:052bfh8cwxyk2k3qsv92m8qgahckbzha95bfv1y6ycfjz4bwc8nz
+FileSize: 2388
+NarHash: sha256:1rz128wfz2a39c9flzxqhslrrnjx02pxr8852x8a10qwaxlyhbn6
+NarSize: 5688
+References: 33zybn9vkws10cmqvdspnwa9rdbbj8l6-korri-steam-engine-fhs-init 5r9yxlp4f30nqrlrya40g1mhs3f97bg1-bubblewrap-0.12.0 b1v2535s9rb9v4fsg99y72kwmlwb6v83-korri-steam-engine-fhs-fhsenv-rootfs czx7cscpnqqmc9nwmbpnv2zcvck64mmf-bash-5.3p20 m2ar7c5ylhgg8vp7dfdx9bhjfvki5xdg-coreutils-9.12 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 ym136nkns5xkr1lbdwb4qlrb9wvj5zii-container-init
+Deriver: spw5iphk819qaldc5dwx9frxqlpilisn-korri-steam-engine-fhs-bwrap.drv
+Sig: korri-plugins-1:K2Wxnd2eOMF4a+pfbq1DQ2k31MREyYqMfg21hgUF/GMF5KIpC+Nc+hDgkjmz5lrJ1sJr47xtfXBrlnW7VYJKDw==
