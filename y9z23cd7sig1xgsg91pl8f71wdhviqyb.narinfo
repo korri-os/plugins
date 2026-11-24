@@ -1,0 +1,10 @@
+StorePath: /nix/store/y9z23cd7sig1xgsg91pl8f71wdhviqyb-libvpx-1.14.1-bin
+URL: https://github.com/korri-os/plugins/releases/download/build-11d9204ccf2f-engine-default/1lp96yq8569a2kmaml36548480ycf3ga1jrpm6p8qs4lw90ldlq3.nar.xz
+Compression: xz
+FileHash: sha256:1lp96yq8569a2kmaml36548480ycf3ga1jrpm6p8qs4lw90ldlq3
+FileSize: 246160
+NarHash: sha256:0a0y9c7al1cbkpljlmh0xbzsdygj7blfb1ysq696n1650xc5cb2d
+NarSize: 1201312
+References: 5p44236hnpw2yqm24byq2x8pz57kfwwi-libvpx-1.14.1 nhphqkv18x8fpf3flz0bsm1h554pawn7-glibc-2.44-57 nhrkwapk0zzzmc8x1f2k24qpyz9gy5qb-gcc-16.2.0-lib
+Deriver: pj04m5wvabpxqnz2m5xahlwchgmd5dg5-libvpx-1.14.1.drv
+Sig: korri-plugins-1:1e2Cq9Juk9i35sBIZcEAiIBZUP3f4mnO0qW89vLy2qfV9xy41pGU49v46TnzvB6kSjwbYa1e3Yx7nySkUYVdCg==

@@ -1,0 +1,10 @@
+StorePath: /nix/store/fvnnkvbipl2nbvgm1h2sm4rdgcgvxqbi-steam-engine-session
+URL: https://github.com/korri-os/plugins/releases/download/build-11d9204ccf2f-engine-default/0lanrczm10lrmv7zbfhlmzm92ks1qcq8sq8zfhgr030hr9nabsd9.nar.xz
+Compression: xz
+FileHash: sha256:0lanrczm10lrmv7zbfhlmzm92ks1qcq8sq8zfhgr030hr9nabsd9
+FileSize: 6568
+NarHash: sha256:0jkj30gc9q9jlmrd013j1nm952k7anv2hpzia8ha081m3m4p59rk
+NarSize: 17496
+References: 2lgg8jqyzjp60svh7kmp39kqwnig31p2-util-linux-2.42.4-bin 9l0j15jg8634hkb6d4c9y95mpxl0nhrd-jq-1.8.2-bin 9wc73n5izv0m7ppjbibi4hbr68rba1lj-gnused-4.10 c3f45pxlb81gzz4w1nym7lpznfypva7s-gnugrep-3.12 cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12 fmg6kh4sx6ljgwqnxccc5j7y1ps572j5-systemd-262 fs48fkk1m1w9krxf7m1qlk79sya9pg8b-steam-engine-session-steps.sh ibjscblgjrzx579mj0im7dwqzd1bi322-korri-steam-engine-fhs nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20 s07c44k8afma38sdda30q6cws6svyndk-x-placeholder.py xahxrjs30p3mw0a42bqg9ikgkikskw8m-python3-3.14.8 xi9ya3p1ahbz8gspp7gfsh5zz71b15ab-launch-entry.py
+Deriver: 3q06lms6m8rb1g3c7apxgwzx572v6kvd-steam-engine-session.drv
+Sig: korri-plugins-1:q09+PunGLpX9gB41I7tZeLTGJk2kLwMnm/GBZXhE3271W+0GpxyfgGRQkpYTa1cfWGCpP9+7C4NCFdUZFLU4Aw==
