@@ -113,6 +113,16 @@ export const artifacts = {
   },
 }
 
+// Core ADR 0083, owner decision 2026-11-23: which Proton and which FEX a game
+// runs with is a launch setting, set for the device, a runner or one game.
+// Each list can hold any number of entries; Korri offers one today. A choice
+// is the id of an artifact, so another version is one more artifact of the
+// Proton or FEX plugin and one more entry here. The first entry is the
+// default. This plugin fixes no version of either: korrid resolves the
+// artifact from the enabled plugin that declares it.
+const PROTON_CHOICES = ["@korri:proton/cachyos"]
+const FEX_CHOICES = ["@korri:fex/rootfs"]
+
 export const runners = {
   steam: {
     program: "steam-session",
@@ -128,7 +138,7 @@ export const runners = {
     // korrid downloads these before it starts the runner and passes the
     // ready directories in `artifacts`. An x86_64 device skips the FEX rootfs,
     // which has no x86_64 build (Core ADR 0052).
-    artifacts: ["@korri:fex/rootfs", "@korri:proton/cachyos"],
+    artifacts: [...FEX_CHOICES, ...PROTON_CHOICES],
   },
   // Korri ADR 0083: Steam games on Valve's engine with no Steam client. Opt-in;
   // the client runner above stays the default. korrid runs korri-steam-host
@@ -143,8 +153,8 @@ export const runners = {
       { key: "game", label: "Starting the game" },
     ],
     artifacts: [
-      "@korri:fex/rootfs",
-      "@korri:proton/cachyos",
+      ...FEX_CHOICES,
+      ...PROTON_CHOICES,
       `${PLUGIN_ID}/${ENGINE_PACKAGE_KEY}`,
       `${PLUGIN_ID}/${LEGACYCOMPAT_KEY}`,
     ],
@@ -162,11 +172,92 @@ function requiredPath(paths: Record<string, string>, key: string): string {
   return path
 }
 
+// The runners' typed settings (Core ADR 0037): the plugin bucket's leaves.
+type SettingLeaf = { type: "string"; title: string; description: string; enum: string[]; default: string }
+const settingChoices: Record<string, { title: string; description: string; choices: string[] }> = {
+  proton: {
+    title: "proton",
+    description: "The Proton that runs Windows games, by its artifact id.",
+    choices: PROTON_CHOICES,
+  },
+  fex: {
+    title: "fex",
+    description: "The FEX x86 root file system on ARM devices, by its artifact id.",
+    choices: FEX_CHOICES,
+  },
+}
+const SETTINGS_REVISION = "1"
+const runnerIds = [`${PLUGIN_ID}/steam`, `${PLUGIN_ID}/engine`]
+
+function describeSettings(input: { id: string }) {
+  if (!runnerIds.includes(input.id)) throw new Error(`Unknown settings contribution: ${input.id}`)
+  const properties: Record<string, SettingLeaf> = {}
+  for (const [key, setting] of Object.entries(settingChoices)) {
+    properties[key] = {
+      type: "string",
+      title: setting.title,
+      description: setting.description,
+      enum: setting.choices,
+      default: setting.choices[0],
+    }
+  }
+  return {
+    schema: {
+      type: "object",
+      title: "Steam",
+      description: "Steam runner settings.",
+      properties,
+      additionalProperties: false,
+    },
+    revision: SETTINGS_REVISION,
+  }
+}
+
+type SettingDiagnostic = { code: string; severity: "error"; path: string[]; message: string }
+
+/** The accepted choice of every setting, and what was refused. */
+function chosenSettings(bucket: unknown): { chosen: Record<string, string>; diagnostics: SettingDiagnostic[] } {
+  const chosen: Record<string, string> = {}
+  const diagnostics: SettingDiagnostic[] = []
+  for (const [key, setting] of Object.entries(settingChoices)) chosen[key] = setting.choices[0]
+  if (bucket === undefined) return { chosen, diagnostics }
+  if (typeof bucket !== "object" || bucket === null || Array.isArray(bucket)) {
+    diagnostics.push({ code: "setting-value", severity: "error", path: ["plugin"], message: "Expected an object" })
+    return { chosen, diagnostics }
+  }
+  for (const [key, value] of Object.entries(bucket)) {
+    const setting = Object.hasOwn(settingChoices, key) ? settingChoices[key] : undefined
+    if (setting === undefined) {
+      diagnostics.push({ code: "setting-unknown", severity: "error", path: ["plugin", key], message: "Unknown setting" })
+    } else if (typeof value !== "string" || !setting.choices.includes(value)) {
+      diagnostics.push({
+        code: "setting-value",
+        severity: "error",
+        path: ["plugin", key],
+        message: `Expected one of: ${setting.choices.join(", ")}`,
+      })
+    } else {
+      chosen[key] = value
+    }
+  }
+  return { chosen, diagnostics }
+}
+
+function validateSettings(input: { values: Record<string, unknown> }) {
+  const diagnostics = chosenSettings(input.values.plugin).diagnostics
+  for (const key of Object.keys(input.values)) {
+    if (key !== "plugin") {
+      diagnostics.push({ code: "setting-unknown", severity: "error", path: [key], message: "Unknown setting" })
+    }
+  }
+  return { valid: diagnostics.length === 0, diagnostics }
+}
+
 /**
  * Both runners: the selected app id, the person's Steam folder for this
  * runner (`homeVariable` = `home` under the account root), and the ready
- * Proton and FEX directories of the exact required builds, as korrid passes
- * them under `<pluginId>/<key>`. korrid adds KORRI_STEAM_ENGINE_CHANNEL for
+ * Proton and FEX directories of the chosen artifacts, as korrid passes them
+ * under their artifact ids. korrid adds KORRI_STEAM_ENGINE_CHANNEL for
  * the engine runner's game unit.
  */
 function steamLaunch(
@@ -181,20 +272,22 @@ function steamLaunch(
   if (overrides?.config !== undefined) {
     throw new Error("Steam takes no raw config override")
   }
-  if (overrides?.settings !== undefined && Object.keys(overrides.settings).length > 0) {
-    throw new Error("Steam runner does not implement typed settings yet")
-  }
+  // korrid has skipped a setting that settings.validate refused (ADR 0037);
+  // what is left here is accepted or the default.
+  const { chosen } = chosenSettings(overrides?.settings?.plugin)
   const folder = `${input.accountRoot}/${home}`
   const env: Record<string, string> = {
     [homeVariable]: folder,
-    KORRI_PROTON_CACHYOS: requiredPath(input.artifacts, "@korri:proton/cachyos"),
+    // The variable keeps its name: it is the session programs' interface.
+    KORRI_PROTON_CACHYOS: requiredPath(input.artifacts, chosen.proton),
   }
   // korrid passes the FEX rootfs only on a device whose platform has it. The
   // ARM64 session program refuses to start without it; the x86_64 one needs
-  // no FEX.
-  if (input.artifacts["@korri:fex/rootfs"]) {
-    env.KORRI_FEX_CONFIG = requiredPath(input.files, "@korri:fex/config")
-    env.KORRI_FEX_ROOTFS = input.artifacts["@korri:fex/rootfs"]
+  // no FEX. The config file is the FEX plugin's own, beside its artifact.
+  if (input.artifacts[chosen.fex]) {
+    const fexPlugin = chosen.fex.slice(0, chosen.fex.indexOf("/"))
+    env.KORRI_FEX_CONFIG = requiredPath(input.files, `${fexPlugin}/config`)
+    env.KORRI_FEX_ROOTFS = input.artifacts[chosen.fex]
   }
   return { command: input.program, args: [input.ref], env, directories: [folder], envUnset: [] }
 }
@@ -321,4 +414,6 @@ function discoverInstalledApps(
 export const handlers = {
   "discovery.discover": discoverInstalledApps,
   "launch.prepare": prepareLaunch,
+  "settings.describe": describeSettings,
+  "settings.validate": validateSettings,
 }

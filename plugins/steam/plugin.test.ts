@@ -211,3 +211,44 @@ describe("Steam engine runner declaration (ADR 0083)", () => {
     expect(() => handlers["launch.prepare"]({ ...launchInput(), ref: "" })).toThrow("provider ref")
   })
 })
+
+describe("Steam runner settings (Core ADR 0083, ADR 0037)", () => {
+  const describeSettings = handlers["settings.describe"]
+  const validate = (plugin: unknown) => handlers["settings.validate"]({ values: { plugin } })
+
+  test("both runners offer one Proton and one FEX, each the id of an artifact they name", () => {
+    for (const runner of ["steam", "engine"] as const) {
+      const { schema, revision } = describeSettings({ id: `${ID}/${runner}` })
+      expect(revision).toBe("1")
+      expect(schema.additionalProperties).toBe(false)
+      expect(Object.keys(schema.properties)).toEqual(["proton", "fex"])
+      expect(schema.properties.proton.enum).toEqual(["@korri:proton/cachyos"])
+      expect(schema.properties.proton.default).toBe("@korri:proton/cachyos")
+      expect(schema.properties.fex.enum).toEqual(["@korri:fex/rootfs"])
+      for (const leaf of Object.values(schema.properties)) {
+        for (const choice of leaf.enum) expect(runners[runner].artifacts).toContain(choice)
+      }
+    }
+    expect(() => describeSettings({ id: "@korri:steam/other" })).toThrow("Unknown settings contribution")
+  })
+
+  test("accepts a listed choice and refuses any other value or key", () => {
+    expect(validate(undefined)).toEqual({ valid: true, diagnostics: [] })
+    expect(validate({ proton: "@korri:proton/cachyos", fex: "@korri:fex/rootfs" }).valid).toBe(true)
+    const wrong = validate({ proton: "@korri:proton/other", speed: 1 })
+    expect(wrong.valid).toBe(false)
+    expect(wrong.diagnostics.map(d => [d.code, d.path.join(".")])).toEqual([
+      ["setting-value", "plugin.proton"], ["setting-unknown", "plugin.speed"],
+    ])
+    expect(handlers["settings.validate"]({ values: { video: {} } }).valid).toBe(false)
+  })
+
+  test("the launch uses the chosen artifacts and falls back to the default for a refused value", () => {
+    const expected = handlers["launch.prepare"](launchInput())
+    for (const plugin of [{ proton: "@korri:proton/cachyos" }, { proton: "@korri:proton/other" }, {}]) {
+      const input = { ...launchInput(), overrides: { settings: { plugin } } }
+      expect(handlers["launch.prepare"](input)).toEqual(expected)
+    }
+  })
+})
+

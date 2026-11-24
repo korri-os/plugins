@@ -51,6 +51,23 @@ it reports the last launch step's label plus “failed”. Client exit and the
 does not change the exit code or skip Steam cleanup. Unknown Steam wording can
 therefore lose detail; it cannot expose arbitrary log content.
 
+## Settings
+
+Both runners have two typed settings in the plugin bucket (Core ADR 0037,
+ADR 0083): `plugin.proton` and `plugin.fex`. Each value is the id of an
+artifact the runner names. Each list has one entry today,
+`@korri:proton/cachyos` and `@korri:fex/rootfs`, and the first entry is the
+default. They are set like any launch setting, for the device, a runner or one
+game:
+
+```sh
+korri launch-settings set plugin.proton @korri:proton/cachyos --game <game>
+```
+
+Another Proton or FEX version is one more artifact of that plugin and one
+more entry in `PROTON_CHOICES` or `FEX_CHOICES` in `plugin.ts`. A value that
+is not in the list is skipped with a launch warning, and the default applies.
+
 ## Runtime
 
 The runners list the artifacts `@korri:fex/rootfs` and
