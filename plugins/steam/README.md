@@ -68,6 +68,25 @@ Another Proton or FEX version is one more artifact of that plugin and one
 more entry in `PROTON_CHOICES` or `FEX_CHOICES` in `plugin.ts`. A value that
 is not in the list is skipped with a launch warning, and the default applies.
 
+## FEX and Proton must be installed and on
+
+The runners name `@korri:fex/rootfs` and `@korri:proton/cachyos`, so the FEX
+and Proton plugins must be installed and enabled, on x86_64 too: there the FEX
+plugin is what tells korrid that the rootfs is not for this platform. While
+one of them is off, both runners are off and korrid logs
+`runner @korri:steam/engine is off: no enabled plugin provides <artifact>`.
+
+A device that moves Steam from a release that required the exact FEX and
+Proton packages (before `build-85abd07f2d57-steam-engine-14`) to a later one
+must turn FEX and Proton on afterwards. The plugin host had them on only as
+Steam's requirements and turns them off when Steam stops requiring them
+(seen on aka, 2026-11-24):
+
+```sh
+korri-plugin enable @korri:fex
+korri-plugin enable @korri:proton
+```
+
 ## Runtime
 
 The runners list the artifacts `@korri:fex/rootfs` and
