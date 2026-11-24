@@ -1,0 +1,10 @@
+StorePath: /nix/store/h18lhlp74hi9vfa3q8h3dy478y8r0lqx-vdf-settings.py
+URL: https://github.com/korri-os/plugins/releases/download/build-85abd07f2d57-steam-engine-14/0bfbaspk0x20jqk3q7w3i0plm0ykcygikzb5jykn9z04ql5hxqin.nar.xz
+Compression: xz
+FileHash: sha256:0bfbaspk0x20jqk3q7w3i0plm0ykcygikzb5jykn9z04ql5hxqin
+FileSize: 3992
+NarHash: sha256:1qj0r3kc6ll094cpaqjcaqfx9jk3ya2cjibfn158kaydmbxzjjc7
+NarSize: 11280
+References: 
+Sig: korri-plugins-1:TYUPG6+O56WwghjvjWhFNkImNHAqmY4FUOBCZqv435Z5DNV0rOAmDhxqYvNdB54yqsbSJoihxZD+5CqktaLqAw==
+CA: fixed:r:sha256:1qj0r3kc6ll094cpaqjcaqfx9jk3ya2cjibfn158kaydmbxzjjc7

@@ -1,0 +1,10 @@
+StorePath: /nix/store/y048q7af1c507flfbxjxzr3x6kn4f915-steam-session
+URL: https://github.com/korri-os/plugins/releases/download/build-85abd07f2d57-steam-engine-14/0xhgbbylg3md1hm7ns4lqxb502k6nsxqnj3lj0wzs8acbwn6f5p5.nar.xz
+Compression: xz
+FileHash: sha256:0xhgbbylg3md1hm7ns4lqxb502k6nsxqnj3lj0wzs8acbwn6f5p5
+FileSize: 932
+NarHash: sha256:13ghvfxlznckk2f67zqwqn10mn4q4mh9ga89d0cc9gwavq1s09ap
+NarSize: 1920
+References: cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12 f88s1f2rgbz6nnkdry1hy25q0kaidiz1-dbus-1.16.2 kppf3fv5wmsn47f4c2038wr6plivmsyv-steam-session-run nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20
+Deriver: 63sfrv86mjwnr5jmb1h279037rsgfinp-steam-session.drv
+Sig: korri-plugins-1:OGxuXnsQForvTfmTz5W5QH7K6SFF93nOw8Aa8SMOM0KrEaySf4pQyoqPR3KhxZ5I7aHd3eucR5B+5LGxCtI+Dg==
