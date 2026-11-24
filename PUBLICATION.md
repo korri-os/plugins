@@ -527,7 +527,7 @@ Build the package outputs you want. Pass their exact store paths to the export
 command. Do not pass flake references to export.
 
 ```sh
-nix run .#korri-cache -- build --system aarch64-linux --paths-file paths.txt korri-tailscale
+nix run .#korri-cache -- build --system aarch64-linux --paths-file paths.txt korri-plugin-tailscale
 nix run .#korri-cache -- export file-cache --key-file cache.secret /nix/store/EXACT_OUTPUT
 nix run .#korri-cache -- prepare file-cache prepared --nar-base-url https://github.com/OWNER/REPO/releases/download/BATCH_TAG/ --upstream-cache https://cache.nixos.org
 ```
@@ -1041,10 +1041,10 @@ The proposed full catalog batch is the 35 plugin IDs in Core's pinned
 34 outputs, retaining `@korri:viewer` on x86_64. This replaces the moving
 catalog without silently dropping unrelated product plugins. The exact UTF-8
 `packages` input below, with no newline, has SHA-256
-`9d337e39e594b6f6a42b67114cab5479e7bcf99319d1f5d8f0eb1b24f46c7bd6`.
+`99ebcd9368c68883f456c167a6eab9058e17d9025584624b861e8ed7566714ed`.
 
 ```sh
-PACKAGES='korri-plugin-beetle-ngp korri-plugin-beetle-pce-fast korri-plugin-beetle-wswan korri-plugin-fake08 korri-plugin-fbneo korri-plugin-fex korri-plugin-flycast korri-plugin-gambatte korri-plugin-gamescope korri-plugin-genesis-plus-gx korri-plugin-gw korri-plugin-handy korri-plugin-homebrewhub korri-plugin-melonds korri-plugin-mgba korri-plugin-mupen64plus korri-plugin-nestopia korri-plugin-pcsx-rearmed korri-plugin-pico8 korri-plugin-picodrive korri-plugin-prosystem korri-plugin-proton korri-plugin-retroarch korri-plugin-retrobrews korri-plugin-snes9x korri-plugin-solarus korri-plugin-ssh korri-plugin-starter-pack korri-plugin-steam korri-plugin-stella korri-plugin-sunshine korri-tailscale korri-plugin-viewer korri-plugin-zquest-classic'
+PACKAGES='korri-plugin-beetle-ngp korri-plugin-beetle-pce-fast korri-plugin-beetle-wswan korri-plugin-fake08 korri-plugin-fbneo korri-plugin-fex korri-plugin-flycast korri-plugin-gambatte korri-plugin-gamescope korri-plugin-genesis-plus-gx korri-plugin-gw korri-plugin-handy korri-plugin-homebrewhub korri-plugin-melonds korri-plugin-mgba korri-plugin-mupen64plus korri-plugin-nestopia korri-plugin-pcsx-rearmed korri-plugin-pico8 korri-plugin-picodrive korri-plugin-prosystem korri-plugin-proton korri-plugin-retroarch korri-plugin-retrobrews korri-plugin-snes9x korri-plugin-solarus korri-plugin-ssh korri-plugin-starter-pack korri-plugin-steam korri-plugin-stella korri-plugin-sunshine korri-plugin-tailscale korri-plugin-viewer korri-plugin-zquest-classic'
 ```
 
 Local preparation passes the moved viewer's 9 settings tests (94 assertions),
@@ -1055,3 +1055,28 @@ Use the normal tested-SHA/tag and dry-run workflow above. Publication still
 needs owner approval, then Core's immutable catalog pin, then ibuki's deploy
 and a `korri` CLI stream from aka. Do not deploy the removal there with its
 old viewer.
+
+
+### Canonical Tailscale output repair
+
+Dry run `45468344890` failed the scoped input-invalidation gate on both
+architectures: Core's product selection requires `korri-plugin-tailscale`,
+but the publisher exported `korri-tailscale`.
+
+This mismatch predates the Moonlight removal. The last successful dry run,
+`45358023735` (`e3343461a76eff0aa0e8ef7b8a8761d3c359918a`), pinned Core
+`7ad834303cef21a85d949969f22fdf788e571db6`, whose image selection did not
+include Tailscale. Against that unchanged publisher, the Core selection at
+`fc314766e4957e337490101e54bef83a99862b7f` already fails on both architectures;
+so does `a27386cb0`. Advancing the Core pin exposed the mismatch.
+
+The publisher now exports only `korri-plugin-tailscale`, consistent with
+Core's catalog-key selection and the other plugin outputs. Publication gate
+selection, workflow defaults, current commands and the host-free churn check
+use that name. No alias, fallback, special-case selection mapping or Core
+change is added. `@korri:tailscale`, its program names and native service
+identity do not change. The exact batch input and digest above are updated.
+
+The new regression evaluates every product image's actual selection against
+both architectures' publisher outputs. It failed before the rename and
+passes after it, including Tailscale in every selected image.

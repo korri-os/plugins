@@ -20,7 +20,7 @@ on:
       packages:
         description: "Package output names separated by spaces; one or more per batch"
         required: true
-        default: korri-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine
+        default: korri-plugin-tailscale korri-plugin-retroarch korri-plugin-mgba korri-plugin-ssh korri-plugin-sunshine
         type: string
       tag:
         description: "Batch tag, not a plugin version; must already point at expected_source_sha"

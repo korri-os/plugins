@@ -316,7 +316,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
   in
   {
     packages = {
-      korri-tailscale = tailscalePackage;
+      korri-plugin-tailscale = tailscalePackage;
       korri-plugin-retroarch = retroarchPackage;
       korri-plugin-ssh = sshPackage;
       korri-plugin-sunshine = sunshinePlugin;

@@ -43,6 +43,26 @@ class PublicationChecksTest(unittest.TestCase):
                     self.assertIsInstance(gates, list)
                     self.assertLessEqual(set(gates), set(checks))
 
+    def test_product_defaults_select_existing_publisher_outputs(self):
+        # Core selects catalog keys. Publisher outputs must use the same
+        # canonical names, not a test-only alias for a differently named output.
+        source = json.dumps("git+" + ROOT.as_uri())
+        for system in selection.SYSTEMS:
+            with self.subTest(system=system):
+                tailscale = evaluate(f"packages.{system}.korri-plugin-tailscale.outPath")
+                selected = json.loads(subprocess.check_output(
+                    ["nix", "eval", "--json", "--impure", f".#packages.{system}", "--apply",
+                     f'''p:
+                       let
+                         core = (builtins.getFlake {source}).inputs.korri;
+                         selected = import (core + "/nix/product/plugin-selection.nix") {{ plugins = p; }};
+                       in builtins.mapAttrs (_: packages: map toString packages) selected'''],
+                    cwd=ROOT, text=True,
+                ))
+                self.assertTrue(selected)
+                self.assertTrue(all(tailscale in packages for packages in selected.values()))
+                self.assertNotIn("korri-tailscale", self.mappings[system])
+
     def test_removed_moonlight_client_has_no_output_or_publication_gate(self):
         for system, mapping in self.mappings.items():
             with self.subTest(system=system):

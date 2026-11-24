@@ -898,7 +898,7 @@ class SignedCache(unittest.TestCase):
 
 class CliInputs(unittest.TestCase):
     def test_export_refuses_build_requests(self):
-        for value in (".#korri-tailscale", "github:owner/repo", "--impure"):
+        for value in (".#korri-plugin-tailscale", "github:owner/repo", "--impure"):
             result = run(
                 sys.executable,
                 str(SCRIPT),

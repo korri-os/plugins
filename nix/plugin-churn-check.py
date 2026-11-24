@@ -149,7 +149,7 @@ def host_free(publisher, korri, system, baseline):
           builtins.listToAttrs (map (name: {{
             inherit name;
             value = {{ output = toString p.${{name}}; derivation = p.${{name}}.drvPath; }};
-          }}) (builtins.fromJSON {json.dumps(json.dumps(sorted(set(baseline['packages']) | {'korri-tailscale'})))}))'''], text=True,
+          }}) (builtins.fromJSON {json.dumps(json.dumps(sorted(baseline['packages'])))}))'''], text=True,
     ))
     builder = json.loads(subprocess.check_output(
         command + [f'path:{publisher}#checks.{system}.korri-plugin-builder', '--apply',

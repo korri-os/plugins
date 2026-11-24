@@ -21,7 +21,7 @@ does not update device images or grant permission approval. See
 
 | Flake output (`packages.<system>`) | Plugin | Source |
 |---|---|---|
-| `korri-tailscale` | `@korri:tailscale` | `plugins/tailscale/` |
+| `korri-plugin-tailscale` | `@korri:tailscale` | `plugins/tailscale/` |
 | `korri-plugin-retroarch` | `@korri:retroarch` | `plugins/retroarch/` |
 | `korri-plugin-<core>` | `@korri:<core>` | Generated from `plugins/libretro/cores.nix` |
 | `korri-plugin-solarus` | `@korri:solarus` | `plugins/solarus/` |
