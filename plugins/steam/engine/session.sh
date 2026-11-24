@@ -304,6 +304,7 @@ else
   "$fhs" "$exe" "${ARGV[@]}" 7>&- &
 fi
 game=$!
+game_started=$SECONDS
 
 finish() {
   # Every process started for this app carries its SteamAppId.
@@ -329,5 +330,19 @@ status=0
 wait "$game" || status=$?
 trap - TERM INT
 say "AppID $appid exited (status $status)"
+# A game that stops with an error soon after its start did not run
+# (korri#594: a launcher that ends with 255, a missing library). A wrapper
+# around this program (gamescope) ends with 0 whatever this program returns,
+# so the host reports it, as it reports a refusal. Later, a status other than
+# 0 says nothing: games end that way after hours of play.
+failed=""
+if (( status != 0 && SECONDS - game_started < ${KORRI_STEAM_EARLY_EXIT_SECONDS:-60} )); then
+  failed=1
+  to_host 'refused game_failed' 5 2>/dev/null ||
+    say 'could not report the failed start to the engine host'
+fi
 finish
+if [[ -n "$failed" ]]; then
+  fail 1 'Steam engine: the game stopped right after it started' "AppID $appid ended with status $status after $((SECONDS - game_started)) s"
+fi
 exit 0

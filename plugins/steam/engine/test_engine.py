@@ -533,7 +533,7 @@ def _named(uid):
 class EngineSessionTests(unittest.TestCase):
     def run_session(self, behavior="normal", entry=None, both=False, installed=(), files=("bin/game.exe",),
                     folders=(), prepare=None, legacycompat=("steamclient.dll", "steamclient64.dll", "Steam.dll"),
-                    env_extra=None, answer=None):
+                    env_extra=None, answer=None, game_status=0):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -583,7 +583,8 @@ class EngineSessionTests(unittest.TestCase):
             "'legacycompat': os.path.realpath(os.environ['STEAM_COMPAT_CLIENT_INSTALL_PATH'] + '/legacycompat'), "
             "'env': {k: os.environ.get(k) for k in ('SteamAppId', 'STEAM_COMPAT_DATA_PATH', 'Steam3Master', 'HOME', "
             "'STEAM_COMPAT_TOOL_PATHS', 'SDL_JOYSTICK_HIDAPI_STEAMXBOX')}}))\n"
-            "time.sleep(0.5)\n")
+            "time.sleep(0.5)\n"
+            f"sys.exit({game_status})\n")
         steps = subprocess.check_output(["bun", str(STEAM / "packages/session-steps.ts"), "engine"], text=True)
         (root / "steps.sh").write_text(steps)
         script = (HERE / "session.sh").read_text()
@@ -664,6 +665,22 @@ class EngineSessionTests(unittest.TestCase):
         self.assertEqual(game["legacycompat"], str(self.root / "cache/legacycompat/1792618285/legacycompat"))
         # The lock file names this session's cgroup for the host's pid translation.
         self.assertTrue((self.channel / "session.lock").read_text().startswith("/"))
+
+    def test_a_game_that_stops_with_an_error_right_after_its_start_is_reported_as_failed(self):
+        # korri#594: Korri showed such a session as completed.
+        result = self.run_session(game_status=255)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual((self.channel / "received").read_text(),
+                         "install 401710\nlaunched 401710\nrefused game_failed\nexited 401710\n")
+        self.assertEqual(self.statuses()[-1],
+                         "--status=plugin-launch: Steam engine: the game stopped right after it started")
+
+    def test_a_late_error_status_is_an_ordinary_end(self):
+        # A game can end with a status other than 0 after hours of play.
+        result = self.run_session(game_status=3, env_extra={"KORRI_STEAM_EARLY_EXIT_SECONDS": "0"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.channel / "received").read_text(),
+                         "install 401710\nlaunched 401710\nexited 401710\n")
 
     def test_a_stale_legacycompat_link_moves_to_the_ready_artifact(self):
         def stale(root, game_dir):

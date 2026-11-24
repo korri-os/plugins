@@ -517,9 +517,10 @@ enum Refusal {
     NotInstalledOffline,
     NoLaunchEntry,
     GameFilesMissing,
+    GameFailed,
 }
 impl Refusal {
-    const ALL: [Refusal; 7] = [
+    const ALL: [Refusal; 8] = [
         Refusal::SessionBusy,
         Refusal::SigninTimeout,
         Refusal::InstallTimeout,
@@ -527,6 +528,7 @@ impl Refusal {
         Refusal::NotInstalledOffline,
         Refusal::NoLaunchEntry,
         Refusal::GameFilesMissing,
+        Refusal::GameFailed,
     ];
     fn name(self) -> &'static str {
         match self {
@@ -537,6 +539,7 @@ impl Refusal {
             Refusal::NotInstalledOffline => "not_installed_offline",
             Refusal::NoLaunchEntry => "no_launch_entry",
             Refusal::GameFilesMissing => "game_files_missing",
+            Refusal::GameFailed => "game_failed",
         }
     }
     /// The words the person sees; the same as the session program's own
@@ -552,6 +555,8 @@ impl Refusal {
             }
             Refusal::NoLaunchEntry => "Steam engine: Steam has no launch entry for this game",
             Refusal::GameFilesMissing => "Steam engine: the game files are missing",
+            // korri#594: the game ended with an error soon after its start.
+            Refusal::GameFailed => "Steam engine: the game stopped right after it started",
         }
     }
     fn parse(word: &str) -> Option<Refusal> {
