@@ -637,13 +637,23 @@ remains available independently.
 
 ## Retries and failures
 
-Release lookup lists 50 releases per page. GitHub embeds every release's asset
-metadata: on 2026-11-25, the 100-per-page call repeatedly returned HTTP 504
-with 96 releases, while the two 50-release pages completed in 5.5 seconds.
-The by-tag endpoint returned 404 for the existing draft. Lookup still scans
-the full history and refuses duplicate tags. Smaller pages cost more API reads;
-50 avoids the tenfold request count of 10-release pages at each upload check.
-There is no new retry of a failed write or relaxation of asset verification.
+Release lookup uses GraphQL's release connection, selecting only database ID,
+tag and draft status. It lists drafts without REST's embedded assets, scans
+all cursor pages and still refuses duplicate tags. REST's by-tag endpoint does
+not find drafts. GraphQL does not expose immutable status, so the existing
+per-upload check reads just the selected release by ID and checks its identity
+against the scan before using its immutable status.
+
+Read-only GraphQL queries and REST GETs retry transient HTTP 5xx, stream errors
+and subprocess timeouts at most three times, after 1, 2 and 4 seconds. Each
+attempt has a 60-second limit. Permission, not-found and malformed-response
+errors fail closed, not as an absent release. Release and asset mutations are
+never automatically retried. Asset digests and signatures are unchanged.
+
+The manual `plugin-checks.yml` `release_lookup_only` probe exercises the live
+lookup on a GitHub-hosted runner with publication's `GITHUB_TOKEN` permissions.
+Only the owner can run that job. It reads an operator-specified draft tag and
+ID; it has no signing environment and performs no release or index writes.
 
 All publications share one concurrency group. Dry runs write nothing and share
 no group, so a publication never queues behind a dry run. Uploads never use `--clobber`

@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 from urllib.parse import parse_qs, urlsplit
 
 root = Path(os.environ["RELEASE_FIXTURE"])
@@ -42,22 +43,22 @@ args = args[3:]
 method = "GET"
 if args[:1] == ["--method"]:
     method, args = args[1], args[2:]
-url = args[0]
-parsed = urlsplit(url)
-parts = parsed.path.lstrip("/").split("/")
-assert parts[:3] == ["repos", "owner", "plugins"], parts
-if parts[3] == "commits":
-    result = {"sha": "1" * 40}
-elif len(parts) == 4:
-    assert parts[3] == "releases"
-    query = parse_qs(parsed.query)
-    page = int(query["page"][0])
-    page_size = int(query["per_page"][0])
-    if page_size > state.get("release_page_limit", 100):
-        sys.exit("gh: release list response too large (HTTP 504)")
+def read_error(key):
+    if "read_errors" not in state:
+        return
+    state.setdefault("reads", []).append(key)
+    failures = state["read_errors"].get(key, [])
+    failure = failures.pop(0) if failures else None
+    (root / "state.json").write_text(json.dumps(state))
+    if isinstance(failure, dict):
+        time.sleep(failure["sleep"])
+    elif failure:
+        sys.exit(failure)
+
+
+def visible_releases():
     hidden = state.get("hidden", {})
     result = [r for r in state["releases"] if str(r["id"]) not in hidden]
-    result = result[(page - 1) * page_size : page * page_size]
     if hidden:
         for identity in list(hidden):
             hidden[identity] -= 1
@@ -66,10 +67,48 @@ elif len(parts) == 4:
         if not hidden:
             del state["hidden"]
         (root / "state.json").write_text(json.dumps(state))
+    return result
+
+
+url = args[0]
+if url == "graphql":
+    fields = dict(value.split("=", 1) for value in args[2::2])
+    assert fields["owner"] == "owner" and fields["name"] == "plugins"
+    assert "assets" not in fields["query"]
+    cursor = fields.get("cursor", "")
+    read_error("graphql:" + cursor)
+    offset = int(cursor or 0)
+    records = visible_releases()
+    batch = records[offset : offset + 100]
+    print(json.dumps({"data": {"repository": {"releases": {
+        "nodes": [{key: r[key] for key in ("id", "tag_name", "draft")} for r in batch],
+        "pageInfo": {"hasNextPage": offset + 100 < len(records),
+                     "endCursor": str(offset + 100)},
+    }}}}))
+    sys.exit(0)
+if method == "GET":
+    read_error(url)
+parsed = urlsplit(url)
+parts = parsed.path.lstrip("/").split("/")
+assert parts[:3] == ["repos", "owner", "plugins"], parts
+if parts[3] == "commits":
+    result = {"sha": "1" * 40}
+elif len(parts) == 4:
+    assert parts[3] == "releases"
+    if state.get("release_list_error"):
+        sys.exit(state["release_list_error"])
+    query = parse_qs(parsed.query)
+    page = int(query["page"][0])
+    page_size = int(query["per_page"][0])
+    if page_size > state.get("release_page_limit", 100):
+        sys.exit("gh: release list response too large (HTTP 504)")
+    result = visible_releases()[(page - 1) * page_size : page * page_size]
 elif parts[4] == "tags":
     result = next(r for r in state["releases"] if r["tag_name"] == parts[5])
     if result["draft"]:
         sys.exit("published release not found")
+elif len(parts) == 5 and method == "GET":
+    result = next(r for r in state["releases"] if r["id"] == int(parts[4]))
 elif parts[4] == "assets":
     sys.stdout.buffer.write((root / parts[5]).read_bytes())
     sys.exit(0)

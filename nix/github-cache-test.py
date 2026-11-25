@@ -21,7 +21,7 @@ SCRIPT = Path(__file__).with_name("github-cache.py")
 # Run the real publisher CLI, but record each time.sleep request made by the
 # publisher on stderr instead of waiting. Other callers, such as subprocess's
 # own wait loop, keep the real sleep.
-RECORDED_SLEEP = """
+RECORDED_WAIT = """
 import runpy, sys, time
 script, wait = sys.argv[1], time.sleep
 def sleep(seconds):
@@ -29,6 +29,8 @@ def sleep(seconds):
         return wait(seconds)
     print(f'slept {seconds}', file=sys.stderr)
 time.sleep = sleep
+"""
+RECORDED_SLEEP = RECORDED_WAIT + """
 sys.argv = sys.argv[1:]
 runpy.run_path(script, run_name='__main__')
 """
@@ -52,50 +54,106 @@ def run(*args, env=None, succeeds=True):
 
 
 class ReleaseLookup(unittest.TestCase):
-    def test_small_pages_find_drafts_and_still_refuse_duplicate_tags(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            history = [
-                {"id": i + 1, "tag_name": f"build-{i}", "draft": True}
-                for i in range(101)
-            ]
-            state = {"releases": history, "assets": [], "release_page_limit": 50}
-            state_path = root / "state.json"
-            state_path.write_text(json.dumps(state))
-            commands = root / "commands"
-            commands.mkdir()
-            gh = commands / "gh"
-            gh.write_text(
-                "#!"
-                + sys.executable
-                + "\n"
-                + Path(__file__).with_name("github-cache-github-fixture.py").read_text()
-            )
-            gh.chmod(0o755)
-            env = dict(
-                os.environ,
-                RELEASE_FIXTURE=str(root),
-                PATH=str(commands) + ":" + os.environ["PATH"],
-            )
-            lookup = """
-import json, runpy, sys
-publisher = runpy.run_path(sys.argv[1])
-print(json.dumps(publisher['release_records']('owner/plugins', sys.argv[2])))
-"""
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.history = [
+            {"id": i + 1, "tag_name": f"build-{i}", "draft": True, "immutable": False}
+            for i in range(101)
+        ]
+        self.state = {
+            "releases": self.history, "assets": [], "read_errors": {},
+            "release_list_error": "stream error: stream ID 1; CANCEL; received from peer",
+        }
+        self.save()
+        commands = self.root / "commands"
+        commands.mkdir()
+        gh = commands / "gh"
+        gh.write_text(
+            "#!" + sys.executable + "\n"
+            + Path(__file__).with_name("github-cache-github-fixture.py").read_text()
+        )
+        gh.chmod(0o755)
+        self.env = dict(
+            os.environ, RELEASE_FIXTURE=str(self.root),
+            PATH=str(commands) + ":" + os.environ["PATH"],
+        )
 
-            def query(tag, succeeds=True):
-                return run(
-                    sys.executable, "-c", lookup, str(SCRIPT), tag,
-                    env=env, succeeds=succeeds,
-                )
+    def save(self):
+        (self.root / "state.json").write_text(json.dumps(self.state))
 
-            self.assertEqual(json.loads(query("build-100").stdout), [history[-1]])
-            self.assertEqual(json.loads(query("missing").stdout), [])
-            # A draft on another page must not hide a duplicate tag.
-            history[0]["tag_name"] = "build-100"
-            state_path.write_text(json.dumps(state))
-            duplicate = query("build-100", succeeds=False)
-            self.assertIn("multiple releases use the same tag", duplicate.stderr)
+    def query(self, expression, succeeds=True):
+        program = RECORDED_WAIT + "\nimport json\npublisher = runpy.run_path(script)\nprint(json.dumps(" + expression + "))\n"
+        return run(sys.executable, "-c", program, str(SCRIPT),
+                   env=self.env, succeeds=succeeds)
+
+    def test_graphql_finds_drafts_without_assets_and_refuses_duplicate_tags(self):
+        result = self.query("publisher['release_records']('owner/plugins', 'build-100')")
+        self.assertEqual(json.loads(result.stdout), [
+            {"id": 101, "tag_name": "build-100", "draft": True}
+        ])
+        self.assertEqual(json.loads(self.query(
+            "publisher['release_records']('owner/plugins', 'missing')"
+        ).stdout), [])
+        self.history[0]["tag_name"] = "build-100"
+        self.save()
+        duplicate = self.query(
+            "publisher['release_records']('owner/plugins', 'build-100')", succeeds=False
+        )
+        self.assertIn("multiple releases use the same tag", duplicate.stderr)
+
+    def test_each_page_retries_5xx_and_stream_errors_with_backoff(self):
+        self.state["read_errors"] = {
+            "graphql:": ["gh: Bad Gateway (HTTP 502)", "stream error: stream ID 1; CANCEL; received from peer"],
+            "graphql:100": ["gh: Service Unavailable (HTTP 503)"],
+        }
+        self.save()
+        result = self.query("publisher['release_records']('owner/plugins', 'build-100')")
+        self.assertEqual(json.loads(result.stdout)[0]["id"], 101)
+        self.assertEqual(sleeps(result), [1, 2, 1])
+
+    def test_a_timed_out_page_is_retried(self):
+        self.state["read_errors"] = {"graphql:": [{"sleep": 61}]}
+        self.save()
+        result = self.query("publisher['release_records']('owner/plugins', 'build-100')")
+        self.assertEqual(json.loads(result.stdout)[0]["id"], 101)
+        self.assertEqual(sleeps(result), [1])
+
+    def test_exhausted_read_retries_fail_closed(self):
+        self.state["read_errors"] = {"graphql:": ["gh: Gateway Timeout (HTTP 504)"] * 4}
+        self.save()
+        result = self.query(
+            "publisher['release_records']('owner/plugins', 'build-100')", succeeds=False
+        )
+        self.assertEqual(sleeps(result), [1, 2, 4])
+        self.assertIn("HTTP 504", result.stderr)
+        state = json.loads((self.root / "state.json").read_text())
+        self.assertEqual(state["reads"], ["graphql:"] * 4)
+
+    def test_nontransient_read_is_not_retried(self):
+        self.state["read_errors"] = {"graphql:": ["gh: Not Found (HTTP 404)"]}
+        self.save()
+        result = self.query(
+            "publisher['release_records']('owner/plugins', 'build-100')", succeeds=False
+        )
+        self.assertEqual(sleeps(result), [])
+        self.assertIn("HTTP 404", result.stderr)
+
+    def test_asset_page_reads_use_the_same_bounded_retry(self):
+        endpoint = "repos/owner/plugins/releases/1/assets?per_page=100&page=1"
+        self.state["read_errors"] = {endpoint: ["gh: Bad Gateway (HTTP 502)"]}
+        self.save()
+        result = self.query(f"publisher['api']({endpoint!r})")
+        self.assertEqual(json.loads(result.stdout), [])
+        self.assertEqual(sleeps(result), [1])
+
+    def test_release_rechecks_immutable_status_by_id(self):
+        self.history[-1]["draft"] = False
+        self.history[-1]["immutable"] = True
+        self.save()
+        result = self.query("publisher['release']('owner/plugins', 'build-100')")
+        self.assertTrue(json.loads(result.stdout)["immutable"])
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

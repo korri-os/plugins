@@ -5,6 +5,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_lookup_only:
+        description: "Run only the read-only publisher-token draft lookup probe"
+        type: boolean
+        default: false
+      lookup_tag:
+        description: "Existing draft tag for the read-only lookup probe"
+        type: string
+      lookup_id:
+        description: "Expected existing draft release ID"
+        type: string
 
 permissions:
   contents: read
@@ -16,7 +27,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-lookup:
+    if: github.event_name == 'workflow_dispatch' && inputs.release_lookup_only && github.actor == 'simonwjackson' && github.triggering_actor == 'simonwjackson'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Match publication's GITHUB_TOKEN permission to prove draft visibility.
+    # No signing environment, uploads, release changes or index writes.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Read the draft with the publisher's token permissions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+          LOOKUP_TAG: ${{ inputs.lookup_tag }}
+          LOOKUP_ID: ${{ inputs.lookup_id }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          python3 - <<'PY'
+          import json, os, runpy, time
+          tag, identity = os.environ["LOOKUP_TAG"], int(os.environ["LOOKUP_ID"])
+          assert tag and identity > 0
+          publisher = runpy.run_path("nix/github-cache.py")
+          start = time.monotonic()
+          records = publisher["release_records"]("korri-os/plugins", tag)
+          assert len(records) == 1 and records[0]["id"] == identity and records[0]["draft"]
+          current = publisher["release"]("korri-os/plugins", tag)
+          assert current["id"] == identity and current["draft"]
+          print(json.dumps({key: current[key] for key in ("id", "tag_name", "draft", "immutable")}))
+          print(f"Read-only lookup passed in {time.monotonic() - start:.3f}s")
+          PY
   check:
+    if: github.event_name != 'workflow_dispatch' || !inputs.release_lookup_only
     strategy:
       fail-fast: false
       matrix:

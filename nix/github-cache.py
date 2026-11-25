@@ -338,26 +338,81 @@ def export(cache, key, paths):
     )
 
 
+READ_RETRY_DELAYS = (1, 2, 4)
+READ_TIMEOUT = 60
+
+
+def github_read(*arguments):
+    """Retry only idempotent API reads, never release or asset mutations."""
+    for attempt in range(len(READ_RETRY_DELAYS) + 1):
+        try:
+            result = subprocess.run(
+                ["gh", "api", "--hostname", "github.com", *arguments],
+                capture_output=True, text=True, check=True, timeout=READ_TIMEOUT,
+            )
+            return json.loads(result.stdout)
+        except subprocess.CalledProcessError as error:
+            message = error.stderr or ""
+            transient = re.search(r"\bHTTP 5\d\d\b", message) or "stream error:" in message
+            if not transient or attempt == len(READ_RETRY_DELAYS):
+                sys.stderr.write(message)
+                raise
+        except subprocess.TimeoutExpired:
+            if attempt == len(READ_RETRY_DELAYS):
+                raise
+        delay = READ_RETRY_DELAYS[attempt]
+        print(f"korri-cache: API read failed; retry in {delay}s", file=sys.stderr)
+        time.sleep(delay)
+
+
 def api(endpoint):
-    return json.loads(run("gh", "api", "--hostname", "github.com", endpoint))
+    return github_read(endpoint)
 
 
-# Release records embed their assets; large pages can time out on GitHub.
-RELEASES_PER_PAGE = 50
+# Unlike REST's release list, this projection does not embed every asset.
+# GraphQL lists drafts too; REST's by-tag endpoint does not.
+RELEASE_QUERY = """
+query($owner: String!, $name: String!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    releases(first: 100, after: $cursor, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { id: databaseId tag_name: tagName draft: isDraft }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+"""
 
 
 def release_records(repo, tag):
-    # The by-tag endpoint is for published releases. Drafts require listing.
+    owner, name = repo.split("/")
     found = []
-    page = 1
+    cursor = None
+    seen = set()
     while True:
-        batch = api(f"repos/{repo}/releases?per_page={RELEASES_PER_PAGE}&page={page}")
-        if not isinstance(batch, list):
-            raise ValueError("invalid GitHub release list")
-        found.extend(record for record in batch if record["tag_name"] == tag)
-        if len(batch) < RELEASES_PER_PAGE:
+        arguments = ["graphql", "-f", f"query={RELEASE_QUERY}",
+                     "-f", f"owner={owner}", "-f", f"name={name}"]
+        if cursor is not None:
+            arguments.extend(["-f", f"cursor={cursor}"])
+        response = github_read(*arguments)
+        connection = response["data"]["repository"]["releases"]
+        batch, info = connection["nodes"], connection["pageInfo"]
+        if not isinstance(batch, list) or not isinstance(info, dict):
+            raise ValueError("invalid GitHub release connection")
+        for record in batch:
+            if (not isinstance(record, dict) or type(record.get("id")) is not int
+                or not isinstance(record.get("tag_name"), str)
+                or type(record.get("draft")) is not bool):
+                raise ValueError("invalid GitHub release record")
+            if record["tag_name"] == tag:
+                found.append(record)
+        if type(info.get("hasNextPage")) is not bool:
+            raise ValueError("invalid GitHub release page info")
+        if not info["hasNextPage"]:
             break
-        page += 1
+        cursor = info.get("endCursor")
+        if not isinstance(cursor, str) or not cursor or cursor in seen:
+            raise ValueError("GitHub release cursor did not advance")
+        seen.add(cursor)
     if len(found) > 1:
         raise ValueError("multiple releases use the same tag")
     return found
@@ -383,7 +438,15 @@ def release(repo, tag):
     found = release_records(repo, tag)
     if not found or type(found[0].get("id")) is not int:
         raise ValueError("expected exactly one release with this tag")
-    return found[0]
+    selected = found[0]
+    # GraphQL does not expose immutable status. Read just this release by ID,
+    # retaining the existing immutability and per-upload identity checks.
+    current = api(f"repos/{repo}/releases/{selected['id']}")
+    if not isinstance(current, dict) or any(
+        current.get(key) != selected[key] for key in ("id", "tag_name", "draft")
+    ):
+        raise ValueError("release changed during lookup")
+    return current
 
 
 def assets(repo, release_id):
