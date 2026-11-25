@@ -51,6 +51,53 @@ def run(*args, env=None, succeeds=True):
     return result
 
 
+class ReleaseLookup(unittest.TestCase):
+    def test_small_pages_find_drafts_and_still_refuse_duplicate_tags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            history = [
+                {"id": i + 1, "tag_name": f"build-{i}", "draft": True}
+                for i in range(101)
+            ]
+            state = {"releases": history, "assets": [], "release_page_limit": 50}
+            state_path = root / "state.json"
+            state_path.write_text(json.dumps(state))
+            commands = root / "commands"
+            commands.mkdir()
+            gh = commands / "gh"
+            gh.write_text(
+                "#!"
+                + sys.executable
+                + "\n"
+                + Path(__file__).with_name("github-cache-github-fixture.py").read_text()
+            )
+            gh.chmod(0o755)
+            env = dict(
+                os.environ,
+                RELEASE_FIXTURE=str(root),
+                PATH=str(commands) + ":" + os.environ["PATH"],
+            )
+            lookup = """
+import json, runpy, sys
+publisher = runpy.run_path(sys.argv[1])
+print(json.dumps(publisher['release_records']('owner/plugins', sys.argv[2])))
+"""
+
+            def query(tag, succeeds=True):
+                return run(
+                    sys.executable, "-c", lookup, str(SCRIPT), tag,
+                    env=env, succeeds=succeeds,
+                )
+
+            self.assertEqual(json.loads(query("build-100").stdout), [history[-1]])
+            self.assertEqual(json.loads(query("missing").stdout), [])
+            # A draft on another page must not hide a duplicate tag.
+            history[0]["tag_name"] = "build-100"
+            state_path.write_text(json.dumps(state))
+            duplicate = query("build-100", succeeds=False)
+            self.assertIn("multiple releases use the same tag", duplicate.stderr)
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *_args):
         pass

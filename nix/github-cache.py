@@ -342,16 +342,20 @@ def api(endpoint):
     return json.loads(run("gh", "api", "--hostname", "github.com", endpoint))
 
 
+# Release records embed their assets; large pages can time out on GitHub.
+RELEASES_PER_PAGE = 50
+
+
 def release_records(repo, tag):
     # The by-tag endpoint is for published releases. Drafts require listing.
     found = []
     page = 1
     while True:
-        batch = api(f"repos/{repo}/releases?per_page=100&page={page}")
+        batch = api(f"repos/{repo}/releases?per_page={RELEASES_PER_PAGE}&page={page}")
         if not isinstance(batch, list):
             raise ValueError("invalid GitHub release list")
         found.extend(record for record in batch if record["tag_name"] == tag)
-        if len(batch) < 100:
+        if len(batch) < RELEASES_PER_PAGE:
             break
         page += 1
     if len(found) > 1:

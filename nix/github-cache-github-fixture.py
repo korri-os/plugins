@@ -50,10 +50,14 @@ if parts[3] == "commits":
     result = {"sha": "1" * 40}
 elif len(parts) == 4:
     assert parts[3] == "releases"
-    page = int(parse_qs(parsed.query)["page"][0])
+    query = parse_qs(parsed.query)
+    page = int(query["page"][0])
+    page_size = int(query["per_page"][0])
+    if page_size > state.get("release_page_limit", 100):
+        sys.exit("gh: release list response too large (HTTP 504)")
     hidden = state.get("hidden", {})
     result = [r for r in state["releases"] if str(r["id"]) not in hidden]
-    result = result[(page - 1) * 100 : page * 100]
+    result = result[(page - 1) * page_size : page * page_size]
     if hidden:
         for identity in list(hidden):
             hidden[identity] -= 1

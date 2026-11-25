@@ -637,6 +637,14 @@ remains available independently.
 
 ## Retries and failures
 
+Release lookup lists 50 releases per page. GitHub embeds every release's asset
+metadata: on 2026-11-25, the 100-per-page call repeatedly returned HTTP 504
+with 96 releases, while the two 50-release pages completed in 5.5 seconds.
+The by-tag endpoint returned 404 for the existing draft. Lookup still scans
+the full history and refuses duplicate tags. Smaller pages cost more API reads;
+50 avoids the tenfold request count of 10-release pages at each upload check.
+There is no new retry of a failed write or relaxation of asset verification.
+
 All publications share one concurrency group. Dry runs write nothing and share
 no group, so a publication never queues behind a dry run. Uploads never use `--clobber`
 or delete assets. A retry skips assets whose reported SHA256 and size match.
