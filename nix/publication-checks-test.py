@@ -201,11 +201,10 @@ class PublicationPlatformsTest(unittest.TestCase):
                 )
 
     def test_single_architecture_outputs_are_skipped_only_where_absent(self):
-        # @korri:viewer exports only an x86_64 output, the V4L2 M2M Sunshine
-        # tool only an aarch64 one. A batch with an output that both export
-        # keeps a supported output on each architecture.
+        # The V4L2 M2M Sunshine tool exports only an aarch64 output. A batch
+        # with an output that both export keeps a supported output on each
+        # architecture.
         for package, present, absent in (
-            ("korri-plugin-viewer", "x86_64-linux", "aarch64-linux"),
             ("sunshine-korri-v4l2m2m", "aarch64-linux", "x86_64-linux"),
         ):
             batch = [package, "korri-plugin-sunshine"]
@@ -221,15 +220,32 @@ class PublicationPlatformsTest(unittest.TestCase):
                     ["korri-plugin-sunshine"],
                 )
 
+    def test_viewer_is_selected_with_its_gates_on_both_architectures(self):
+        for system in selection.SYSTEMS:
+            with self.subTest(system=system):
+                self.assertEqual(
+                    selection.select_packages(
+                        self.mappings, self.platforms, ["korri-plugin-viewer"], system
+                    ),
+                    ["korri-plugin-viewer"],
+                )
+                checks = selection.select_checks(self.mappings[system], ["korri-plugin-viewer"])
+                for gate in ("korri-viewer-plugin-native", "korri-viewer-picture", "korri-viewer-io"):
+                    self.assertIn(gate, checks)
+                if system == "x86_64-linux":
+                    self.assertIn("korri-viewer-lifecycle", checks)
+                else:
+                    self.assertNotIn("korri-viewer-lifecycle", checks)
+
     def test_single_architecture_output_cannot_be_skipped_everywhere(self):
         platforms = {
-            system: values | {"korri-plugin-viewer": False}
+            system: values | {"sunshine-korri-v4l2m2m": False}
             for system, values in self.platforms.items()
         }
         for system in selection.SYSTEMS:
             with self.subTest(system=system), self.assertRaisesRegex(ValueError, "every publication architecture"):
                 selection.select_packages(
-                    self.mappings, platforms, ["korri-plugin-viewer"], system
+                    self.mappings, platforms, ["sunshine-korri-v4l2m2m"], system
                 )
 
     def test_cli_skips_an_output_that_the_architecture_does_not_export(self):
@@ -237,26 +253,27 @@ class PublicationPlatformsTest(unittest.TestCase):
             path = Path(temporary) / "packages.txt"
             result = subprocess.run(
                 [sys.executable, str(ROOT / "nix/publication-checks.py"),
-                 "--system", "aarch64-linux", "--packages-file", str(path),
-                 "korri-plugin-viewer", "korri-plugin-sunshine"],
+                 "--system", "x86_64-linux", "--packages-file", str(path),
+                 "sunshine-korri-v4l2m2m", "korri-plugin-sunshine"],
                 cwd=ROOT, text=True, capture_output=True, check=True,
             )
             self.assertEqual(path.read_text(), "korri-plugin-sunshine\n")
             self.assertIn(
-                "Skipping korri-plugin-viewer on aarch64-linux: no aarch64-linux package output",
+                "Skipping sunshine-korri-v4l2m2m on x86_64-linux: no x86_64-linux package output",
                 result.stderr,
             )
-            self.assertIn(".#ci.checks.aarch64-linux.korri-sunshine-plugin-native", result.stdout)
-            self.assertNotIn("korri-viewer", result.stdout)
+            # Sunshine's own gates include a check named sunshine-korri-v4l2m2m,
+            # so only the packages file proves the skip.
+            self.assertIn(".#ci.checks.x86_64-linux.korri-sunshine-plugin-native", result.stdout)
 
     def test_cli_refuses_an_architecture_with_no_selected_output(self):
         result = subprocess.run(
             [sys.executable, str(ROOT / "nix/publication-checks.py"),
-             "--system", "aarch64-linux", "korri-plugin-viewer"],
+             "--system", "x86_64-linux", "sunshine-korri-v4l2m2m"],
             cwd=ROOT, text=True, capture_output=True,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("No selected packages are available on aarch64-linux", result.stderr)
+        self.assertIn("No selected packages are available on x86_64-linux", result.stderr)
         self.assertEqual(result.stdout, "")
 
     def test_platform_filter_does_not_hide_unknown_packages(self):

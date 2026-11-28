@@ -6,10 +6,11 @@ permission-approved plugin (korri-os/korri ADR 0061, issue #435). Its code is
 repository builds it with its own package set. It is the only client since
 2026-11-24 (Core ADR 0099). A device without it cannot stream.
 
-Only the PC picture paths (X11 VA-API and the SDL software fallback) have a
-proof. Korri's aarch64 `v4l2request` path has none on a bench device yet
-(ADR 0063), so only `x86_64-linux` exports the plugin. No publication,
-deployment or hardware acceptance follows from these package checks.
+Both `x86_64-linux` and `aarch64-linux` export the plugin. The aarch64
+export serves the tabs6 installed-viewer proof (korri#616); ADR 0063 still
+requires a passing device proof before an ARM image selects it. No
+publication, deployment or hardware acceptance follows from these package
+checks.
 
 ## What the plugin declares
 

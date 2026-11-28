@@ -44,8 +44,10 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     heldPkgs = packageSet nixpkgs-held;
     heldMkPlugin = korri.lib.${system}.mkPlugin { pkgs = heldPkgs; };
     sunshine = import ../services/sunshine { inherit pkgs system; };
-    # ADR 0099: the Rust viewer is the only client. Its current published
-    # picture paths are x86_64; unsupported ARM devices lose streaming.
+    # ADR 0099: the Rust viewer is the only client. Export the aarch64
+    # plugin too, for the tabs6 installed-viewer proof (korri#616). Exporting
+    # does not select it for an image: ADR 0063 still requires a passing
+    # device proof before an ARM device ships it.
     viewer = import "${korri}/clients/viewer" { inherit pkgs; };
     viewerDefinition = import ../plugins/viewer/plugin.nix { inherit pkgs viewer; };
     viewerPlugin = mkPlugin {
@@ -53,7 +55,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
       source = ../plugins/viewer;
       plugin = _: viewerDefinition;
     };
-    hasViewer = pkgs.stdenv.hostPlatform.isx86_64;
+    hasViewer = pkgs.stdenv.hostPlatform.isx86_64 || pkgs.stdenv.hostPlatform.isAarch64;
     sshPackage = mkPlugin {
       publisher.namespace = "@korri";
       source = ../plugins/ssh;
@@ -429,7 +431,7 @@ flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
     ) libretro.catalogue;
     publicationChecks = import ./publication-checks.nix {
       inherit (pkgs) lib;
-      inherit hasViewer;
+      inherit hasViewer system;
       hasSteamHostCross = pkgs.stdenv.hostPlatform.isx86_64;
       libretroPackages = libretro.packages;
       sunshineChecks = sunshine.checks;
